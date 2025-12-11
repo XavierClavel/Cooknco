@@ -48,6 +48,7 @@ import io.lettuce.core.ExperimentalLettuceCoroutinesApi
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.koin.java.KoinJavaComponent.inject
+import shared.dto.SessionDto
 import java.util.UUID
 import kotlin.text.trim
 
@@ -85,8 +86,9 @@ object AuthController: Controller(AUTH_URL) {
     private fun Route.login() = post("/login") {
         val mail = call.principal<UserIdPrincipal>()?.name.toString()
         val user = userService.findByMail(mail).toInfo()
-        createSession(user)
-        call.respond(HttpStatusCode.OK)
+        val sessionId = createSession(user)
+        call.sessions.set(UserSession(sessionId))
+        call.respond(SessionDto(sessionId))
     }
 
     private fun Route.loginGoogleOauth() = get("/login-oauth-google") {
@@ -100,12 +102,12 @@ object AuthController: Controller(AUTH_URL) {
             val accessToken = principal.accessToken
 
             if (state != null) {
-                googleOauthLogin(accessToken)
+                val sessionId = googleOauthLogin(accessToken)
 
                 val redirect = redirects[state]
 
                 if (redirect == "app") {
-                    call.respondRedirect("cooknco://login/callback?token=$accessToken")
+                    call.respondRedirect("cooknco://login/callback?token=$sessionId")
                     return@get
                 }
 
@@ -122,7 +124,7 @@ object AuthController: Controller(AUTH_URL) {
 
     private suspend fun RoutingContext.googleOauthLogin(
         oauthToken: String
-    ) {
+    ): String {
         val data = applicationHttpClient.get("https://openidconnect.googleapis.com/v1/userinfo") {
             bearerAuth(oauthToken)
         }.bodyAsText()
@@ -134,8 +136,9 @@ object AuthController: Controller(AUTH_URL) {
         }
         var user = userService.findEntityByGoogleId(response.sub)
         if (user != null) {
-            createSession(user.toInfo())
-            return
+            val sessionId = createSession(user.toInfo())
+            call.sessions.set(UserSession(sessionId))
+            return sessionId
         }
         if (userService.findEntityByMail(response.email) != null) {
             //todo: merge accounts
@@ -143,9 +146,9 @@ object AuthController: Controller(AUTH_URL) {
         }
 
         user = createGoogleOauthUser(response)
-        createSession(user.toInfo())
-
-
+        val sessionId = createSession(user.toInfo())
+        call.sessions.set(UserSession(sessionId))
+        return sessionId
     }
 
     private fun RoutingContext.createGoogleOauthUser(oauthDto: GoogleOauthDto): User {
@@ -180,8 +183,6 @@ object AuthController: Controller(AUTH_URL) {
     }
 
     private fun Route.whoami() = get("/me") {
-        val userSession = call.sessions.get<UserSession>()
-        if (userSession == null) return@get call.respond(HttpStatusCode.Unauthorized, "Session expired")
         val userInfo = userService.getUser(getSessionUserId()) ?: throw NotFoundException(NotFoundCause.USER_NOT_FOUND)
         call.respond(userInfo)
     }
@@ -242,11 +243,11 @@ object AuthController: Controller(AUTH_URL) {
         return userId
     }
 
-    private suspend fun RoutingContext.createSession(user: UserInfo) {
+    private suspend fun RoutingContext.createSession(user: UserInfo): String {
         userService.registerUserActivity(user.id)
         val sessionId = UUID.randomUUID().toString()
         redisService.createSession(sessionId, user)
-        call.sessions.set(UserSession(sessionId))
+        return sessionId
     }
 
 }
