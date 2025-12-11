@@ -182,12 +182,7 @@ object AuthController: Controller(AUTH_URL) {
     }
 
     private fun Route.whoami() = get("/me") {
-        val principal = call.principal<UserIdPrincipal>()
-            ?: throw UnauthorizedException(UnauthorizedCause.SESSION_NOT_FOUND)
-
-        logger.info {"Request from ${principal.name}"}
-        val userId = principal.name.toLong()
-        val userInfo = userService.getUser(userId)
+        val userInfo = userService.getUser(getSessionUserId()) ?: throw NotFoundException(NotFoundCause.USER_NOT_FOUND)
         call.respond(userInfo)
     }
 
