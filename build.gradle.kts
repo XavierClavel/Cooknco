@@ -1,5 +1,5 @@
 allprojects {
-    version = "1.2.2"
+    version = "1.2.4"
     group = "eu.cooknco"
 }
 
@@ -7,12 +7,12 @@ plugins {
     kotlin("jvm") version "2.2.21"
     kotlin("kapt") version "2.2.21"
     kotlin("plugin.serialization") version "2.2.21"
-    id("io.ebean") version "16.0.1"
+    id("io.ebean") version "17.0.1"
 }
 
 val junitVersion = "5.10.2"
 val testcontainersVersion = "1.20.1"
-val ebeanVersion = "16.0.1"
+val ebeanVersion = "17.0.1"
 val ktorVersion = "3.2.3"
 val koinVersion = "4.0.0"
 val kotlin_version: String by project
@@ -31,11 +31,6 @@ subprojects {
             debugLevel = 1
             queryBeans = true
         }
-    }
-
-
-    tasks.withType<Test> {
-        useJUnitPlatform()
     }
 
     dependencies {
@@ -57,7 +52,7 @@ subprojects {
         implementation("io.ktor:ktor-server-auth:${ktorVersion}")
         implementation("io.ktor:ktor-server-status-pages:${ktorVersion}")
         implementation("io.ktor:ktor-server-sse:${ktorVersion}")
-        testImplementation("io.ktor:ktor-server-test-host-jvm")
+        testImplementation("io.ktor:ktor-server-test-host-jvm:${ktorVersion}")
 
         //DB -> Ebean
         implementation("org.hibernate:hibernate-core:6.6.1.Final")

@@ -30,6 +30,7 @@ import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.request.path
 import io.ktor.server.response.respond
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
@@ -70,14 +71,13 @@ fun Application.module() {
             call.respond(HttpStatusCode.Forbidden, cause.message ?: "Unknown error")
         }
         exception<NotFoundException> { call, cause ->
-            logger.error {cause.message ?: "Unknown error"}
             call.respond(HttpStatusCode.NotFound, cause.message ?: "Unknown error")
         }
         exception<BadRequestException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, cause.message ?: "Unknown error")
         }
         exception<Throwable> { call, cause ->
-            logger.error {cause.message ?: "Unknown error"}
+            logger.error { "Call to ${call.request.path()} failed with error ${cause.stackTraceToString()}" }
             call.respond(HttpStatusCode.InternalServerError, cause.message ?: "Unknown error")
         }
 

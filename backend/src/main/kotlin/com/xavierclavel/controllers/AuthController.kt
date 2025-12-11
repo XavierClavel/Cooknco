@@ -93,19 +93,32 @@ object AuthController: Controller(AUTH_URL) {
     }
 
     private fun Route.callbackGoogleOauth() = get("/callback-oauth-google") {
-        val currentPrincipal: OAuthAccessTokenResponse.OAuth2? = call.principal()
-        // redirects home if the url is not found before authorization
+        val currentPrincipal = call.principal<OAuthAccessTokenResponse.OAuth2>()
+
         currentPrincipal?.let { principal ->
-            principal.state?.let { state ->
-                googleOauthLogin(principal.accessToken)
-                redirects[state]?.let { redirect ->
+            val state = principal.state
+            val accessToken = principal.accessToken
+
+            if (state != null) {
+                googleOauthLogin(accessToken)
+
+                val redirect = redirects[state]
+
+                if (redirect == "app") {
+                    call.respondRedirect("cooknco://login/callback?token=$accessToken")
+                    return@get
+                }
+
+                if (redirect != null) {
                     call.respondRedirect(redirect)
                     return@get
                 }
             }
         }
+
         call.respondRedirect("${configuration.frontend.url}/home")
     }
+
 
     private suspend fun RoutingContext.googleOauthLogin(
         oauthToken: String

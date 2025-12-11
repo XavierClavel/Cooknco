@@ -25,8 +25,6 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.Plugin
 import io.ktor.server.testing.*
 import io.ktor.utils.io.KtorDsl
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.serialization.json.Json
 import main.com.xavierclavel.containers.RedisTestContainer
 import main.com.xavierclavel.utils.login
@@ -152,6 +150,7 @@ abstract class ApplicationTest: KoinTest {
     @KtorDsl
     fun runTest(block: suspend TestBuilderWrapper.() -> Unit) {
         return testApplication(EmptyCoroutineContext) {
+
             userService.setupDefaultAdmin()
             application {
                 module()
