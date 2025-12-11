@@ -15,7 +15,7 @@ object NotificationController: Controller(NOTIFICATION_URL) {
     val followService: FollowService by inject(FollowService::class.java)
 
     override fun Route.routes() {
-        authenticate("auth-session") {
+        authenticate("auth-session", "bearer-auth") {
             getNotifications()
         }
 

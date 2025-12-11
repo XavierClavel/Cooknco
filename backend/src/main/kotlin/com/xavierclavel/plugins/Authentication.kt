@@ -28,6 +28,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.sessions.Sessions
 import io.ktor.server.sessions.cookie
 import io.ktor.client.engine.cio.*
+import io.ktor.server.auth.bearer
 import io.lettuce.core.ExperimentalLettuceCoroutinesApi
 import org.koin.java.KoinJavaComponent
 import org.koin.ktor.ext.inject
@@ -61,8 +62,17 @@ fun Application.configureAuthentication() {
                     throw UnauthorizedException(UnauthorizedCause.INVALID_MAIL_OR_PASSWORD)
                 }
             }
+        }
 
-
+        bearer("bearer-auth") {
+            authenticate { tokenCredential ->
+                val session = redisService.getSession(tokenCredential.token)
+                if (session != null) {
+                    UserIdPrincipal(session.userId.toString())
+                } else {
+                    null
+                }
+            }
         }
 
         oauth("auth-oauth-google") {
@@ -115,5 +125,7 @@ fun Application.configureAuthentication() {
             }
         }
     }
+
+
 
 }

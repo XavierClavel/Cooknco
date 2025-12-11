@@ -94,7 +94,7 @@ fun Application.module() {
 
 //Controllers declaration
 fun Application.serveRoutes() = routing {
-    authenticate("auth-session") {
+    authenticate("auth-session", "bearer-auth") {
         serve(ExportController)
         serve(LikeController)
         serve(DashboardController)

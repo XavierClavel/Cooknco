@@ -43,7 +43,7 @@ object CookbookController: Controller(COOKBOOK_URL) {
         listCookbooks()
         isAdminOfCookbook()
 
-        authenticate("auth-session") {
+        authenticate("auth-session", "bearer-auth") {
             createCookbook()
 
             updateCookbook()

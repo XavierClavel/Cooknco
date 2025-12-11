@@ -40,7 +40,7 @@ object UserController: Controller(USER_URL) {
         searchUsers()
         countUsers()
 
-        authenticate("auth-session") {
+        authenticate("auth-session", "bearer-auth") {
             editUser()
             deleteUser()
 

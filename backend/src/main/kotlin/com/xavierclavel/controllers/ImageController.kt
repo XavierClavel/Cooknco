@@ -78,7 +78,7 @@ object ImageController: Controller(IMAGE_URL) {
             }
         }
 
-        authenticate("auth-session") {
+        authenticate("auth-session", "bearer-auth") {
             uploadRecipeImage()
             uploadCookbookImage()
             uploadUserIcon()

@@ -71,7 +71,7 @@ object AuthController: Controller(AUTH_URL) {
             loginGoogleOauth()
             callbackGoogleOauth()
         }
-        authenticate("auth-session") {
+        authenticate("auth-session", "bearer-auth") {
             whoami()
         }
         logout()

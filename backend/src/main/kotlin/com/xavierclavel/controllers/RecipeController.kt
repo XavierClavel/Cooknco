@@ -42,7 +42,7 @@ object RecipeController: Controller(RECIPE_URL) {
     override fun Route.routes() {
         getRecipe()
         listRecipes()
-        authenticate("auth-session") {
+        authenticate("auth-session", "bearer-auth") {
             createRecipe()
             updateRecipe()
             deleteRecipe()
