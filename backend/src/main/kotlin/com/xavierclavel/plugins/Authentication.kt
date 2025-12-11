@@ -80,7 +80,7 @@ fun Application.configureAuthentication() {
                     extraAuthParameters = listOf("access_type" to "offline"),
                     onStateCreated = { call, state ->
                         //saves new state with redirect url value
-                        call.request.queryParameters["redirectUrl"]?.let {
+                        call.request.queryParameters["redirect"]?.let {
                             AuthController.redirects[state] = it
                         }
                     }
