@@ -35,11 +35,12 @@ router.beforeEach(async (to, from) => {
   ) {
     return
   }
+  const token = localStorage.getItem("authToken")
   console.log(to)
   const authStore = useAuthStore();
   await authStore.checkAuth()
   console.log("auth status : ",authStore.isAuthenticated)
-  if (!authStore.isAuthenticated) {
+  if (!authStore.isAuthenticated && !token) {
     // redirect the user to the login page
     setCookie("redirectedFrom", to.fullPath)
     return { name: `/login` }

@@ -17,6 +17,7 @@ import router from "@/router";
 import VueCookies from 'vue-cookies'
 import i18n from "@/plugins/i18n";
 import './styles/global.scss'
+import './capacitor-app-listeners';
 
 
 const pinia = createPinia();
