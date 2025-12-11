@@ -66,7 +66,9 @@ fun Application.configureAuthentication() {
 
         bearer("bearer-auth") {
             authenticate { tokenCredential ->
+                logger.info {"Received token ${tokenCredential.token}"}
                 val session = redisService.getSession(tokenCredential.token)
+                logger.info {"Session found: $session"}
                 if (session != null) {
                     UserIdPrincipal(session.userId.toString())
                 } else {

@@ -55,7 +55,6 @@ import kotlin.text.trim
 object AuthController: Controller(AUTH_URL) {
     val userService: UserService by inject(UserService::class.java)
     val redisService: RedisService by inject(RedisService::class.java)
-    val encryptionService: EncryptionService by inject(EncryptionService::class.java)
     val configuration: Configuration by inject(Configuration::class.java)
     val redirects = mutableMapOf<String, String>()
     val applicationHttpClient = HttpClient(CIO) {
