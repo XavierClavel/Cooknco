@@ -224,6 +224,10 @@ object AuthController: Controller(AUTH_URL) {
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun RoutingContext.getOptionalSessionId(): Long? {
+        val userPrincipal = call.principal<UserIdPrincipal>()
+        if (userPrincipal != null) {
+            return userPrincipal.name.toLong()
+        }
         val session = call.sessions.get<UserSession>() ?: return null
         val userId = redisService.getSessionUserId(session.sessionId)
         if (userId == null) {
@@ -234,6 +238,10 @@ object AuthController: Controller(AUTH_URL) {
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun RoutingContext.getSessionUserId(): Long {
+        val userPrincipal = call.principal<UserIdPrincipal>()
+        if (userPrincipal != null) {
+            return userPrincipal.name.toLong()
+        }
         val sessionId = getSessionId()
         val userId = redisService.getSessionUserId(sessionId)
         if (userId == null) {
