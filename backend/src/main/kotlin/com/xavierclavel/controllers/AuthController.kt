@@ -88,7 +88,7 @@ object AuthController: Controller(AUTH_URL) {
         val mail = call.principal<UserIdPrincipal>()?.name.toString()
         val user = userService.findByMail(mail).toInfo()
         val sessionId = createSession(user)
-        call.sessions.set(UserSession(sessionId))
+        call.sessions.set("auth-session",UserSession(sessionId))
         call.respond(SessionDto(sessionId))
     }
 
@@ -138,7 +138,7 @@ object AuthController: Controller(AUTH_URL) {
         var user = userService.findEntityByGoogleId(response.sub)
         if (user != null) {
             val sessionId = createSession(user.toInfo())
-            call.sessions.set(UserSession(sessionId))
+            call.sessions.set("auth-session",UserSession(sessionId))
             return sessionId
         }
         if (userService.findEntityByMail(response.email) != null) {
@@ -148,7 +148,7 @@ object AuthController: Controller(AUTH_URL) {
 
         user = createGoogleOauthUser(response)
         val sessionId = createSession(user.toInfo())
-        call.sessions.set(UserSession(sessionId))
+        call.sessions.set("auth-session",UserSession(sessionId))
         return sessionId
     }
 
@@ -224,16 +224,33 @@ object AuthController: Controller(AUTH_URL) {
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun RoutingContext.getOptionalSessionId(): Long? {
-        val principal = call.principal<SessionData>() ?: return null
-        return principal.userId
+        val session = call.sessions.get<UserSession>() ?: return null
+        val userId = redisService.getSessionUserId(session.sessionId)
+        if (userId == null) {
+            call.sessions.clear<UserSession>()
+        }
+        return userId
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun RoutingContext.getSessionUserId(): Long {
-        val principal = call.principal<SessionData>()
-            ?: throw UnauthorizedException(UnauthorizedCause.SESSION_NOT_FOUND)
-        return principal.userId
+        val sessionId = getSessionId()
+        val userId = redisService.getSessionUserId(sessionId)
+        if (userId == null) {
+            call.sessions.clear<UserSession>()
+            throw UnauthorizedException(UnauthorizedCause.SESSION_NOT_FOUND)
+        }
+        return userId
     }
+
+
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun RoutingContext.getSessionId(): String {
+        val session =
+            call.sessions.get<UserSession>() ?: throw UnauthorizedException(UnauthorizedCause.SESSION_NOT_FOUND)
+        return session.sessionId
+    }
+
 
     private suspend fun RoutingContext.createSession(user: UserInfo): String {
         userService.registerUserActivity(user.id)

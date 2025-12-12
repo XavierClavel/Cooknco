@@ -66,13 +66,14 @@ fun Application.configureAuthentication() {
 
         bearer("bearer-auth") {
             authenticate { tokenCredential ->
-                logger.info {"Received token ${tokenCredential.token}"}
                 val session = redisService.getSession(tokenCredential.token)
-                logger.info {"Session found: $session"}
-                session
+                if (session != null) {
+                    UserIdPrincipal(session.userId.toString())
+                } else {
+                    null
+                }
             }
         }
-
         oauth("auth-oauth-google") {
             // Configure oauth authentication
             urlProvider = { "${configuration.backend.url}/auth/callback-oauth-google" }
@@ -99,13 +100,16 @@ fun Application.configureAuthentication() {
 
         session<UserSession>("auth-session") {
             validate { session ->
-                redisService.getSession(session.sessionId)
+                if (redisService.hasSession(session.sessionId)) {
+                    session
+                } else {
+                    null
+                }
             }
             challenge {
-                call.respond(HttpStatusCode.Unauthorized, UnauthorizedCause.SESSION_NOT_FOUND.key)
+                throw UnauthorizedException(UnauthorizedCause.SESSION_NOT_FOUND)
             }
         }
-
         session<UserSession>("admin-session") {
             validate { session ->
                 redisService.getAdminSession(session.sessionId)
