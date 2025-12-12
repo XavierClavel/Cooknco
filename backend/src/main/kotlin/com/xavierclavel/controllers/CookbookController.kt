@@ -78,13 +78,15 @@ object CookbookController: Controller(COOKBOOK_URL) {
         val search = getQuery()
         val paging = getPaging()
         val sort = getSort()
+        val sessionUserId = getOptionalSessionId()
+        logger.info {"current user: $sessionUserId"}
         val cookbook = cookbookService.listCookbooks(
             paging,
             sort,
             user = userId,
             recipe = recipeId,
             search = search,
-            currentUser = getOptionalSessionId()
+            currentUser = sessionUserId
         )
         logger.info {"cookbooks: $cookbook"}
         call.respond(cookbook)
