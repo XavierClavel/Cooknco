@@ -28,6 +28,7 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.OAuthAccessTokenResponse
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
@@ -222,11 +223,22 @@ object AuthController: Controller(AUTH_URL) {
         call.respond(HttpStatusCode.OK)
     }
 
+    fun ApplicationCall.getBearerToken(): String? {
+        val header = request.headers["Authorization"] ?: return null
+        if (!header.startsWith("Bearer ")) return null
+        return header.removePrefix("Bearer ").trim()
+    }
+
+    suspend fun ApplicationCall.getBearerTokenUserId(): Long? {
+        val token = getBearerToken() ?: return null
+        return redisService.getSessionUserId(token)
+    }
+
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun RoutingContext.getOptionalSessionId(): Long? {
-        val userPrincipal = call.principal<UserIdPrincipal>()
-        if (userPrincipal != null) {
-            return userPrincipal.name.toLong()
+        val tokenUserId = call.getBearerTokenUserId()
+        if (tokenUserId != null) {
+            return tokenUserId
         }
         val session = call.sessions.get<UserSession>() ?: return null
         val userId = redisService.getSessionUserId(session.sessionId)
@@ -238,9 +250,9 @@ object AuthController: Controller(AUTH_URL) {
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun RoutingContext.getSessionUserId(): Long {
-        val userPrincipal = call.principal<UserIdPrincipal>()
-        if (userPrincipal != null) {
-            return userPrincipal.name.toLong()
+        val tokenUserId = call.getBearerTokenUserId()
+        if (tokenUserId != null) {
+            return tokenUserId
         }
         val sessionId = getSessionId()
         val userId = redisService.getSessionUserId(sessionId)
