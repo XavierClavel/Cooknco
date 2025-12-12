@@ -86,6 +86,7 @@ object CookbookController: Controller(COOKBOOK_URL) {
             search = search,
             currentUser = getOptionalSessionId()
         )
+        logger.info {"cookbooks: $cookbook"}
         call.respond(cookbook)
     }
 
