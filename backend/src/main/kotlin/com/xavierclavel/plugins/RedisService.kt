@@ -56,4 +56,7 @@ class RedisService(redisUrl: String): KoinComponent {
         getSession(sessionId)?.role == UserRole.ADMIN
 
 
+    suspend fun getAdminSession(sessionId: String): SessionData? =
+        getSession(sessionId)?.takeIf { it.role == UserRole.ADMIN }
+
 }

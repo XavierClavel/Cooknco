@@ -99,11 +99,7 @@ fun Application.configureAuthentication() {
 
         session<UserSession>("auth-session") {
             validate { session ->
-                if (redisService.hasSession(session.sessionId)) {
-                    session
-                } else {
-                    null
-                }
+                redisService.getSession(session.sessionId)
             }
             challenge {
                 call.respond(HttpStatusCode.Unauthorized, UnauthorizedCause.SESSION_NOT_FOUND.key)
@@ -112,11 +108,7 @@ fun Application.configureAuthentication() {
 
         session<UserSession>("admin-session") {
             validate { session ->
-                if (redisService.isUserAdmin(session.sessionId)) {
-                    session
-                } else {
-                    null
-                }
+                redisService.getAdminSession(session.sessionId)
             }
             challenge {
                 call.respond(HttpStatusCode.Unauthorized, UnauthorizedCause.SESSION_NOT_FOUND.key)
