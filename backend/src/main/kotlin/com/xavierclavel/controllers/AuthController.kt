@@ -88,7 +88,7 @@ object AuthController: Controller(AUTH_URL) {
         val mail = call.principal<UserIdPrincipal>()?.name.toString()
         val user = userService.findByMail(mail).toInfo()
         val sessionId = createSession(user)
-        call.sessions.set("auth-session",UserSession(sessionId))
+        call.sessions.set(UserSession(sessionId))
         call.respond(SessionDto(sessionId))
     }
 
@@ -138,7 +138,7 @@ object AuthController: Controller(AUTH_URL) {
         var user = userService.findEntityByGoogleId(response.sub)
         if (user != null) {
             val sessionId = createSession(user.toInfo())
-            call.sessions.set("auth-session",UserSession(sessionId))
+            call.sessions.set(UserSession(sessionId))
             return sessionId
         }
         if (userService.findEntityByMail(response.email) != null) {
@@ -148,7 +148,7 @@ object AuthController: Controller(AUTH_URL) {
 
         user = createGoogleOauthUser(response)
         val sessionId = createSession(user.toInfo())
-        call.sessions.set("auth-session",UserSession(sessionId))
+        call.sessions.set(UserSession(sessionId))
         return sessionId
     }
 
