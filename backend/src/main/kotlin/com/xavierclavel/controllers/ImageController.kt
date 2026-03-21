@@ -130,7 +130,7 @@ object ImageController: Controller(IMAGE_URL) {
         val recipe = recipeService.getEntityById(id)
         checkRecipeEditionRights(recipeService.getRecipeOwner(id).id)
         imageService.deleteImage(RECIPES_IMG_PATH, id, recipe.imageVersion)
-        recipe.resetVersion()
+        recipe.increaseVersion()
         call.respond(HttpStatusCode.OK)
     }
 
@@ -139,7 +139,7 @@ object ImageController: Controller(IMAGE_URL) {
         val cookbook = cookbookService.getEntityById(id)
         if (!cookbookService.isAdminOfCookbook(id, getSessionUserId())) throw ForbiddenException(ForbiddenCause.MUST_BE_COOKBOOK_ADMINISTRATOR)
         imageService.deleteImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion)
-        cookbook.resetVersion()
+        cookbook.increaseVersion()
         call.respond(HttpStatusCode.OK)
     }
 
@@ -148,7 +148,7 @@ object ImageController: Controller(IMAGE_URL) {
         checkUserEditionRights(id)
         val user = userService.getEntityById(id)
         imageService.deleteImage(USERS_IMG_PATH, id, user.imageVersion)
-        user.resetVersion()
+        user.increaseVersion()
         call.respond(HttpStatusCode.OK)
     }
 
