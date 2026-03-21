@@ -100,6 +100,7 @@ object ImageController: Controller(IMAGE_URL) {
 
         recipe.increaseVersion()
         imageService.deleteImage(RECIPES_IMG_PATH, id, recipe.imageVersion - 1)
+        imageService.deleteImage(RECIPES_THUMBNAIL_PATH, id, recipe.imageVersion - 1)
         call.respond(HttpStatusCode.OK)
     }
 

@@ -19,6 +19,7 @@ import kotlin.io.path.createParentDirectories
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import net.coobird.thumbnailator.Thumbnails
+import shared.utils.logger
 import java.io.File
 import javax.imageio.IIOImage
 import javax.imageio.ImageWriteParam
@@ -35,7 +36,10 @@ class ImageService: KoinComponent {
         deleteImage("$path/$id-v$version.webp")
     }
 
-    private fun deleteImage(path:String) = Path(path).deleteIfExists()
+    private fun deleteImage(path:String) {
+        val result = Path(path).deleteIfExists()
+        logger.info("Deleted image: $result at $path")
+    }
 
 
 

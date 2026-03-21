@@ -64,21 +64,21 @@ fun Application.module() {
 
     }
     install(StatusPages) {
-        exception<UnauthorizedException> { call, cause ->
-            call.respond(HttpStatusCode.Unauthorized, cause.message ?: "Unknown error")
+        exception<UnauthorizedException> { call, error ->
+            call.respond(HttpStatusCode.Unauthorized, error.message ?: "Unknown error")
         }
-        exception<ForbiddenException> { call, cause ->
-            call.respond(HttpStatusCode.Forbidden, cause.message ?: "Unknown error")
+        exception<ForbiddenException> { call, error ->
+            call.respond(HttpStatusCode.Forbidden, error.message ?: "Unknown error")
         }
-        exception<NotFoundException> { call, cause ->
-            call.respond(HttpStatusCode.NotFound, cause.message ?: "Unknown error")
+        exception<NotFoundException> { call, error ->
+            call.respond(HttpStatusCode.NotFound, error.message ?: "Unknown error")
         }
-        exception<BadRequestException> { call, cause ->
-            call.respond(HttpStatusCode.BadRequest, cause.message ?: "Unknown error")
+        exception<BadRequestException> { call, error ->
+            call.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
         }
-        exception<Throwable> { call, cause ->
-            logger.error { "Call to ${call.request.path()} failed with error ${cause.stackTraceToString()}" }
-            call.respond(HttpStatusCode.InternalServerError, cause.message ?: "Unknown error")
+        exception<Throwable> { call, error ->
+            logger.error { "Call to ${call.request.path()} failed with error ${error.stackTraceToString()}" }
+            call.respond(HttpStatusCode.InternalServerError, error.message ?: "Unknown error")
         }
 
     }
