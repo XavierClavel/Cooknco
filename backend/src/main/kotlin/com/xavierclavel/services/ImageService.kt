@@ -2,6 +2,7 @@ package com.xavierclavel.services
 
 import com.drew.metadata.Metadata
 import com.drew.metadata.exif.ExifIFD0Directory
+import com.xavierclavel.enums.ExifOrientation
 import shared.utils.Filepath.RECIPES_IMG_PATH
 import org.koin.core.component.KoinComponent
 import java.awt.Image
@@ -84,48 +85,10 @@ class ImageService: KoinComponent {
 
     fun getEFIXTransform(metadata: Metadata, originalImage: BufferedImage): AffineTransform {
         val directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory::class.java)
-        val orientation = directory?.getInt(ExifIFD0Directory.TAG_ORIENTATION) ?: 1
+        val orientation = ExifOrientation.fromInt(directory?.getInt(ExifIFD0Directory.TAG_ORIENTATION) ?: 1)
+        logger.info { "Processing image with orientation $orientation" }
 
-        val transform = AffineTransform()
-
-        when (orientation) {
-            1 -> { //Top left -> Normal
-
-            }
-            2 -> { //Top right -> Mirror horizontally
-                transform.scale(-1.0, 1.0)
-                transform.translate(-originalImage.width.toDouble(), 0.0)
-            }
-            3 -> { //Bottom right -> Rotate 180,
-                transform.translate(originalImage.width.toDouble(), originalImage.height.toDouble())
-                transform.rotate(Math.toRadians(180.0))
-            }
-            4 -> { //Bottom left -> Mirror vertically
-                transform.scale(1.0, -1.0)
-                transform.translate(0.0, -originalImage.height.toDouble())
-            }
-            5 -> { //Left top -> Mirror horizontally and rotate 90 CW
-                transform.scale(-1.0, 1.0)
-                transform.translate(-originalImage.height.toDouble(), 0.0)
-                transform.rotate(Math.toRadians(90.0))
-
-            }
-            6 -> { //Right top -> Rotate 90 CW
-                transform.translate(originalImage.height.toDouble(), 0.0)
-                transform.rotate(Math.toRadians(90.0))
-            }
-            7 -> { //Right bottom -> Mirror horizontally and rotate 90 CW
-                transform.scale(-1.0, 1.0)
-                transform.translate(-originalImage.height.toDouble(), -originalImage.width.toDouble())
-                transform.rotate(Math.toRadians(270.0))
-            }
-            8 -> { //Left bottom -> Rotate 270 CW
-                transform.translate(0.0, originalImage.width.toDouble())
-                transform.rotate(Math.toRadians(270.0))
-            }
-        }
-
-        return transform
+        return orientation.getTransform(originalImage.width.toDouble(), originalImage.height.toDouble())
     }
 
 
