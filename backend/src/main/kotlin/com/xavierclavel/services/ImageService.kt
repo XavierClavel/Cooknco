@@ -106,7 +106,7 @@ class ImageService: KoinComponent {
         graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
-        graphics.drawImage(croppedImage, 0, 0, null)
+        graphics.drawImage(croppedImage.getScaledInstance(targetWidth, targetHeight, Image.SCALE_SMOOTH), 0, 0, null)
         graphics.dispose()
 
         return resizedImage
