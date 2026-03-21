@@ -17,6 +17,8 @@ enum class ExifOrientation(val value: Int) {
         fun fromInt(i: Int) = entries.first { it.value == i }
     }
 
+    fun requiresSwap(): Boolean = value > 4
+
     fun getTransform(width: Double, height: Double): AffineTransform {
         val transform = AffineTransform()
 
