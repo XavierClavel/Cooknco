@@ -51,48 +51,32 @@ class ImageService: KoinComponent {
         if (!file.exists()) {
             file.createFile()
         }
-        val affineTransform = getEFIXTransform(metadata, image)
-        val cleanedImage = cropAndResizeImage(image, targetSize.first, targetSize.second, affineTransform)
-        ImageIO.write(cleanedImage, "webp", file.toFile())
-    }
 
-    fun saveWebP(image: BufferedImage, outputFile: File, quality: Float = 0.9f) {
-        val writers = ImageIO.getImageWritersByFormatName("webp")
-        if (!writers.hasNext()) {
-            throw IllegalStateException("No WebP ImageWriter available")
-        }
-
-        val imageWriter: ImageWriter = writers.next()
-        val outputStream = ImageIO.createImageOutputStream(outputFile)
-        imageWriter.output = outputStream
-
-        val writeParam = imageWriter.defaultWriteParam
-        if (writeParam.canWriteCompressed()) {
-            writeParam.compressionMode = ImageWriteParam.MODE_EXPLICIT
-
-            val compressionTypes = writeParam.compressionTypes // Get available compression types
-            if (compressionTypes != null && compressionTypes.isNotEmpty()) {
-                writeParam.compressionType = compressionTypes[0] // Use the first available type
-            }
-
-            writeParam.compressionQuality = quality // Set quality (0.0 - 1.0)
-        }
-
-        imageWriter.write(null, IIOImage(image, null, null), writeParam)
-        outputStream.close()
-        imageWriter.dispose()
-    }
-
-    fun getEFIXTransform(metadata: Metadata, originalImage: BufferedImage): AffineTransform {
         val directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory::class.java)
         val orientation = ExifOrientation.fromInt(directory?.getInt(ExifIFD0Directory.TAG_ORIENTATION) ?: 1)
         logger.info { "Processing image with orientation $orientation" }
-
-        return orientation.getTransform(originalImage.width.toDouble(), originalImage.height.toDouble())
+        val orientedImage = applyOrientation(image, orientation)
+        val cleanedImage = cropAndResizeImage(orientedImage, targetSize.first, targetSize.second)
+        ImageIO.write(cleanedImage, "webp", file.toFile())
     }
 
+    private fun applyOrientation(image: BufferedImage, orientation: ExifOrientation): BufferedImage {
+        val transform = orientation.getTransform(image.width.toDouble(), image.height.toDouble())
 
-    private fun cropAndResizeImage(originalImage: BufferedImage, targetWidth: Int, targetHeight: Int, transform: AffineTransform): BufferedImage {
+        val newWidth = if (orientation.requiresSwap()) image.height else image.width
+        val newHeight = if (orientation.requiresSwap()) image.width else image.height
+
+        val result = BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB)
+
+        val g = result.createGraphics()
+        g.transform = transform
+        g.drawImage(image, 0, 0, null)
+        g.dispose()
+
+        return result
+    }
+
+    private fun cropAndResizeImage(originalImage: BufferedImage, targetWidth: Int, targetHeight: Int): BufferedImage {
         val targetRatio = targetWidth.toDouble() / targetHeight.toDouble()
         val originalRatio = originalImage.width.toDouble() / originalImage.height.toDouble()
 
@@ -117,34 +101,15 @@ class ImageService: KoinComponent {
         // Resize the cropped image
         val resizedImage = BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB)
         val graphics = resizedImage.createGraphics()
-        graphics.transform = transform
 
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
         graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
-        graphics.drawImage(croppedImage.getScaledInstance(targetWidth, targetHeight, Image.SCALE_SMOOTH), 0, 0, null)
+        graphics.drawImage(croppedImage, 0, 0, null)
         graphics.dispose()
 
         return resizedImage
-    }
-
-    fun resizeImageThumbnailator(inputImage: BufferedImage, targetWidth: Int, targetHeight: Int): BufferedImage {
-        return Thumbnails.of(inputImage)
-            .size(targetWidth, targetHeight)
-            .outputQuality(1.0) // 100% quality
-            .asBufferedImage()
-    }
-
-
-
-
-    private fun removeMetadata(image: BufferedImage): BufferedImage {
-        val cleanedImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_RGB)
-        val graphics = cleanedImage.createGraphics()
-        graphics.drawImage(image, 0, 0, null)
-        graphics.dispose()
-        return cleanedImage
     }
 
 
