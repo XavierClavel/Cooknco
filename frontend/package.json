@@ -11,6 +11,7 @@
     "@capacitor/android": "^8.0.0",
     "@capacitor/app": "^8.0.0",
     "@capacitor/core": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
     "@mdi/font": "7.4.47",
     "@vueuse/core": "^13.0.0",
     "axios": "^1.7.7",

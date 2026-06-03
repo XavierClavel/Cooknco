@@ -172,7 +172,15 @@ object AuthController: Controller(AUTH_URL) {
     }
 
     private fun Route.logout() = post("/logout") {
-        call.sessions.clear<UserSession>()
+        val bearerToken = call.getBearerToken()
+        if (bearerToken != null) {
+            redisService.deleteSession(bearerToken)
+        }
+        val session = call.sessions.get<UserSession>()
+        if (session != null) {
+            redisService.deleteSession(session.sessionId)
+            call.sessions.clear<UserSession>()
+        }
         call.respond(HttpStatusCode.OK)
     }
 

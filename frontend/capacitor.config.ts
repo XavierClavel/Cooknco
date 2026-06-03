@@ -10,7 +10,12 @@ const config: CapacitorConfig = {
   plugins: {
     App: {
       urlSchemes: ["cooknco"]
-    }
+    },
+    StatusBar: {
+      overlaysWebView: false,
+      style: "DARK",
+      backgroundColor: "#ff0000ff",
+    },
   }
 };
 

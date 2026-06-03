@@ -1,5 +1,6 @@
 import {toHome} from "@/scripts/common";
 import {Capacitor} from "@capacitor/core";
+import {StatusBar, Style} from "@capacitor/status-bar";
 
 if (Capacitor.isNativePlatform()) {
   console.log("setting up capacitor listeners")
@@ -14,5 +15,12 @@ if (Capacitor.isNativePlatform()) {
         toHome();
       }
     });
+
+    App.addListener('appStateChange', async () => {
+      await StatusBar.setOverlaysWebView({ overlay: false });
+      await StatusBar.setStyle({ style: Style.Dark });
+    });
   });
+
+
 }
