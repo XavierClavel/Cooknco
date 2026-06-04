@@ -28,6 +28,10 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbookScreen
 import com.xavierclavel.cooknco.ui.cookbook.CookbookViewModel
 import com.xavierclavel.cooknco.ui.main.MainScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditScreen
+import com.xavierclavel.cooknco.ui.user.UserEditScreen
+import com.xavierclavel.cooknco.ui.user.UserEditViewModel
+import com.xavierclavel.cooknco.ui.user.UserProfileScreen
+import com.xavierclavel.cooknco.ui.user.UserProfileViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipeViewModel
@@ -44,6 +48,8 @@ private object Routes {
     const val COOKBOOK = "cookbook/{cookbookId}"
     const val COOKBOOK_EDIT = "cookbook/{cookbookId}/edit"
     const val COOKBOOK_CREATE = "cookbook/create"
+    const val USER = "user/{userId}"
+    const val USER_EDIT = "user/{userId}/edit"
 }
 
 @Composable
@@ -120,6 +126,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             MainScreen(
                 user = user,
                 onLogout = viewModel::logout,
+                onNavigateToEditProfile = { navController.navigate("user/${user.id}/edit") },
                 onNavigateToRecipe = { recipeId ->
                     navController.navigate("recipe/$recipeId")
                 },
@@ -277,6 +284,42 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                     }
                 },
                 viewModel = editViewModel,
+            )
+        }
+
+        // ── User profile ──────────────────────────────────────────────────────
+        composable(
+            route = Routes.USER,
+            arguments = listOf(navArgument("userId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getLong("userId") ?: return@composable
+            val currentUserId = (authState as? AuthState.Authenticated)?.user?.id ?: 0L
+            val context = LocalContext.current
+            val profileViewModel: UserProfileViewModel = viewModel(
+                key = "user_$userId",
+                factory = UserProfileViewModel.factory(context, userId, currentUserId),
+            )
+            UserProfileScreen(
+                viewModel = profileViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToEdit = { navController.navigate("user/$userId/edit") },
+                onNavigateToRecipe = { recipeId -> navController.navigate("recipe/$recipeId") },
+            )
+        }
+
+        composable(
+            route = Routes.USER_EDIT,
+            arguments = listOf(navArgument("userId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getLong("userId") ?: return@composable
+            val context = LocalContext.current
+            val editViewModel: UserEditViewModel = viewModel(
+                key = "user_edit_$userId",
+                factory = UserEditViewModel.factory(context, userId),
+            )
+            UserEditScreen(
+                viewModel = editViewModel,
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }

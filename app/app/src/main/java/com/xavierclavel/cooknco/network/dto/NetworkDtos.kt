@@ -190,3 +190,11 @@ data class UserSearchResult(
     val items: List<UserSummary>,
 )
 
+@Serializable
+data class RecipeSearchResult(
+    val count: Int,
+    val page: Int,
+    val size: Int,
+    val items: List<RecipeOverview>,
+)
+

@@ -1,8 +1,8 @@
 package com.xavierclavel.cooknco.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,12 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,14 +34,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
+import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoNavy
+import com.xavierclavel.cooknco.ui.theme.CookncoOrange
+import com.xavierclavel.cooknco.ui.theme.CookncoTheme
+import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 
 @Composable
 fun HomeScreen(
@@ -60,29 +71,46 @@ fun HomeScreen(
             last >= info.totalItemsCount - 3
         }
     }
-
     LaunchedEffect(reachedEnd) {
-        if (reachedEnd) viewModel.loadMore()
+        if (reachedEnd && !uiState.allLoaded) viewModel.loadMore()
     }
+
+    val timelineColor = CookncoNavy.copy(alpha = 0.2f)
 
     LazyColumn(
         state = listState,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .drawBehind {
+                // Vertical timeline line, aligned to the center of the date-group circles
+                val lineX = 44.dp.toPx()
+                drawLine(
+                    color = timelineColor,
+                    start = Offset(lineX, 0f),
+                    end = Offset(lineX, size.height),
+                    strokeWidth = 2.dp.toPx(),
+                )
+            },
         contentPadding = PaddingValues(bottom = 32.dp),
     ) {
+        // Welcome header
         item {
-            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 78.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
+            ) {
                 Text(
                     text = "Welcome, ${user.username}! ✨",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
+                    color = CookncoNavy,
                 )
-                Spacer(Modifier.height(4.dp))
                 Text(
                     text = "What's cooking, good looking?",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = CookncoNavy.copy(alpha = 0.55f),
                     fontWeight = FontWeight.Light,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 )
             }
         }
@@ -91,27 +119,43 @@ fun HomeScreen(
             item(key = "header_${group.label}") {
                 DateGroupHeader(label = group.label, count = group.recipes.size)
             }
-            item(key = "row_${group.label}") {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(group.recipes, key = { it.id }) { recipe ->
-                        RecipeCard(recipe = recipe, onClick = { onRecipeClick(recipe.id) })
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
+            items(group.recipes, key = { it.id }) { recipe ->
+                RecipeCard(
+                    recipe = recipe,
+                    onClick = { onRecipeClick(recipe.id) },
+                    modifier = Modifier.padding(
+                        start = 78.dp,
+                        end = 16.dp,
+                        top = 8.dp,
+                        bottom = 4.dp,
+                    ),
+                )
+            }
+            item(key = "spacer_${group.label}") {
+                Spacer(Modifier.height(16.dp))
             }
         }
 
         if (uiState.isLoading) {
             item {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp)
                 }
+            }
+        }
+
+        if (uiState.error != null) {
+            item {
+                Text(
+                    text = uiState.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(16.dp),
+                )
             }
         }
     }
@@ -120,22 +164,25 @@ fun HomeScreen(
 @Composable
 private fun DateGroupHeader(label: String, count: Int) {
     Row(
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        // Orange count circle — centered on the timeline line (x = 44dp = 20 + 24 radius)
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .border(2.dp, MaterialTheme.colorScheme.onBackground, CircleShape),
+                .background(CookncoOrange)
+                .border(2.dp, CookncoNavy, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = count.toString(),
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.labelLarge,
+                color = CookncoWhite,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -143,55 +190,198 @@ private fun DateGroupHeader(label: String, count: Int) {
             text = label,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
+            color = CookncoNavy,
+            fontSize = 17.sp,
         )
     }
 }
 
 @Composable
-private fun RecipeCard(recipe: RecipeOverview, onClick: () -> Unit = {}) {
+private fun RecipeCard(
+    recipe: RecipeOverview,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(
-        modifier = Modifier.width(200.dp),
-        shape = RoundedCornerShape(12.dp),
         onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = CookncoGreen),
+        border = BorderStroke(1.5.dp, CookncoNavy),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column {
+            // Recipe photo
             AsyncImage(
                 model = "${ApiClient.IMAGE_URL}/recipes-thumbnails/${recipe.id}-v${recipe.version}.webp",
                 contentDescription = recipe.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp),
+                    .height(220.dp),
             )
-            Text(
-                text = recipe.title,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+
+            // Green footer: title + author chip
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                AsyncImage(
-                    model = "${ApiClient.IMAGE_URL}/users/${recipe.owner.id}-v${recipe.owner.version}.webp",
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape),
-                )
                 Text(
-                    text = recipe.owner.username,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                    maxLines = 1,
+                    text = recipe.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = CookncoNavy,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                AuthorChip(owner = recipe.owner)
             }
-            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun AuthorChip(owner: RecipeOwner, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50.dp))
+            .background(CookncoWhite)
+            .border(1.5.dp, CookncoNavy, RoundedCornerShape(50.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        AsyncImage(
+            model = "${ApiClient.IMAGE_URL}/users/${owner.id}-v${owner.version}.webp",
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape),
+        )
+        Text(
+            text = owner.username,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = CookncoNavy,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+// ── Previews ──────────────────────────────────────────────────────────────────
+
+private val previewUser = UserInfo(
+    id = 1L, version = 1L, username = "Xavier Clavel",
+    role = "USER", joinDate = 0L, bio = "",
+    recipesCount = 5, likesCount = 12, cookbooksCount = 2,
+    followersCount = 3, followsCount = 7,
+)
+
+private val previewOwner = RecipeOwner(id = 2L, version = 1L, username = "Aya Amayri")
+
+private val previewRecipes = listOf(
+    RecipeOverview(id = 1L, version = 1L, title = "Harcha", owner = previewOwner, likesCount = 8, creationDate = 1742601600000L),
+    RecipeOverview(id = 2L, version = 2L, title = "Chocolate Fondant", owner = previewOwner, likesCount = 23, creationDate = 1740182400000L),
+)
+
+private val previewGroups = listOf(
+    DateGroup("March 22, 2026", previewRecipes.take(1)),
+    DateGroup("February 28, 2026", previewRecipes.drop(1)),
+)
+
+private val previewState = HomeUiState(dateGroups = previewGroups)
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+fun HomeScreenPreview() {
+    CookncoTheme {
+        // Standalone preview — renders the layout without a real ViewModel
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(CookncoBackground),
+        ) {
+            HomeScreenContent(
+                user = previewUser,
+                uiState = previewState,
+                onRecipeClick = {},
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "Home - Loading")
+@Composable
+fun HomeScreenLoadingPreview() {
+    CookncoTheme {
+        Box(modifier = Modifier.fillMaxSize().background(CookncoBackground)) {
+            HomeScreenContent(user = previewUser, uiState = HomeUiState(isLoading = true), onRecipeClick = {})
+        }
+    }
+}
+
+/**
+ * Stateless version used for previews (no ViewModel dependency).
+ */
+@Composable
+private fun HomeScreenContent(
+    user: UserInfo,
+    uiState: HomeUiState,
+    onRecipeClick: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val timelineColor = CookncoNavy.copy(alpha = 0.2f)
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .drawBehind {
+                val lineX = 44.dp.toPx()
+                drawLine(timelineColor, Offset(lineX, 0f), Offset(lineX, size.height), 2.dp.toPx())
+            },
+        contentPadding = PaddingValues(bottom = 32.dp),
+    ) {
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 78.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
+            ) {
+                Text(
+                    "Welcome, ${user.username}! ✨",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = CookncoNavy,
+                )
+                Text(
+                    "What's cooking, good looking?",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = CookncoNavy.copy(alpha = 0.55f),
+                    fontWeight = FontWeight.Light,
+                )
+            }
+        }
+
+        uiState.dateGroups.forEach { group ->
+            item { DateGroupHeader(label = group.label, count = group.recipes.size) }
+            items(group.recipes, key = { it.id }) { recipe ->
+                RecipeCard(
+                    recipe = recipe,
+                    onClick = { onRecipeClick(recipe.id) },
+                    modifier = Modifier.padding(start = 78.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+                )
+            }
+            item { Spacer(Modifier.height(16.dp)) }
+        }
+
+        if (uiState.isLoading) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
+                    CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp)
+                }
+            }
         }
     }
 }
