@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 
 object ApiClient {
     const val BASE_URL = "https://cooknco.eu/api/v1"
+    const val IMAGE_URL = "https://cooknco.eu/image"
 
     val json = Json {
         ignoreUnknownKeys = true
