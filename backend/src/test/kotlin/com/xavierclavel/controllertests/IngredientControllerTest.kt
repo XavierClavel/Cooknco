@@ -20,6 +20,7 @@ import main.com.xavierclavel.utils.assertIngredientExists
 import main.com.xavierclavel.utils.createIngredient
 import main.com.xavierclavel.utils.deleteIngredient
 import main.com.xavierclavel.utils.getIngredient
+import main.com.xavierclavel.utils.searchIngredients
 import main.com.xavierclavel.utils.updateIngredient
 import kotlin.test.assertFalse
 
@@ -33,6 +34,17 @@ class IngredientControllerTest : ApplicationTest() {
         )
         val response = client.createIngredient(ingredientDTO)
         client.assertIngredientExists(response.id)
+    }
+
+    @Test
+    fun `search ingredients by name`() = runTestAsAdmin {
+        val tomato = client.createIngredient(IngredientDTO(name = mapOf(Locale.EN to "tomato"), type = IngredientType.VEGETABLE))
+        val tomatillo = client.createIngredient(IngredientDTO(name = mapOf(Locale.EN to "tomatillo"), type = IngredientType.VEGETABLE))
+        client.createIngredient(IngredientDTO(name = mapOf(Locale.EN to "zucchini"), type = IngredientType.VEGETABLE))
+
+        // exact match ranks before fuzzy match, unrelated ingredient is excluded
+        val result = client.searchIngredients("tomato")
+        assertEquals(listOf(tomato.id, tomatillo.id), result.items.map { it.id })
     }
 
     @Test

@@ -11,7 +11,7 @@ plugins {
 }
 
 val junitVersion = "5.10.2"
-val testcontainersVersion = "1.20.1"
+val testcontainersVersion = "1.21.4"
 val ebeanVersion = "17.0.1"
 val ktorVersion = "3.2.3"
 val koinVersion = "4.0.0"
