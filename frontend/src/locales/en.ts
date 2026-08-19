@@ -222,6 +222,7 @@ export default {
 
   public_account: "Public account",
   auto_accept_follow_requests: "Auto accept follow requests",
+  auto_accept_follow_requests_public_hint: "Public accounts always accept follow requests automatically.",
   no_data: "No data",
 
   unit_teaspoon: "teaspoons",

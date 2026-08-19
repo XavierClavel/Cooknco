@@ -34,13 +34,20 @@
 
         <v-card color="background" class="mb-2">
           <v-checkbox
-            v-model="settings.autoAcceptFollowRequests"
+            v-model="autoAcceptFollowRequests"
             :label="`${$t('auto_accept_follow_requests')}`"
+            :disabled="settings.isAccountPublic"
             color="black"
             base-color="black"
             variant="elevated"
-            class="mx-2 my-0 mb-n6"
+            :class="settings.isAccountPublic ? 'mx-2 my-0' : 'mx-2 my-0 mb-n6'"
           ></v-checkbox>
+          <v-card-text
+            v-if="settings.isAccountPublic"
+            class="pt-0 pb-2 text-caption"
+          >
+            {{ $t('auto_accept_follow_requests_public_hint') }}
+          </v-card-text>
         </v-card>
 
         <v-container>
@@ -71,7 +78,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import {login, toMyProfile, toSignup, toUpdatePassword} from '@/scripts/common'
 import {useI18n} from "vue-i18n";
@@ -89,7 +96,17 @@ const locales = [
   {label: "English", value: "en"},
 ]
 
-const settings = ref({})
+const settings = ref({
+  autoAcceptFollowRequests: false,
+  isAccountPublic: false,
+})
+
+// Public accounts always auto accept: show the toggle locked on, but keep the
+// stored preference untouched so it applies again if the account goes private
+const autoAcceptFollowRequests = computed({
+  get: () => settings.value.isAccountPublic || !!settings.value.autoAcceptFollowRequests,
+  set: (value) => { settings.value.autoAcceptFollowRequests = value },
+})
 
 getSettings().then(response => {
   settings.value = response.data

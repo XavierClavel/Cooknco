@@ -147,6 +147,9 @@ class User (
         isAccountPublic = userSettingsDTO.isAccountPublic
     }
 
+    // Public accounts have nothing to gate, so they never hold follow requests pending
+    fun autoAcceptsFollowRequests() = isAccountPublic || autoAcceptFollowRequests
+
     fun getSettings() = UserSettingsDTO(
         autoAcceptFollowRequests = this.autoAcceptFollowRequests,
         isAccountPublic = this.isAccountPublic,

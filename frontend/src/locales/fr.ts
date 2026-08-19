@@ -223,6 +223,7 @@ export default {
 
   public_account: "Compte public",
   auto_accept_follow_requests: "Accepter automatiques requêtes d'abonnement",
+  auto_accept_follow_requests_public_hint: "Les comptes publics acceptent automatiquement les demandes d'abonnement.",
   no_data: "Aucune donnée",
 
   unit_teaspoon: "cuillères à café",

@@ -30,6 +30,7 @@ import java.util.UUID
 
 class UserService: KoinComponent {
     val encryptionService: EncryptionService by inject()
+    val followService: FollowService by inject()
     val eventProducerService: EventProducer by inject()
 
 
@@ -188,8 +189,13 @@ class UserService: KoinComponent {
     fun validateUser(id: Long) =
         getEntityById(id).verify().updateAndGet()
 
-    fun updateSettings(id: Long, userSettingsDTO: UserSettingsDTO) =
-        getEntityById(id).updateSettings(userSettingsDTO).updateAndGet().toInfo()
+    fun updateSettings(id: Long, userSettingsDTO: UserSettingsDTO): UserInfo {
+        val user = getEntityById(id).updateSettings(userSettingsDTO).updateAndGet()
+        if (!user.autoAcceptsFollowRequests()) return user.toInfo()
+        // Nothing left to review: clear the backlog and reload to get up-to-date counts
+        followService.acceptAllPendingFollowRequests(id)
+        return getEntityById(id).toInfo()
+    }
 
     fun getSettings(id: Long): UserSettingsDTO =
         getEntityById(id).getSettings()

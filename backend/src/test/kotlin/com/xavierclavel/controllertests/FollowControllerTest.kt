@@ -11,7 +11,10 @@ import main.com.xavierclavel.utils.getFollows
 import main.com.xavierclavel.utils.getUser
 import main.com.xavierclavel.utils.unfollow
 import org.junit.jupiter.api.Test
+import shared.dto.UserSettingsDTO
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class FollowControllerTest : ApplicationTest() {
     @Test
@@ -138,6 +141,37 @@ class FollowControllerTest : ApplicationTest() {
             client.unfollow(user)
             val userInfo = client.getUser(user)
             assertEquals(1, userInfo.followersCount)
+        }
+    }
+
+    @Test
+    fun `following a public account is accepted immediately`() = runTest {
+        val user = setupTestUser("user3", UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = true))
+        runAsUser1 {
+            assertFalse(client.follow(user).pending)
+            assertEquals(1, client.getUser(user).followersCount)
+        }
+    }
+
+    @Test
+    fun `following a private account stays pending`() = runTest {
+        val user = setupTestUser("user3", UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+        runAsUser1 {
+            assertTrue(client.follow(user).pending)
+            assertEquals(0, client.getUser(user).followersCount)
+        }
+    }
+
+    @Test
+    fun `switching an account to public accepts its pending follow requests`() = runTest {
+        val user = setupTestUser("user3", UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+        runAsUser1 {
+            assertTrue(client.follow(user).pending)
+        }
+        userService.updateSettings(user, UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = true))
+        runAsUser1 {
+            assertEquals(1, client.getUser(user).followersCount)
+            assertEquals(listOf(false), client.getFollowers(user).map { it.pending })
         }
     }
 }
