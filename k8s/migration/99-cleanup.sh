@@ -62,5 +62,6 @@ Cleanup done. Two follow-ups outside the cluster:
        git -C <kubeconfig> commit -m "cooknco: manifests moved to the app repo (k8s/)"
 
   2. The deploy job's pre-flight check now passes, so master pushes deploy
-     automatically. Confirm the KUBE_CONFIG secret is set.
+     automatically. Confirm the four deploy secrets are set: DEPLOY_HOST,
+     DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_SSH_KNOWN_HOSTS (see k8s/README.md).
 EOF

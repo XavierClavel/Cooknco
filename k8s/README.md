@@ -79,23 +79,62 @@ Two workflows, both in `.github/workflows/`.
    so this cannot loop.
 2. The `deploy` job re-pins to the version this run actually built (so a race
    between the bump commit and its own checkout cannot deploy a stale tag),
-   runs `--dry-run=server`, applies both roots, and waits on all six rollouts.
+   renders both roots on the runner, and pipes them into `kubectl apply` over
+   SSH: `--dry-run=server` first, then the apply, then all six rollouts.
+
+The cluster API is never exposed to the internet. The only inbound door is
+sshd on the cluster host, and the only credential GitHub holds is the deploy
+key — no kubeconfig is stored in the repository or in Actions. The kubeconfig
+lives on the host, owned by the deploy user, and the runner only ever sends it
+rendered manifests. Those manifests are checked for `kind: Secret` before they
+leave the runner: every Secret the app needs is created out-of-band on the
+cluster (see the table above), so one appearing in the render means a generator
+crept back into the overlay, and the job fails rather than shipping credentials
+through GitHub's infrastructure.
 
 ### Repository setup the deploy job needs
 
-- **`KUBE_CONFIG`** secret — a base64-encoded kubeconfig:
-  `base64 -w0 < ~/.kube/config` (`base64 -i ~/.kube/config` on macOS).
-  Use a dedicated ServiceAccount scoped to the `cooknco` and `kafka`
-  namespaces rather than cluster-admin credentials.
-- The cluster API server must be reachable from GitHub-hosted runners. If it
-  is not exposed publicly, switch the `deploy` job to a self-hosted runner on
-  the cluster's network, or join the runner to a Tailscale/WireGuard network.
+Four secrets, all under *Settings → Secrets and variables → Actions*:
+
+| Secret | Value |
+|---|---|
+| `DEPLOY_HOST` | Hostname or IP of the cluster host running sshd |
+| `DEPLOY_USER` | Login the deploy key belongs to; owns `~/.kube/config` on that host |
+| `DEPLOY_SSH_KEY` | The **private** half of a dedicated deploy keypair, in full PEM form |
+| `DEPLOY_SSH_KNOWN_HOSTS` | The host's public key line, so the runner pins it |
+
+Generating and installing the key:
+
+```sh
+ssh-keygen -t ed25519 -f ~/.ssh/cooknco_deploy -C "github-actions cooknco deploy" -N ''
+ssh-copy-id -i ~/.ssh/cooknco_deploy.pub <deploy-user>@<host>
+
+pbcopy    < ~/.ssh/cooknco_deploy     # -> DEPLOY_SSH_KEY   (private key, whole file)
+ssh-keyscan -H <host> | pbcopy        # -> DEPLOY_SSH_KNOWN_HOSTS
+```
+
+`ssh-keyscan` is trust-on-first-use: run it from somewhere you trust the path,
+and check the fingerprint against `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`
+on the host itself. The key is pinned rather than `StrictHostKeyChecking=no`
+because this channel carries manifests an interceptor could rewrite into
+anything the deploy user is allowed to apply.
+
+On the host, `<deploy-user>` needs a working `~/.kube/config`. Point it at a
+dedicated ServiceAccount scoped to the `cooknco` and `kafka` namespaces rather
+than cluster-admin credentials.
+
+The workflow assumes sshd on port 22. If it listens elsewhere, change
+`DEPLOY_PORT` in the `deploy` job's `env:` block.
+
+Two more repository-level notes:
+
 - `master` must accept pushes from `github-actions[bot]`. If branch protection
   blocks it, either add the bot as an exception or drop the *Commit image tag
   bump* step — the `deploy` job re-pins the tag itself, so deployments still
   work; only the git-recorded history of deployed versions is lost.
-- Optional but recommended: move the `deploy` job behind a GitHub
-  `environment: production` to get a manual approval gate.
+- The `deploy` job declares `environment: production`. GitHub creates that
+  environment on the first run; attaching a required reviewer to it in the
+  repository settings puts a manual approval gate in front of prod.
 
 The `deploy` job refuses to run while nodePort 30080 is held outside the
 `cooknco` namespace. That is the pre-migration state, so **complete

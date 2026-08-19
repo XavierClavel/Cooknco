@@ -180,9 +180,11 @@ CI pushed an image-tag bump you should revert that commit and disable the
    git -C <kubeconfig> rm -r cooknco
    git -C <kubeconfig> commit -m "cooknco: manifests moved to the app repo (k8s/)"
    ```
-2. Set the `KUBE_CONFIG` secret if you have not already. The `deploy` job's
-   pre-flight check passes once nodePort 30080 is held only by `cooknco`, so the
-   next push to `master` deploys automatically.
+2. Set the four deploy secrets if you have not already — `DEPLOY_HOST`,
+   `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_SSH_KNOWN_HOSTS`; see
+   [../README.md](../README.md#repository-setup-the-deploy-job-needs). The
+   `deploy` job's pre-flight check passes once nodePort 30080 is held only by
+   `cooknco`, so the next push to `master` deploys automatically.
 3. The overlay is still pinned to the pre-migration versions (backend and
    frontend `1.1.0`, mail-service `1.2.9` — which is what its `latest` tag
    already resolved to) so that this migration changed the namespace and nothing
