@@ -38,3 +38,7 @@ out/
 ### Custom ###
 /backend/.env
 /backend/src/main/resources/application.yaml
+
+### Kubernetes migration artefacts (contain database dumps and user uploads) ###
+/k8s/migration/backup-*/
+/k8s/migration/.last-backup

@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mail-service-database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mail-service-database
+  template:
+    metadata:
+      labels:
+        app: mail-service-database
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17.2
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: mail-database-secrets
+          volumeMounts:
+            - name: mail-service-data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+      volumes:
+        - name: mail-service-data
+          persistentVolumeClaim:
+            claimName: mail-service-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mail-service-database
+spec:
+  selector:
+    app: mail-service-database
+  ports:
+    - port: 5432
+      targetPort: 5432

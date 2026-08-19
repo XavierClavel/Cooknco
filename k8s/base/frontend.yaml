@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cooknco-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cooknco-frontend
+  template:
+    metadata:
+      labels:
+        app: cooknco-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: xavierclavel/cooknco-frontend
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cooknco-frontend
+spec:
+  type: NodePort # or LoadBalancer if cloud
+  selector:
+    app: cooknco-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 30080

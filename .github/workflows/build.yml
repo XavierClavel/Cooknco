@@ -8,9 +8,21 @@ on:
 permissions:
   contents: write
 
+# Serialise master builds so two runs cannot race on the image-tag bump commit
+# or apply to the cluster at the same time.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  KUSTOMIZE_VERSION: '5.7.1'
+  DEPLOY_OVERLAY: k8s/overlays/prod
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
     - name: Checkout repository
@@ -48,6 +60,7 @@ jobs:
       run: |
         VERSION=$(./gradlew -q printVersion)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Detected version: $VERSION"
 
     - name: Gradle build
@@ -66,6 +79,36 @@ jobs:
           docker tag ${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project:${{ env.VERSION }} ${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project:latest
         done
+
+    - name: Install kustomize
+      if: github.event_name != 'pull_request'
+      run: |
+        curl -sSfL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+          | tar xz -C /usr/local/bin kustomize
+
+    - name: Bump image tags in ${{ env.DEPLOY_OVERLAY }}
+      if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+      run: |
+        cd "${DEPLOY_OVERLAY}"
+        for project in backend frontend mail-service; do
+          # `=*:tag` rewrites only newTag and leaves the repository name alone.
+          kustomize edit set image \
+            "${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project=*:${{ env.VERSION }}"
+        done
+
+    - name: Commit image tag bump
+      if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+      run: |
+        if git diff --quiet -- "${DEPLOY_OVERLAY}"; then
+          echo "Overlay already pins ${VERSION}. Nothing to commit."
+          exit 0
+        fi
+        git config user.name  "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add "${DEPLOY_OVERLAY}"
+        git commit -m "ci: pin cooknco images to ${VERSION} [skip ci]"
+        # Pushes with GITHUB_TOKEN do not re-trigger workflows, so this cannot loop.
+        git push origin HEAD:master
 
     - name: Create tag if it does not exist
       run: |
@@ -106,3 +149,100 @@ jobs:
               throw error;
             }
           }
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Pick up the image-tag bump the build job just pushed.
+        ref: master
+
+    - name: Install kustomize
+      run: |
+        curl -sSfL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+          | tar xz -C /usr/local/bin kustomize
+
+    - name: Configure kubectl
+      env:
+        # Via env, not inline interpolation: the value is a multi-line base64
+        # blob and would break a shell test if pasted into the script.
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+      run: |
+        if [ -z "$KUBE_CONFIG" ]; then
+          echo "::error::KUBE_CONFIG secret is not set. See k8s/README.md."
+          exit 1
+        fi
+        mkdir -p "$HOME/.kube"
+        printf '%s' "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+        chmod 600 "$HOME/.kube/config"
+        kubectl version
+        kubectl config current-context
+
+    - name: Re-pin overlay to the version built by this run
+      run: |
+        # Idempotent, and immune to the checkout above racing the bump commit:
+        # what gets applied is always the image this run actually pushed.
+        cd "${DEPLOY_OVERLAY}"
+        for project in backend frontend mail-service; do
+          kustomize edit set image \
+            "${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project=*:${VERSION}"
+        done
+
+    - name: Pre-flight — refuse to deploy while the legacy release is up
+      run: |
+        # nodePort 30080 is unique cluster-wide. While the pre-migration release
+        # still owns it in `default`, the apply below fails halfway through and
+        # leaves the namespace part-applied. Fail early, pointing at the runbook.
+        # kubectl's jsonpath cannot filter on a wildcard sub-path, so list
+        # namespace/name plus every nodePort and match with awk.
+        holder=$(kubectl get svc --all-namespaces \
+          -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{" "}{.spec.ports[*].nodePort}{"\n"}{end}' \
+          | awk '/(^| )30080( |$)/ {print $1}' \
+          | grep -v '^cooknco/' || true)
+        if [ -n "$holder" ]; then
+          echo "::error::nodePort 30080 is still held outside the cooknco namespace:"
+          echo "$holder"
+          echo "::error::Complete the cutover in k8s/migration/README.md first."
+          exit 1
+        fi
+
+    - name: Diff against the cluster
+      continue-on-error: true
+      run: |
+        echo "::group::kubectl diff"
+        kubectl diff -k "${DEPLOY_OVERLAY}" || true
+        kubectl diff -k k8s/kafka-topics || true
+        echo "::endgroup::"
+
+    - name: Server-side dry run
+      run: |
+        kubectl apply -k "${DEPLOY_OVERLAY}" --dry-run=server
+        kubectl apply -k k8s/kafka-topics --dry-run=server
+
+    - name: Apply manifests
+      run: |
+        kubectl apply -k "${DEPLOY_OVERLAY}"
+        # Applied separately: Strimzi only reconciles KafkaTopics in the Kafka
+        # cluster's namespace, which the prod overlay cannot retarget.
+        kubectl apply -k k8s/kafka-topics
+
+    - name: Wait for rollouts
+      run: |
+        for deploy in cooknco-database cooknco-redis mail-service-database \
+                      cooknco-backend cooknco-frontend cooknco-mail-service; do
+          echo "--- $deploy"
+          kubectl -n cooknco rollout status "deployment/$deploy" --timeout=5m
+        done
+
+    - name: Report failure detail
+      if: failure()
+      run: |
+        kubectl -n cooknco get pods -o wide || true
+        kubectl -n cooknco get events --sort-by=.lastTimestamp | tail -40 || true
