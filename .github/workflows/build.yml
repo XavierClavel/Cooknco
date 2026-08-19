@@ -76,11 +76,36 @@ jobs:
           git push origin v${{ env.VERSION }}
         fi
 
+    - name: Build changelog since last release
+      id: changelog
+      run: |
+        TAG="v${{ env.VERSION }}"
+        PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+        if [ -n "$PREV_TAG" ]; then
+          RANGE="${PREV_TAG}..${TAG}"
+          echo "Previous tag: $PREV_TAG"
+        else
+          RANGE="$TAG"
+          echo "No previous tag found, listing all commits."
+        fi
+        {
+          echo "## What's Changed"
+          echo
+          git log --no-merges --pretty=format:'- %s (%h)' "$RANGE"
+          echo
+          if [ -n "$PREV_TAG" ]; then
+            echo
+            echo "**Full Changelog**: ${{ github.server_url }}/${{ github.repository }}/compare/${PREV_TAG}...${TAG}"
+          fi
+        } > release_notes.md
+        cat release_notes.md
+
     - name: Create GitHub Release if it does not exist
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
+          const fs = require('fs');
           const tag = `v${process.env.VERSION}`;
           try {
             // Check if release already exists
@@ -93,12 +118,14 @@ jobs:
           } catch (error) {
             if (error.status === 404) {
               core.info(`Creating new release for ${tag}`);
+              const body = fs.readFileSync('release_notes.md', 'utf8').trim()
+                || 'Release created automatically by GitHub Actions.';
               await github.rest.repos.createRelease({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 tag_name: tag,
                 name: `Release ${process.env.VERSION}`,
-                body: "Release created automatically by GitHub Actions.",
+                body,
                 draft: false,
                 prerelease: process.env.prerelease === 'true'
               });
