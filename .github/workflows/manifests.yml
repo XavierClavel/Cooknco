@@ -33,16 +33,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install kustomize
+      # Downloaded to a file rather than piped into tar: a reset mid-stream (which
+      # these GitHub release URLs do throw) would otherwise hand tar a truncated
+      # archive that no amount of curl retrying can undo.
+      - name: Install kustomize and kubeconform
         run: |
-          curl -sSfL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
-            | tar xz -C /usr/local/bin kustomize
+          curl -sSfL --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 15 \
+            -o /tmp/kustomize.tar.gz \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          tar xzf /tmp/kustomize.tar.gz -C /usr/local/bin kustomize
           kustomize version
 
-      - name: Install kubeconform
-        run: |
-          curl -sSfL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
-            | tar xz -C /usr/local/bin kubeconform
+          curl -sSfL --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 15 \
+            -o /tmp/kubeconform.tar.gz \
+            "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          tar xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
           kubeconform -v
 
       - name: Render ${{ matrix.overlay }}
