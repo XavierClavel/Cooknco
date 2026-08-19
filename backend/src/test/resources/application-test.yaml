@@ -2,9 +2,12 @@ ebean:
   test:
     platform: postgres
     ddlMode: dropCreate
-    dbName: my_app
+    # dbName is set per checkout in test-ebean.properties
     postgres:
       version: 17.2
+      # keep the container alive between runs: the default shutdown hook removes it
+      # at JVM exit, racing (and breaking) any other test run using the same container
+      shutdownMode: none
 frontend:
   url: http://localhost:3000
 backend:

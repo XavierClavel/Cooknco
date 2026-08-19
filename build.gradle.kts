@@ -1,5 +1,5 @@
 allprojects {
-    version = "1.2.9"
+    version = "1.2.10"
     group = "eu.cooknco"
 }
 
@@ -11,7 +11,7 @@ plugins {
 }
 
 val junitVersion = "5.10.2"
-val testcontainersVersion = "1.20.1"
+val testcontainersVersion = "1.21.4"
 val ebeanVersion = "17.0.1"
 val ktorVersion = "3.2.3"
 val koinVersion = "4.0.0"
@@ -81,6 +81,15 @@ subprojects {
 
     tasks.test {
         useJUnitPlatform()
+        // Each checkout gets its own database in the shared ebean test container, so
+        // concurrent checkouts/worktrees don't drop-create each other's schema.
+        // application-test.yaml resolves ${EBEAN_TEST_DBNAME}; an explicit
+        // EBEAN_TEST_DBNAME in the environment still wins.
+        environment(
+            "EBEAN_TEST_DBNAME",
+            System.getenv("EBEAN_TEST_DBNAME")
+                ?: ("test_" + Integer.toHexString(rootProject.projectDir.absolutePath.hashCode()))
+        )
     }
 }
 

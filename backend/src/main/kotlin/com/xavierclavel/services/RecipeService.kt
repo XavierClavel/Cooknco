@@ -12,6 +12,7 @@ import com.xavierclavel.models.query.QRecipe
 import com.xavierclavel.utils.DbTransaction.insertAndGet
 import com.xavierclavel.utils.DbTransaction.updateAndGet
 import com.xavierclavel.utils.logger
+import com.xavierclavel.utils.sqlStringLiteral
 import shared.RecipeFilter
 import shared.dto.RecipeDTO
 import shared.enums.DishClass
@@ -260,7 +261,9 @@ class RecipeService: KoinComponent {
     private fun QRecipe.filterBySearch(search: String?) =
         if (search.isNullOrEmpty()) this
         else this.apply {
-            this.raw("similarity(unaccent(title), unaccent(?)) > 0.3", search)
+            // word_similarity matches the query against the best-matching part of the
+            // title, so short queries still match long titles (similarity would not)
+            this.raw("word_similarity(unaccent(?), unaccent(${QRecipe.Alias.title})) > 0.3", search)
         }
 
     private fun QRecipe.sort(sort: Sort, recipeFilter: RecipeFilter) =
@@ -273,7 +276,11 @@ class RecipeService: KoinComponent {
             Sort.DATE_ASCENDING -> this.orderBy().creationDate.asc()
             Sort.DATE_DESCENDING -> this.orderBy().creationDate.desc()
             Sort.RANDOM -> this.orderBy("random()")
-            Sort.BEST_MATCH -> this.orderBy("similarity(unaccent(title), unaccent('" + recipeFilter.search!!.replace("'", "''") + "')) desc")
+            // Ebean copies orderBy strings into SQL verbatim (no parameter binding),
+            // so the search term is inlined as an injection-proof hex literal
+            Sort.BEST_MATCH -> this.orderBy(
+                "word_similarity(unaccent(${sqlStringLiteral(recipeFilter.search.orEmpty())}), unaccent(${QRecipe.Alias.title})) desc"
+            )
         }
 
 }
