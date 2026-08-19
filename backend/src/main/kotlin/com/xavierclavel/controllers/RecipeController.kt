@@ -2,7 +2,6 @@ package com.xavierclavel.controllers
 
 import com.xavierclavel.controllers.AuthController.getOptionalSessionId
 import com.xavierclavel.controllers.AuthController.getSessionUserId
-import com.xavierclavel.services.CustomIngredientService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeService
@@ -35,7 +34,6 @@ import org.koin.java.KoinJavaComponent.inject
 object RecipeController: Controller(RECIPE_URL) {
     val recipeService: RecipeService by inject(RecipeService::class.java)
     val recipeIngredientService: RecipeIngredientService by inject(RecipeIngredientService::class.java)
-    val customIngredientService: CustomIngredientService by inject(CustomIngredientService::class.java)
     val userService: UserService by inject(UserService::class.java)
     val imageService: ImageService by inject(ImageService::class.java)
 
@@ -80,35 +78,26 @@ object RecipeController: Controller(RECIPE_URL) {
     }
 
     private fun Route.createRecipe() = post {
-        try {
-            val user = userService.getEntityById(getSessionUserId())
-            val recipeDto = call.receive<RecipeDTO>()
-            val recipe = recipeService.createRecipe(recipeDto, user)
-            recipeIngredientService.updateRecipeIngredients(recipe.id, recipeDto)
-            customIngredientService.updateCustomIngredients(recipe.id, recipeDto)
-            val recipeInfo = recipeService.getRawById(recipe.id, getSessionUserId(), Locale.EN)
-            logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) created by user ${user.username}"}
-            call.respond(HttpStatusCode.Created, recipeInfo)
-        } catch (e: Exception) {
-            logger.error {e.message}
-        }
-
+        val user = userService.getEntityById(getSessionUserId())
+        val recipeDto = call.receive<RecipeDTO>()
+        // Validated before the recipe is inserted, so a rejected ingredient leaves nothing behind.
+        val ingredients = recipeIngredientService.validateIngredients(recipeDto)
+        val recipe = recipeService.createRecipe(recipeDto, user)
+        recipeIngredientService.replaceRecipeIngredients(recipe.id, ingredients)
+        val recipeInfo = recipeService.getRawById(recipe.id, getSessionUserId(), Locale.EN)
+        logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) created by user ${user.username}"}
+        call.respond(HttpStatusCode.Created, recipeInfo)
     }
 
     private fun Route.updateRecipe() = put("/{id}") {
-        try {
-            val recipeId = getPathId()
-            val recipe = recipeService.getRawById(recipeId, getSessionUserId(), Locale.EN)
-            checkRecipeEditionRights(recipe.owner.id)
-            val recipeDto = call.receive<RecipeDTO>()
-            recipeIngredientService.updateRecipeIngredients(recipe.id, recipeDto)
-            customIngredientService.updateCustomIngredients(recipe.id, recipeDto)
-            val recipeInfo = recipeService.updateRecipe(recipeId, recipeDto)
-            logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) edited by user ${recipe.owner.username}"}
-            call.respond(HttpStatusCode.OK, recipeInfo)
-        } catch (e: Exception) {
-            logger.error {e}
-        }
+        val recipeId = getPathId()
+        val recipe = recipeService.getRawById(recipeId, getSessionUserId(), Locale.EN)
+        checkRecipeEditionRights(recipe.owner.id)
+        val recipeDto = call.receive<RecipeDTO>()
+        recipeIngredientService.updateRecipeIngredients(recipe.id, recipeDto)
+        val recipeInfo = recipeService.updateRecipe(recipeId, recipeDto)
+        logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) edited by user ${recipe.owner.username}"}
+        call.respond(HttpStatusCode.OK, recipeInfo)
     }
 
     private fun Route.deleteRecipe() = delete("/{id}") {

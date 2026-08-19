@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <addColumn tableName="ingredients">
+            <column name="grams_per_unit" type="float"/>
+            <column name="grams_per_milliliter" type="float"/>
+            <column name="measurable_by_weight" type="boolean" defaultValue="true" notnull="true"/>
+        </addColumn>
+    </changeSet>
+    <changeSet type="pendingDrops">
+        <dropColumn columnName="allow_amount" tableName="ingredients"/>
+        <dropColumn columnName="allow_weight" tableName="ingredients"/>
+        <dropColumn columnName="allow_volume" tableName="ingredients"/>
+        <dropColumn columnName="volumic_mass" tableName="ingredients"/>
+        <dropColumn columnName="weight_per_unit" tableName="ingredients"/>
+    </changeSet>
+</migration>

@@ -1,8 +1,10 @@
 package shared.infodto
 
 import shared.dto.IngredientDTO
+import shared.enums.AmountUnit
 import shared.enums.IngredientType
 import shared.enums.Locale
+import shared.enums.MeasurementType
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -21,12 +23,13 @@ data class IngredientInfo(
     val proteins: Float = 0f,
     val sodium: Float = 0f,
 
-    val allowAmount: Boolean = true,
-    val allowWeight: Boolean = true,
-    val allowVolume: Boolean = true,
+    val gramsPerUnit: Float? = null,
+    val gramsPerMilliliter: Float? = null,
+    val measurableByWeight: Boolean = true,
+    val defaultUnit: AmountUnit? = null,
 
-    val volumicMass: Float = 1f,
-    val weightPerUnit: Float = 1f,
+    /** Derived from the conversions above; clients filter the unit picker with it. */
+    val allowedTypes: Set<MeasurementType> = setOf(MeasurementType.NONE),
 ) {
     fun compareToDTO(ingredientDTO: IngredientDTO): Boolean =
         this.type == ingredientDTO.type &&

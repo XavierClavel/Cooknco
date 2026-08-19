@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <addColumn tableName="recipe_ingredients">
+            <column name="custom_name" type="varchar(50)"/>
+            <column name="sort_order" type="integer" defaultValue="0" notnull="true"/>
+        </addColumn>
+        <alterForeignKey name="fk_custom_ingredients_recipe_id" columnNames="DROP FOREIGN KEY" indexName="ix_custom_ingredients_recipe_id" tableName="custom_ingredients"/>
+    </changeSet>
+    <changeSet type="pendingDrops">
+        <dropTable name="custom_ingredients" sequenceCol="id"/>
+    </changeSet>
+</migration>

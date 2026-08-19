@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <addColumn tableName="ingredients">
+            <column name="default_unit" type="varchar(11)" checkConstraint="check ( default_unit in ('NONE','UNIT','GRAM','KILOGRAM','POUND','MILLILITERS','CENTILITER','LITER','TEASPOON','TABLESPOON','CUP'))" checkConstraintName="ck_ingredients_default_unit"/>
+        </addColumn>
+    </changeSet>
+</migration>

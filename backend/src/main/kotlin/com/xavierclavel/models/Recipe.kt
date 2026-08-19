@@ -3,7 +3,6 @@ package com.xavierclavel.models
 import com.xavierclavel.models.jointables.CookbookRecipe
 import com.xavierclavel.models.jointables.Like
 import com.xavierclavel.models.jointables.RecipeIngredient
-import com.xavierclavel.models.jointables.CustomIngredient
 import shared.dto.RecipeDTO
 import shared.enums.DishClass
 import shared.enums.Locale
@@ -63,9 +62,6 @@ class Recipe (
     @OneToMany(fetch = FetchType.EAGER, cascade = [CascadeType.ALL], orphanRemoval = true)
     var ingredients: List<RecipeIngredient> = listOf(),
 
-    @OneToMany(fetch = FetchType.EAGER, cascade = [CascadeType.ALL], orphanRemoval = true)
-    var customIngredients: List<CustomIngredient> = listOf(),
-
 
     @ManyToOne
     var owner: User? = null,
@@ -123,8 +119,7 @@ class Recipe (
         description = description,
         dishClass = dishClass,
         steps = steps,
-        ingredients = ingredients.map { it.toInfo(locale) },
-        customIngredients = customIngredients.map {it.toInfo()},
+        ingredients = ingredients.sortedBy { it.sortOrder }.map { it.toInfo(locale) },
 
         owner = this.owner!!.toOverview(),
         creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),

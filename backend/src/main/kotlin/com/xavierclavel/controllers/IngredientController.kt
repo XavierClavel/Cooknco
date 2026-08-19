@@ -7,8 +7,12 @@ import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getQuery
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.logger
+import shared.dto.AbsorbCustomIngredientDTO
+import shared.dto.AbsorbCustomIngredientResult
 import shared.dto.IngredientDTO
 import shared.dto.SearchResult
+import shared.infodto.CustomIngredientUsage
 import shared.infodto.IngredientInfo
 import shared.utils.URL.INGREDIENT_URL
 import io.ktor.http.HttpStatusCode
@@ -36,7 +40,29 @@ object IngredientController: Controller(INGREDIENT_URL) {
             createIngredientsBatch()
             updateIngredient()
             deleteIngredient()
+            listCustomIngredientUsage()
+            absorbCustomIngredient()
         }
+    }
+
+    /** Which free-text ingredient names users type most, i.e. what to add to the catalog next. */
+    private fun Route.listCustomIngredientUsage() = get("/custom-usage") {
+        val paging = getPaging()
+        val usage = ingredientService.findCustomIngredientUsage(paging)
+        val result = SearchResult(usage.first, paging.pageIndex(), paging.pageSize(), usage.second)
+        call.respond(json.encodeToString(SearchResult.serializer(CustomIngredientUsage.serializer()), result))
+    }
+
+    /** Re-points recipe rows that used a free-text name at this ingredient. */
+    private fun Route.absorbCustomIngredient() = post("/{id}/absorb-custom") {
+        val id = getPathId()
+        val dto = call.receive<AbsorbCustomIngredientDTO>()
+        val result = ingredientService.absorbCustomIngredient(id, dto.name)
+        logger.info {
+            "Absorbed ${result.convertedRows} custom ingredient rows named '${dto.name}' into ingredient $id" +
+                ", skipped ${result.skippedRows} whose unit it does not allow"
+        }
+        call.respond(result)
     }
 
     private fun Route.createIngredient() = post {

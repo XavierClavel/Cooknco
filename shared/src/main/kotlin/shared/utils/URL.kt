@@ -4,6 +4,7 @@ object URL {
     const val USER_URL = "api/v1/user"
     const val NOTIFICATION_URL = "api/v1/notification"
     const val INGREDIENT_URL = "api/v1/ingredient"
+    const val UNIT_URL = "api/v1/unit"
     const val RECIPE_URL = "api/v1/recipe"
     const val RECIPE_NOTES_URL = "api/v1/recipe-notes"
     const val LIKE_URL = "api/v1/like"

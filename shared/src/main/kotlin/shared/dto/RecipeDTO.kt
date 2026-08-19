@@ -2,7 +2,6 @@ package shared.dto
 
 import shared.enums.AmountUnit
 import shared.enums.DishClass
-import shared.infodto.CustomIngredientInfo
 import kotlinx.serialization.*
 
 @Serializable
@@ -17,31 +16,24 @@ data class RecipeDTO (
     val cookingTemperature: Int? = null,
 
     val ingredients: MutableList<RecipeIngredientDTO> = mutableListOf(),
-    val customIngredients: MutableList<CustomIngredientDTO> = mutableListOf(),
     val steps: MutableList<String> = mutableListOf(),
 
     val tips: String = "",
 ) {
+    /**
+     * A recipe ingredient is either a reference to the ingredients table (id) or free text
+     * entered by the user (customName). Exactly one of the two is set.
+     */
     @Serializable
     data class RecipeIngredientDTO (
-        val id: Long,
+        val id: Long? = null,
+        val customName: String? = null,
         val unit: AmountUnit = AmountUnit.NONE,
         val amount: Float? = null,
         val complement: String? = null,
-    )
-
-    @Serializable
-    data class CustomIngredientDTO (
-        val name: String,
-        val unit: AmountUnit = AmountUnit.NONE,
-        val amount: Float? = null,
     ) {
-        fun toInfo() = CustomIngredientInfo(
-            name = name,
-            unit = unit,
-            amount = amount,
-        )
+        val isCustom: Boolean get() = id == null
     }
 }
 
-
+const val CUSTOM_INGREDIENT_NAME_MAX_LENGTH = 50
