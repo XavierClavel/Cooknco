@@ -27,6 +27,8 @@ import io.ktor.server.auth.session
 import io.ktor.server.response.respond
 import io.ktor.server.sessions.Sessions
 import io.ktor.server.sessions.cookie
+import io.ktor.server.sessions.sessions
+import io.ktor.server.sessions.set
 import io.ktor.client.engine.cio.*
 import io.ktor.server.auth.bearer
 import io.lettuce.core.ExperimentalLettuceCoroutinesApi
@@ -45,7 +47,10 @@ fun Application.configureAuthentication() {
         cookie<UserSession>("user_session") {
             cookie.httpOnly = true
             cookie.path = "/"
-            cookie.maxAgeInSeconds = 7 * 24 * 60 * 60
+            cookie.maxAgeInSeconds = RedisService.SESSION_TTL
+            // Local dev runs on plain http, where a Secure cookie would never be sent back.
+            cookie.secure = configuration.backend.url.startsWith("https")
+            cookie.extensions["SameSite"] = "Lax"
         }
     }
 
@@ -68,6 +73,7 @@ fun Application.configureAuthentication() {
             authenticate { tokenCredential ->
                 val session = redisService.getSession(tokenCredential.token)
                 if (session != null) {
+                    redisService.touchSession(tokenCredential.token)
                     UserIdPrincipal(session.userId.toString())
                 } else {
                     null
@@ -101,6 +107,8 @@ fun Application.configureAuthentication() {
         session<UserSession>("auth-session") {
             validate { session ->
                 if (redisService.hasSession(session.sessionId)) {
+                    // Rolling session: an active user keeps their session alive indefinitely.
+                    if (redisService.touchSession(session.sessionId)) sessions.set(session)
                     session
                 } else {
                     null
@@ -112,7 +120,9 @@ fun Application.configureAuthentication() {
         }
         session<UserSession>("admin-session") {
             validate { session ->
-                redisService.getAdminSession(session.sessionId)
+                redisService.getAdminSession(session.sessionId)?.also {
+                    if (redisService.touchSession(session.sessionId)) sessions.set(session)
+                }
             }
             challenge {
                 call.respond(HttpStatusCode.Unauthorized, UnauthorizedCause.SESSION_NOT_FOUND.key)

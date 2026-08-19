@@ -21,6 +21,14 @@ data class SessionData(
 }
 
 class RedisService(redisUrl: String): KoinComponent {
+    companion object {
+        /** Idle timeout: a session survives this long without activity. */
+        const val SESSION_TTL = 30L * 24 * 60 * 60
+
+        /** Slide the TTL only once this much of it has been consumed, to avoid a Redis write per request. */
+        const val REFRESH_THRESHOLD = 24L * 60 * 60
+    }
+
     private val client = RedisClient.create(redisUrl)
     private val connection = client.connect()
 
@@ -30,7 +38,20 @@ class RedisService(redisUrl: String): KoinComponent {
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun createSession(sessionId: String, user: UserInfo) {
         val json = SessionData.from(user)
-        redis.setex("session:$sessionId", 7 * 24 * 60 * 60, Json.encodeToString(json))
+        redis.setex("session:$sessionId", SESSION_TTL, Json.encodeToString(json))
+    }
+
+    /**
+     * Slides the session expiry back to [SESSION_TTL] so that an active user is never logged out.
+     * Returns true when the TTL was actually extended, so the caller knows to re-emit the cookie.
+     */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun touchSession(sessionId: String): Boolean {
+        val key = "session:$sessionId"
+        val ttl = redis.ttl(key) ?: return false
+        if (ttl <= 0 || ttl > SESSION_TTL - REFRESH_THRESHOLD) return false
+        redis.expire(key, SESSION_TTL)
+        return true
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
