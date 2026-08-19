@@ -10,16 +10,29 @@ show_context
 
 BACKUP_DIR="${BACKUP_DIR:-$(cat k8s/migration/.last-backup 2>/dev/null || true)}"
 [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ] || die "set BACKUP_DIR to the directory written by 02-freeze-and-backup.sh"
+load_plan
+print_plan
 
-confirm "Roll back to $SRC_NS and stop serving from $DST_NS?"
+# Rolling back only undoes THIS migration. Anything that already lived in
+# $DST_NS before it started has no home in $SRC_NS to go back to, so scaling it
+# down here would take it offline permanently.
+if [ -n "${PRESERVED:-}" ]; then
+  say "leaving already-migrated components running in $DST_NS: $PRESERVED"
+fi
+
+confirm "Roll back [${MIGRATE_APP:-none} ${MIGRATE_DB:-} ${MIGRATE_CACHE:-}] to $SRC_NS?"
 
 # Free nodePort 30080 and the cooknco.eu host again, in the other direction.
 say "removing the new Service and Ingress"
 kubectl -n "$DST_NS" delete ingress cooknco-frontend --ignore-not-found
 kubectl -n "$DST_NS" delete svc cooknco-frontend --ignore-not-found
-say "scaling $DST_NS to zero"
-scale_deploys "$DST_NS" 0 "${APP_DEPLOYS[@]}" "${DB_DEPLOYS[@]}"
-wait_gone "$DST_NS" "${APP_DEPLOYS[@]}" "${DB_DEPLOYS[@]}"
+say "scaling the migrated components in $DST_NS to zero"
+scale_deploys "$DST_NS" 0 ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"} \
+                          ${MIGRATE_DB_A[@]+"${MIGRATE_DB_A[@]}"} \
+                          ${MIGRATE_CACHE_A[@]+"${MIGRATE_CACHE_A[@]}"}
+wait_gone "$DST_NS" ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"} \
+                    ${MIGRATE_DB_A[@]+"${MIGRATE_DB_A[@]}"} \
+                    ${MIGRATE_CACHE_A[@]+"${MIGRATE_CACHE_A[@]}"}
 
 # 03-cutover.sh deleted exactly these three; everything else in $SRC_NS was
 # only scaled to zero and is still there.
@@ -33,11 +46,17 @@ done
 shopt -u nullglob
 [ "$restored" -gt 0 ] || die "no snapshots in $BACKUP_DIR/restore — cannot rebuild the Service/Ingress"
 
-say "restarting $SRC_NS (databases first)"
-scale_deploys "$SRC_NS" 1 "${DB_DEPLOYS[@]}"
-for d in "${DB_DEPLOYS[@]}"; do kubectl -n "$SRC_NS" rollout status "deploy/$d" --timeout=5m; done
-scale_deploys "$SRC_NS" 1 "${APP_DEPLOYS[@]}"
-for d in "${APP_DEPLOYS[@]}"; do kubectl -n "$SRC_NS" rollout status "deploy/$d" --timeout=5m; done
+say "restarting $SRC_NS (databases and cache first)"
+scale_deploys "$SRC_NS" 1 ${MIGRATE_DB_A[@]+"${MIGRATE_DB_A[@]}"} \
+                          ${MIGRATE_CACHE_A[@]+"${MIGRATE_CACHE_A[@]}"}
+for d in ${MIGRATE_DB_A[@]+"${MIGRATE_DB_A[@]}"} \
+         ${MIGRATE_CACHE_A[@]+"${MIGRATE_CACHE_A[@]}"}; do
+  kubectl -n "$SRC_NS" rollout status "deploy/$d" --timeout=5m
+done
+scale_deploys "$SRC_NS" 1 ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"}
+for d in ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"}; do
+  kubectl -n "$SRC_NS" rollout status "deploy/$d" --timeout=5m
+done
 
 kubectl -n "$SRC_NS" get deploy,svc,ingress
 cat <<'EOF'

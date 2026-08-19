@@ -10,6 +10,8 @@ show_context
 
 [ -f k8s/migration/.last-backup ] || die "no backup recorded — run 02-freeze-and-backup.sh first"
 say "using backup: $(cat k8s/migration/.last-backup)"
+load_plan
+print_plan
 
 confirm "Delete the legacy Ingress, Service and Certificate from $SRC_NS?"
 
@@ -33,11 +35,15 @@ kubectl apply -k "$OVERLAY"
 # Held at zero so the backend cannot create an Ebean schema in the fresh
 # database while 04-restore.sh is dropping and recreating it. (04 recreates the
 # database anyway, so this is belt-and-braces rather than a hard race.)
-say "holding the app tier at zero replicas until the data is restored"
-scale_deploys "$DST_NS" 0 "${APP_DEPLOYS[@]}"
+#
+# Only the deployments being migrated are held. Anything already running in
+# $DST_NS keeps serving: its database is not being restored, so there is nothing
+# to protect it from.
+say "holding [${MIGRATE_APP:-none}] at zero replicas until the data is restored"
+scale_deploys "$DST_NS" 0 ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"}
 
-say "waiting for the database tier in $DST_NS"
-for d in "${DB_DEPLOYS[@]}"; do
+say "waiting for the databases being migrated"
+for d in ${MIGRATE_DB_A[@]+"${MIGRATE_DB_A[@]}"}; do
   kubectl -n "$DST_NS" rollout status "deploy/$d" --timeout=5m
 done
 

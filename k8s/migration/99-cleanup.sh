@@ -12,8 +12,11 @@ kubectl -n "$DST_NS" get deploy -o wide
 confirm "Is $DST_NS above healthy, and is the backup archived off-cluster?"
 confirm "DELETE the cooknco workloads AND PersistentVolumeClaims from $SRC_NS? This destroys the old data."
 
+load_plan
 say "deleting legacy workloads from $SRC_NS"
-for d in "${APP_DEPLOYS[@]}" "${DB_DEPLOYS[@]}"; do
+for d in ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"} \
+         ${MIGRATE_DB_A[@]+"${MIGRATE_DB_A[@]}"} \
+         ${MIGRATE_CACHE_A[@]+"${MIGRATE_CACHE_A[@]}"}; do
   kubectl -n "$SRC_NS" delete "deploy/$d" --ignore-not-found
 done
 for s in cooknco-backend cooknco-database cooknco-redis mail-service-database; do

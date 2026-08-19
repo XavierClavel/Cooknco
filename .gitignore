@@ -42,3 +42,4 @@ out/
 ### Kubernetes migration artefacts (contain database dumps and user uploads) ###
 /k8s/migration/backup-*/
 /k8s/migration/.last-backup
+/k8s/migration/.migration-plan

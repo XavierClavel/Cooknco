@@ -5,6 +5,38 @@ data. Every script is idempotent and safe to re-run, and nothing in `default` is
 deleted until `99-cleanup.sh` — so the migration is reversible right up to that
 last step.
 
+## The release is already partly migrated
+
+**The mail service and its database already run in `cooknco`.** Nothing here
+assumes otherwise: `00-preflight.sh` discovers where each component actually
+lives and writes a plan to `.migration-plan`, which steps 02–05 and 99 then act
+on. Components already in `cooknco` are **left running throughout** — no dump is
+taken for them, no database of theirs is dropped, and they are never scaled down
+or relocated. Only what is still in `default` moves.
+
+For the current cluster that resolves to:
+
+| Component | Where it is | What happens |
+|---|---|---|
+| `cooknco-backend`, `cooknco-frontend` | `default` | migrated (stopped, then recreated in `cooknco`) |
+| `cooknco-database` | `default` | dumped, then restored into `cooknco` |
+| `cooknco-redis` | `default` | stopped and recreated empty — data not migrated |
+| `cooknco-mail-service` | `cooknco` | **left running**; the overlay adopts it |
+| `mail-service-database` | `cooknco` | **left running**; its data is never touched |
+
+Because the overlay covers the whole release, applying it also adopts the two
+components already in `cooknco`: they pick up the common labels and their image
+tag is pinned (`mail-service` moves from `latest` to `1.2.9`, which is a normal
+rollout of the same content). `00-preflight.sh` runs `kubectl diff -k` so you can
+see exactly that before anything happens.
+
+> **The one thing to check by hand.** `cooknco-secrets` already exists in
+> `cooknco` because the mail service needs it, and `01-copy-config.sh` will not
+> overwrite an object that is already there. If that copy only carries the mail
+> service's keys, the backend will crash-loop after the cutover looking for
+> `redis-password` or `postgres-*`. `00-preflight.sh` compares the key sets in
+> both namespaces and tells you if any are missing — fix it before starting.
+
 Run everything from the repository root, against the cluster you mean:
 
 ```sh
@@ -28,9 +60,12 @@ machine running these scripts:
 - **`pictures`** (user uploads, the one irreplaceable volume) — `tar` out of a
   helper pod in `default`, `tar` into a helper pod in `cooknco`.
 - **`logs`** — archived into the backup directory, not restored.
-- **`redis`** — not migrated. It is a cache and session store. **Logged-in users
-  will be signed out and must log in again.** If that is unacceptable, copy it
-  the same way `pictures` is copied, with the deployment scaled to zero.
+- **`redis`** — not migrated, only stopped and recreated empty. It is a cache and
+  session store. **Logged-in users will be signed out and must log in again.** If
+  that is unacceptable, copy it the same way `pictures` is copied, with the
+  deployment scaled to zero.
+- **The mail service's database and volume** — not copied at all: they are
+  already in `cooknco`.
 
 The backup directory this produces is a genuine off-cluster backup. Keep it.
 It is gitignored, because it contains database dumps and user uploads:
@@ -57,7 +92,7 @@ side by side and why downtime is unavoidable without first dropping the nodePort
 
 | # | Script | Effect | Reversible |
 |---|---|---|---|
-| 0 | `00-preflight.sh` | Read-only inventory and assumption checks | — |
+| 0 | `00-preflight.sh` | Read-only. Discovers what lives where, writes `.migration-plan`, diffs the overlay against the cluster, compares secret keys | — |
 | 1 | `01-copy-config.sh` | Creates `cooknco`; copies the 4 secrets + 1 configmap | yes, additive |
 | 2 | `02-freeze-and-backup.sh` | **Outage starts.** Snapshots `default`, dumps both databases, tars `pictures`/`logs`, stops `default` | yes |
 | 3 | `03-cutover.sh` | Deletes the old Service/Ingress/Certificate, applies the overlay, holds the app tier at 0 | via `90-rollback.sh` |
@@ -77,16 +112,20 @@ k8s/migration/05-resume.sh
 k8s/migration/99-cleanup.sh
 ```
 
-`ASSUME_YES=1` skips the prompts. `SRC_NS`, `DST_NS`, `BACKUP_DIR` and
-`HELPER_IMAGE` are all overridable. Step 2 records its backup directory in
-`.last-backup`, which steps 3, 4 and the rollback read automatically.
+`ASSUME_YES=1` skips the prompts. `SRC_NS`, `DST_NS`, `BACKUP_DIR`, `PLAN_FILE`
+and `HELPER_IMAGE` are all overridable. Step 2 records its backup directory in
+`.last-backup` and re-derives `.migration-plan`; steps 3, 4, 5, 99 and the
+rollback read both automatically. Every step prints the plan it is acting on
+before it does anything.
 
 ## Preflight findings to resolve before starting
 
 `00-preflight.sh` will tell you, but two are worth knowing up front:
 
-- **The four secrets and the configmap must exist in `default`.** They are not
-  in git. If any is missing, find it before the outage starts, not during it.
+- **The four secrets and the configmap must exist in one of the two
+  namespaces.** They are not in git. Preflight prints a presence table for both;
+  anything missing from `cooknco` and absent from `default` has to be found
+  before the outage starts, not during it.
 - **The `KafkaTopic` CRs in `default` are inert.** They are labelled for a
   cluster named `cooknco-kafka` that does not exist, in a namespace Strimzi's
   topic operator does not watch, so the topics the backend uses were only ever
@@ -145,7 +184,8 @@ CI pushed an image-tag bump you should revert that commit and disable the
    pre-flight check passes once nodePort 30080 is held only by `cooknco`, so the
    next push to `master` deploys automatically.
 3. The overlay is still pinned to the pre-migration versions (backend and
-   frontend `1.1.0`, mail-service `1.2.9`) so that this migration changed the
-   namespace and nothing else. The first `master` build after cleanup bumps all
+   frontend `1.1.0`, mail-service `1.2.9` — which is what its `latest` tag
+   already resolved to) so that this migration changed the namespace and nothing
+   else. The first `master` build after cleanup bumps all
    three to the current project version — a normal deploy, separately
    observable, which is the point.

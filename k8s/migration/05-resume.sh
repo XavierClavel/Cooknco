@@ -6,9 +6,13 @@ cd "$(dirname "$0")/../.." || exit 1
 need kubectl
 show_context
 
-say "starting the app tier in $DST_NS"
-scale_deploys "$DST_NS" 1 "${APP_DEPLOYS[@]}"
-for d in "${APP_DEPLOYS[@]}"; do
+load_plan
+
+# Only what 03 held at zero. Anything already in $DST_NS kept running throughout
+# and is left alone.
+say "starting [${MIGRATE_APP:-none}] in $DST_NS"
+scale_deploys "$DST_NS" 1 ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"}
+for d in ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"}; do
   kubectl -n "$DST_NS" rollout status "deploy/$d" --timeout=5m
 done
 

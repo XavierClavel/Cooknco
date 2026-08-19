@@ -34,6 +34,15 @@ of the Kafka cluster it manages — `kafka-kraft` in namespace `kafka`. The prod
 overlay's `namespace: cooknco` transformer rewrites every resource it renders,
 so the topics cannot live under it and are applied as their own root.
 
+## Current namespace state
+
+The release is **partly migrated already**: `cooknco-mail-service` and
+`mail-service-database` run in `cooknco`, while the backend, frontend, database
+and redis are still in `default`. The overlay describes the whole release in
+`cooknco`, so applying it adopts the two components that are already there and
+creates the rest. `k8s/migration/` handles the move and deliberately leaves the
+already-migrated components running — see its README.
+
 ## Config this tree does not contain
 
 These exist only in the cluster and must be present in the target namespace

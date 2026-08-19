@@ -10,18 +10,23 @@ show_context
 
 BACKUP_DIR="${BACKUP_DIR:-$(cat k8s/migration/.last-backup 2>/dev/null || true)}"
 [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ] || die "set BACKUP_DIR to the directory written by 02-freeze-and-backup.sh"
+load_plan
+print_plan
 say "restoring from $BACKUP_DIR"
 
-# The app tier must be down: PostgreSQL refuses to drop a database with live
-# connections, and a half-restored schema behind a running backend is worse
-# than an outage.
-running="$(kubectl -n "$DST_NS" get deploy -o jsonpath='{range .items[*]}{.metadata.name}={.spec.replicas} {end}')"
-case "$running" in
-  *cooknco-backend=0*) : ;;
-  *) confirm "cooknco-backend is not at 0 replicas ($running). Scale the app tier down and continue?" 
-     scale_deploys "$DST_NS" 0 "${APP_DEPLOYS[@]}"
-     wait_gone "$DST_NS" "${APP_DEPLOYS[@]}" ;;
-esac
+# The migrated app tier must be down: PostgreSQL refuses to drop a database with
+# live connections, and a half-restored schema behind a running backend is worse
+# than an outage. Deployments already in $DST_NS are neither checked nor touched
+# — none of their databases are being restored.
+for d in ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"}; do
+  n="$(kubectl -n "$DST_NS" get "deploy/$d" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)"
+  if [ "${n:-0}" != "0" ]; then
+    confirm "deploy/$d is at $n replicas in $DST_NS. Scale the migrated app tier to 0 and continue?"
+    scale_deploys "$DST_NS" 0 ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"}
+    wait_gone    "$DST_NS" ${MIGRATE_APP_A[@]+"${MIGRATE_APP_A[@]}"}
+    break
+  fi
+done
 
 restore_db() {
   local deploy="$1" dump="$2"
@@ -48,17 +53,23 @@ restore_db() {
     pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --exit-on-error
   ' < "$dump"
 }
-restore_db cooknco-database      "$BACKUP_DIR/cooknco.pgc"
-restore_db mail-service-database "$BACKUP_DIR/mail-service.pgc"
+# Only databases that were actually dumped from $SRC_NS. A database already
+# living in $DST_NS is never dropped — its data is already in the right place.
+for d in ${MIGRATE_DB_A[@]+"${MIGRATE_DB_A[@]}"}; do
+  restore_db "$d" "$BACKUP_DIR/$(dump_name_for "$d")"
+done
 
-say "restoring pvc/pictures"
-[ -s "$BACKUP_DIR/pictures.tar" ] || warn "pictures.tar is empty — nothing to restore"
-if [ -s "$BACKUP_DIR/pictures.tar" ]; then
-  pod="$(helper_pod_start "$DST_NS" pictures)"
-  kubectl -n "$DST_NS" exec -i "$pod" -- tar xf - -C /data < "$BACKUP_DIR/pictures.tar"
+for v in ${MIGRATE_DATA_PVCS_A[@]+"${MIGRATE_DATA_PVCS_A[@]}"}; do
+  say "restoring pvc/$v"
+  if [ ! -s "$BACKUP_DIR/$v.tar" ]; then
+    warn "$v.tar is empty — nothing to restore"
+    continue
+  fi
+  pod="$(helper_pod_start "$DST_NS" "$v")"
+  kubectl -n "$DST_NS" exec -i "$pod" -- tar xf - -C /data < "$BACKUP_DIR/$v.tar"
   say "restored file count: $(kubectl -n "$DST_NS" exec "$pod" -- sh -c 'find /data -type f | wc -l')"
   helper_pod_stop "$DST_NS" "$pod"
-fi
+done
 
 # pvc/logs is intentionally not restored — the archive in $BACKUP_DIR is the
 # historical record and the new volume starts clean.
