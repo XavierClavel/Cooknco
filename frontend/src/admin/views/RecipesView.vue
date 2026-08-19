@@ -123,11 +123,17 @@
         <img v-if="detail.version" class="hero" alt=""
              :src="recipeImageUrl(detail.id, detail.version)" />
         <p v-if="detail.description">{{ detail.description }}</p>
-        <div v-if="detail.ingredients?.length || detail.customIngredients?.length">
+        <div v-if="detail.ingredients?.length">
           <h4>{{ $t('ingredients') }}</h4>
+          <!-- One list for both kinds; a row with no id is a name the author typed by hand -->
           <ul>
-            <li v-for="(i, n) in detail.ingredients" :key="`i${n}`">{{ i.name }} — {{ i.amount }}</li>
-            <li v-for="(i, n) in detail.customIngredients" :key="`c${n}`">{{ i.name }}</li>
+            <!-- Flex, so the parts keep a gap: Vue condenses the whitespace between them away -->
+            <li v-for="(i, n) in detail.ingredients" :key="n" class="row-wrap" style="gap:5px">
+              <span>{{ i.name }}</span>
+              <span v-if="formatAmount(i.amount, i.unit)" class="muted">— {{ formatAmount(i.amount, i.unit) }}</span>
+              <span v-if="i.complement" class="subtle">({{ i.complement }})</span>
+              <span v-if="!i.id" class="badge">{{ $t('admin_custom') }}</span>
+            </li>
           </ul>
         </div>
         <div v-if="detail.steps?.length">
@@ -153,6 +159,7 @@ import {
   deleteRecipe, errorKey, getRecipeDetail, hideRecipe, listRecipes, unhideRecipe,
 } from '../lib/api'
 import {fmtDate} from '../lib/format'
+import {formatAmount} from '../lib/ingredients'
 import {recipeImageUrl, recipeThumbnailUrl} from '../lib/images'
 import {notifyError, notifyOk} from '../lib/toast'
 import UiIcon from '../components/UiIcon.vue'

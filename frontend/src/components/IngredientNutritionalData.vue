@@ -10,27 +10,13 @@ const props = defineProps({
   },
 })
 
-const getValueAmount = v => {
-  if (!props.ingredient.allowWeight) {
-    return v
-  }
-  else {
-    return (v * props.ingredient.weightPerUnit / 100).toFixed(2).replace(/[.,]00$/, '')
-  }
-}
+const format = v => v.toFixed(2).replace(/[.,]00$/, '')
 
-const getValueWeight = v => {
-  return v
-}
+const getValueAmount = v => v == null ? v : format(v * props.ingredient.gramsPerUnit / 100)
 
-const getValueVolume = v => {
-  if (!props.ingredient.allowWeight) {
-    return v
-  }
-  else {
-    return (v / props.ingredient.volumicMass).toFixed(2).replace(/[.,]00$/, '')
-  }
-}
+const getValueWeight = v => v
+
+const getValueVolume = v => v == null ? v : format(v * props.ingredient.gramsPerMilliliter)
 
 
 
@@ -46,9 +32,9 @@ const getValueVolume = v => {
     <thead>
     <tr>
       <th class="text-left">Value</th>
-      <th v-if="ingredient.allowAmount" class="text-center">{{ $t("per_unit") }}</th>
-      <th v-if="ingredient.allowWeight" class="text-center">{{ $t("per_weight")}}</th>
-      <th v-if="ingredient.allowVolume" class="text-center">{{ $t("per_volume")}}</th>
+      <th v-if="ingredient.gramsPerUnit != null" class="text-center">{{ $t("per_unit") }}</th>
+      <th v-if="ingredient.measurableByWeight" class="text-center">{{ $t("per_weight")}}</th>
+      <th v-if="ingredient.gramsPerMilliliter != null" class="text-center">{{ $t("per_volume")}}</th>
     </tr>
     </thead>
     <tbody>
@@ -56,13 +42,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('calories')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.calories)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.calories)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.calories)}}
       </th>
     </tr>
@@ -71,13 +57,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('carbohydrates')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.carbohydrates)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.carbohydrates)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.carbohydrates)}}
       </th>
     </tr>
@@ -86,13 +72,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('sugars')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.sugars)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.sugars)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.sugars)}}
       </th>
     </tr>
@@ -101,13 +87,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('fibers')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.fibers)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.fibers)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.fibers)}}
       </th>
     </tr>
@@ -116,13 +102,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('cholesterol')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.cholesterol)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.cholesterol)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.cholesterol)}}
       </th>
     </tr>
@@ -131,13 +117,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('unsaturatedFat')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.unsaturatedFat)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.unsaturatedFat)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.unsaturatedFat)}}
       </th>
     </tr>
@@ -146,13 +132,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('saturatedFat')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.saturatedFat)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.saturatedFat)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.saturatedFat)}}
       </th>
     </tr>
@@ -161,13 +147,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('proteins')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.proteins)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.proteins)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.proteins)}}
       </th>
     </tr>
@@ -176,13 +162,13 @@ const getValueVolume = v => {
       <th class="text-left">
         {{$t('sodium')}}
       </th>
-      <th class="text-center" v-if="ingredient.allowAmount">
+      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
         {{ getValueAmount(ingredient.sodium)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowWeight">
+      <th class="text-center" v-if="ingredient.measurableByWeight">
         {{ getValueWeight(ingredient.sodium)}}
       </th>
-      <th class="text-center" v-if="ingredient.allowVolume">
+      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
         {{ getValueVolume(ingredient.sodium)}}
       </th>
     </tr>

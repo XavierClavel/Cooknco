@@ -300,6 +300,8 @@ class AdminService: KoinComponent {
                     type = it.type,
                     calories = it.calories,
                     recipesCount = usage[it.id] ?: 0,
+                    allowedTypes = it.allowedTypes(),
+                    defaultUnit = it.defaultUnit,
                 )
             },
         )

@@ -4,20 +4,20 @@ Branch: `improve-ingredient-units`
 
 ## Implementation status
 
-Backend and `shared` are implemented and verified: the full `:backend:test` suite is green (117 tests),
-and `scripts/verify-migrations.sh` exercises migrations 1.32–1.35 with legacy data on a throwaway
-Postgres. Web frontend and Android app follow the same contract.
+Backend and `shared` are implemented and verified: the full `:backend:test` suite is green,
+and `scripts/verify-migrations.sh` exercises migrations 1.34–1.37 with legacy data on a throwaway
+Postgres. Web frontend and the shared Compose app follow the same contract.
 
-Migrations added, in order: **1.32** unify custom ingredients into `recipe_ingredients` + `sort_order`
-+ the xor check constraint; **1.33** `unit` from enum ordinal to varchar; **1.34** nullable conversion
-fields + backfill; **1.35** `default_unit`. Two sets of pending drops are queued and must ride later
-releases: the `custom_ingredients` table (`pendingDropsFor 1.32`) and the
-`allow_*` / `volumic_mass` / `weight_per_unit` columns (`pendingDropsFor 1.34`).
+Migrations added, in order: **1.34** unify custom ingredients into `recipe_ingredients` + `sort_order`
++ the xor check constraint; **1.35** `unit` from enum ordinal to varchar; **1.36** nullable conversion
+fields + backfill; **1.37** `default_unit`. Two sets of pending drops are queued and must ride later
+releases: the `custom_ingredients` table (`pendingDropsFor 1.34`) and the
+`allow_*` / `volumic_mass` / `weight_per_unit` columns (`pendingDropsFor 1.36`).
 
 ### Deviations from the plan as written below
 
 - **Unit storage is varchar**, via JPA `@Enumerated(EnumType.STRING)` on `RecipeIngredient.unit` —
-  no ebean annotation dependency in `shared` was needed after all. Migration 1.33 converts with an
+  no ebean annotation dependency in `shared` was needed after all. Migration 1.35 converts with an
   explicit ordinal→name `CASE`; the generator's default `using unit::varchar` would have written
   `'0'` instead of `'NONE'`.
 - **Phase 6's new units (KILOGRAM, LITER, CENTILITER) were folded into phase 2.** Once units are
@@ -223,7 +223,7 @@ update ingredients set
   grams_per_milliliter = case when allow_volume then volumic_mass end,
   measurable_by_weight = allow_weight;
 ```
-Note: rows that had `allowVolume=true` with the untouched default `volumicMass=1.0` were already showing fabricated conversions; the migration preserves them as `1.0`. Optional data-quality pass afterwards: `select` ingredients where `grams_per_milliliter = 1.0` or `grams_per_unit = 1.0` and review in the admin panel.
+Note: rows that had `allowVolume=true` with the untouched default `volumicMass=1.0` were already showing fabricated conversions; the migration preserves them as `1.0`. Optional data-quality pass afterwards: `select` ingredients where `grams_per_milliliter = 1.0` or `grams_per_unit = 1.0` and review in the backoffice catalogue, which shows each ingredient's allowed measurements.
 
 ### Wire format
 
@@ -233,7 +233,7 @@ Note: rows that had `allowVolume=true` with the untouched default `volumicMass=1
 
 ### Web frontend
 
-- `pages/ingredient/list.vue` admin panel: replace three checkboxes + two always-on number inputs with: a weight switch, a clearable "grams per unit" input (empty = not countable), a clearable "density (g/mL)" input (empty = no volume). Nullability = capability, so invalid states are unrepresentable.
+- Backoffice ingredient form (`src/admin/views/IngredientsView.vue`): a weight checkbox, a clearable "grams per unit" input (empty = not countable) and a clearable "density (g/mL)" input (empty = no volume), in place of the three capability checkboxes and two always-on number inputs the pre-backoffice admin panel had. Nullability = capability, so invalid states are unrepresentable.
 - `components/IngredientNutritionalData.vue`: per-unit / per-volume columns render only when the corresponding conversion is non-null (fixes fabricated values from the 1.0 defaults); computations use `gramsPerUnit` / `gramsPerMilliliter`.
 - `recipe/edit.vue` `getUnitOptions`: filter `unitOptions` by `ingredient.allowedTypes`.
 
@@ -262,8 +262,8 @@ Note: rows that had `allowVolume=true` with the untouched default `volumicMass=1
 
 ## Phase 5 — Defaults from type + per-ingredient default unit (size: S)
 
-1. **Admin pre-fill** (client-side only): in `ingredient/list.vue`, watching the type select pre-fills capabilities for new ingredients — e.g. liquids/beverages/oil → density 1.0 + weight; fruit/vegetable → gramsPerUnit placeholder + weight; condiment → density + weight. Table lives in `scripts/values.ts` next to `ingredientTypes`. Backend stays dumb.
-2. **`defaultUnit: AmountUnit?`** column on `Ingredient` (+ DTO/Info + admin select filtered to allowed units + migration; backfill null). Validate server-side: `defaultUnit.type in allowedTypes()`.
+1. **Admin pre-fill** (client-side only): in the backoffice form, changing the type select pre-fills the capabilities of a *new* ingredient — liquids/beverages/oil → density + weight, everything else → weight only. Table lives in `src/admin/lib/ingredients.ts`. Backend stays dumb.
+2. **`defaultUnit: AmountUnit?`** column on `Ingredient` (+ DTO/Info + backoffice select filtered to allowed units + migration; backfill null). Validate server-side: `defaultUnit.type in allowedTypes()`.
 3. Recipe editors preselect it: web `recipe/edit.vue` on autocomplete selection; app `RecipeEditViewModel` on ingredient pick. Fallback when null: WEIGHT→GRAM if allowed, else first allowed unit, else NONE.
 
 ---
@@ -291,7 +291,7 @@ Note: rows that had `allowVolume=true` with the untouched default `volumicMass=1
    where lower(unaccent(custom_name)) = lower(unaccent(:name));
    ```
    Recipes that used the custom name gain nutrition data retroactively. Guard: chosen unit types that the new ingredient doesn't allow — keep the rows as-is (historical data), the phase-4 validation only applies to new writes.
-3. **Admin UI** in `pages/ingredient/list.vue`: a "Custom ingredients in use" table (name, count, convert button). Convert opens the existing create panel pre-filled with the name in both locales; on save, call absorb with the created id. If a matching real ingredient already exists, allow picking it instead of creating.
+3. **Admin UI** in `src/admin/views/IngredientsView.vue`: a "Custom ingredients in use" panel (name, count, convert button) under the catalogue. Convert opens the ingredient form pre-filled with the name in both locales; on save, call absorb with the created id. If a matching real ingredient already exists, the same dialog offers picking it instead of creating.
 4. Tests: usage aggregation (case/accents collapse), absorb re-points rows and clears `custom_name`, absorb is admin-only.
 
 ---

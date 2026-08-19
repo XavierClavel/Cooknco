@@ -106,23 +106,37 @@
               :label="`${$t('ingredient')} ${index + 1}`"
               v-model:search="queryList[index]"
               color="primary"
-              :items="autocompleteList[index]"
+              :items="getAutocompleteItems(index)"
               item-color="primary"
               item-title="name"
               item-value="id"
               @update:search="(query) => onIngredientAutocompleteChange(query, index)"
+              @update:model-value="(value) => onIngredientSelected(value, index)"
               :key="index"
               return-object
               @keydown.enter.prevent="selectFirstMatch(index)"
               class="ma-1"
               min-width="150px"
               :no-data-text="`${$t('no_data')}`"
-            ></v-autocomplete>
+            >
+              <!-- Only the dropdown says "use this as a custom ingredient"; the option itself
+                   carries the plain name, which is what the field shows once it is picked -->
+              <template v-slot:item="{ props, item }">
+                <v-list-item
+                  v-bind="props"
+                  :title="item.raw.isCustom ? $t('custom_ingredient', {name: item.raw.name}) : item.raw.name"
+                >
+                  <template #prepend v-if="item.raw.isCustom">
+                    <v-icon>mdi-plus</v-icon>
+                  </template>
+                </v-list-item>
+              </template>
+            </v-autocomplete>
 
             <v-select
               v-model="recipe.ingredients[index].unit"
               :label="`${$t('unit')}`"
-              :items="getUnitOptions(recipe.ingredients[index])"
+              :items="getUnitOptions(recipe.ingredients[index].ingredient?.allowedTypes)"
               color="primary"
               :item-title="getLocalizedLabel"
               item-value="value"
@@ -180,81 +194,6 @@
         </template>
       </draggable>
 
-      <!-- Custom ingredients -->
-      <h2 class="my-3 mt-12" v-if="recipe.customIngredients && recipe.customIngredients.length > 0">{{$t('custom_ingredients')}}</h2>
-      <draggable v-model="recipe.customIngredients" ghost-class="ghost" item-key="index" handle=".drag-handle">
-        <template #item="{ element, index }">
-          <div class="d-flex flex-wrap align-center mb-2">
-            <!-- Add a handle for dragging -->
-            <v-icon
-              class="mr-2 drag-handle"
-              color="black"
-              small
-            >mdi-drag</v-icon>
-
-            <v-text-field
-              v-model="recipe.customIngredients[index].name"
-              :label="`${$t('custom_ingredient')} ${index + 1}`"
-              color="primary"
-              item-color="primary"
-              :key="index"
-              :rules="[max50]"
-              class="ma-1"
-            ></v-text-field>
-
-            <v-select
-              v-model="recipe.customIngredients[index].unit"
-              :label="`${$t('unit')}`"
-              :items="unitOptions"
-              color="primary"
-              :item-title="getLocalizedLabel"
-              item-value="value"
-              return-object
-              class="ma-1"
-              max-width="200px"
-            >
-              <!-- Customize how items appear in the dropdown -->
-              <template v-slot:item="{ props, item }">
-                <v-list-item v-bind="props">
-                  <template #prepend>
-                    <v-icon>{{ item.raw.icon }}</v-icon>
-                  </template>
-                </v-list-item>
-              </template>
-
-              <!-- Customize how selected item appears -->
-              <template v-slot:selection="{ item }">
-                <v-icon start class="mr-2">{{ item.raw.icon }}</v-icon>
-                {{ $t(item.raw.label) }}
-              </template>
-            </v-select>
-
-            <v-number-input
-              v-model="recipe.customIngredients[index].amount"
-              :label="`${$t('amount')}`"
-              color="primary"
-              control-variant="stacked"
-              min=0
-              class="ma-1"
-              max-width="150px"
-              v-if="recipe.customIngredients[index].unit?.value != 'NONE'"
-            >
-            </v-number-input>
-
-            <div>
-              <v-btn
-                @click="removeCustomIngredient(index)"
-                icon="mdi-delete"
-                color="primary"
-                class="ml-4"
-              ></v-btn>
-            </div>
-
-
-          </div>
-        </template>
-      </draggable>
-
       <!-- Button to add ingredient -->
       <v-btn
         @click="addIngredient"
@@ -263,22 +202,6 @@
         flat
         class="mb-2 mr-2"
       >{{$t("ingredient")}}</v-btn>
-
-      <!-- Button to add custom ingredient -->
-      <v-tooltip :text="`${$t('custom_ingredients_warning')}`"
-      location="bottom">
-        <template v-slot:activator="{ props }">
-          <v-btn
-            v-bind="props"
-            @click="addCustomIngredient"
-            prepend-icon="mdi-plus-circle-outline"
-            color="black"
-            flat
-            class="mb-2"
-            variant="outlined"
-          >{{$t("custom_ingredient")}}</v-btn>
-        </template>
-      </v-tooltip>
 
 
       <!-- Steps -->
@@ -359,7 +282,8 @@ import {getRecipe, createRecipe, updateRecipe} from "@/scripts/recipes";
 import {defaultImageRecipe, toViewRecipe} from "@/scripts/common";
 import {searchIngredients} from "@/scripts/ingredients";
 import EditablePicture from "@/components/EditablePicture.vue";
-import {dishOptions, unitOptions} from "@/scripts/values";
+import {dishOptions} from "@/scripts/values";
+import {findUnitOption, getUnitOptions, loadUnits} from "@/scripts/units";
 import {useI18n} from "vue-i18n";
 import {getLocale} from "@/scripts/localization";
 import {max100, max255, max50, max511, requiredRule} from "@/scripts/rules";
@@ -376,13 +300,15 @@ const editablePicture = ref(null)
 const autocompleteList = ref([])
 const queryList = ref([])
 
+// Mirrors the column width the backend enforces.
+const CUSTOM_NAME_MAX_LENGTH = 50
+
 const recipe = ref<object>({
   title: "",
   description: "",
   steps: [''],
   dishClass: "MAIN_DISH",
   ingredients: [],
-  customIngredients: [],
   tips: "",
 })
 
@@ -393,45 +319,56 @@ function getLocalizedLabel(item: any) {
 
 const onIngredientAutocompleteChange = async (query, index) => {
   queryList.value[index] = query
-  console.log(recipe.value.ingredients)
-  console.log(recipe.value.ingredients[index])
-  console.log(!query)
   if (!query) return
   const response = await searchIngredients(`query=${query}`, 0, 20);
   autocompleteList.value[index] = response.data.items.map(item => ({
     id: item.id,
     name: item.name?.[getLocale().toUpperCase()] || '',
-    allowWeight: item.allowWeight,
-    allowVolume: item.allowVolume,
-    allowAmount: item.allowAmount,
+    allowedTypes: item.allowedTypes,
+    defaultUnit: item.defaultUnit,
   }));
+}
+
+/**
+ * The typed text, offered as a custom ingredient when it matches nothing.
+ *
+ * Its `name` is the name itself, not the "use X as a custom ingredient" wording: `item-title` is
+ * what the field displays once the option is picked, so putting the prompt there left the prompt
+ * sitting in the input until the next blur. The wording lives in the item slot instead, and the
+ * option is already the shape a picked row holds, so nothing has to be swapped in afterwards.
+ */
+const getAutocompleteItems = (index) => {
+  const query = queryList.value[index]
+  const items = autocompleteList.value[index] ?? []
+  if (!query || items.some(it => it.name.toLowerCase() == query.toLowerCase())) return items
+  return [...items, {id: null, name: query.trim().slice(0, CUSTOM_NAME_MAX_LENGTH), isCustom: true}]
 }
 
 function selectFirstMatch(index) {
   const query = queryList.value[index]
-  const match = autocompleteList.value[index].find(opt =>
+  const match = getAutocompleteItems(index).find(opt =>
     opt.name.toLowerCase().includes(query?.toLowerCase())
   )
 
   if (match) {
     recipe.value.ingredients[index].ingredient = match
-    queryList.value[index] = match.name // Update displayed input text
+    onIngredientSelected(match, index)
   }
 }
 
+const onIngredientSelected = (selected, index) => {
+  if (selected) {
+    queryList.value[index] = selected.name // Update displayed input text
+  }
+  recipe.value.ingredients[index].unit = findUnitOption(getDefaultUnit(selected))
+}
 
-
-
-
-const getUnitOptions = (v) => {
-  const ingredient = v?.ingredient
-  if (!ingredient || typeof ingredient !== 'object') return unitOptions.value
-  return unitOptions.value.filter(it =>
-    it.type == "NONE" ||
-    (ingredient.allowAmount && it.type == "AMOUNT") ||
-    (ingredient.allowWeight && it.type == "WEIGHT") ||
-    (ingredient.allowVolume && it.type == "VOLUME")
-  )
+const getDefaultUnit = (ingredient) => {
+  if (!ingredient) return "NONE"
+  if (ingredient.defaultUnit) return ingredient.defaultUnit
+  const allowed = getUnitOptions(ingredient.allowedTypes)
+  if (allowed.some(it => it.type == "WEIGHT")) return "GRAM"
+  return allowed.find(it => it.type != "NONE")?.value ?? "NONE"
 }
 
 
@@ -464,10 +401,6 @@ async function addStepAt(index) {
   document.getElementById(`step_${index + 1}`).focus()
 }
 
-const addCustomIngredient = () => {
-  recipe.value.customIngredients.push({});
-}
-
 // Function to add a new item
 const removeStep = (index) => {
   recipe.value.steps.splice(index,1);
@@ -475,10 +408,6 @@ const removeStep = (index) => {
 
 const removeIngredient = (index) => {
   recipe.value.ingredients.splice(index,1);
-}
-
-const removeCustomIngredient = (index) => {
-  recipe.value.customIngredients.splice(index,1);
 }
 
 async function submit() {
@@ -491,16 +420,10 @@ async function submit() {
     .filter((it) => it.ingredient )
     .map(item => ({
     id: item.ingredient.id,
+    customName: item.ingredient.id == null ? item.ingredient.name : null,
     amount: item.unit == null || item.unit.value == "NONE" ? null : item.amount,
     unit: item.unit ? item.unit.value : "NONE",
     complement: item.complement}))
-  submitted.customIngredients = recipe.value.customIngredients
-    .filter((it) => "name" in it)
-    .map(item => ({
-      name: item.name,
-      amount: item.unit == null || item.unit.value == "NONE" ? null : item.amount,
-      unit: item.unit ? item.unit.value : "NONE"
-    }))
   submitted.steps = submitted.steps.filter((it) => it)
   delete submitted['version']
   console.log(submitted)
@@ -516,7 +439,11 @@ async function submit() {
   toViewRecipe(recipeId.value)
 }
 
-if (recipeId.value != null) {
+loadUnits().then(function () {
+  if (recipeId.value == null) {
+    ready.value = true
+    return
+  }
   getRecipe(recipeId.value).then (
     function (response) {
       recipe.value.title = response.data.title
@@ -527,17 +454,11 @@ if (recipeId.value != null) {
         ingredient: {
           id: item.id,
           name: item.name,
-          allowWeight: item.allowWeight,
-          allowVolume: item.allowVolume,
-          allowAmount: item.allowAmount,
+          allowedTypes: item.allowedTypes,
         },
         amount: item.amount,
-        unit: unitOptions.value.find(it => it.value == item.unit)
-      }))
-      recipe.value.customIngredients = response.data.customIngredients.map(item => ({
-        name: item.name,
-        amount: item.amount,
-        unit: unitOptions.value.find(it => it.value == item.unit)
+        unit: findUnitOption(item.unit),
+        complement: item.complement,
       }))
       recipe.value.yield = response.data.yield
       recipe.value.preparationTime = response.data.preparationTime
@@ -552,9 +473,7 @@ if (recipeId.value != null) {
   }).finally(function () {
     // always executed
   });
-} else {
-  ready.value = true
-}
+})
 
 
 
