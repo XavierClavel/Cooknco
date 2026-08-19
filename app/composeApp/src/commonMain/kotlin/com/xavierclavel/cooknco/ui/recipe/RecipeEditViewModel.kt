@@ -6,11 +6,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.RecipeRepository
+import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.di.AppGraph
-import com.xavierclavel.cooknco.network.dto.CustomIngredientSaveDto
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientSaveDto
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
+import com.xavierclavel.cooknco.network.dto.UnitInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,25 +20,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** A single row of the ingredient list: a referenced ingredient when [ingredientId] is set, a free-text one when [customName] is. */
 data class EditIngredient(
     val ingredientId: Long? = null,
+    val customName: String? = null,
     val ingredientName: String = "",
     val type: String = "",
     val query: String = "",
-    val unit: String = "UNIT",
+    // A fresh row carries no amount yet, and the server rejects a unit without one.
+    val unit: String = "NONE",
     val amount: Float? = null,
     val complement: String = "",
-    val allowAmount: Boolean = true,
-    val allowWeight: Boolean = true,
-    val allowVolume: Boolean = true,
+    val allowedTypes: List<String> = emptyList(),
     val searchResults: List<IngredientSummary> = emptyList(),
     val showDropdown: Boolean = false,
-)
-
-data class EditCustomIngredient(
-    val name: String = "",
-    val unit: String = "UNIT",
-    val amount: Float? = null,
 )
 
 data class StepItem(val id: String, val text: String)
@@ -54,7 +50,7 @@ data class RecipeEditUiState(
     val cookTime: String = "",
     val cookTemp: String = "",
     val ingredients: List<EditIngredient> = emptyList(),
-    val customIngredients: List<EditCustomIngredient> = emptyList(),
+    val units: List<UnitInfo> = emptyList(),
     val steps: List<StepItem> = emptyList(),
     val tips: String = "",
     val error: String? = null,
@@ -64,11 +60,14 @@ data class RecipeEditUiState(
 
 class RecipeEditViewModel(
     private val repo: RecipeRepository,
+    private val unitRepo: UnitRepository,
     private val recipeId: Long?,
     private val userId: Long,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(RecipeEditUiState(recipeId = recipeId))
+    private val _uiState = MutableStateFlow(
+        RecipeEditUiState(recipeId = recipeId, units = UnitRepository.DEFAULT_UNITS),
+    )
     val uiState: StateFlow<RecipeEditUiState> = _uiState.asStateFlow()
 
     private val searchJobs = mutableMapOf<Int, Job>()
@@ -76,8 +75,16 @@ class RecipeEditViewModel(
     private fun newStepId() = "s${nextStepId++}"
 
     init {
+        loadUnits()
         if (recipeId != null) {
             loadRecipe(recipeId)
+        }
+    }
+
+    private fun loadUnits() {
+        viewModelScope.launch {
+            val units = unitRepo.getUnits()
+            _uiState.update { it.copy(units = units) }
         }
     }
 
@@ -89,19 +96,15 @@ class RecipeEditViewModel(
                     val editIngredients = recipe.ingredients.map { ing ->
                         EditIngredient(
                             ingredientId = ing.id,
+                            customName = ing.name.takeIf { ing.id == null },
                             ingredientName = ing.name,
-                            type = ing.type,
+                            type = ing.type ?: "",
                             query = ing.name,
                             unit = ing.unit,
                             amount = ing.amount,
                             complement = ing.complement ?: "",
-                            allowAmount = ing.allowAmount,
-                            allowWeight = ing.allowWeight,
-                            allowVolume = ing.allowVolume,
+                            allowedTypes = ing.allowedTypes,
                         )
-                    }
-                    val editCustomIngredients = recipe.customIngredients.map { ci ->
-                        EditCustomIngredient(name = ci.name, unit = ci.unit, amount = ci.amount)
                     }
                     _uiState.update {
                         it.copy(
@@ -114,7 +117,6 @@ class RecipeEditViewModel(
                             cookTime = recipe.cookingTime?.toString() ?: "",
                             cookTemp = recipe.cookingTemperature?.toString() ?: "",
                             ingredients = editIngredients,
-                            customIngredients = editCustomIngredients,
                             steps = recipe.steps.map { text -> StepItem(newStepId(), text) },
                             tips = recipe.tips,
                             recipeId = recipe.id,
@@ -154,7 +156,15 @@ class RecipeEditViewModel(
         _uiState.update { state ->
             val list = state.ingredients.toMutableList()
             if (index < list.size) {
-                list[index] = list[index].copy(query = query, ingredientId = null, ingredientName = query, showDropdown = query.isNotBlank())
+                val row = list[index]
+                list[index] = row.copy(
+                    query = query,
+                    ingredientId = null,
+                    // A row already known to be custom keeps its name in sync with the field.
+                    customName = if (row.customName == null) null else customName(query),
+                    ingredientName = query,
+                    showDropdown = query.isNotBlank(),
+                )
             }
             state.copy(ingredients = list)
         }
@@ -167,7 +177,7 @@ class RecipeEditViewModel(
                         _uiState.update { state ->
                             val list = state.ingredients.toMutableList()
                             if (index < list.size) {
-                                list[index] = list[index].copy(searchResults = result.items, showDropdown = result.items.isNotEmpty())
+                                list[index] = list[index].copy(searchResults = result.items, showDropdown = true)
                             }
                             state.copy(ingredients = list)
                         }
@@ -186,24 +196,36 @@ class RecipeEditViewModel(
 
     fun selectIngredient(index: Int, summary: IngredientSummary) {
         val name = summary.name["EN"] ?: summary.name.values.firstOrNull() ?: ""
-        val defaultUnit = when {
-            summary.allowAmount -> "UNIT"
-            summary.allowWeight -> "GRAM"
-            summary.allowVolume -> "MILLILITERS"
-            else -> "NONE"
-        }
         _uiState.update { state ->
             val list = state.ingredients.toMutableList()
             if (index < list.size) {
                 list[index] = list[index].copy(
                     ingredientId = summary.id,
+                    customName = null,
                     ingredientName = name,
                     type = summary.type,
                     query = name,
-                    unit = defaultUnit,
-                    allowAmount = summary.allowAmount,
-                    allowWeight = summary.allowWeight,
-                    allowVolume = summary.allowVolume,
+                    unit = defaultUnitFor(summary, state.units),
+                    allowedTypes = summary.allowedTypes,
+                    searchResults = emptyList(),
+                    showDropdown = false,
+                )
+            }
+            state.copy(ingredients = list)
+        }
+    }
+
+    fun selectCustomIngredient(index: Int) {
+        _uiState.update { state ->
+            val list = state.ingredients.toMutableList()
+            if (index < list.size) {
+                val name = customName(list[index].query)
+                list[index] = list[index].copy(
+                    ingredientId = null,
+                    customName = name,
+                    ingredientName = name,
+                    query = name,
+                    allowedTypes = emptyList(),
                     searchResults = emptyList(),
                     showDropdown = false,
                 )
@@ -215,7 +237,12 @@ class RecipeEditViewModel(
     fun updateIngredientUnit(index: Int, unit: String) {
         _uiState.update { state ->
             val list = state.ingredients.toMutableList()
-            if (index < list.size) list[index] = list[index].copy(unit = unit)
+            if (index < list.size) {
+                list[index] = list[index].copy(
+                    unit = unit,
+                    amount = if (unit == "NONE") null else list[index].amount,
+                )
+            }
             state.copy(ingredients = list)
         }
     }
@@ -241,41 +268,6 @@ class RecipeEditViewModel(
             val list = state.ingredients.toMutableList()
             if (index < list.size) list[index] = list[index].copy(showDropdown = false)
             state.copy(ingredients = list)
-        }
-    }
-
-    // Custom ingredient operations
-    fun addCustomIngredient() {
-        _uiState.update { it.copy(customIngredients = it.customIngredients + EditCustomIngredient()) }
-    }
-
-    fun removeCustomIngredient(index: Int) {
-        _uiState.update { state ->
-            state.copy(customIngredients = state.customIngredients.toMutableList().also { it.removeAt(index) })
-        }
-    }
-
-    fun updateCustomIngredientName(index: Int, name: String) {
-        _uiState.update { state ->
-            val list = state.customIngredients.toMutableList()
-            if (index < list.size) list[index] = list[index].copy(name = name)
-            state.copy(customIngredients = list)
-        }
-    }
-
-    fun updateCustomIngredientUnit(index: Int, unit: String) {
-        _uiState.update { state ->
-            val list = state.customIngredients.toMutableList()
-            if (index < list.size) list[index] = list[index].copy(unit = unit)
-            state.copy(customIngredients = list)
-        }
-    }
-
-    fun updateCustomIngredientAmount(index: Int, amount: String) {
-        _uiState.update { state ->
-            val list = state.customIngredients.toMutableList()
-            if (index < list.size) list[index] = list[index].copy(amount = amount.toFloatOrNull())
-            state.copy(customIngredients = list)
         }
     }
 
@@ -310,19 +302,16 @@ class RecipeEditViewModel(
             cookingTime = state.cookTime.toIntOrNull(),
             cookingTemperature = state.cookTemp.toIntOrNull(),
             ingredients = state.ingredients.mapNotNull { ing ->
-                val id = ing.ingredientId ?: return@mapNotNull null
+                val customName = ing.customName?.takeIf { it.isNotBlank() }
+                if (ing.ingredientId == null && customName == null) return@mapNotNull null
                 RecipeIngredientSaveDto(
-                    id = id,
+                    id = ing.ingredientId,
+                    customName = customName.takeIf { ing.ingredientId == null },
                     unit = ing.unit,
-                    amount = ing.amount,
+                    amount = if (ing.unit == "NONE") null else ing.amount,
                     complement = ing.complement.ifBlank { null },
                 )
             },
-            customIngredients = state.customIngredients
-                .filter { it.name.isNotBlank() }
-                .map { ci ->
-                    CustomIngredientSaveDto(name = ci.name, unit = ci.unit, amount = ci.amount)
-                },
             steps = state.steps.filter { it.text.isNotBlank() }.map { it.text },
             tips = state.tips.trim(),
         )
@@ -345,8 +334,20 @@ class RecipeEditViewModel(
     }
 
     companion object {
+        private const val CUSTOM_NAME_MAX_LENGTH = 50
+
+        private fun customName(query: String) = query.trim().take(CUSTOM_NAME_MAX_LENGTH)
+
+        private fun defaultUnitFor(summary: IngredientSummary, units: List<UnitInfo>): String =
+            summary.defaultUnit
+                ?: "GRAM".takeIf { "WEIGHT" in summary.allowedTypes }
+                ?: units.firstOrNull { it.name != "NONE" && it.type in summary.allowedTypes }?.name
+                ?: "NONE"
+
         fun factory(recipeId: Long?, userId: Long): ViewModelProvider.Factory = viewModelFactory {
-            initializer { RecipeEditViewModel(AppGraph.recipeRepository, recipeId, userId) }
+            initializer {
+                RecipeEditViewModel(AppGraph.recipeRepository, AppGraph.unitRepository, recipeId, userId)
+            }
         }
     }
 }

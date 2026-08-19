@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
+import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
@@ -93,24 +94,25 @@ private val dishClasses = listOf(
     "OTHER" to "Other",
 )
 
-private val allUnits = listOf(
+private val unitLabels = mapOf(
     "NONE" to "—",
     "UNIT" to "Unit",
     "GRAM" to "g",
+    "KILOGRAM" to "kg",
     "POUND" to "lb",
     "MILLILITERS" to "mL",
+    "CENTILITER" to "cL",
+    "LITER" to "L",
     "TEASPOON" to "tsp",
     "TABLESPOON" to "tbsp",
     "CUP" to "cup",
 )
 
-private fun unitsForIngredient(allowAmount: Boolean, allowWeight: Boolean, allowVolume: Boolean): List<Pair<String, String>> {
-    val r = mutableListOf<Pair<String, String>>()
-    if (allowAmount) { r += "NONE" to "—"; r += "UNIT" to "Unit" }
-    if (allowWeight) { r += "GRAM" to "g"; r += "POUND" to "lb" }
-    if (allowVolume) { r += "MILLILITERS" to "mL"; r += "TEASPOON" to "tsp"; r += "TABLESPOON" to "tbsp"; r += "CUP" to "cup" }
-    return r.ifEmpty { allUnits }
-}
+private fun unitFieldLabel(unit: String): String = unitLabels[unit] ?: unit
+
+// Custom rows carry no capability data, so they accept the whole catalog.
+private fun unitsForIngredient(allowedTypes: List<String>, units: List<UnitInfo>): List<UnitInfo> =
+    if (allowedTypes.isEmpty()) units else units.filter { it.type in allowedTypes }
 
 // ── Shared styling helpers ────────────────────────────────────────────────────
 
@@ -372,34 +374,15 @@ fun RecipeEditScreen(
                     IngredientEditCard(
                         index = index,
                         ingredient = ingredient,
+                        units = uiState.units,
                         onQueryChange = { viewModel.updateIngredientQuery(index, it) },
                         onSelect = { viewModel.selectIngredient(index, it) },
+                        onSelectCustom = { viewModel.selectCustomIngredient(index) },
                         onDismiss = { viewModel.dismissDropdown(index) },
                         onUnitChange = { viewModel.updateIngredientUnit(index, it) },
                         onAmountChange = { viewModel.updateIngredientAmount(index, it) },
                         onComplementChange = { viewModel.updateIngredientComplement(index, it) },
                         onRemove = { viewModel.removeIngredient(index) },
-                    )
-                }
-            }
-
-            // ── Custom ingredients ───────────────────────────────────────────
-            item {
-                SectionHeader(
-                    title = "Custom ingredients",
-                    count = uiState.customIngredients.size,
-                    onAdd = { viewModel.addCustomIngredient() },
-                )
-            }
-
-            uiState.customIngredients.forEachIndexed { index, ci ->
-                item(key = "custom_ingredient_$index") {
-                    CustomIngredientEditCard(
-                        ingredient = ci,
-                        onNameChange = { viewModel.updateCustomIngredientName(index, it) },
-                        onUnitChange = { viewModel.updateCustomIngredientUnit(index, it) },
-                        onAmountChange = { viewModel.updateCustomIngredientAmount(index, it) },
-                        onRemove = { viewModel.removeCustomIngredient(index) },
                     )
                 }
             }
@@ -516,15 +499,17 @@ private fun DishClassChip(label: String, selected: Boolean, onClick: () -> Unit)
 private fun IngredientEditCard(
     index: Int,
     ingredient: EditIngredient,
+    units: List<UnitInfo>,
     onQueryChange: (String) -> Unit,
     onSelect: (IngredientSummary) -> Unit,
+    onSelectCustom: () -> Unit,
     onDismiss: () -> Unit,
     onUnitChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
     onComplementChange: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
-    val units = unitsForIngredient(ingredient.allowAmount, ingredient.allowWeight, ingredient.allowVolume)
+    val availableUnits = unitsForIngredient(ingredient.allowedTypes, units)
     val showAmount = ingredient.unit != "NONE"
 
     Card(
@@ -592,6 +577,12 @@ private fun IngredientEditCard(
                             val name = result.name["EN"] ?: result.name.values.firstOrNull() ?: ""
                             DropdownMenuItem(text = { Text(name) }, onClick = { onSelect(result) })
                         }
+                        if (ingredient.searchResults.isEmpty() && ingredient.query.isNotBlank()) {
+                            DropdownMenuItem(
+                                text = { Text("Add \"${ingredient.query.trim()}\" as custom ingredient") },
+                                onClick = onSelectCustom,
+                            )
+                        }
                     }
                 }
                 IconButton(onClick = onRemove) {
@@ -611,7 +602,7 @@ private fun IngredientEditCard(
                     modifier = Modifier.width(110.dp),
                 ) {
                     OutlinedTextField(
-                        value = units.find { it.first == ingredient.unit }?.second ?: ingredient.unit,
+                        value = unitFieldLabel(ingredient.unit),
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Unit") },
@@ -621,8 +612,11 @@ private fun IngredientEditCard(
                         shape = fieldShape,
                     )
                     ExposedDropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
-                        units.forEach { (key, label) ->
-                            DropdownMenuItem(text = { Text(label) }, onClick = { onUnitChange(key); unitExpanded = false })
+                        availableUnits.forEach { unit ->
+                            DropdownMenuItem(
+                                text = { Text(unitFieldLabel(unit.name)) },
+                                onClick = { onUnitChange(unit.name); unitExpanded = false },
+                            )
                         }
                     }
                 }
@@ -649,85 +643,6 @@ private fun IngredientEditCard(
                     colors = editFieldColors(),
                     shape = fieldShape,
                 )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CustomIngredientEditCard(
-    ingredient: EditCustomIngredient,
-    onNameChange: (String) -> Unit,
-    onUnitChange: (String) -> Unit,
-    onAmountChange: (String) -> Unit,
-    onRemove: () -> Unit,
-) {
-    val showAmount = ingredient.unit != "NONE"
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = CookncoWhite),
-        border = BorderStroke(1.5.dp, CookncoNavy),
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = ingredient.name,
-                    onValueChange = onNameChange,
-                    label = { Text("Name") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
-                IconButton(onClick = onRemove) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                var unitExpanded by rememberSaveable { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = unitExpanded,
-                    onExpandedChange = { unitExpanded = it },
-                    modifier = Modifier.width(110.dp),
-                ) {
-                    OutlinedTextField(
-                        value = allUnits.find { it.first == ingredient.unit }?.second ?: ingredient.unit,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Unit") },
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
-                        colors = editFieldColors(),
-                        shape = fieldShape,
-                    )
-                    ExposedDropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
-                        allUnits.forEach { (key, label) ->
-                            DropdownMenuItem(text = { Text(label) }, onClick = { onUnitChange(key); unitExpanded = false })
-                        }
-                    }
-                }
-
-                if (showAmount) {
-                    OutlinedTextField(
-                        value = ingredient.amount?.toString() ?: "",
-                        onValueChange = onAmountChange,
-                        label = { Text("Amount") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        colors = editFieldColors(),
-                        shape = fieldShape,
-                    )
-                }
             }
         }
     }

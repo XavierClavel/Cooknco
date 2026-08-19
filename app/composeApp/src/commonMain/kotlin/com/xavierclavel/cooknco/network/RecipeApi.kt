@@ -4,6 +4,7 @@ import com.xavierclavel.cooknco.network.dto.IngredientSearchResult
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
+import com.xavierclavel.cooknco.network.dto.UnitInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
@@ -178,6 +179,14 @@ class RecipeApi(private val client: HttpClient) {
             parameter("size", 20)
             parameter("locale", "EN")
         }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    suspend fun listUnits(): List<UnitInfo> {
+        val response = client.get("$base/unit")
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
         }

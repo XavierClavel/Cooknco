@@ -6,6 +6,7 @@ import com.xavierclavel.cooknco.data.AuthRepository
 import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.TokenDataStore
+import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.data.UserRepository
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.AuthApi
@@ -48,4 +49,5 @@ object AppGraph {
     val userRepository by lazy { UserRepository(userApi, tokenDataStore) }
     val recipeRepository by lazy { RecipeRepository(recipeApi, tokenDataStore) }
     val cookbookRepository by lazy { CookbookRepository(cookbookApi, tokenDataStore) }
+    val unitRepository by lazy { UnitRepository(recipeApi) }
 }
