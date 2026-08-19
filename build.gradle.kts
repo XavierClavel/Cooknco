@@ -81,6 +81,15 @@ subprojects {
 
     tasks.test {
         useJUnitPlatform()
+        // Each checkout gets its own database in the shared ebean test container, so
+        // concurrent checkouts/worktrees don't drop-create each other's schema.
+        // application-test.yaml resolves ${EBEAN_TEST_DBNAME}; an explicit
+        // EBEAN_TEST_DBNAME in the environment still wins.
+        environment(
+            "EBEAN_TEST_DBNAME",
+            System.getenv("EBEAN_TEST_DBNAME")
+                ?: ("test_" + Integer.toHexString(rootProject.projectDir.absolutePath.hashCode()))
+        )
     }
 }
 
