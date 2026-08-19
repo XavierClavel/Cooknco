@@ -1,6 +1,7 @@
 package main.com.xavierclavel.utils
 
 import shared.dto.IngredientDTO
+import shared.dto.SearchResult
 import shared.enums.IngredientType
 import shared.infodto.IngredientInfo
 import shared.utils.URL.INGREDIENT_URL
@@ -34,6 +35,18 @@ suspend fun HttpClient.createIngredient(ingredient: IngredientDTO = ingredientDT
         return response
     }
 
+}
+
+suspend fun HttpClient.searchIngredients(query: String): SearchResult<IngredientInfo> {
+    this.get(INGREDIENT_URL) {
+        url {
+            parameters.append("query", query)
+            parameters.append("locale", "en")
+        }
+    }.apply {
+        assertEquals(HttpStatusCode.OK, status)
+        return Json.decodeFromString(SearchResult.serializer(IngredientInfo.serializer()), bodyAsText())
+    }
 }
 
 suspend fun HttpClient.getIngredient(id: Long): IngredientInfo {

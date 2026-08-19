@@ -5,6 +5,7 @@ import shared.dto.IngredientDTO
 import shared.dto.RecipeDTO
 import shared.dto.RecipeDTO.RecipeIngredientDTO
 import shared.enums.DishClass
+import shared.enums.Sort
 import shared.infodto.RecipeInfo
 import shared.infodto.UserInfo
 import org.junit.jupiter.api.Test
@@ -216,8 +217,25 @@ class RecipeFiltersTest : ApplicationTest() {
         val recipe2 = client.createRecipe(recipeDTO2)
         val recipe3 = client.createRecipe(recipeDTO3)
 
+        // full-length query with a typo
         val response1 = client.listRecipes(user = adminUser.id, search = "torte aux pommes")
         assertEquals(setOf(recipe1.toOverview(), recipe2.toOverview()), response1.toSet())
+
+        // single word of a longer title
+        val response2 = client.listRecipes(user = adminUser.id, search = "pommes")
+        assertEquals(setOf(recipe1.toOverview(), recipe2.toOverview()), response2.toSet())
+
+        // prefix typed while searching
+        val response3 = client.listRecipes(user = adminUser.id, search = "tart")
+        assertEquals(setOf(recipe1.toOverview()), response3.toSet())
+
+        // no false positives
+        val response4 = client.listRecipes(user = adminUser.id, search = "raclette")
+        assertEquals(setOf(recipe3.toOverview()), response4.toSet())
+
+        // best match ordering: exact title first, partial match second
+        val response5 = client.listRecipes(user = adminUser.id, search = "tarte aux pommes", sort = Sort.BEST_MATCH)
+        assertEquals(listOf(recipe1.toOverview(), recipe2.toOverview()), response5)
     }
 
     @Test

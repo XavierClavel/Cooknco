@@ -13,6 +13,7 @@ import org.koin.core.component.KoinComponent
 import com.xavierclavel.utils.DbTransaction.deleteAndGet
 import com.xavierclavel.utils.DbTransaction.insertAndGet
 import com.xavierclavel.utils.DbTransaction.updateAndGet
+import com.xavierclavel.utils.sqlStringLiteral
 import shared.enums.Locale
 import shared.infodto.IngredientInfo
 
@@ -74,13 +75,14 @@ class IngredientService: KoinComponent {
                 if (searchString.isBlank()) return@apply
                 this.and()
                     .translations.locale.eq(locale)
-                    .raw("similarity(unaccent(translations.name), unaccent(?)) > 0.3", searchString)
+                    .raw("word_similarity(unaccent(?), unaccent(${QIngredient.Alias.translations.name})) > 0.3", searchString)
                     .endAnd()
             }
             .query()
 
-        query.orderBy("similarity(unaccent(translations.name), unaccent(:term)) desc")
-        query.setParameter("term", searchString)
+        // Ebean copies orderBy strings into SQL verbatim (no parameter binding),
+        // so the search term is inlined as an injection-proof hex literal
+        query.orderBy("word_similarity(unaccent(${sqlStringLiteral(searchString)}), unaccent(${QIngredient.Alias.translations.name})) desc")
 
         return Pair(query.findCount(), query.setPaging(paging).findList().map{it.toInfo()})
     }
