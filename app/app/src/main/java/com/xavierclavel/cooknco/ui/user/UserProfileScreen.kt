@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -59,9 +60,10 @@ import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.RecipeImage
+import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
-import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
@@ -80,6 +82,7 @@ fun UserProfileScreen(
 
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {
@@ -191,10 +194,10 @@ private fun ProfileContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    AsyncImage(
-                        model = "${ApiClient.IMAGE_URL}/users/${user.id}-v${user.version}.webp",
+                    UserAvatar(
+                        userId = user.id,
+                        version = user.version,
                         contentDescription = user.username,
-                        contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(110.dp)
                             .clip(CircleShape)
@@ -393,14 +396,13 @@ private fun ProfileRecipeCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AsyncImage(
-                model = "${ApiClient.IMAGE_URL}/recipes-thumbnails/${recipe.id}-v${recipe.version}.webp",
+            RecipeImage(
+                recipeId = recipe.id,
+                version = recipe.version,
                 contentDescription = recipe.title,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(64.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(CookncoGreenLight),
+                    .clip(RoundedCornerShape(8.dp)),
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(

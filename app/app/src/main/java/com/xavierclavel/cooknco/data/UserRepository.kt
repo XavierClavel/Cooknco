@@ -3,6 +3,7 @@ package com.xavierclavel.cooknco.data
 import com.xavierclavel.cooknco.network.UserApi
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
 import kotlinx.coroutines.flow.first
 
 class UserRepository(
@@ -38,5 +39,13 @@ class UserRepository(
 
     suspend fun getUserRecipes(profileUserId: Long, page: Int): Result<List<RecipeOverview>> = runCatching {
         userApi.getUserRecipes(token(), profileUserId, page)
+    }
+
+    suspend fun getSettings(): Result<UserSettingsDTO> = runCatching {
+        userApi.getSettings(requireToken())
+    }
+
+    suspend fun updateSettings(settings: UserSettingsDTO): Result<UserSettingsDTO> = runCatching {
+        userApi.updateSettings(requireToken(), settings)
     }
 }

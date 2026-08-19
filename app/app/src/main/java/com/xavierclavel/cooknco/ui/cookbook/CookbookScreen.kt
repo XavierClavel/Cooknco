@@ -24,7 +24,6 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExitToApp
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,17 +47,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
+import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
+import com.xavierclavel.cooknco.ui.components.RecipeImage
+import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
@@ -73,6 +72,8 @@ fun CookbookScreen(
     currentUserId: Long,
     onNavigateToEdit: (Long) -> Unit,
     onNavigateBack: () -> Unit,
+    onNavigateToRecipe: (Long) -> Unit = {},
+    onNavigateToUser: (Long) -> Unit = {},
     viewModel: CookbookViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -150,6 +151,8 @@ fun CookbookScreen(
                     isAdmin = uiState.isAdmin,
                     error = uiState.error,
                     onLeave = { viewModel.confirmLeave() },
+                    onNavigateToRecipe = onNavigateToRecipe,
+                    onNavigateToUser = onNavigateToUser,
                     modifier = Modifier.padding(innerPadding),
                 )
             }
@@ -185,6 +188,8 @@ private fun CookbookContent(
     isAdmin: Boolean,
     error: String?,
     onLeave: () -> Unit,
+    onNavigateToRecipe: (Long) -> Unit = {},
+    onNavigateToUser: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -193,10 +198,10 @@ private fun CookbookContent(
     ) {
         // ── Cookbook image ───────────────────────────────────────────────────
         item {
-            AsyncImage(
-                model = "${ApiClient.IMAGE_URL}/cookbooks/${cookbook.id}-v${cookbook.version}.webp",
+            CookbookImage(
+                cookbookId = cookbook.id,
+                version = cookbook.version,
                 contentDescription = cookbook.title,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(240.dp),
@@ -276,6 +281,7 @@ private fun CookbookContent(
             items(recipes, key = { "recipe_${it.id}" }) { recipe ->
                 RecipeRow(
                     recipe = recipe,
+                    onClick = { onNavigateToRecipe(recipe.id) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
@@ -293,6 +299,7 @@ private fun CookbookContent(
             items(members, key = { "member_${it.id}" }) { member ->
                 MemberRow(
                     member = member,
+                    onClick = { onNavigateToUser(member.id) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
@@ -362,8 +369,9 @@ private fun StatChip(label: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RecipeRow(recipe: CookbookRecipeInfo, modifier: Modifier = Modifier) {
+private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
+        onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = CookncoWhite),
@@ -375,10 +383,10 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, modifier: Modifier = Modifier)
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AsyncImage(
-                model = "${ApiClient.IMAGE_URL}/recipes-thumbnails/${recipe.id}-v1.webp",
+            RecipeImage(
+                recipeId = recipe.id,
+                version = 1L,
                 contentDescription = recipe.title,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(60.dp)
                     .clip(RoundedCornerShape(8.dp)),
@@ -406,8 +414,9 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, modifier: Modifier = Modifier)
 }
 
 @Composable
-private fun MemberRow(member: RecipeOwner, modifier: Modifier = Modifier) {
+private fun MemberRow(member: RecipeOwner, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
     Card(
+        onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = CookncoWhite),
@@ -419,29 +428,14 @@ private fun MemberRow(member: RecipeOwner, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Avatar with person icon fallback
-            Box(
+            UserAvatar(
+                userId = member.id,
+                version = member.version,
+                contentDescription = member.username,
                 modifier = Modifier
                     .size(44.dp)
-                    .clip(CircleShape)
-                    .background(CookncoGreen.copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Person,
-                    contentDescription = null,
-                    tint = CookncoNavy.copy(alpha = 0.4f),
-                    modifier = Modifier.size(28.dp),
-                )
-                AsyncImage(
-                    model = "${ApiClient.IMAGE_URL}/users/${member.id}-v${member.version}.webp",
-                    contentDescription = member.username,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape),
-                )
-            }
+                    .clip(CircleShape),
+            )
 
             Text(
                 text = member.username,

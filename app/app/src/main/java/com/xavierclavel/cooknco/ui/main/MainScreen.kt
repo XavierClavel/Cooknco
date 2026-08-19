@@ -41,16 +41,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.cookbook.CookbooksScreen
 import com.xavierclavel.cooknco.ui.cookbook.CookbooksViewModel
 import com.xavierclavel.cooknco.ui.home.HomeScreen
@@ -75,6 +73,7 @@ fun MainScreen(
     onNavigateToCookbook: (Long) -> Unit = {},
     onNavigateToEditCookbook: (Long?) -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToUser: (Long) -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -166,6 +165,7 @@ fun MainScreen(
                 user = user,
                 viewModel = homeViewModel,
                 onRecipeClick = onNavigateToRecipe,
+                onUserClick = onNavigateToUser,
                 modifier = Modifier.padding(innerPadding),
             )
             1 -> CookbooksScreen(
@@ -248,10 +248,10 @@ private fun MainTopBar(
             }
 
             // User avatar — tapping opens the profile tab
-            AsyncImage(
-                model = "${ApiClient.IMAGE_URL}/users/${user.id}-v${user.version}.webp",
+            UserAvatar(
+                userId = user.id,
+                version = user.version,
                 contentDescription = "My profile",
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)

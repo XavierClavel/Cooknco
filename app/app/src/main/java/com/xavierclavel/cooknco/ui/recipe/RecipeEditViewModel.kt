@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 data class EditIngredient(
     val ingredientId: Long? = null,
     val ingredientName: String = "",
+    val type: String = "",
     val query: String = "",
     val unit: String = "UNIT",
     val amount: Float? = null,
@@ -40,6 +41,8 @@ data class EditCustomIngredient(
     val amount: Float? = null,
 )
 
+data class StepItem(val id: String, val text: String)
+
 data class RecipeEditUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -53,7 +56,7 @@ data class RecipeEditUiState(
     val cookTemp: String = "",
     val ingredients: List<EditIngredient> = emptyList(),
     val customIngredients: List<EditCustomIngredient> = emptyList(),
-    val steps: List<String> = emptyList(),
+    val steps: List<StepItem> = emptyList(),
     val tips: String = "",
     val error: String? = null,
     val recipeId: Long? = null,
@@ -70,6 +73,8 @@ class RecipeEditViewModel(
     val uiState: StateFlow<RecipeEditUiState> = _uiState.asStateFlow()
 
     private val searchJobs = mutableMapOf<Int, Job>()
+    private var nextStepId = 0
+    private fun newStepId() = "s${nextStepId++}"
 
     init {
         if (recipeId != null) {
@@ -86,6 +91,7 @@ class RecipeEditViewModel(
                         EditIngredient(
                             ingredientId = ing.id,
                             ingredientName = ing.name,
+                            type = ing.type,
                             query = ing.name,
                             unit = ing.unit,
                             amount = ing.amount,
@@ -110,7 +116,7 @@ class RecipeEditViewModel(
                             cookTemp = recipe.cookingTemperature?.toString() ?: "",
                             ingredients = editIngredients,
                             customIngredients = editCustomIngredients,
-                            steps = recipe.steps.toMutableList(),
+                            steps = recipe.steps.map { text -> StepItem(newStepId(), text) },
                             tips = recipe.tips,
                             recipeId = recipe.id,
                             recipeVersion = recipe.version,
@@ -193,6 +199,7 @@ class RecipeEditViewModel(
                 list[index] = list[index].copy(
                     ingredientId = summary.id,
                     ingredientName = name,
+                    type = summary.type,
                     query = name,
                     unit = defaultUnit,
                     allowAmount = summary.allowAmount,
@@ -274,22 +281,18 @@ class RecipeEditViewModel(
     }
 
     // Step operations
-    fun addStep() {
-        _uiState.update { it.copy(steps = it.steps + "") }
+    fun addStep() = _uiState.update { it.copy(steps = it.steps + StepItem(newStepId(), "")) }
+
+    fun removeStep(id: String) = _uiState.update { s ->
+        s.copy(steps = s.steps.filter { it.id != id })
     }
 
-    fun removeStep(index: Int) {
-        _uiState.update { state ->
-            state.copy(steps = state.steps.toMutableList().also { it.removeAt(index) })
-        }
+    fun updateStep(id: String, text: String) = _uiState.update { s ->
+        s.copy(steps = s.steps.map { if (it.id == id) it.copy(text = text) else it })
     }
 
-    fun updateStep(index: Int, text: String) {
-        _uiState.update { state ->
-            val list = state.steps.toMutableList()
-            if (index < list.size) list[index] = text
-            state.copy(steps = list)
-        }
+    fun reorderStep(from: Int, to: Int) = _uiState.update { s ->
+        s.copy(steps = s.steps.toMutableList().apply { add(to, removeAt(from)) })
     }
 
     fun save() {
@@ -321,7 +324,7 @@ class RecipeEditViewModel(
                 .map { ci ->
                     CustomIngredientSaveDto(name = ci.name, unit = ci.unit, amount = ci.amount)
                 },
-            steps = state.steps.filter { it.isNotBlank() },
+            steps = state.steps.filter { it.text.isNotBlank() }.map { it.text },
             tips = state.tips.trim(),
         )
 

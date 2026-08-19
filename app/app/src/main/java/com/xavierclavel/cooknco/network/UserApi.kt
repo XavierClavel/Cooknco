@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.network
 
 import com.xavierclavel.cooknco.network.dto.UserDTO
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
@@ -75,6 +76,24 @@ class UserApi(private val client: HttpClient) {
             bearerAuth(token)
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    suspend fun getSettings(token: String): UserSettingsDTO {
+        val response = client.get("$base/user/settings") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
+    suspend fun updateSettings(token: String, settings: UserSettingsDTO): UserSettingsDTO {
+        val response = client.put("$base/user/settings") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(settings)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
     }
 
     suspend fun getUserRecipes(token: String?, profileUserId: Long, page: Int, size: Int = 20): List<com.xavierclavel.cooknco.network.dto.RecipeOverview> {

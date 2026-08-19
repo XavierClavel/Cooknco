@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.ui.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,17 +37,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.RecipeImage
+import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
@@ -59,6 +59,7 @@ fun HomeScreen(
     user: UserInfo,
     viewModel: HomeViewModel,
     onRecipeClick: (Long) -> Unit = {},
+    onUserClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -123,6 +124,7 @@ fun HomeScreen(
                 RecipeCard(
                     recipe = recipe,
                     onClick = { onRecipeClick(recipe.id) },
+                    onUserClick = onUserClick,
                     modifier = Modifier.padding(
                         start = 78.dp,
                         end = 16.dp,
@@ -200,6 +202,7 @@ private fun DateGroupHeader(label: String, count: Int) {
 private fun RecipeCard(
     recipe: RecipeOverview,
     onClick: () -> Unit,
+    onUserClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -212,10 +215,10 @@ private fun RecipeCard(
     ) {
         Column {
             // Recipe photo
-            AsyncImage(
-                model = "${ApiClient.IMAGE_URL}/recipes-thumbnails/${recipe.id}-v${recipe.version}.webp",
+            RecipeImage(
+                recipeId = recipe.id,
+                version = recipe.version,
                 contentDescription = recipe.title,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp),
@@ -234,27 +237,28 @@ private fun RecipeCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                AuthorChip(owner = recipe.owner)
+                AuthorChip(owner = recipe.owner, onClick = { onUserClick(recipe.owner.id) })
             }
         }
     }
 }
 
 @Composable
-private fun AuthorChip(owner: RecipeOwner, modifier: Modifier = Modifier) {
+private fun AuthorChip(owner: RecipeOwner, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50.dp))
             .background(CookncoWhite)
             .border(1.5.dp, CookncoNavy, RoundedCornerShape(50.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        AsyncImage(
-            model = "${ApiClient.IMAGE_URL}/users/${owner.id}-v${owner.version}.webp",
+        UserAvatar(
+            userId = owner.id,
+            version = owner.version,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(28.dp)
                 .clip(CircleShape),
@@ -370,6 +374,7 @@ private fun HomeScreenContent(
                 RecipeCard(
                     recipe = recipe,
                     onClick = { onRecipeClick(recipe.id) },
+                    onUserClick = {},
                     modifier = Modifier.padding(start = 78.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
                 )
             }

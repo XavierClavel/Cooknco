@@ -34,6 +34,8 @@ import com.xavierclavel.cooknco.ui.user.UserProfileScreen
 import com.xavierclavel.cooknco.ui.user.UserProfileViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeScreen
+import com.xavierclavel.cooknco.ui.recipe.RecipesScreen
+import com.xavierclavel.cooknco.ui.recipe.RecipesViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeViewModel
 
 private object Routes {
@@ -50,6 +52,7 @@ private object Routes {
     const val COOKBOOK_CREATE = "cookbook/create"
     const val USER = "user/{userId}"
     const val USER_EDIT = "user/{userId}/edit"
+    const val RECIPES = "recipes"
 }
 
 @Composable
@@ -126,6 +129,8 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             MainScreen(
                 user = user,
                 onLogout = viewModel::logout,
+                onNavigateToSearch = { navController.navigate(Routes.RECIPES) },
+                onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 onNavigateToEditProfile = { navController.navigate("user/${user.id}/edit") },
                 onNavigateToRecipe = { recipeId ->
                     navController.navigate("recipe/$recipeId")
@@ -164,10 +169,9 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             RecipeScreen(
                 recipeId = recipeId,
                 currentUserId = currentUserId,
-                onNavigateToEdit = { id ->
-                    navController.navigate("recipe/$id/edit")
-                },
+                onNavigateToEdit = { id -> navController.navigate("recipe/$id/edit") },
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 viewModel = recipeViewModel,
             )
         }
@@ -253,10 +257,10 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             CookbookScreen(
                 cookbookId = cookbookId,
                 currentUserId = currentUserId,
-                onNavigateToEdit = { id ->
-                    navController.navigate("cookbook/$id/edit")
-                },
+                onNavigateToEdit = { id -> navController.navigate("cookbook/$id/edit") },
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToRecipe = { recipeId -> navController.navigate("recipe/$recipeId") },
+                onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 viewModel = cookbookViewModel,
             )
         }
@@ -284,6 +288,20 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                     }
                 },
                 viewModel = editViewModel,
+            )
+        }
+
+        // ── Recipes browse / search ───────────────────────────────────────────
+        composable(Routes.RECIPES) {
+            val context = LocalContext.current
+            val recipesViewModel: RecipesViewModel = viewModel(
+                factory = RecipesViewModel.factory(context),
+            )
+            RecipesScreen(
+                viewModel = recipesViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onRecipeClick = { recipeId -> navController.navigate("recipe/$recipeId") },
+                onUserClick = { userId -> navController.navigate("user/$userId") },
             )
         }
 

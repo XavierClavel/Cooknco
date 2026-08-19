@@ -131,6 +131,7 @@ data class CustomIngredientSaveDto(
 data class IngredientSummary(
     val id: Long,
     val name: Map<String, String>,
+    val type: String = "",
     val allowAmount: Boolean,
     val allowWeight: Boolean,
     val allowVolume: Boolean,
@@ -196,5 +197,11 @@ data class RecipeSearchResult(
     val page: Int,
     val size: Int,
     val items: List<RecipeOverview>,
+)
+
+@Serializable
+data class UserSettingsDTO(
+    val autoAcceptFollowRequests: Boolean = false,
+    val isAccountPublic: Boolean = false,
 )
 

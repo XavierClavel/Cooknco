@@ -33,16 +33,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
+import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
+import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
@@ -137,10 +136,10 @@ private fun CookbookCard(cookbook: CookbookInfo, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column {
-            AsyncImage(
-                model = "${ApiClient.IMAGE_URL}/cookbooks/${cookbook.id}-v${cookbook.version}.webp",
+            CookbookImage(
+                cookbookId = cookbook.id,
+                version = cookbook.version,
                 contentDescription = cookbook.title,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp),
@@ -180,10 +179,10 @@ private fun MemberAvatars(members: List<RecipeOwner>, modifier: Modifier = Modif
         horizontalArrangement = Arrangement.spacedBy((-8).dp),
     ) {
         visible.forEach { member ->
-            AsyncImage(
-                model = "${ApiClient.IMAGE_URL}/users/${member.id}-v${member.version}.webp",
+            UserAvatar(
+                userId = member.id,
+                version = member.version,
                 contentDescription = member.username,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(26.dp)
                     .clip(CircleShape)

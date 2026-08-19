@@ -17,8 +17,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Dp
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyColumnState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -26,6 +34,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,14 +65,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
@@ -226,7 +239,16 @@ fun RecipeEditScreen(
             return@Scaffold
         }
 
+        val lazyListState = rememberLazyListState()
+        val reorderState = rememberReorderableLazyColumnState(lazyListState) { from, to ->
+            val steps = uiState.steps
+            val fromIdx = steps.indexOfFirst { it.id == from.key }
+            val toIdx = steps.indexOfFirst { it.id == to.key }
+            if (fromIdx != -1 && toIdx != -1) viewModel.reorderStep(fromIdx, toIdx)
+        }
+
         LazyColumn(
+            state = lazyListState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -392,13 +414,25 @@ fun RecipeEditScreen(
             }
 
             uiState.steps.forEachIndexed { index, step ->
-                item(key = "step_$index") {
-                    StepEditCard(
-                        index = index,
-                        step = step,
-                        onStepChange = { viewModel.updateStep(index, it) },
-                        onRemove = { viewModel.removeStep(index) },
-                    )
+                item(key = step.id) {
+                    ReorderableItem(reorderState, key = step.id) { isDragging ->
+                        val elevation by animateDpAsState(
+                            targetValue = if (isDragging) 6.dp else 0.dp,
+                            label = "step_elevation",
+                        )
+                        val haptic = LocalHapticFeedback.current
+                        StepEditCard(
+                            index = index,
+                            step = step,
+                            elevation = elevation,
+                            dragHandleModifier = Modifier.draggableHandle(
+                                onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                                onDragStopped = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                            ),
+                            onStepChange = { viewModel.updateStep(step.id, it) },
+                            onRemove = { viewModel.removeStep(step.id) },
+                        )
+                    }
                 }
             }
 
@@ -505,8 +539,34 @@ private fun IngredientEditCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Row 1: name autocomplete + delete
-            Row(verticalAlignment = Alignment.Top) {
+            // Row 1: type icon + name autocomplete + delete
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(CookncoGreenLight),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (ingredient.type.isNotEmpty()) {
+                        AsyncImage(
+                            model = "${ApiClient.IMAGE_URL}/ingredients/${ingredient.type}.webp",
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                        )
+                    } else {
+                        Icon(
+                            Icons.Outlined.Add,
+                            contentDescription = null,
+                            tint = CookncoNavy.copy(alpha = 0.25f),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
                 ExposedDropdownMenuBox(
                     expanded = ingredient.showDropdown,
                     onExpandedChange = { if (!it) onDismiss() },
@@ -676,7 +736,9 @@ private fun CustomIngredientEditCard(
 @Composable
 private fun StepEditCard(
     index: Int,
-    step: String,
+    step: StepItem,
+    elevation: Dp = 0.dp,
+    dragHandleModifier: Modifier = Modifier,
     onStepChange: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -689,7 +751,8 @@ private fun StepEditCard(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 24.dp),
+                .padding(start = 24.dp)
+                .shadow(elevation, RoundedCornerShape(12.dp)),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = CookncoWhite),
             border = BorderStroke(1.5.dp, CookncoNavy),
@@ -699,13 +762,22 @@ private fun StepEditCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedTextField(
-                    value = step,
+                    value = step.text,
                     onValueChange = onStepChange,
                     label = { Text("Step ${index + 1}") },
                     modifier = Modifier.weight(1f),
                     minLines = 2,
                     colors = editFieldColors(),
                     shape = fieldShape,
+                )
+                Icon(
+                    imageVector = Icons.Outlined.DragIndicator,
+                    contentDescription = "Drag to reorder",
+                    tint = CookncoNavy.copy(alpha = 0.35f),
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .size(24.dp)
+                        .then(dragHandleModifier),
                 )
                 IconButton(onClick = onRemove) {
                     Icon(Icons.Outlined.Delete, contentDescription = "Remove step", tint = MaterialTheme.colorScheme.error)

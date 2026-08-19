@@ -19,6 +19,12 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 
+enum class RecipeSort(val value: String, val label: String) {
+    RECENT("DATE_DESCENDING", "Recent"),
+    BEST_MATCH("BEST_MATCH", "Best match"),
+    MOST_LIKED("MOST_LIKED", "Most liked"),
+}
+
 class RecipeApi(private val client: HttpClient) {
 
     private val base = ApiClient.BASE_URL
@@ -40,6 +46,24 @@ class RecipeApi(private val client: HttpClient) {
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
         }
+        return response.body()
+    }
+
+    suspend fun searchRecipes(
+        token: String?,
+        query: String = "",
+        sort: RecipeSort = RecipeSort.RECENT,
+        page: Int = 0,
+        size: Int = 20,
+    ): List<RecipeOverview> {
+        val response = client.get("$base/recipe") {
+            if (token != null) bearerAuth(token)
+            if (query.isNotBlank()) parameter("search", query)
+            parameter("sort", sort.value)
+            parameter("page", page)
+            parameter("size", size)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
         return response.body()
     }
 

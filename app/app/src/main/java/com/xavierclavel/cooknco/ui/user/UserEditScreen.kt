@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,6 +59,7 @@ import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
@@ -188,16 +190,28 @@ private fun UserEditContent(
             val imageModel: Any? = uiState.pendingImageUri
                 ?: user?.let { "${ApiClient.IMAGE_URL}/users/${it.id}-v${it.version}.webp" }
 
-            AsyncImage(
-                model = imageModel,
-                contentDescription = "Profile photo",
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
                     .border(2.5.dp, CookncoNavy, CircleShape)
-                    .background(CookncoGreen.copy(alpha = 0.3f), CircleShape),
-            )
+                    .background(CookncoGreenLight)
+                    .align(Alignment.Center),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(72.dp),
+                )
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = "Profile photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
             // Camera badge
             Box(

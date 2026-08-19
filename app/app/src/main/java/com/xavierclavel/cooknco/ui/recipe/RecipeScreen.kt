@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,6 +74,8 @@ import com.xavierclavel.cooknco.network.dto.CustomIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
+import com.xavierclavel.cooknco.ui.components.RecipeImage
+import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
@@ -111,6 +114,7 @@ fun RecipeScreen(
     currentUserId: Long,
     onNavigateToEdit: (Long) -> Unit,
     onNavigateBack: () -> Unit,
+    onNavigateToUser: (Long) -> Unit = {},
     viewModel: RecipeViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -184,6 +188,7 @@ fun RecipeScreen(
                 onNotesChange = viewModel::updateNotes,
                 onSaveNotes = viewModel::saveNotes,
                 onCancelNoteEdit = viewModel::cancelNoteEdit,
+                onNavigateToUser = onNavigateToUser,
                 modifier = Modifier.padding(innerPadding),
             )
         }
@@ -224,6 +229,7 @@ private fun RecipeContent(
     onNotesChange: (String) -> Unit,
     onSaveNotes: () -> Unit,
     onCancelNoteEdit: () -> Unit,
+    onNavigateToUser: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val recipeYield = recipe.yield ?: 1
@@ -234,13 +240,14 @@ private fun RecipeContent(
     ) {
         // ── Full-width banner image ──────────────────────────────────────────
         item {
-            AsyncImage(
-                model = "${ApiClient.IMAGE_URL}/recipes/${recipe.id}-v${recipe.version}.webp",
+            RecipeImage(
+                recipeId = recipe.id,
+                version = recipe.version,
                 contentDescription = recipe.title,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(260.dp),
+                thumbnail = false,
             )
         }
 
@@ -275,7 +282,7 @@ private fun RecipeContent(
                     }
 
                     // Author chip
-                    AuthorChip(owner = recipe.owner)
+                    AuthorChip(owner = recipe.owner, onClick = { onNavigateToUser(recipe.owner.id) })
 
                     // Cooking meta chips
                     val hasMeta = recipe.preparationTime != null || recipe.cookingTime != null || recipe.cookingTemperature != null
@@ -464,20 +471,21 @@ private fun RecipeContent(
 // ── Reusable sub-composables ──────────────────────────────────────────────────
 
 @Composable
-private fun AuthorChip(owner: RecipeOwner, modifier: Modifier = Modifier) {
+private fun AuthorChip(owner: RecipeOwner, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50.dp))
             .background(CookncoWhite)
             .border(1.5.dp, CookncoNavy, RoundedCornerShape(50.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        AsyncImage(
-            model = "${ApiClient.IMAGE_URL}/users/${owner.id}-v${owner.version}.webp",
+        UserAvatar(
+            userId = owner.id,
+            version = owner.version,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
             modifier = Modifier.size(28.dp).clip(CircleShape),
         )
         Text(

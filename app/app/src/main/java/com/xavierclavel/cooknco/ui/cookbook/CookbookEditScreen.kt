@@ -14,9 +14,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -30,8 +31,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,12 +43,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.network.ApiClient
+import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoNavy
+import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.network.dto.UserSummary
+import com.xavierclavel.cooknco.ui.components.UserAvatar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,16 +72,61 @@ fun CookbookEditScreen(
         }
     }
 
-    if (uiState.isLoading) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = if (cookbookId == null) "New Cookbook" else "Edit Cookbook",
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.save() },
+                        enabled = !uiState.isSaving,
+                    ) {
+                        if (uiState.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = CookncoNavy,
+                            )
+                        } else {
+                            Icon(Icons.Outlined.Check, contentDescription = "Save")
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = CookncoGreen,
+                    titleContentColor = CookncoNavy,
+                    navigationIconContentColor = CookncoNavy,
+                    actionIconContentColor = CookncoNavy,
+                ),
+            )
+        },
+        containerColor = CookncoBackground,
+    ) { innerPadding ->
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp)
+            }
+            return@Scaffold
         }
-        return
-    }
 
     LazyColumn(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
+            .padding(innerPadding)
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -204,6 +255,7 @@ fun CookbookEditScreen(
 
         item { Spacer(Modifier.height(32.dp)) }
     }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -227,30 +279,14 @@ private fun MemberEditRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Avatar / placeholder
-            Box(
+            UserAvatar(
+                userId = member.userId,
+                version = 1L,
+                contentDescription = member.username,
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(40.dp),
-                )
-                if (member.userId > 0L) {
-                    AsyncImage(
-                        model = "${ApiClient.IMAGE_URL}/users/${member.userId}-v1.webp",
-                        contentDescription = member.username,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape),
-                    )
-                }
-            }
+            )
 
             // Username search field with autocomplete
             ExposedDropdownMenuBox(
