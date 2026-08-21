@@ -23,5 +23,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Cooknco"
-include(":app")
- 
+include(":composeApp")
+include(":androidApp")
