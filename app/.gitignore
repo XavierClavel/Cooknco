@@ -13,3 +13,14 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+### Xcode ###
+xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+
+### Kotlin/Native ###
+.kotlin/

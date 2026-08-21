@@ -16,8 +16,25 @@ Cooknco runs on a Kubernetes cluster. Here are the pods used:
   - cooknco-mail-database: its database
 - cooknco-frontend: the frontend, powered by nginx
 
+## Mobile app
+The native app in `app/` is a Kotlin Multiplatform project sharing one Compose UI
+across Android and iOS:
+- `app/composeApp` — shared module. `commonMain` holds the whole app (UI, view models,
+  networking); `androidMain` and `iosMain` hold only the platform pieces (photo picker,
+  in-app browser, preferences path, HTTP engine).
+- `app/androidApp` — Android application shell: manifest, resources, `MainActivity`.
+- `app/iosApp` — Xcode project; builds the `ComposeApp` framework via
+  `:composeApp:embedAndSignAppleFrameworkForXcode`.
+
+```
+cd app
+./gradlew :androidApp:assembleDebug   # Android APK
+open iosApp/iosApp.xcodeproj          # iOS (requires Xcode)
+```
+
 ## Stack
 - Kotlin
+- Kotlin Multiplatform + Compose Multiplatform (mobile app)
 - Ktor
 - Ebean
 - Vue.js
