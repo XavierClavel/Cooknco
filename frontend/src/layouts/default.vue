@@ -168,7 +168,7 @@ import {
   toUsers,
 } from "@/scripts/common";
 import {useAuthStore} from "@/stores/auth";
-import { debounce } from 'lodash'
+import debounce from 'lodash/debounce'
 import {ICON_ADMIN, ICON_COOKBOOK, ICON_HOME, ICON_INGREDIENT, ICON_NOTIFICATION, ICON_RECIPE} from "@/scripts/icons";
 import {useDisplay} from "vuetify";
 import {usePollingStore} from "@/stores/pollingStore";

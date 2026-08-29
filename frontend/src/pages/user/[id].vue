@@ -94,7 +94,6 @@
 import { useRoute } from 'vue-router';
 import {ref} from "vue";
 import {getUserIconUrl, toEditUser, toListRecipe} from "@/scripts/common";
-import {getUser} from "@/scripts/users";
 import InteractiblePictoInfo from "@/components/InteractiblePictoInfo.vue";
 import {follow, isFollowingUser, unfollow} from "@/scripts/follows";
 import {useAuthStore} from "@/stores/auth";
@@ -112,7 +111,6 @@ const errorMessage = ref(null)
 const authStore = useAuthStore();
 const currentUserId = computed(() => authStore.id)
 
-const user = ref<object>({})
 const followsUser = ref(null)
 const followersDialog = ref(false)
 const followsDialog = ref(false)
@@ -135,12 +133,40 @@ const openFollowsWindow = () => {
   followsDialog.value = true
 }
 
-isFollowingUser(userId).then (
-  function (response) {
-    console.log(response)
+// Profiles carry no visibility filter server-side (UserService.getUser returns
+// the full UserInfo to anyone), so there is no restricted branch here.
+const { data: user, error, refresh: updateUser } = await useAsyncData(
+  () => `user:${userId}`,
+  () => $fetch<any>(`${apiBase()}/user/${userId}`),
+  { default: () => ({}) },
+)
+
+if (error.value) {
+  throw createError({
+    statusCode: (error.value as any).statusCode === 404 ? 404 : 500,
+    statusMessage: 'User not found',
+    fatal: true,
+  })
+}
+
+useShareMeta(() => ({
+  kind: 'user',
+  title: user.value?.username,
+  description: user.value?.bio
+    || (user.value?.username
+      ? `${user.value.username} on Cook&Co — ${user.value.recipesCount ?? 0} recipes`
+      : null),
+  imageId: user.value?.id,
+  imageVersion: user.value?.version,
+}))
+
+// Follow state is per-visitor, so it is never part of the server render.
+onMounted(() => {
+  isFollowingUser(userId).then((response) => {
     followsUser.value = response.data
   }).catch(function (error) {
     errorMessage.value = error.response.data
+  })
 })
 
 const redirectRecipesOwned = () => {
@@ -167,15 +193,4 @@ async function followUnfollow() {
 }
 
 
-const updateUser = () => {
-  getUser(userId).then (
-    function (response) {
-      console.log(response.data)
-      user.value = response.data
-    }).catch(function (error) {
-    errorMessage.value = error.response.data
-  });
-}
-
-updateUser()
 </script>

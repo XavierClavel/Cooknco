@@ -230,4 +230,7 @@ export default {
 
   notes: "Write notes here !",
   everything: "Everything",
+
+  private_recipe: "Private recipe",
+  private_cookbook: "Private cookbook",
 };

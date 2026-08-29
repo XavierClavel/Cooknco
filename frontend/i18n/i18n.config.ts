@@ -1,5 +1,5 @@
-import en from './src/locales/en'
-import fr from './src/locales/fr'
+import en from '../src/locales/en'
+import fr from '../src/locales/fr'
 
 /**
  * Consumed by @nuxtjs/i18n. Unlike the old src/plugins/i18n.ts this is a

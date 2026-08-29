@@ -159,6 +159,12 @@ const updateGrid = async() => {
   }
 }
 
-updateGrid()
+// The home feed is personalised ("Welcome, {username}") and needs a session, so
+// the route is ssr: false and the data is fetched after mount. Its link preview
+// is the site-wide card declared in nuxt.config's app.head — a composable here
+// would only run after hydration, which no crawler waits for.
+onMounted(() => {
+  updateGrid()
+})
 
 </script>

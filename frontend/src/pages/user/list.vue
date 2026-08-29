@@ -91,7 +91,7 @@
 <script lang="ts" setup>
 import {listUsers, deleteUser, setRole, getUsersCount} from "@/scripts/users";
 import {getUserIconUrl, toViewIngredient, toViewUser} from "@/scripts/common";
-import {debounce} from "lodash";
+import debounce from "lodash/debounce";
 let users = ref<string[]>([])
 const page = ref<number>(1)
 const pagesCount = ref<number>(1)

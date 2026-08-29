@@ -118,32 +118,67 @@ const route = useRoute();
 definePageMeta({ validate: (r) => /^\d+$/.test(String(r.params.id)) })
 let cookbookId = ref(route.params.id)
 const isAdmin = ref(false)
-const cookbook = ref<object>({
+const errors = ref(null)
+const {t} = useI18n()
+
+const EMPTY_COOKBOOK = {
   title: "",
   description: "",
   users: [],
   recipesCount: null,
   usersCount: null,
   version: null,
-})
-const errors = ref(null)
-
-
-if (cookbookId.value != null) {
-  getCookbook(cookbookId.value).then (
-    function (response) {
-      cookbook.value = response.data
-      console.log(cookbook.value)
-    }).catch(function (error) {
-      console.log(error);
-      errors.value = error.response.data;
-  })
-  isAdminOfCookbook(cookbookId.value).then(
-    function (response) {
-      isAdmin.value = response.data
-    }
-  )
 }
+
+// Fetched during render so useShareMeta can emit real Open Graph tags. Runs
+// anonymously — see the note on the recipe page — so a non-public cookbook
+// comes back 403 and gets a noindex stub instead of leaking its title.
+const { data, error } = await useAsyncData(
+  () => `cookbook:${cookbookId.value}`,
+  async () => {
+    try {
+      return { cookbook: await $fetch<any>(`${apiBase()}/cookbook/${cookbookId.value}`), restricted: false }
+    } catch (e: any) {
+      if ((e?.status ?? e?.response?.status) === 403) return { cookbook: null, restricted: true }
+      throw e
+    }
+  },
+)
+
+if (error.value) {
+  throw createError({
+    statusCode: (error.value as any).statusCode === 404 ? 404 : 500,
+    statusMessage: 'Cookbook not found',
+    fatal: true,
+  })
+}
+
+const restricted = computed(() => !!data.value?.restricted)
+const cookbook = computed<any>(() => data.value?.cookbook ?? EMPTY_COOKBOOK)
+
+useShareMeta(() => ({
+  kind: 'cookbook',
+  title: restricted.value ? t('private_cookbook') : cookbook.value.title,
+  description: restricted.value ? null : cookbook.value.description,
+  imageId: cookbook.value.id,
+  imageVersion: cookbook.value.version,
+  noindex: restricted.value,
+}))
+
+onMounted(async () => {
+  // A member of a private cookbook may see it; the anonymous render could not.
+  if (restricted.value) {
+    try {
+      data.value = { cookbook: (await getCookbook(cookbookId.value)).data, restricted: false }
+    } catch (e: any) {
+      errors.value = e?.response?.data
+    }
+  }
+
+  isAdminOfCookbook(cookbookId.value).then((response) => {
+    isAdmin.value = response.data
+  })
+})
 
 async function leave() {
   await leaveCookbook(cookbookId.value)

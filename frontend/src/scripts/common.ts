@@ -66,6 +66,7 @@ export {
   getIngredientImageUrl,
   getImageUrl,
   getDefaultImageUrl,
+  buildImageUrl,
 
   getHealth,
 
@@ -160,14 +161,25 @@ const defaultImageUser = '/default_user.jpg'
 const defaultImageRecipe = '/default_recipe.png'
 const defaultImageCookbook = '/default_cookbook.png'
 
+/**
+ * Single source of truth for the shape of an image URL. Takes the base
+ * explicitly so callers that run outside the Nuxt async context — notably the
+ * lazily-evaluated <head> getters in useShareMeta — can capture it during setup
+ * and pass it in, instead of reaching for useRuntimeConfig() too late.
+ */
+const buildImageUrl = (base: string, dir: ImageDir, id, version) =>
+  `${base}/${dir}/${id}-v${version}.webp`
+
+type ImageDir = 'users' | 'recipes' | 'recipes-thumbnails' | 'cookbooks'
+
 // Resolved per call, not at module scope: import.meta.env.VITE_* does not exist
 // under Nitro, and runtimeConfig lets the same build serve any environment.
 const imgBase = () => useRuntimeConfig().public.imgUrl
 
-const getUserIconUrl = (id, version) => id && version ? `${imgBase()}/users/${id}-v${version}.webp` : defaultImageUser
-const getCookbookIconUrl = (id, version) => id && version ? `${imgBase()}/cookbooks/${id}-v${version}.webp` : defaultImageCookbook
-const getRecipeImageUrl = (id, version) => id && version ? `${imgBase()}/recipes/${id}-v${version}.webp` : defaultImageRecipe
-const getRecipeThumbnailUrl = (id, version) => id && version ? `${imgBase()}/recipes-thumbnails/${id}-v${version}.webp` : defaultImageRecipe
+const getUserIconUrl = (id, version) => id && version ? buildImageUrl(imgBase(), 'users', id, version) : defaultImageUser
+const getCookbookIconUrl = (id, version) => id && version ? buildImageUrl(imgBase(), 'cookbooks', id, version) : defaultImageCookbook
+const getRecipeImageUrl = (id, version) => id && version ? buildImageUrl(imgBase(), 'recipes', id, version) : defaultImageRecipe
+const getRecipeThumbnailUrl = (id, version) => id && version ? buildImageUrl(imgBase(), 'recipes-thumbnails', id, version) : defaultImageRecipe
 const getIngredientImageUrl = (type) => {
   try {
     const t = ingredientTypes.value.find((item) => item.value == type)

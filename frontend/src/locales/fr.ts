@@ -231,4 +231,7 @@ export default {
 
   notes: "Ecris des notes ici !",
   everything: "Tout",
+
+  private_recipe: "Recette privée",
+  private_cookbook: "Livre de recettes privé",
 };

@@ -14,7 +14,8 @@ Cooknco runs on a Kubernetes cluster. Here are the pods used:
   - cooknco-redis: used for sessions
 - cooknco-mail-service: microservice used for sending mails
   - cooknco-mail-database: its database
-- cooknco-frontend: the frontend, powered by nginx
+- cooknco-frontend: the frontend, a Nuxt server-rendering the shareable pages
+  and proxying /api and /image to the backend
 
 ## Mobile app
 The native app in `app/` is a Kotlin Multiplatform project sharing one Compose UI
@@ -37,5 +38,5 @@ open iosApp/iosApp.xcodeproj          # iOS (requires Xcode)
 - Kotlin Multiplatform + Compose Multiplatform (mobile app)
 - Ktor
 - Ebean
-- Vue.js
+- Nuxt (Vue 3, SSR)
 - Apache Kafka

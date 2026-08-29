@@ -324,7 +324,7 @@ import {getIngredientImageUrl, getUserIconUrl, toCreateCookbook, toViewIngredien
 import {getLocale} from "@/scripts/localization";
 import {ingredientTypes} from "@/scripts/values";
 import {useAuthStore} from "@/stores/auth";
-import {debounce} from "lodash";
+import debounce from "lodash/debounce";
 
 const theme = useTheme()
 

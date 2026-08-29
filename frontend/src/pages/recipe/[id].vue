@@ -368,51 +368,97 @@ const snackbar = ref(false)
 
 const userCookbooks = ref([])
 const authStore = useAuthStore()
-const {t} = useI18n()
+const {t, locale} = useI18n()
 const selectedYield = ref(null)
 
 const scaledAmount = computed((amount) => (amount * coefficient).toFixed(2).replace(/[.,]00$/, ''))
 
 const coefficient = computed(() =>  selectedYield.value / recipe.value.yield)
 
-const recipe = ref<object>({
-  steps: [''],
-  ingredients: [],
-  owner: {}
+const EMPTY_RECIPE = { steps: [''], ingredients: [], owner: {} }
+
+// Fetched with useAsyncData so the recipe exists during server render, which is
+// what useShareMeta needs to put a real title, description and image into the
+// HTML a crawler reads.
+//
+// This runs without the visitor's session: a crawler has none, and rendering
+// anonymously means no private data can ever land in cacheable HTML. Anything
+// personalised (like state, notes, cookbook membership, owner controls) is
+// fetched after mount instead.
+const { data, error } = await useAsyncData(
+  () => `recipe:${recipeId}:${locale.value}`,
+  async () => {
+    try {
+      return {
+        recipe: await $fetch(`${apiBase()}/recipe/${recipeId}`, {
+          // Required: the backend throws BadRequest without it.
+          query: { locale: locale.value },
+        }),
+        restricted: false,
+      }
+    } catch (e: any) {
+      // Forbidden is not the same as missing. Hard-404ing here would show the
+      // recipe's own owner a 404 flash before the client could recover, so
+      // render a noindex stub and let the client refetch with credentials.
+      if ((e?.status ?? e?.response?.status) === 403) {
+        return { recipe: null, restricted: true }
+      }
+      throw e
+    }
+  },
+  { watch: [locale] },
+)
+
+if (error.value) {
+  throw createError({
+    statusCode: (error.value as any).statusCode === 404 ? 404 : 500,
+    statusMessage: 'Recipe not found',
+    fatal: true,
+  })
+}
+
+const restricted = computed(() => !!data.value?.restricted)
+const recipe = computed<any>(() => data.value?.recipe ?? EMPTY_RECIPE)
+
+useShareMeta(() => ({
+  kind: 'recipe',
+  title: restricted.value ? t('private_recipe') : recipe.value.title,
+  description: restricted.value ? null : recipe.value.description,
+  imageId: recipe.value.id,
+  imageVersion: recipe.value.version,
+  noindex: restricted.value,
+}))
+
+watchEffect(() => {
+  if (data.value?.recipe) selectedYield.value = data.value.recipe.yield
 })
 
-getRecipe(recipeId).then (
-  function (response) {
-    recipe.value = response.data
-    selectedYield.value = recipe.value.yield
-    console.log("Recipe", recipe.value)
-    isOwner.value = response.data.owner.id == authStore.id
-    console.log("Recipe owner", recipe.value.owner)
-  }).catch(function (error) {
-    displayError.value = true
-  console.log(error);
-    console.log(displayError)
-}).finally(function () {
-  // always executed
-});
-
-isLiked(recipeId).then (
-  function (response) {
-    recipeLiked.value = response
-    console.log(response)
+onMounted(async () => {
+  // The owner of a private recipe can see it; the anonymous server render
+  // could not.
+  if (restricted.value) {
+    try {
+      data.value = { recipe: (await getRecipe(recipeId)).data, restricted: false }
+    } catch {
+      displayError.value = true
+    }
   }
-)
 
-getNotes(recipeId).then (
-  function (response) {
+  isOwner.value = recipe.value.owner?.id == authStore.id
+
+  isLiked(recipeId).then((response) => {
+    recipeLiked.value = response
+  })
+
+  getNotes(recipeId).then((response) => {
     remoteNotes.value = response.data
     cancelNoteEdition()
-  }
-).catch(
-  function (error) {
+  }).catch(() => {
     remoteNotes.value = null
-  }
-)
+  })
+
+  updateCookbook()
+})
 
 
 const updateCookbook = () => {
@@ -423,8 +469,6 @@ const updateCookbook = () => {
     }
   )
 }
-
-updateCookbook()
 
 const remove = (id) => {
   deleteRecipe(id)

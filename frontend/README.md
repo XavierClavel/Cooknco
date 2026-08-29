@@ -1,81 +1,74 @@
-# Vuetify (Default)
+# Cook&Co frontend
 
-This is the official scaffolding tool for Vuetify, designed to give you a head start in building your new Vuetify application. It sets up a base template with all the necessary configurations and standard directory structure, enabling you to begin development without the hassle of setting up the project from scratch.
+A [Nuxt 4](https://nuxt.com) app (Vue 3 + [Vuetify 3](https://vuetifyjs.com)) that both
+server-renders the shareable pages and proxies the backend.
 
-## ❗️ Important Links
+## Rendering model
 
-- 📄 [Docs](https://vuetifyjs.com/)
-- 🚨 [Issues](https://issues.vuetifyjs.com/)
-- 🏬 [Store](https://store.vuetifyjs.com/)
-- 🎮 [Playground](https://play.vuetifyjs.com/)
-- 💬 [Discord](https://community.vuetifyjs.com)
+SSR is on globally, but only the pages people actually share are server-rendered
+— see `routeRules` in `nuxt.config.ts`:
 
-## 💿 Install
+| Route | Rendering | Why |
+| --- | --- | --- |
+| `/recipe/:id`, `/user/:id`, `/cookbook/:id` | server-rendered | Crawlers do not run JavaScript, so link previews (`useShareMeta`) and search engines need real HTML |
+| everything else | client-only (`ssr: false`) | Auth-gated or personalised; nothing a crawler should see |
 
-Set up your project using your preferred package manager. Use the corresponding command to install the dependencies:
+Server renders run **anonymously** — no session cookie is forwarded. A crawler has no
+session anyway, and it guarantees no per-visitor data can land in HTML. Anything
+personalised (like state, private notes, cookbook membership, owner controls) is fetched
+client-side in `onMounted`. A backend 403 renders a `noindex` stub rather than a 404, so
+the owner of a private recipe still sees it once the client refetches with credentials.
 
-| Package Manager                                                | Command        |
-|---------------------------------------------------------------|----------------|
-| [yarn](https://yarnpkg.com/getting-started)                   | `yarn install` |
-| [npm](https://docs.npmjs.com/cli/v7/commands/npm-install)     | `npm install`  |
-| [pnpm](https://pnpm.io/installation)                          | `pnpm install` |
-| [bun](https://bun.sh/#getting-started)                        | `bun install`  |
+## Link previews
 
-After completing the installation, your environment is ready for Vuetify development.
+`src/composables/useShareMeta.ts` emits the Open Graph and Twitter card tags. It must be
+called at the top level of a page's `<script setup>` — never inside `<ClientOnly>`, and
+never for a route that is `ssr: false`, since a crawler only reads the server's HTML.
+Routes that are not server-rendered fall back to the site-wide card declared in
+`app.head`.
 
-## ✨ Features
+Fallback cards for entities with no image live in `public/og/` (1200×630).
 
-- 🖼️ **Optimized Front-End Stack**: Leverage the latest Vue 3 and Vuetify 3 for a modern, reactive UI development experience. [Vue 3](https://v3.vuejs.org/) | [Vuetify 3](https://vuetifyjs.com/en/)
-- 🗃️ **State Management**: Integrated with [Pinia](https://pinia.vuejs.org/), the intuitive, modular state management solution for Vue.
-- 🚦 **Routing and Layouts**: Utilizes Vue Router for SPA navigation and vite-plugin-vue-layouts for organizing Vue file layouts. [Vue Router](https://router.vuejs.org/) | [vite-plugin-vue-layouts](https://github.com/JohnCampionJr/vite-plugin-vue-layouts)
-- 💻 **Enhanced Development Experience**: Benefit from TypeScript's static type checking and the ESLint plugin suite for Vue, ensuring code quality and consistency. [TypeScript](https://www.typescriptlang.org/) | [ESLint Plugin Vue](https://eslint.vuejs.org/)
-- ⚡ **Next-Gen Tooling**: Powered by Vite, experience fast cold starts and instant HMR (Hot Module Replacement). [Vite](https://vitejs.dev/)
-- 🧩 **Automated Component Importing**: Streamline your workflow with unplugin-vue-components, automatically importing components as you use them. [unplugin-vue-components](https://github.com/antfu/unplugin-vue-components)
-- 🛠️ **Strongly-Typed Vue**: Use vue-tsc for type-checking your Vue components, and enjoy a robust development experience. [vue-tsc](https://github.com/johnsoncodehk/volar/tree/master/packages/vue-tsc)
+## Backend
 
-These features are curated to provide a seamless development experience from setup to deployment, ensuring that your Vuetify application is both powerful and maintainable.
+`/api/**` and `/image/**` are proxied to the Ktor backend by `server/routes/`, replacing
+the nginx config this app used to ship with. The target is `NUXT_BACKEND_URL`, read at
+runtime, so one image serves every environment.
 
-## 💡 Usage
+⚠️ nginx also did `/api` rate limiting (10 r/s) and capped request bodies at 20 MB.
+Neither has an equivalent here — they belong at the ingress, which is the only layer that
+sees the real client address.
 
-This section covers how to start the development server and build your project for production.
+## Environment
 
-### Starting the Development Server
+All runtime, none baked into the build:
 
-To start the development server with hot-reload, run the following command. The server will be accessible at [http://localhost:3000](http://localhost:3000):
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NUXT_BACKEND_URL` | `http://cooknco-backend:8080` | Proxy target and server-side fetch base |
+| `NUXT_PUBLIC_SITE_URL` | `https://cooknco.eu` | Absolute base for `og:url` / `og:image` |
+| `NUXT_PUBLIC_API_URL` | `/api/v1` | Browser-side API base (same-origin) |
+| `NUXT_PUBLIC_IMG_URL` | `/image` | Browser-side image base |
 
-```bash
-yarn dev
-```
-
-(Repeat for npm, pnpm, and bun with respective commands.)
-
-> Add NODE_OPTIONS='--no-warnings' to suppress the JSON import warnings that happen as part of the Vuetify import mapping. If you are on Node [v21.3.0](https://nodejs.org/en/blog/release/v21.3.0) or higher, you can change this to NODE_OPTIONS='--disable-warning=5401'. If you don't mind the warning, you can remove this from your package.json dev script.
-
-### Building for Production
-
-To build your project for production, use:
+## Development
 
 ```bash
-yarn build
+npm install
+npm run dev        # http://localhost:3000, proxying to NUXT_BACKEND_URL
+npm run build      # -> .output
+npm run preview
+npm run typecheck
+npm run lint
 ```
 
-(Repeat for npm, pnpm, and bun with respective commands.)
+Run the backend alongside it (`docker compose up -d backend database redis` from the repo
+root) and point `NUXT_BACKEND_URL` at `http://localhost:8080`.
 
-Once the build process is completed, your application will be ready for deployment in a production environment.
+To check a link preview the way a crawler sees it — without JavaScript:
 
-## 💪 Support Vuetify Development
+```bash
+curl -s -A "Twitterbot/1.0" http://localhost:3000/recipe/1 | grep -E 'og:|twitter:'
+```
 
-This project is built with [Vuetify](https://vuetifyjs.com/en/), a UI Library with a comprehensive collection of Vue components. Vuetify is an MIT licensed Open Source project that has been made possible due to the generous contributions by our [sponsors and backers](https://vuetifyjs.com/introduction/sponsors-and-backers/). If you are interested in supporting this project, please consider:
-
-- [Requesting Enterprise Support](https://support.vuetifyjs.com/)
-- [Sponsoring John on Github](https://github.com/users/johnleider/sponsorship)
-- [Sponsoring Kael on Github](https://github.com/users/kaelwd/sponsorship)
-- [Supporting the team on Open Collective](https://opencollective.com/vuetify)
-- [Becoming a sponsor on Patreon](https://www.patreon.com/vuetify)
-- [Becoming a subscriber on Tidelift](https://tidelift.com/subscription/npm/vuetify)
-- [Making a one-time donation with Paypal](https://paypal.me/vuetify)
-
-## 📑 License
-[MIT](http://opensource.org/licenses/MIT)
-
-Copyright (c) 2016-present Vuetify, LLC
+`npm ci` and `npm install` rely on `.npmrc`'s `legacy-peer-deps=true`; npm's strict
+resolver crashes building this dependency tree.
