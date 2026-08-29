@@ -1,4 +1,4 @@
-import apiClient from '@/plugins/axios.js';
+import apiClient from '@/scripts/axios';
 import {getLocale} from "@/scripts/localization";
 
 export {

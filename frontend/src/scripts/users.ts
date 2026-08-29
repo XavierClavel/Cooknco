@@ -1,4 +1,4 @@
-import apiClient from '@/plugins/axios.js';
+import apiClient from '@/scripts/axios';
 
 export{
   getUser,

@@ -79,7 +79,7 @@ import {ICON_SAVE} from "@/scripts/icons";
 import {logout, toMyProfile, toUpdatePasswordSuccess} from "@/scripts/common";
 import {updatePassword} from "@/scripts/users";
 import {min8Rule, passwordRule, requiredRule} from "@/scripts/rules";
-import apiClient from "@/plugins/axios";
+import apiClient from "@/scripts/axios";
 import {useAuthStore} from "@/stores/auth";
 
 const showOld = ref(false)

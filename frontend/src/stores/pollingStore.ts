@@ -1,7 +1,7 @@
 // stores/usePollingStore.ts
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import apiClient from "@/plugins/axios";
+import apiClient from "@/scripts/axios";
 
 export const usePollingStore = defineStore('polling', () => {
   const data = ref<any>({usersPending: []})

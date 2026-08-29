@@ -1,6 +1,5 @@
 import axios from "axios";
-import router from "@/router";
-import apiClient from '@/plugins/axios.js';
+import apiClient from '@/scripts/axios';
 import {useAuthStore, declareLogin} from "@/stores/auth";
 
 export {

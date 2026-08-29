@@ -110,7 +110,6 @@ const { t } = useI18n();
 const value = ref(null)
 const form = ref(null)
 
-console.log(import.meta.env.VITE_API_URL)
 
 const user = ref<object>({
   username: '',

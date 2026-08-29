@@ -1,16 +1,14 @@
 /**
- * plugins/vuetify.ts
+ * vuetify.config.ts
  *
- * Framework documentation: https://vuetifyjs.com`
+ * Consumed by vuetify-nuxt-module (nuxt.config.ts -> vuetify.vuetifyOptions).
+ * The module injects vuetify/styles and the MDI stylesheet itself, and takes
+ * `styles.configFile` through its own moduleOptions, so neither belongs here.
+ *
+ * Framework documentation: https://vuetifyjs.com
  */
-
-// Styles
-import '@mdi/font/css/materialdesignicons.css'
-import 'vuetify/styles'
-
-// Composables
-import {createVuetify, ThemeDefinition} from 'vuetify'
-import { VNumberInput } from 'vuetify/labs/VNumberInput'
+import { defineVuetifyConfiguration } from 'vuetify-nuxt-module/custom-configuration'
+import type { ThemeDefinition } from 'vuetify'
 
 const customTheme: ThemeDefinition = {
   dark: false,
@@ -33,7 +31,7 @@ const customTheme: ThemeDefinition = {
 }
 
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
-export default createVuetify({
+export default defineVuetifyConfiguration({
   theme: {
     defaultTheme: 'customTheme',
     themes: {
@@ -117,10 +115,4 @@ export default createVuetify({
       color: "surface",
     }
   },
-  components: {
-    VNumberInput,
-  },
-  styles: {
-    configFile: 'src/styles/settings.scss'
-  }
 })

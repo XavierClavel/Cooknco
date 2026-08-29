@@ -7,8 +7,7 @@ import {
   ICON_VOLUME,
   ICON_WEIGHT
 } from "@/scripts/icons";
-import {useI18n} from "vue-i18n";
-import i18n from "@/plugins/i18n";
+import {t} from "@/scripts/localization";
 
 export {
   requiredRule,
@@ -19,9 +18,6 @@ export {
   max100,
   max50,
 }
-
-const { t } = i18n.global
-
 
 const requiredRule = value => !!value || t('required')
 const min8Rule = v => v.length >= 8 || t('min_8_characters')

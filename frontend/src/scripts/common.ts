@@ -1,11 +1,9 @@
 import axios from "axios";
-import router from "@/router";
-import apiClient, {imageClient} from '@/plugins/axios.js';
+import apiClient, {imageClient} from '@/scripts/axios';
 import {useAuthStore, declareLogin} from "@/stores/auth";
 import {deleteCookie, getCookie} from "@/scripts/cookies";
-import {getLocale} from "@/scripts/localization";
+import {getLocale, t} from "@/scripts/localization";
 import {ingredientTypes} from "@/scripts/values";
-import i18n from "@/plugins/i18n";
 
 export {
   login,
@@ -56,6 +54,8 @@ export {
   noLoginRedirectStartsWith,
   allowNoLoginStartsWith,
   adminOnly,
+  isPublicPath,
+  isChromelessPath,
 
   unitToReadable,
 
@@ -71,9 +71,6 @@ export {
 
   defaultImageRecipe,
 }
-
-const { t } = i18n.global
-
 
 const toCreateRecipe = () => navigateTo(`/recipe/edit`)
 const toEditRecipe = (id) => navigateTo(`/recipe/edit?id=${id}`)
@@ -113,12 +110,17 @@ const toUpdatePasswordSuccess = () => navigateTo('/password/update/success')
 const toResetPasswordEmailSent = () => navigateTo('/password/reset/email')
 const toResetPasswordSuccess = () => navigateTo('/password/reset/success')
 
-function navigateTo(path) {
-  nextTick(() => {
-    router.push(path)
-  })
-}
+// NB: `navigateTo` used to be defined here as a nextTick + router.push wrapper.
+// Under Nuxt that local definition would shadow the framework's own
+// auto-imported navigateTo, so every helper above would keep pushing onto a
+// router that no longer exists. It is deliberately gone.
 
+// These used to be matched against vue-router route *names*, which under
+// unplugin-vue-router happened to be identical to the paths. Nuxt names routes
+// differently ('password-reset-email', not '/password/reset/email'), so they
+// are matched against `route.path` now — same strings, stable meaning.
+
+/** Routes reachable logged out, and which render without the app chrome. */
 const noLoginRedirect = [
   '/logout',
   '/signup',
@@ -126,14 +128,13 @@ const noLoginRedirect = [
   '/maintenance',
   '/verification-email-sent',
   '/password/update/success',
-  'https://accounts.google.com/o/oauth2/auth',
 ]
 const noLoginRedirectStartsWith = [
   '/password/reset',
-  '/login'
+  '/login',
 ]
 
-
+/** Routes reachable logged out that keep the normal chrome (shareable pages). */
 const allowNoLoginStartsWith = [
   '/recipe/view',
   '/user/view',
@@ -143,14 +144,29 @@ const adminOnly = [
   '/user/list',
 ]
 
+/** True for a path that does not require an authenticated session. */
+const isPublicPath = (path: string) =>
+  noLoginRedirect.includes(path) ||
+  noLoginRedirectStartsWith.some((it) => path.startsWith(it)) ||
+  allowNoLoginStartsWith.some((it) => path.startsWith(it))
+
+/** True for a path that renders bare, without drawer and app bar. */
+const isChromelessPath = (path: string) =>
+  noLoginRedirect.includes(path) ||
+  noLoginRedirectStartsWith.some((it) => path.startsWith(it))
+
 const defaultImageUser = '/default_user.jpg'
 const defaultImageRecipe = '/default_recipe.png'
 const defaultImageCookbook = '/default_cookbook.png'
 
-const getUserIconUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/users/${id}-v${version}.webp` : defaultImageUser
-const getCookbookIconUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/cookbooks/${id}-v${version}.webp` : defaultImageCookbook
-const getRecipeImageUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/recipes/${id}-v${version}.webp` : defaultImageRecipe
-const getRecipeThumbnailUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/recipes-thumbnails/${id}-v${version}.webp` : defaultImageRecipe
+// Resolved per call, not at module scope: import.meta.env.VITE_* does not exist
+// under Nitro, and runtimeConfig lets the same build serve any environment.
+const imgBase = () => useRuntimeConfig().public.imgUrl
+
+const getUserIconUrl = (id, version) => id && version ? `${imgBase()}/users/${id}-v${version}.webp` : defaultImageUser
+const getCookbookIconUrl = (id, version) => id && version ? `${imgBase()}/cookbooks/${id}-v${version}.webp` : defaultImageCookbook
+const getRecipeImageUrl = (id, version) => id && version ? `${imgBase()}/recipes/${id}-v${version}.webp` : defaultImageRecipe
+const getRecipeThumbnailUrl = (id, version) => id && version ? `${imgBase()}/recipes-thumbnails/${id}-v${version}.webp` : defaultImageRecipe
 const getIngredientImageUrl = (type) => {
   try {
     const t = ingredientTypes.value.find((item) => item.value == type)
@@ -210,7 +226,8 @@ async function login(user) {
 }
 
 async function loginOauthGoogle() {
-  window.location.href = `${import.meta.env.VITE_API_URL}/auth/login-oauth-google`
+  if (!import.meta.client) return
+  window.location.href = `${useRuntimeConfig().public.apiUrl}/auth/login-oauth-google`
 }
 
 async function signup(user) {

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {getIngredient, searchIngredients} from "@/scripts/ingredients";
-import router from "@/router";
 import {useAuthStore} from "@/stores/auth";
 import {useI18n} from "vue-i18n";
 import ChipRow from "@/components/ChipRow.vue";
@@ -22,6 +21,7 @@ const authStore = useAuthStore()
 const comboboxRef = ref()
 
 const route = useRoute();
+const router = useRouter();
 
 
 if(route.query.user) {
@@ -106,14 +106,14 @@ const onIngredientAutocompleteChange = async (query) => {
 
 const updateUrl = () => {
   console.log(selectedDishType.value)
-  const route = router.currentRoute
+  const currentQuery = route.query
   let selectedSortOrder = sortOrder.value == "asc" ? "_ASCENDING" : "_DESCENDING"
   if (selectedSort.value == "RANDOM") {
     selectedSortOrder = ""
   }
   const query = Object.fromEntries(
     Object.entries({
-      ...route.query,
+      ...currentQuery,
       user: selectedSource.value.includes(0) ? authStore.id : undefined,
       likedBy: selectedSource.value.includes(1) ? authStore.id : undefined,
       cookbookUser: selectedSource.value.includes(2) ? authStore.id : undefined,

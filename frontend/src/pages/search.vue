@@ -5,9 +5,9 @@ import {listRecipes} from "@/scripts/recipes";
 import {useAuthStore} from "@/stores/auth";
 import {searchIngredients} from "@/scripts/ingredients";
 import {listCookbooks} from "@/scripts/cookbooks";
-import router from "@/router";
 
 const route = useRoute()
+const router = useRouter()
 const searchQuery = ref(route.query.search || '')
 const users = ref([])
 const recipes = ref([])
@@ -58,7 +58,7 @@ updateSearch()
 
 function onChipSelected() {
   console.log(selection.value)
-  router.push({ name: '/search', query: { search: searchQuery.value, filter: selection.value } })
+  router.push({ path: '/search', query: { search: searchQuery.value, filter: selection.value } })
 }
 
 
