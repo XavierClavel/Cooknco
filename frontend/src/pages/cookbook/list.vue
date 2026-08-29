@@ -38,7 +38,7 @@ const cookbooks = ref<object[]>([])
 
 const route = useRoute();
 
-listCookbooks(window.location.search).then(
+listCookbooks(route.fullPath.split('?')[1] ?? '').then(
   function (response) {
     console.log(response.data)
     cookbooks.value = response.data

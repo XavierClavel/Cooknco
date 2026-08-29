@@ -11,6 +11,7 @@ const props = defineProps({
 
 const cookbooks = ref<object[]>([])
 const router = useRouter()
+const route = useRoute()
 const routesToCheck = ["/cookbook"]
 const currentPage = ref(0)
 const isLoading = ref(false)
@@ -36,7 +37,7 @@ const loadMore = async ({ done }: { done: () => void }) => {
 const updateGrid = async() => {
   errorMessage.value = null
   try {
-    const query = props.query || window.location.search
+    const query = props.query || (route.fullPath.split('?')[1] ?? '')
     const response = await listCookbooks(query, currentPage.value, 20)
     if (response.data.length === 0) {
       allDataLoaded.value = true

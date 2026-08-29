@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Cooknco</string>
-    <string name="title_activity_main">Cooknco</string>
-    <string name="package_name">eu.cooknco</string>
-    <string name="custom_url_scheme">eu.cooknco</string>
-</resources>

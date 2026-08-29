@@ -13,7 +13,7 @@
       style="border: 3.5px solid #0d1821 !important;"
     >
       <v-list>
-        <v-img src="/src/assets/logo.png" class="mx-12 my-8"></v-img>
+        <v-img src="/logo.png" class="mx-12 my-8"></v-img>
         <v-list-item class="d-flex justify-center">
           <v-btn
             prepend-icon="mdi-pencil"
