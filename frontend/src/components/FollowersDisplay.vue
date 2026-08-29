@@ -16,7 +16,8 @@ import {usePollingStore} from "@/stores/pollingStore";
 const { t } = useI18n();
 
 const route = useRoute();
-const userId = route.query.user
+// The profile page moved from /user/view?user=N to /user/N.
+const userId = route.params.id
 const authStore = useAuthStore()
 const currentUser = computed(() => authStore.id)
 

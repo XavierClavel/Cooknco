@@ -52,7 +52,7 @@ export {
 
   noLoginRedirect,
   noLoginRedirectStartsWith,
-  allowNoLoginStartsWith,
+  publicEntityPath,
   adminOnly,
   isPublicPath,
   isChromelessPath,
@@ -74,13 +74,13 @@ export {
 
 const toCreateRecipe = () => navigateTo(`/recipe/edit`)
 const toEditRecipe = (id) => navigateTo(`/recipe/edit?id=${id}`)
-const toViewRecipe = (id) => navigateTo(`/recipe/view?id=${id}`)
+const toViewRecipe = (id) => navigateTo(`/recipe/${id}`)
 const toListRecipe = (search) => navigateTo(`/recipe/list${search}`)
 
-const toViewUser = (id) => navigateTo(`/user/view/?user=${id}`)
+const toViewUser = (id) => navigateTo(`/user/${id}`)
 const toMyProfile = () => {
   const authStore = useAuthStore();
-  navigateTo(`/user/view?user=${authStore.id}`)
+  navigateTo(`/user/${authStore.id}`)
 }
 const toEditUser = (id) => navigateTo(`/user/edit?user=${id}`)
 const toSettings = () => navigateTo(`/user/settings`)
@@ -91,7 +91,7 @@ const toViewIngredient = (id) => navigateTo(`/ingredient/view?ingredient=${id}`)
 const toCreateCookbook = () => navigateTo(`/cookbook/edit`)
 const toEditCookbook = (id) => navigateTo(`/cookbook/edit?cookbook=${id}`)
 const toCreateCookbookAddRecipe = (id) => navigateTo(`/cookbook/edit?addRecipe=${id}`)
-const toViewCookbook = (id) => navigateTo(`/cookbook/view?cookbook=${id}`)
+const toViewCookbook = (id) => navigateTo(`/cookbook/${id}`)
 const toListCookbooks = (id) => navigateTo(`/cookbook/list?user=${id}`)
 
 const toMyCookbooks = () => {
@@ -134,11 +134,12 @@ const noLoginRedirectStartsWith = [
   '/login',
 ]
 
-/** Routes reachable logged out that keep the normal chrome (shareable pages). */
-const allowNoLoginStartsWith = [
-  '/recipe/view',
-  '/user/view',
-]
+/**
+ * The shareable entity pages, reachable logged out and keeping the normal
+ * chrome. Anchored on a numeric id on purpose: a '/user/' prefix match would
+ * also hand out /user/settings, /user/edit and the admin-only /user/list.
+ */
+const publicEntityPath = /^\/(recipe|user|cookbook)\/\d+$/
 
 const adminOnly = [
   '/user/list',
@@ -148,7 +149,7 @@ const adminOnly = [
 const isPublicPath = (path: string) =>
   noLoginRedirect.includes(path) ||
   noLoginRedirectStartsWith.some((it) => path.startsWith(it)) ||
-  allowNoLoginStartsWith.some((it) => path.startsWith(it))
+  publicEntityPath.test(path)
 
 /** True for a path that renders bare, without drawer and app bar. */
 const isChromelessPath = (path: string) =>

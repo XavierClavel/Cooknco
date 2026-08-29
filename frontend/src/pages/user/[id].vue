@@ -102,7 +102,12 @@ import {ICON_USER_FOLLOWERS, ICON_USER_FOLLOWS, ICON_USER_LIKES, ICON_USER_RECIP
 import RecipesList from "@/components/RecipesList.vue";
 
 const route = useRoute();
-const userId = route.query.user
+
+// Keeps this dynamic route from swallowing a sibling static path
+// (/recipe/edit, /user/settings, ...) and makes /recipe/banana a clean 404
+// rather than a 400 from the backend.
+definePageMeta({ validate: (r) => /^\d+$/.test(String(r.params.id)) })
+const userId = route.params.id
 const errorMessage = ref(null)
 const authStore = useAuthStore();
 const currentUserId = computed(() => authStore.id)

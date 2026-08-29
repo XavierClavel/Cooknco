@@ -111,7 +111,12 @@ import {getCookbook, isAdminOfCookbook, leaveCookbook} from "@/scripts/cookbooks
 import {ICON_COOKBOOK_RECIPES, ICON_COOKBOOK_USERS} from "@/scripts/icons";
 import {useAuthStore} from "@/stores/auth";
 const route = useRoute();
-let cookbookId = ref(route.query.cookbook)
+
+// Keeps this dynamic route from swallowing a sibling static path
+// (/recipe/edit, /user/settings, ...) and makes /recipe/banana a clean 404
+// rather than a 400 from the backend.
+definePageMeta({ validate: (r) => /^\d+$/.test(String(r.params.id)) })
+let cookbookId = ref(route.params.id)
 const isAdmin = ref(false)
 const cookbook = ref<object>({
   title: "",

@@ -351,7 +351,12 @@ import {createNotes, getNotes, updateNotes} from "@/scripts/notes";
 
 // Get the route object
 const route = useRoute();
-const recipeId = route.query.id
+
+// Keeps this dynamic route from swallowing a sibling static path
+// (/recipe/edit, /user/settings, ...) and makes /recipe/banana a clean 404
+// rather than a 400 from the backend.
+definePageMeta({ validate: (r) => /^\d+$/.test(String(r.params.id)) })
+const recipeId = route.params.id
 let displayError = ref<boolean>(false)
 const editingNote = ref<boolean>(true)
 const notes = ref<string>("")
