@@ -9,6 +9,7 @@ export {
   ICON_INGREDIENT,
   ICON_HOME,
   ICON_ADMIN,
+  ICON_REPORT,
 
   ICON_SAVE,
   ICON_DELETE,
@@ -54,6 +55,7 @@ const ICON_COOKBOOK = "mdi-bookshelf"
 const ICON_INGREDIENT = "mdi-food-apple"
 const ICON_HOME = "mdi-home"
 const ICON_ADMIN = "mdi-security"
+const ICON_REPORT = "mdi-flag-outline"
 
 const ICON_SAVE = "mdi-content-save"
 const ICON_DELETE = "mdi-delete"

@@ -3,7 +3,9 @@
 import {useAuthStore} from "@/stores/auth";
 
 const authStore = useAuthStore()
-const isAdmin = ref(authStore.isAdmin)
+// Computed rather than a ref snapshot: checkAuth resolves after this component mounts,
+// so a snapshot would hide the admin entry until the next full page load.
+const isAdmin = computed(() => authStore.isAdmin)
 </script>
 
 <template>
