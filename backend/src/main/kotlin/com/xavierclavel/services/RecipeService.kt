@@ -24,6 +24,7 @@ import shared.utils.Filepath.RECIPES_IMG_PATH
 import shared.utils.Filepath.RECIPES_THUMBNAIL_PATH
 import io.ebean.FetchConfig
 import io.ebean.Paging
+import java.time.LocalDateTime
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -32,6 +33,12 @@ class RecipeService: KoinComponent {
 
     fun countAll() =
         QRecipe().findCount()
+
+    fun countHidden() =
+        QRecipe().isHidden.eq(true).findCount()
+
+    fun countCreatedSince(since: LocalDateTime) =
+        QRecipe().creationDate.gt(since).findCount()
 
     fun countByOwner(username: String) =
         queryByOwner(username).findCount()
@@ -60,6 +67,19 @@ class RecipeService: KoinComponent {
     fun findEntityById(recipeId: Long) : Recipe? =
         QRecipe().id.eq(recipeId).findOne()
 
+    /**
+     * Maps every recipe owned by one of [ownerIds] to its owner, so callers can attribute
+     * per-recipe data back to accounts without a query per recipe.
+     */
+    fun mapRecipeIdsToOwnerIds(ownerIds: Collection<Long>): Map<Long, Long> =
+        QRecipe()
+            .select("id")
+            .fetch("owner", "id")
+            .owner.id.`in`(ownerIds)
+            .findList()
+            .mapNotNull { recipe -> recipe.owner?.let { recipe.id to it.id } }
+            .toMap()
+
     fun getEntityById(recipeId: Long) : Recipe =
         findEntityById(recipeId)
             ?: throw NotFoundException(NotFoundCause.RECIPE_NOT_FOUND)
@@ -70,30 +90,48 @@ class RecipeService: KoinComponent {
             .filterOutDeletion(userId)
             .exists()
 
+    /**
+     * Restricts a query to the recipes [userId] is allowed to see.
+     *
+     * Moderation is enforced here rather than per-endpoint: a hidden recipe, or any recipe
+     * whose author is banned, drops out of every listing and lookup. The author keeps
+     * seeing their own recipes either way, so a hidden recipe never silently vanishes on
+     * the person who wrote it.
+     */
     fun QRecipe.filterByVisibility(userId: Long?): QRecipe {
 
         if (userId == null) {
-            // Anonymous users: only public recipes
-            return this.owner.isAccountPublic.isTrue
+            // Anonymous users: only public, visible recipes
+            return this.and()
+                .isHidden.isFalse
+                .owner.isBanned.isFalse
+                .owner.isAccountPublic.isTrue
+                .endAnd()
         }
 
         return this.or()
             .owner.id.eq(userId) // Owner
-            .owner.isAccountPublic.isTrue // Public
-            .and() // Follower
-                .owner.followers.follower.id.eq(userId)
-                .owner.followers.pending.isFalse
+            .and()
+                .isHidden.isFalse
+                .owner.isBanned.isFalse
+                .or()
+                    .owner.isAccountPublic.isTrue // Public
+                    .and() // Follower
+                        .owner.followers.follower.id.eq(userId)
+                        .owner.followers.pending.isFalse
+                    .endAnd()
+                    .exists("select 1 from likes l where l.recipe_id = t0.id and l.user_id = ?", userId)
+                    .exists("""
+                        select 1 
+                        from cookbook_recipes cr
+                        join cookbooks c on c.id = cr.cookbook_id
+                        join cookbook_users cu on cu.cookbook_id = c.id
+                        where cr.recipe_id = t0.id
+                        and cu.user_id = ?
+                        """.trimIndent(), userId
+                    )
+                .endOr()
             .endAnd()
-            .exists("select 1 from likes l where l.recipe_id = t0.id and l.user_id = ?", userId)
-            .exists("""
-                select 1 
-                from cookbook_recipes cr
-                join cookbooks c on c.id = cr.cookbook_id
-                join cookbook_users cu on cu.cookbook_id = c.id
-                where cr.recipe_id = t0.id
-                and cu.user_id = ?
-                """.trimIndent(), userId
-            )
             .endOr()
     }
 

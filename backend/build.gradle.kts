@@ -72,6 +72,19 @@ ktor {
 
 
 
+/**
+ * Regenerates the next dbmigration SQL + model xml from the current entity classes,
+ * by diffing them against src/main/resources/dbmigration/model. Run after changing
+ * an @Entity: `./gradlew :backend:generateDbMigration`.
+ */
+tasks.register<JavaExec>("generateDbMigration") {
+    group = "ebean"
+    description = "Generate the DDL for the next DB migration from the current entities"
+    mainClass.set("main.GenerateMigrationKt")
+    classpath = sourceSets["test"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 val generatedVersionDir = "${buildDir}/generated-version"
 
 sourceSets {

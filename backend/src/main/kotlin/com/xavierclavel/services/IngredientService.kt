@@ -24,6 +24,24 @@ class IngredientService: KoinComponent {
     fun countRecipes(id: Long) =
         QRecipeIngredient().ingredient.id.eq(id).findCount()
 
+    /**
+     * How many recipes use each of [ingredientIds], counted in one pass so the admin
+     * catalogue table does not issue a count per row.
+     *
+     * @return count per ingredient id; unused ingredients are absent from the map
+     */
+    fun countRecipesByIngredient(ingredientIds: Collection<Long>): Map<Long, Int> {
+        if (ingredientIds.isEmpty()) return emptyMap()
+        val counts = mutableMapOf<Long, Int>()
+        QRecipeIngredient()
+            .select("id")
+            .fetch("ingredient", "id")
+            .ingredient.id.`in`(ingredientIds)
+            .findList()
+            .forEach { link -> link.ingredient?.id?.let { counts.merge(it, 1, Int::plus) } }
+        return counts
+    }
+
     fun findEntityById(ingredientId: Long) : Ingredient? =
         QIngredient().id.eq(ingredientId).findOne()
 

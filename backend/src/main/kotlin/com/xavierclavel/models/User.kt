@@ -5,7 +5,9 @@ import com.xavierclavel.models.jointables.Follow
 import com.xavierclavel.models.jointables.Like
 import shared.dto.UserDTO
 import shared.dto.UserSettingsDTO
+import shared.infodto.AdminUserInfo
 import shared.infodto.UserInfo
+import shared.enums.AccountStatus
 import shared.enums.UserRole
 import shared.overviewdto.UserOverview
 import io.ebean.Model
@@ -58,6 +60,15 @@ class User (
     //Privacy
     var isAccountPublic: Boolean = true,
     var autoAcceptFollowRequests : Boolean = false,
+
+    //Moderation
+    @DbDefault("false")
+    var isBanned: Boolean = false,
+    /** Set while the account is temporarily locked out; null once the suspension is lifted. */
+    var suspendedUntil: LocalDateTime? = null,
+    @Column(length = 1023)
+    @DbDefault("")
+    var moderationNote: String = "",
 
     var joinDate: LocalDateTime = LocalDateTime.now(),
     var lastActivityDate: LocalDateTime = LocalDateTime.now(),
@@ -149,6 +160,58 @@ class User (
 
     // Public accounts have nothing to gate, so they never hold follow requests pending
     fun autoAcceptsFollowRequests() = isAccountPublic || autoAcceptFollowRequests
+
+    /** True while a temporary suspension is still running. */
+    fun isSuspended(): Boolean = suspendedUntil?.isAfter(LocalDateTime.now()) == true
+
+    fun accountStatus(): AccountStatus = when {
+        isBanned -> AccountStatus.BANNED
+        isSuspended() -> AccountStatus.SUSPENDED
+        !isVerified -> AccountStatus.UNVERIFIED
+        else -> AccountStatus.ACTIVE
+    }
+
+    fun suspend(until: LocalDateTime, reason: String) = this.apply {
+        suspendedUntil = until
+        moderationNote = reason.take(1023)
+    }
+
+    fun ban(reason: String) = this.apply {
+        isBanned = true
+        suspendedUntil = null
+        moderationNote = reason.take(1023)
+    }
+
+    /** Clears both a ban and a running suspension. */
+    fun reinstate() = this.apply {
+        isBanned = false
+        suspendedUntil = null
+        moderationNote = ""
+    }
+
+    fun toAdminInfo(mail: String, reportsAgainstCount: Int) = AdminUserInfo(
+        id = this.id,
+        version = this.imageVersion,
+        username = this.username,
+        mail = mail,
+        role = this.role,
+        status = this.accountStatus(),
+        isVerified = this.isVerified,
+        isBanned = this.isBanned,
+        suspendedUntil = this.suspendedUntil?.toEpochSecond(ZoneOffset.UTC),
+        moderationNote = this.moderationNote,
+        bio = this.bio,
+        locale = this.locale,
+        isAccountPublic = this.isAccountPublic,
+        joinDate = this.joinDate.toEpochSecond(ZoneOffset.UTC),
+        lastActivityDate = this.lastActivityDate.toEpochSecond(ZoneOffset.UTC),
+        recipesCount = this.recipes.size,
+        likesCount = this.likes.size,
+        cookbooksCount = this.cookbooks.size,
+        followersCount = this.followers.count { !it.pending },
+        followsCount = this.follows.count { !it.pending },
+        reportsAgainstCount = reportsAgainstCount,
+    )
 
     fun getSettings() = UserSettingsDTO(
         autoAcceptFollowRequests = this.autoAcceptFollowRequests,

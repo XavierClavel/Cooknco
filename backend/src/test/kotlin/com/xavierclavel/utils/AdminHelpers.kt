@@ -1,0 +1,240 @@
+package main.com.xavierclavel.utils
+
+import io.ktor.client.HttpClient
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.put
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import kotlinx.serialization.json.Json
+import shared.dto.LogPage
+import shared.dto.ModerationReasonDTO
+import shared.dto.ReportDTO
+import shared.dto.ReportResolutionDTO
+import shared.dto.SearchResult
+import shared.dto.SuspensionDTO
+import shared.enums.ModerationAction
+import shared.enums.ReportReason
+import shared.enums.ReportStatus
+import shared.enums.ReportTargetType
+import shared.enums.UserRole
+import shared.infodto.AdminIngredientInfo
+import shared.infodto.AdminOverview
+import shared.infodto.AdminRecipeInfo
+import shared.infodto.AdminTrends
+import shared.infodto.AdminUserInfo
+import shared.infodto.ReportInfo
+import shared.utils.URL.ADMIN_URL
+import shared.utils.URL.REPORT_URL
+import kotlin.test.assertEquals
+
+private val json = Json { ignoreUnknownKeys = true }
+
+// ------------------------------------------------------------------- reporting
+
+suspend fun HttpClient.reportRaw(
+    targetType: ReportTargetType,
+    targetId: Long,
+    reason: ReportReason = ReportReason.SPAM,
+    comment: String = "",
+) = this.post(REPORT_URL) {
+    contentType(ContentType.Application.Json)
+    header(HttpHeaders.ContentType, ContentType.Application.Json)
+    setBody(ReportDTO(targetType = targetType, targetId = targetId, reason = reason, comment = comment))
+}
+
+suspend fun HttpClient.report(
+    targetType: ReportTargetType,
+    targetId: Long,
+    reason: ReportReason = ReportReason.SPAM,
+    comment: String = "",
+): ReportInfo =
+    this.reportRaw(targetType, targetId, reason, comment).let {
+        assertEquals(HttpStatusCode.Created, it.status)
+        json.decodeFromString<ReportInfo>(it.bodyAsText())
+    }
+
+// -------------------------------------------------------------------- overview
+
+suspend fun HttpClient.getAdminOverviewRaw(): HttpResponse = this.get("$ADMIN_URL/overview")
+
+suspend fun HttpClient.getAdminOverview(): AdminOverview =
+    this.getAdminOverviewRaw().let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminOverview>(it.bodyAsText())
+    }
+
+// -------------------------------------------------------------------- trends
+
+suspend fun HttpClient.getTrendsRaw(granularity: String? = null, buckets: Int? = null) =
+    this.get("$ADMIN_URL/trends") {
+        url {
+            granularity?.let { parameters.append("granularity", it) }
+            buckets?.let { parameters.append("buckets", it.toString()) }
+        }
+    }
+
+suspend fun HttpClient.getTrends(granularity: String? = null, buckets: Int? = null): AdminTrends =
+    this.getTrendsRaw(granularity, buckets).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminTrends>(it.bodyAsText())
+    }
+
+// ----------------------------------------------------------------------- users
+
+suspend fun HttpClient.listAdminUsers(
+    query: String? = null,
+    role: UserRole? = null,
+    status: String? = null,
+): SearchResult<AdminUserInfo> =
+    this.get("$ADMIN_URL/users") {
+        url {
+            query?.let { parameters.append("query", it) }
+            role?.let { parameters.append("role", it.name) }
+            status?.let { parameters.append("status", it) }
+        }
+    }.let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<SearchResult<AdminUserInfo>>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.getAdminUser(id: Long): AdminUserInfo =
+    this.get("$ADMIN_URL/users/$id").let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminUserInfo>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.suspendUserRaw(id: Long, days: Int = 7, reason: String = "") =
+    this.post("$ADMIN_URL/users/$id/suspend") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(SuspensionDTO(days = days, reason = reason))
+    }
+
+suspend fun HttpClient.banUserRaw(id: Long, reason: String = "") =
+    this.post("$ADMIN_URL/users/$id/ban") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(ModerationReasonDTO(reason = reason))
+    }
+
+suspend fun HttpClient.reinstateUserRaw(id: Long) = this.post("$ADMIN_URL/users/$id/reinstate")
+
+suspend fun HttpClient.setUserRoleRaw(id: Long, role: UserRole) =
+    this.put("$ADMIN_URL/users/$id/role/${role.name}")
+
+suspend fun HttpClient.deleteUserAsAdminRaw(id: Long) = this.delete("$ADMIN_URL/users/$id")
+
+// --------------------------------------------------------------------- recipes
+
+suspend fun HttpClient.listAdminRecipes(
+    query: String? = null,
+    hidden: Boolean? = null,
+    reported: Boolean? = null,
+): SearchResult<AdminRecipeInfo> =
+    this.get("$ADMIN_URL/recipes") {
+        url {
+            query?.let { parameters.append("query", it) }
+            hidden?.let { parameters.append("hidden", it.toString()) }
+            reported?.let { parameters.append("reported", it.toString()) }
+        }
+    }.let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<SearchResult<AdminRecipeInfo>>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.hideRecipeRaw(id: Long, reason: String = "") =
+    this.post("$ADMIN_URL/recipes/$id/hide") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(ModerationReasonDTO(reason = reason))
+    }
+
+suspend fun HttpClient.hideRecipe(id: Long, reason: String = ""): AdminRecipeInfo =
+    this.hideRecipeRaw(id, reason).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminRecipeInfo>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.unhideRecipe(id: Long): AdminRecipeInfo =
+    this.post("$ADMIN_URL/recipes/$id/unhide").let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminRecipeInfo>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.deleteRecipeAsAdminRaw(id: Long) = this.delete("$ADMIN_URL/recipes/$id")
+
+// ----------------------------------------------------------------- ingredients
+
+suspend fun HttpClient.listAdminIngredients(query: String? = null): SearchResult<AdminIngredientInfo> =
+    this.get("$ADMIN_URL/ingredients") {
+        url { query?.let { parameters.append("query", it) } }
+    }.let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<SearchResult<AdminIngredientInfo>>(it.bodyAsText())
+    }
+
+// ------------------------------------------------------------------ moderation
+
+suspend fun HttpClient.listReportsRaw(status: ReportStatus? = null, targetType: ReportTargetType? = null) =
+    this.get("$ADMIN_URL/reports") {
+        url {
+            status?.let { parameters.append("status", it.name) }
+            targetType?.let { parameters.append("targetType", it.name) }
+        }
+    }
+
+suspend fun HttpClient.listReports(
+    status: ReportStatus? = null,
+    targetType: ReportTargetType? = null,
+): SearchResult<ReportInfo> =
+    this.listReportsRaw(status, targetType).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<SearchResult<ReportInfo>>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.resolveReportRaw(
+    id: Long,
+    action: ModerationAction,
+    note: String = "",
+    suspensionDays: Int = 7,
+) = this.post("$ADMIN_URL/reports/$id/resolve") {
+    contentType(ContentType.Application.Json)
+    header(HttpHeaders.ContentType, ContentType.Application.Json)
+    setBody(ReportResolutionDTO(action = action, note = note, suspensionDays = suspensionDays))
+}
+
+suspend fun HttpClient.resolveReport(
+    id: Long,
+    action: ModerationAction,
+    note: String = "",
+    suspensionDays: Int = 7,
+): ReportInfo =
+    this.resolveReportRaw(id, action, note, suspensionDays).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<ReportInfo>(it.bodyAsText())
+    }
+
+// ------------------------------------------------------------------------ logs
+
+suspend fun HttpClient.getLogsRaw(level: String? = null, search: String? = null, logger: String? = null) =
+    this.get("$ADMIN_URL/logs") {
+        url {
+            level?.let { parameters.append("level", it) }
+            search?.let { parameters.append("search", it) }
+            logger?.let { parameters.append("logger", it) }
+        }
+    }
+
+suspend fun HttpClient.getLogs(level: String? = null, search: String? = null, logger: String? = null): LogPage =
+    this.getLogsRaw(level, search, logger).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<LogPage>(it.bodyAsText())
+    }

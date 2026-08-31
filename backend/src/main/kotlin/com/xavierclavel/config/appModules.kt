@@ -1,6 +1,7 @@
 package com.xavierclavel.config
 
 import com.xavierclavel.plugins.RedisService
+import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.CustomIngredientService
 import com.xavierclavel.services.DashboardService
@@ -10,6 +11,7 @@ import com.xavierclavel.services.FollowService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
+import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
@@ -33,6 +35,8 @@ val appModules = module {
     single { CustomIngredientService() }
     single { FollowService() }
     single { RecipeNotesService() }
+    single { ModerationService() }
+    single { AdminService() }
     single { RedisService(getProperty("redis.url", "redis://:${System.getenv("REDIS_PASSWORD")}@cooknco-redis:6379")) }
     single { config }
     single { EncryptionService() }

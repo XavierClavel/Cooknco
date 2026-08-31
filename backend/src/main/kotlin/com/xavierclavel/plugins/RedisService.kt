@@ -6,6 +6,7 @@ import io.lettuce.core.ExperimentalLettuceCoroutinesApi
 import io.lettuce.core.RedisClient
 import io.lettuce.core.api.coroutines
 import io.lettuce.core.api.coroutines.RedisCoroutinesCommands
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.koin.core.component.KoinComponent
@@ -39,6 +40,9 @@ class RedisService(redisUrl: String): KoinComponent {
     suspend fun createSession(sessionId: String, user: UserInfo) {
         val json = SessionData.from(user)
         redis.setex("session:$sessionId", SESSION_TTL, Json.encodeToString(json))
+        // Reverse index, so moderation can revoke every session an account holds
+        redis.sadd(userSessionsKey(user.id), sessionId)
+        redis.expire(userSessionsKey(user.id), SESSION_TTL)
     }
 
     /**
@@ -51,13 +55,34 @@ class RedisService(redisUrl: String): KoinComponent {
         val ttl = redis.ttl(key) ?: return false
         if (ttl <= 0 || ttl > SESSION_TTL - REFRESH_THRESHOLD) return false
         redis.expire(key, SESSION_TTL)
+        getSession(sessionId)?.let { redis.expire(userSessionsKey(it.userId), SESSION_TTL) }
         return true
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun deleteSession(sessionId: String) {
+        val userId = getSession(sessionId)?.userId
         redis.del("session:$sessionId")
+        userId?.let { redis.srem(userSessionsKey(it), sessionId) }
     }
+
+    /**
+     * Logs an account out everywhere. Called when a moderator suspends, bans or deletes an
+     * account, so the decision takes effect on the next request rather than when the
+     * session would have expired.
+     *
+     * @return how many sessions were revoked
+     */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun deleteAllSessionsOfUser(userId: Long): Int {
+        val key = userSessionsKey(userId)
+        val sessionIds = redis.smembers(key).toList()
+        sessionIds.forEach { redis.del("session:$it") }
+        redis.del(key)
+        return sessionIds.size
+    }
+
+    private fun userSessionsKey(userId: Long) = "user-sessions:$userId"
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun hasSession(sessionId: String): Boolean =

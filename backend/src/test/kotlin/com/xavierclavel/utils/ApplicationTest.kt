@@ -2,6 +2,7 @@ package com.xavierclavel
 
 import com.xavierclavel.plugins.DatabaseManager
 import com.xavierclavel.plugins.RedisService
+import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.CustomIngredientService
 import com.xavierclavel.services.DashboardService
@@ -11,7 +12,9 @@ import com.xavierclavel.services.FollowService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
+import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.RecipeIngredientService
+import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.loadConfig
@@ -33,8 +36,8 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
+import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import org.koin.test.KoinTest
 import org.koin.test.inject
@@ -55,9 +58,20 @@ abstract class ApplicationTest: KoinTest {
         const val USER2 = "user2"
         const val password = "Passw0rd"
 
+        /**
+         * Starts Koin once for the whole test JVM.
+         *
+         * Controllers are Kotlin `object`s, so their `by inject()` delegates resolve once
+         * per process and then keep pointing at whichever Koin instance was live at first
+         * use. Restarting Koin per test class would leave them wired to a stopped context,
+         * and a class would then assert against services the running app no longer uses.
+         * Isolation between tests comes from [cleanDb], not from recreating the container.
+         */
         @BeforeAll
         @JvmStatic
         fun startKoin() {
+            if (GlobalContext.getOrNull() != null) return
+
             val testModules = module {
                 single { RecipeService() }
                 single { UserService() }
@@ -70,6 +84,9 @@ abstract class ApplicationTest: KoinTest {
                 single { RecipeIngredientService() }
                 single { CustomIngredientService() }
                 single { FollowService() }
+                single { RecipeNotesService() }
+                single { ModerationService() }
+                single { AdminService() }
                 single { RedisService(getProperty("redis.url", "redis://redis:6379")) }
                 single { loadConfig() }
                 single { EncryptionService() }
@@ -82,10 +99,13 @@ abstract class ApplicationTest: KoinTest {
             }
         }
 
+        /**
+         * Deliberately leaves Koin running: see [startKoin]. The JVM exiting is what tears
+         * it down.
+         */
         @AfterAll
         @JvmStatic
         fun stopKoinApplication() {
-            stopKoin()
         }
     }
 

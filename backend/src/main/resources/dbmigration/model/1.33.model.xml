@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <addColumn tableName="recipes">
+            <column name="is_hidden" type="boolean" defaultValue="false" notnull="true"/>
+            <column name="hidden_reason" type="varchar(1023)" defaultValue="''" notnull="true"/>
+        </addColumn>
+        <createTable name="reports" identityType="identity" pkName="pk_reports">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="target_type" type="integer" notnull="true" checkConstraint="check ( target_type in (0,1,2))" checkConstraintName="ck_reports_target_type"/>
+            <column name="target_id" type="bigint" notnull="true"/>
+            <column name="reporter_id" type="bigint" references="users.id" foreignKeyName="fk_reports_reporter_id" foreignKeyIndex="ix_reports_reporter_id"/>
+            <column name="reason" type="integer" notnull="true" checkConstraint="check ( reason in (0,1,2,3,4,5))" checkConstraintName="ck_reports_reason"/>
+            <column name="comment" type="varchar(1023)" defaultValue="''" notnull="true"/>
+            <column name="status" type="integer" notnull="true" checkConstraint="check ( status in (0,1,2))" checkConstraintName="ck_reports_status"/>
+            <column name="creation_date" type="localdatetime" notnull="true"/>
+            <column name="resolution_date" type="localdatetime"/>
+            <column name="resolved_by_id" type="bigint" references="users.id" foreignKeyName="fk_reports_resolved_by_id" foreignKeyIndex="ix_reports_resolved_by_id"/>
+            <column name="resolution" type="integer" checkConstraint="check ( resolution in (0,1,2,3,4))" checkConstraintName="ck_reports_resolution"/>
+            <column name="moderator_note" type="varchar(1023)" defaultValue="''" notnull="true"/>
+        </createTable>
+        <addColumn tableName="users">
+            <column name="is_banned" type="boolean" defaultValue="false" notnull="true"/>
+            <column name="suspended_until" type="localdatetime"/>
+            <column name="moderation_note" type="varchar(1023)" defaultValue="''" notnull="true"/>
+        </addColumn>
+    </changeSet>
+</migration>

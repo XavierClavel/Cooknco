@@ -11,5 +11,7 @@ data class RecipeOverview(
     val dishClass: DishClass,
     val owner: UserOverview,
     val likesCount: Int,
-    val creationDate: Long
+    val creationDate: Long,
+    /** Set when a moderator has hidden the recipe; only its owner and admins ever see it. */
+    val isHidden: Boolean = false,
 )

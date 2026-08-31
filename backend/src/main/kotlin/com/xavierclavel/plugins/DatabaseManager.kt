@@ -10,6 +10,7 @@ import com.xavierclavel.models.query.QCookbook
 import com.xavierclavel.models.query.QDietaryRestrictions
 import com.xavierclavel.models.query.QIngredient
 import com.xavierclavel.models.query.QRecipe
+import com.xavierclavel.models.query.QReport
 import com.xavierclavel.models.query.QUser
 import com.xavierclavel.utils.logger
 import com.zaxxer.hikari.HikariConfig
@@ -28,7 +29,13 @@ object DatabaseManager {
     var mainDB : Database? = null
     private val dataSource: HikariDataSource by lazy { hikari() }
 
+    /**
+     * Every table, in an order safe to delete from front to back: rows that reference
+     * others come first. Tests wipe the database by walking this list.
+     */
     fun getTables() = listOf(
+        // Reports point at users with ON DELETE RESTRICT, so they have to go first
+        QReport(),
         QRecipe(),
         QRecipeIngredient(),
         QCustomIngredient(),

@@ -8,6 +8,7 @@ import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.exceptions.UnauthorizedCause
 import com.xavierclavel.exceptions.UnauthorizedException
 import com.xavierclavel.models.User
+import com.xavierclavel.models.query.QReport
 import com.xavierclavel.models.query.QUser
 import com.xavierclavel.utils.DbTransaction.insertAndGet
 import com.xavierclavel.utils.DbTransaction.updateAndGet
@@ -44,7 +45,44 @@ class UserService: KoinComponent {
             .findCount()
 
     fun getEntityById(userId: Long) : User =
-        QUser().id.eq(userId).findOne() ?: throw NotFoundException(NotFoundCause.USER_NOT_FOUND)
+        findEntityById(userId) ?: throw NotFoundException(NotFoundCause.USER_NOT_FOUND)
+
+    fun findEntityById(userId: Long) : User? =
+        QUser().id.eq(userId).findOne()
+
+    /**
+     * Decrypts an account's mail address, for the admin backoffice. Returns a placeholder
+     * rather than throwing when the ciphertext cannot be read with the current AES key, so
+     * one unreadable row does not break a whole listing.
+     */
+    fun readMail(user: User): String =
+        try {
+            if (user.mailEncrypted.isBlank()) "" else encryptionService.decrypt(user.mailEncrypted)
+        } catch (e: Exception) {
+            logger.warn { "Could not decrypt mail of user ${user.id}: ${e.message}" }
+            "<unreadable>"
+        }
+
+    /** Mail addresses are only searchable by exact match, since they are stored encrypted. */
+    fun hashMail(mail: String): String = encryptionService.hash(mail)
+
+    fun countAdmins() =
+        QUser().role.eq(UserRole.ADMIN).findCount()
+
+    fun countUnverifiedUsers() =
+        QUser().isVerified.eq(false).findCount()
+
+    fun countBannedUsers() =
+        QUser().isBanned.eq(true).findCount()
+
+    fun countSuspendedUsers() =
+        QUser()
+            .isBanned.eq(false)
+            .suspendedUntil.gt(LocalDateTime.now())
+            .findCount()
+
+    fun countUsersJoinedSince(since: LocalDateTime) =
+        QUser().joinDate.gt(since).findCount()
 
     fun findByUsername(username: String) : User? =
         QUser().username.eq(username).findOne()
@@ -124,8 +162,20 @@ class UserService: KoinComponent {
 
     fun registerUserActivity(id: Long) = getEntityById(id).registerNewActivity()
 
-    fun deleteUserById(userId: Long) =
-        QUser().id.eq(userId).delete()
+    fun deleteUserById(userId: Long): Int {
+        detachReports(userId)
+        return QUser().id.eq(userId).delete()
+    }
+
+    /**
+     * Anonymises the reports an account filed or resolved instead of deleting them, so the
+     * moderation history survives the account. Also required for the delete to go through
+     * at all: reports.reporter_id / resolved_by_id are ON DELETE RESTRICT.
+     */
+    private fun detachReports(userId: Long) {
+        QReport().reporter.id.eq(userId).findList().forEach { it.reporter = null; it.update() }
+        QReport().resolvedBy.id.eq(userId).findList().forEach { it.resolvedBy = null; it.update() }
+    }
 
     fun deleteUserByUsername(username: String) =
         QUser().username.eq(username).delete()
