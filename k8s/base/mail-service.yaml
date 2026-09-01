@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cooknco-mail-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cooknco-mail-service
+  template:
+    metadata:
+      labels:
+        app: cooknco-mail-service
+    spec:
+      containers:
+        - name: mail-service
+          image: xavierclavel/cooknco-mail-service
+          imagePullPolicy: Always
+          command: ["java", "-jar", "/app/mail-service.jar"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: cooknco-secrets
+            - secretRef:
+                name: mail-database-secrets
+            - configMapRef:
+                name: smtp-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10

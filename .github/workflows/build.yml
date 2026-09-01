@@ -8,9 +8,21 @@ on:
 permissions:
   contents: write
 
+# Serialise master builds so two runs cannot race on the image-tag bump commit
+# or apply to the cluster at the same time.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  KUSTOMIZE_VERSION: '5.7.1'
+  DEPLOY_OVERLAY: k8s/overlays/prod
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
     - name: Checkout repository
@@ -48,6 +60,7 @@ jobs:
       run: |
         VERSION=$(./gradlew -q printVersion)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Detected version: $VERSION"
 
     - name: Gradle build
@@ -67,13 +80,52 @@ jobs:
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project:latest
         done
 
+    - name: Install kustomize
+      if: github.ref == 'refs/heads/master'
+      run: |
+        # To a file, not piped into tar: a reset mid-stream would hand tar a
+        # truncated archive that curl retrying cannot undo.
+        curl -sSfL --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 15 \
+          -o /tmp/kustomize.tar.gz \
+          "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+        tar xzf /tmp/kustomize.tar.gz -C /usr/local/bin kustomize
+        kustomize version
+
+    - name: Bump image tags in ${{ env.DEPLOY_OVERLAY }}
+      if: github.ref == 'refs/heads/master'
+      run: |
+        cd "${DEPLOY_OVERLAY}"
+        for project in backend frontend mail-service; do
+          # `=*:tag` rewrites only newTag and leaves the repository name alone.
+          kustomize edit set image \
+            "${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project=*:${{ env.VERSION }}"
+        done
+
+    - name: Commit image tag bump
+      if: github.ref == 'refs/heads/master'
+      run: |
+        if git diff --quiet -- "${DEPLOY_OVERLAY}"; then
+          echo "Overlay already pins ${VERSION}. Nothing to commit."
+          exit 0
+        fi
+        git config user.name  "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add "${DEPLOY_OVERLAY}"
+        git commit -m "ci: pin cooknco images to ${VERSION} [skip ci]"
+        # Pushes with GITHUB_TOKEN do not re-trigger workflows, so this cannot loop.
+        git push origin HEAD:master
+
     - name: Create tag if it does not exist
       run: |
-        if git rev-parse "v${{ env.VERSION }}" >/dev/null 2>&1; then
-          echo "Tag v${{ env.VERSION }} already exists. Skipping."
+        # Asks the remote, not the local ref: a tag created after this job's
+        # checkout is invisible to `git rev-parse`, which is how two master
+        # builds four minutes apart both tried to create v1.2.10 and the second
+        # failed on a rejected push.
+        if [ -n "$(git ls-remote --tags origin "refs/tags/v${VERSION}")" ]; then
+          echo "Tag v${VERSION} already exists on the remote. Skipping."
         else
-          git tag v${{ env.VERSION }}
-          git push origin v${{ env.VERSION }}
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
         fi
 
     - name: Build changelog since last release
@@ -133,3 +185,199 @@ jobs:
               throw error;
             }
           }
+
+  # Renders both roots on the runner and pipes them into `kubectl apply` over SSH.
+  # The cluster API is never exposed to the internet: the only inbound door is
+  # sshd, and the only credential GitHub holds is the deploy key. No kubeconfig
+  # is stored here — it lives on the host, owned by the deploy user.
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    # Attaching a required reviewer or a branch filter to this environment in the
+    # repository settings puts a manual gate in front of prod. GitHub creates it
+    # on the first run if it does not exist.
+    environment: production
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      DEPLOY_PORT: '22'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Pick up the image-tag bump the build job just pushed.
+        ref: master
+
+    - name: Install kustomize
+      run: |
+        # To a file, not piped into tar: a reset mid-stream would hand tar a
+        # truncated archive that curl retrying cannot undo.
+        curl -sSfL --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 15 \
+          -o /tmp/kustomize.tar.gz \
+          "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+        tar xzf /tmp/kustomize.tar.gz -C /usr/local/bin kustomize
+        kustomize version
+
+    - name: Render manifests for ${{ needs.build.outputs.version }}
+      run: |
+        # Re-pinning here is idempotent, and immune to the checkout above racing
+        # the bump commit: what gets applied is always the image this run pushed.
+        ( cd "${DEPLOY_OVERLAY}"
+          for project in backend frontend mail-service; do
+            # `=*:tag` rewrites only newTag and leaves the repository name alone.
+            kustomize edit set image \
+              "${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project=*:${VERSION}"
+          done )
+
+        kustomize build "${DEPLOY_OVERLAY}" > "${RUNNER_TEMP}/app.yaml"
+        # Rendered as its own root: Strimzi only reconciles KafkaTopics in the
+        # Kafka cluster's namespace, which the prod overlay cannot retarget.
+        kustomize build k8s/kafka-topics > "${RUNNER_TEMP}/kafka.yaml"
+
+        # This pipeline is built on the premise that no sensitive material
+        # crosses the runner — every Secret the app needs is created out-of-band
+        # on the cluster (k8s/README.md). A Secret in the render means someone
+        # put a generator back in the overlay: fail loudly here rather than
+        # quietly shipping credentials through GitHub's infrastructure and then
+        # over the network.
+        if grep -qE '^kind: Secret$' "${RUNNER_TEMP}/app.yaml" "${RUNNER_TEMP}/kafka.yaml"; then
+          echo "::error::The rendered manifests contain a Secret. Secrets are managed out-of-band on the cluster — see k8s/README.md."
+          exit 1
+        fi
+
+    - name: Configure SSH
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+      run: |
+        if [ -z "$SSH_PRIVATE_KEY" ] || [ -z "$SSH_KNOWN_HOSTS" ]; then
+          echo "::error::DEPLOY_SSH_KEY / DEPLOY_SSH_KNOWN_HOSTS are not set. See k8s/README.md."
+          exit 1
+        fi
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh
+        printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+        chmod 600 ~/.ssh/id_deploy
+        # Host key pinned rather than StrictHostKeyChecking=no: this channel
+        # carries manifests an interceptor could rewrite into anything the
+        # deploy user is allowed to apply.
+        printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+
+    - name: Apply to cluster
+      env:
+        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      run: |
+        set -euo pipefail
+
+        # Only the transport is retried — an application failure (a lost nodePort
+        # race, a rejected dry run, a failed rollout) exits immediately.
+        deploy_once() {
+          # TCP reachability first: a filtered SYN otherwise costs two minutes of
+          # kernel retransmissions before ssh gives up, and the failure ends up
+          # blamed on whatever the remote script would have checked.
+          if ! timeout 20 bash -c "exec 3<>/dev/tcp/${DEPLOY_HOST}/${DEPLOY_PORT}" 2>/dev/null; then
+            echo "No TCP route to the deploy host on port ${DEPLOY_PORT}." >&2
+            return 254
+          fi
+
+        # One connection for the whole deploy, and one place the transport can
+        # fail. The manifests travel base64-encoded inside the remote script,
+        # stdin being already taken by `bash -s`.
+        {
+          printf 'MANIFESTS_APP_B64=%s\n'   "$(base64 -w0 < "${RUNNER_TEMP}/app.yaml")"
+          printf 'MANIFESTS_KAFKA_B64=%s\n' "$(base64 -w0 < "${RUNNER_TEMP}/kafka.yaml")"
+          cat <<'REMOTE'
+        set -euo pipefail
+        export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
+
+        # nodePort 30080 is unique cluster-wide. While the pre-migration release
+        # still owns it in `default`, the apply below fails halfway through and
+        # leaves the namespace part-applied. Exit 3 so the runner can name this
+        # cause and point at the runbook instead of reporting a generic failure.
+        # kubectl's jsonpath cannot filter on a wildcard sub-path, so list
+        # namespace/name plus every nodePort and match with awk.
+        holder=$(kubectl get svc --all-namespaces \
+          -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{" "}{.spec.ports[*].nodePort}{"\n"}{end}' \
+          | awk '/(^| )30080( |$)/ {print $1}' \
+          | grep -v '^cooknco/' || true)
+        if [ -n "$holder" ]; then
+          echo "nodePort 30080 is still held outside the cooknco namespace:" >&2
+          echo "$holder" >&2
+          exit 3
+        fi
+
+        workdir=$(mktemp -d)
+        trap 'rm -rf "$workdir"' EXIT
+        printf '%s' "$MANIFESTS_APP_B64"   | base64 -d > "$workdir/app.yaml"
+        printf '%s' "$MANIFESTS_KAFKA_B64" | base64 -d > "$workdir/kafka.yaml"
+
+        echo "--- diff against the cluster"
+        kubectl diff -f "$workdir/app.yaml"   || true
+        kubectl diff -f "$workdir/kafka.yaml" || true
+
+        echo "--- server-side dry run"
+        kubectl apply -f "$workdir/app.yaml"   --dry-run=server
+        kubectl apply -f "$workdir/kafka.yaml" --dry-run=server
+
+        echo "--- apply"
+        kubectl apply -f "$workdir/app.yaml"
+        kubectl apply -f "$workdir/kafka.yaml"
+
+        # A green apply only says "the API server accepted the objects". Without
+        # the wait below the job would report success while an image crash-loops.
+        for deploy in cooknco-database cooknco-redis mail-service-database \
+                      cooknco-backend cooknco-frontend cooknco-mail-service; do
+          echo "--- rollout $deploy"
+          kubectl -n cooknco rollout status "deployment/$deploy" --timeout=5m
+        done
+        REMOTE
+        # `rollout status` can stay silent for minutes while a pod restarts:
+        # without keepalives the session is reaped for inactivity ("Broken pipe")
+        # well before the 5-minute timeout, and the failure gets attributed to
+        # the transport instead of the rollout.
+        } | ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+                -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+                -p "$DEPLOY_PORT" \
+                "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s
+        }
+
+        # `kubectl apply` and `rollout status` are idempotent: replaying an
+        # attempt cut off in flight produces nothing new on the cluster.
+        for attempt in 1 2 3 4 5; do
+          set +e
+          deploy_once
+          rc=$?
+          set -e
+          if [ "$rc" -ne 254 ] && [ "$rc" -ne 255 ]; then
+            break
+          fi
+          if [ "$attempt" -lt 5 ]; then
+            echo "::warning::Transport attempt ${attempt}/5 failed (rc=${rc}); retrying in 30s."
+            sleep 30
+          fi
+        done
+
+        # ssh's and kubectl's stderr is relayed verbatim above: this `case` names
+        # the cause, it does not replace it.
+        case "$rc" in
+          0)   ;;
+          3)   echo "::error::nodePort 30080 is still held outside the cooknco namespace. Complete the cutover in k8s/migration/README.md first."; exit 1 ;;
+          254) echo "::error::No TCP route to the deploy host on port ${DEPLOY_PORT} after 5 attempts — SYN dropped, or nothing listening. The cluster was never contacted, so this is not a Kubernetes problem."; exit 1 ;;
+          255) echo "::error::SSH transport failure after 5 attempts — see the ssh stderr above. The remote commands never ran."; exit 1 ;;
+          *)   echo "::error::Remote deploy failed with exit code ${rc} — see the kubectl output above."; exit 1 ;;
+        esac
+
+    - name: Report failure detail
+      if: failure()
+      env:
+        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      run: |
+        ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+          -o ConnectTimeout=15 -p "$DEPLOY_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" '
+            export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
+            kubectl -n cooknco get pods -o wide || true
+            kubectl -n cooknco get events --sort-by=.lastTimestamp | tail -40 || true
+          ' || echo "Could not reach the cluster to collect diagnostics."

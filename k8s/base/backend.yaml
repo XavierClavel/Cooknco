@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cooknco-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cooknco-backend
+  template:
+    metadata:
+      labels:
+        app: cooknco-backend
+    spec:
+      containers:
+        - name: backend
+          image: xavierclavel/cooknco-backend
+          imagePullPolicy: Always
+          command: ["java", "-jar", "/app/backend.jar"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cooknco-secrets
+                  key: redis-password
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka-kraft-kafka-bootstrap.kafka.svc.cluster.local:9092
+          volumeMounts:
+            - name: pictures
+              mountPath: /img
+            - name: logs
+              mountPath: /var/log/cooknco
+            - name: cooknco-config
+              mountPath: /app/config
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+      volumes:
+        - name: pictures
+          persistentVolumeClaim:
+            claimName: pictures
+        - name: logs
+          persistentVolumeClaim:
+            claimName: logs
+        - name: cooknco-config
+          secret:
+            secretName: cooknco-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cooknco-backend
+spec:
+  selector:
+    app: cooknco-backend
+  ports:
+    - port: 8080
+      targetPort: 8080

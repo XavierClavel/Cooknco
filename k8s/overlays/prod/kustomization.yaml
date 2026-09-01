@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cooknco
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+# CI rewrites the newTag values below with `kustomize edit set image`.
+# Pinned to what runs in the `default` namespace today so the namespace
+# migration changes the namespace and nothing else. The first master build
+# after the cutover bumps these to the current project version.
+images:
+  - name: xavierclavel/cooknco-backend
+    newTag: 1.1.0
+  - name: xavierclavel/cooknco-frontend
+    newTag: 1.1.0
+  - name: xavierclavel/cooknco-mail-service
+    newTag: 1.2.9
