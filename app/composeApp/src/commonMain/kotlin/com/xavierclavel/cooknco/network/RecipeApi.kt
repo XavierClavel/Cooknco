@@ -22,7 +22,7 @@ import io.ktor.http.isSuccess
 enum class RecipeSort(val value: String, val label: String) {
     RECENT("DATE_DESCENDING", "Recent"),
     BEST_MATCH("BEST_MATCH", "Best match"),
-    MOST_LIKED("MOST_LIKED", "Most liked"),
+    MOST_LIKED("LIKES_DESCENDING", "Most liked"),
 }
 
 class RecipeApi(private val client: HttpClient) {

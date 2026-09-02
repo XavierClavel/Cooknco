@@ -239,6 +239,21 @@ class RecipeFiltersTest : ApplicationTest() {
     }
 
     @Test
+    fun `best match ranks by relevance, not by insertion order`() = runTestAsAdmin {
+        val adminUser = client.getMe()
+        // inserted worst match first, so an unranked query would return the reverse order
+        val pesto = client.createRecipe(RecipeDTO(title = "Pates halloumi poivrons pesto"))
+        val gorgonzola = client.createRecipe(RecipeDTO(title = "Pates chorizo gorgonzola"))
+        val celebres = client.createRecipe(RecipeDTO(title = "Les celebres pates aux chorizo"))
+
+        val response = client.listRecipes(user = adminUser.id, search = "pates au chorizo", sort = Sort.BEST_MATCH)
+        assertEquals(
+            listOf(celebres.toOverview(), gorgonzola.toOverview(), pesto.toOverview()),
+            response,
+        )
+    }
+
+    @Test
     fun `filter recipes by users followed`() = runTest {
         var user1: UserInfo? = null
         var user2: UserInfo? = null

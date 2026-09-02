@@ -13,12 +13,15 @@ import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -37,7 +40,14 @@ class RecipesViewModel(
 ) : ViewModel() {
 
     val query = MutableStateFlow(initialQuery)
-    val sort = MutableStateFlow(RecipeSort.RECENT)
+
+    /** Sort explicitly picked from the chips, null while the default applies. */
+    private val pickedSort = MutableStateFlow<RecipeSort?>(null)
+
+    /** Sort actually sent to the backend, and shown as selected in the chips. */
+    val sort: StateFlow<RecipeSort> =
+        combine(query, pickedSort) { q, picked -> effectiveSort(q, picked) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, effectiveSort(initialQuery, null))
 
     private val _uiState = MutableStateFlow(RecipesUiState())
     val uiState: StateFlow<RecipesUiState> = _uiState.asStateFlow()
@@ -46,25 +56,37 @@ class RecipesViewModel(
     private var page = 0
     private val pageSize = 20
 
+    // Parameters the buffered pages were loaded with: further pages must use the same
+    // ones, not the current (possibly still debouncing) query.
+    private var loadedQuery = initialQuery
+    private var loadedSort = effectiveSort(initialQuery, null)
+
     init {
         viewModelScope.launch {
             // Debounce text; sort changes apply immediately
             val debouncedQuery = query.debounce(350L)
-            combine(debouncedQuery, sort) { q, s -> q to s }
+            combine(debouncedQuery, pickedSort) { q, picked -> q to effectiveSort(q, picked) }
+                .distinctUntilChanged()
                 .collectLatest { (q, s) -> resetAndLoad(q, s) }
         }
+    }
+
+    fun onSortPicked(s: RecipeSort) {
+        pickedSort.value = s
     }
 
     private suspend fun resetAndLoad(q: String, s: RecipeSort) {
         buffer.clear()
         page = 0
+        loadedQuery = q
+        loadedSort = s
         _uiState.update { it.copy(recipes = emptyList(), isLoading = true, allLoaded = false, error = null) }
         loadPage(q, s)
     }
 
     fun loadMore() {
         if (_uiState.value.isLoading || _uiState.value.allLoaded) return
-        viewModelScope.launch { loadPage(query.value, sort.value) }
+        viewModelScope.launch { loadPage(loadedQuery, loadedSort) }
     }
 
     private suspend fun loadPage(q: String, s: RecipeSort) {
@@ -88,6 +110,17 @@ class RecipesViewModel(
     }
 
     companion object {
+        /**
+         * Relevance ranking only means something against a search term, so BEST_MATCH is
+         * the default while searching and is unavailable when simply browsing.
+         */
+        private fun effectiveSort(query: String, picked: RecipeSort?): RecipeSort =
+            if (query.isBlank()) {
+                if (picked == null || picked == RecipeSort.BEST_MATCH) RecipeSort.RECENT else picked
+            } else {
+                picked ?: RecipeSort.BEST_MATCH
+            }
+
         fun factory(initialQuery: String = ""): ViewModelProvider.Factory = viewModelFactory {
             initializer { RecipesViewModel(AppGraph.recipeApi, AppGraph.tokenDataStore, initialQuery) }
         }
