@@ -127,7 +127,7 @@ fun RecipesScreen(
             uiState = uiState,
             query = query,
             activeSort = sort,
-            onSortChange = { viewModel.sort.value = it },
+            onSortChange = { viewModel.onSortPicked(it) },
             onRecipeClick = onRecipeClick,
             onUserClick = onUserClick,
             onLoadMore = { viewModel.loadMore() },
@@ -248,7 +248,11 @@ private fun RecipesContent(
                     .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                RecipeSort.entries.forEach { sortOption ->
+                val sortOptions = RecipeSort.entries.filter {
+                    // Relevance ranking needs a search term to rank against
+                    it != RecipeSort.BEST_MATCH || query.isNotBlank()
+                }
+                sortOptions.forEach { sortOption ->
                     SortChip(
                         label = sortOption.label,
                         selected = activeSort == sortOption,
