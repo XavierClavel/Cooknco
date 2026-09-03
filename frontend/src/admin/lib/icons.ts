@@ -38,4 +38,6 @@ export const ICONS = {
   userCheck:  {p: ['M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M17 11l2 2 4-4'], c: [[9, 7, 4]]},
   disk:       {p: ['M3 6h18v12H3z', 'M7 10h.01', 'M7 14h.01', 'M11 14h6']},
   image:      {p: ['M3 4h18v16H3z', 'M3 16l5-5 4 4 3-3 6 6'], c: [[9, 9, 1.4]]},
+  upload:     {p: ['M12 16V4', 'M7 9l5-5 5 5', 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2']},
+  undo:       {p: ['M3 8h11a6 6 0 0 1 0 12H8', 'M3 8l4-4', 'M3 8l4 4']},
 } satisfies Record<string, IconDef>

@@ -45,6 +45,65 @@
       </div>
     </section>
 
+    <!-- ----------------------------------------------------- default images -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">{{ $t('admin_defaults') }}</span>
+        <span class="spacer"></span>
+        <button class="btn icon" :title="$t('admin_refresh')" @click="loadDefaults">
+          <ui-icon name="refresh" />
+        </button>
+      </div>
+
+      <div class="progress" v-if="defaultsLoading"><i></i></div>
+
+      <div class="panel-body">
+        <p class="small muted" style="margin:0 0 12px">{{ $t('admin_defaults_hint') }}</p>
+
+        <div class="cards">
+          <div v-for="d in defaults" :key="d.image" class="card">
+            <img class="preview" :style="{aspectRatio: `${d.files[0].width} / ${d.files[0].height}`}"
+                 :src="defaultImageUrl(d.files[0].path, d.files[0].lastModified)"
+                 :alt="$t(DEFAULT_LABELS[d.image])" />
+
+            <div class="meta">
+              <div class="row" style="gap:6px">
+                <b>{{ $t(DEFAULT_LABELS[d.image]) }}</b>
+                <span class="badge" :class="d.custom ? 'ok' : 'info'">
+                  {{ $t(d.custom ? 'admin_defaults_custom' : 'admin_defaults_packaged') }}
+                </span>
+              </div>
+
+              <!-- A recipe default is one picture written at two sizes, so both are listed -->
+              <div class="small subtle tnum">
+                <template v-for="(f, i) in d.files" :key="f.bucket">
+                  <template v-if="i"> · </template>{{ f.width }}×{{ f.height }} {{ fmtBytes(f.bytes) }}
+                </template>
+              </div>
+              <div class="small subtle">
+                {{ d.custom
+                  ? $t('admin_defaults_replaced', {when: fmtAgo(d.files[0].lastModified)})
+                  : $t('admin_defaults_packaged_hint') }}
+              </div>
+
+              <div class="row" style="gap:6px; margin-top:auto">
+                <button class="btn sm" :disabled="!!uploading" @click="pickFile(d.image)">
+                  <ui-icon name="upload" :size="14" />
+                  {{ uploading === d.image ? $t('admin_defaults_uploading') : $t('admin_defaults_replace') }}
+                </button>
+                <button class="btn sm ghost" :disabled="!d.custom || !!uploading" @click="askReset(d)">
+                  <ui-icon name="undo" :size="14" />
+                  {{ $t('admin_defaults_reset') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <input ref="fileInput" type="file" accept="image/*" hidden @change="onFilePicked" />
+    </div>
+
     <!-- ------------------------------------------------------------ buckets -->
     <div class="panel">
       <div class="panel-head">
@@ -204,6 +263,15 @@
       </template>
     </ui-modal>
 
+    <!-- --------------------------------------------- reset a default image -->
+    <ui-modal v-model="resetDialog" :title="$t('admin_defaults_reset')">
+      <p class="small muted">{{ $t('admin_defaults_reset_hint') }}</p>
+      <template #actions>
+        <button class="btn" @click="resetDialog = false">{{ $t('cancel') }}</button>
+        <button class="btn danger" @click="confirmReset">{{ $t('admin_defaults_reset') }}</button>
+      </template>
+    </ui-modal>
+
     <!-- ------------------------------------------------------------- cleanup -->
     <ui-modal v-model="cleanupDialog" :title="$t('admin_storage_sweep')" :width="560">
       <div class="col" style="gap:14px">
@@ -255,7 +323,10 @@
 <script setup lang="ts">
 import {computed, onMounted, reactive, ref} from 'vue'
 import {useI18n} from 'vue-i18n'
-import {cleanupStorage, deleteImage, errorKey, getStorageOverview, imageUrl, listImages} from '../lib/api'
+import {
+  cleanupStorage, defaultImageUrl, deleteImage, errorKey, getDefaultImages, getStorageOverview,
+  imageUrl, listImages, resetDefaultImage, uploadDefaultImage,
+} from '../lib/api'
 import {fmtAgo, fmtBytes, fmtNumber} from '../lib/format'
 import {notifyError, notifyOk} from '../lib/toast'
 import UiIcon from '../components/UiIcon.vue'
@@ -307,6 +378,13 @@ const STATUS_TONES: Record<string, string> = {
   UNKNOWN: 'info',
 }
 
+/** What each backoffice-managed default stands for, in the order the backend lists them. */
+const DEFAULT_LABELS: Record<string, string> = {
+  USER: 'admin_defaults_user',
+  RECIPE: 'admin_defaults_recipe',
+  COOKBOOK: 'admin_defaults_cookbook',
+}
+
 /** MISSING has no per-bucket byte figure, but its count belongs beside the others. */
 const statusColumns = STATUSES
 
@@ -319,6 +397,14 @@ const page = ref(1)
 const size = ref(25)
 const total = ref(0)
 const filters = reactive<any>({query: '', bucket: null, status: null, sort: 'SIZE_DESCENDING'})
+
+const defaults = ref<any[]>([])
+const defaultsLoading = ref(false)
+const uploading = ref<string | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const pendingImage = ref<string | null>(null)
+const resetTarget = ref<any>(null)
+const resetDialog = ref(false)
 
 const selected = ref<any>(null)
 const deleteDialog = ref(false)
@@ -408,7 +494,49 @@ async function runCleanup(dryRun: boolean) {
   } catch (e) { fail(e) } finally { cleanup.running = false }
 }
 
-onMounted(reloadAll)
+// --------------------------------------------------------- default images
+
+async function loadDefaults() {
+  defaultsLoading.value = true
+  try {
+    defaults.value = (await getDefaultImages()).data
+  } catch (e) { fail(e) } finally { defaultsLoading.value = false }
+}
+
+/** One hidden input serves every card, so the card being replaced is remembered here. */
+function pickFile(image: string) {
+  pendingImage.value = image
+  fileInput.value?.click()
+}
+
+async function onFilePicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  const image = pendingImage.value
+  // Picking the same file twice fires no change event unless the input is cleared first
+  input.value = ''
+  if (!file || !image) return
+  uploading.value = image
+  try {
+    await uploadDefaultImage(image, file)
+    notifyOk(t('admin_action_done'))
+    await Promise.all([loadDefaults(), reloadAll()])
+  } catch (e) { fail(e) } finally { uploading.value = null }
+}
+
+const askReset = (d: any) => { resetTarget.value = d; resetDialog.value = true }
+
+async function confirmReset() {
+  const image = resetTarget.value?.image
+  resetDialog.value = false
+  try {
+    await resetDefaultImage(image)
+    notifyOk(t('admin_action_done'))
+    await Promise.all([loadDefaults(), reloadAll()])
+  } catch (e) { fail(e) }
+}
+
+onMounted(() => Promise.all([reloadAll(), loadDefaults()]))
 </script>
 
 <style scoped>
@@ -426,6 +554,26 @@ onMounted(reloadAll)
 .meter { height: 4px; margin-top: 8px; border-radius: 2px; background: var(--c-border); overflow: hidden; }
 .meter > i { display: block; height: 100%; background: var(--c-accent); }
 .meter.tight > i { background: var(--c-danger); }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 10px; }
+.card {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  background: var(--c-surface-alt);
+}
+/* Framed exactly as the site serves it, so what is previewed is what visitors get */
+.preview {
+  flex: none;
+  height: 78px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+}
+.card .meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 
 .thumb {
   display: block;

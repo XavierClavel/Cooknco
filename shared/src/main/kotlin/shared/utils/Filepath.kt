@@ -13,4 +13,13 @@ object Filepath {
     val RECIPES_THUMBNAIL_PATH = "$IMG_ROOT/recipes-thumbnails"
     val USERS_IMG_PATH = "$IMG_ROOT/users"
     val COOKBOOKS_IMG_PATH = "$IMG_ROOT/cookbooks"
+
+    /**
+     * The picture every bucket serves in place of one it does not have.
+     *
+     * The name is fixed because it is what `staticFiles { default(...) }` falls back to;
+     * the file itself is written by the backoffice, and is absent until an operator
+     * uploads one, in which case the app serves the picture packaged in its own jar.
+     */
+    const val DEFAULT_IMAGE = "default.webp"
 }

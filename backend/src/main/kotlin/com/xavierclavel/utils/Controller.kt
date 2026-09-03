@@ -74,6 +74,16 @@ inline fun <reified T : Enum<T>> RoutingContext.getEnumQueryParam(name: String):
                 ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
         }
 
+/**
+ * Reads an enum-valued path segment, case-insensitively.
+ *
+ * @throws BadRequestException when the segment is absent or not a value of [T]
+ */
+inline fun <reified T : Enum<T>> RoutingContext.getEnumPathParam(name: String): T =
+    call.parameters[name]
+        ?.let { enumValues<T>().find { value -> value.name.equals(it, ignoreCase = true) } }
+        ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
+
 /** Reads an optional free-text query parameter, treating blank as absent. */
 fun RoutingContext.getStringQueryParam(name: String): String? =
     call.request.queryParameters[name]?.takeIf { it.isNotBlank() }

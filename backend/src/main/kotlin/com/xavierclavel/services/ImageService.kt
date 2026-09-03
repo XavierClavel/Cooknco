@@ -3,6 +3,8 @@ package com.xavierclavel.services
 import com.drew.metadata.Metadata
 import com.drew.metadata.exif.ExifIFD0Directory
 import com.xavierclavel.enums.ExifOrientation
+import shared.enums.ImageBucket
+import shared.utils.Filepath.DEFAULT_IMAGE
 import shared.utils.Filepath.RECIPES_IMG_PATH
 import org.koin.core.component.KoinComponent
 import java.awt.Image
@@ -42,8 +44,31 @@ class ImageService: KoinComponent {
         logger.info("Deleted image: $result at $path")
     }
 
+    /**
+     * Writes the fallback picture a bucket serves when an entity has none of its own.
+     *
+     * Framed like a real upload so it drops into the same slots, but never enlarged past
+     * what was given: a default is decoration shown to everyone, and upscaling a small
+     * placeholder to a bucket's full size only costs bytes on every page that shows it.
+     */
+    fun saveDefaultImage(bucket: ImageBucket, image: BufferedImage, metadata: Metadata) {
+        val file = Path("${bucket.path}/$DEFAULT_IMAGE")
+        file.createParentDirectories()
+        ImageIO.write(render(image, orientationOf(metadata), bucket.size, upscale = false), "webp", file.toFile())
+    }
 
-
+    /**
+     * The packaged fallback, encoded for one bucket without ever touching the volume.
+     *
+     * The volume only holds what an operator uploaded, so until they do there is no file
+     * to serve and these bytes are what goes out instead.
+     */
+    fun encodeWebp(image: BufferedImage, bucket: ImageBucket): ByteArray =
+        ByteArrayOutputStream().use { out ->
+            // Packaged pictures are stored upright; there is no EXIF to read them from
+            ImageIO.write(render(image, ExifOrientation.NORMAL, bucket.size, upscale = false), "webp", out)
+            out.toByteArray()
+        }
 
     private fun saveImage(path: String, targetSize: Pair<Int, Int>, image: BufferedImage, metadata: Metadata) {
         val file = Path(path)
@@ -52,12 +77,24 @@ class ImageService: KoinComponent {
             file.createFile()
         }
 
+        ImageIO.write(render(image, orientationOf(metadata), targetSize), "webp", file.toFile())
+    }
+
+    private fun orientationOf(metadata: Metadata): ExifOrientation {
         val directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory::class.java)
-        val orientation = ExifOrientation.fromInt(directory?.getInt(ExifIFD0Directory.TAG_ORIENTATION) ?: 1)
+        return ExifOrientation.fromInt(directory?.getInt(ExifIFD0Directory.TAG_ORIENTATION) ?: 1)
+    }
+
+    /** Turns what was uploaded into what a bucket stores: upright, and cropped to its frame. */
+    private fun render(
+        image: BufferedImage,
+        orientation: ExifOrientation,
+        targetSize: Pair<Int, Int>,
+        upscale: Boolean = true,
+    ): BufferedImage {
         logger.info { "Processing image with orientation $orientation" }
         val orientedImage = applyOrientation(image, orientation)
-        val cleanedImage = cropAndResizeImage(orientedImage, targetSize.first, targetSize.second)
-        ImageIO.write(cleanedImage, "webp", file.toFile())
+        return cropAndResizeImage(orientedImage, targetSize.first, targetSize.second, upscale)
     }
 
     private fun applyOrientation(image: BufferedImage, orientation: ExifOrientation): BufferedImage {
@@ -76,7 +113,12 @@ class ImageService: KoinComponent {
         return result
     }
 
-    private fun cropAndResizeImage(originalImage: BufferedImage, targetWidth: Int, targetHeight: Int): BufferedImage {
+    private fun cropAndResizeImage(
+        originalImage: BufferedImage,
+        targetWidth: Int,
+        targetHeight: Int,
+        upscale: Boolean = true,
+    ): BufferedImage {
         val targetRatio = targetWidth.toDouble() / targetHeight.toDouble()
         val originalRatio = originalImage.width.toDouble() / originalImage.height.toDouble()
 
@@ -98,15 +140,20 @@ class ImageService: KoinComponent {
 
         val croppedImage = originalImage.getSubimage(cropX, cropY, cropWidth, cropHeight)
 
+        // The crop already carries the target ratio, so holding onto it keeps a caller that
+        // refused upscaling from stretching a small source to a frame it cannot fill.
+        val width = if (upscale) targetWidth else minOf(targetWidth, cropWidth)
+        val height = if (upscale) targetHeight else minOf(targetHeight, cropHeight)
+
         // Resize the cropped image
-        val resizedImage = BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB)
+        val resizedImage = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
         val graphics = resizedImage.createGraphics()
 
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
         graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
-        graphics.drawImage(croppedImage.getScaledInstance(targetWidth, targetHeight, Image.SCALE_SMOOTH), 0, 0, null)
+        graphics.drawImage(croppedImage.getScaledInstance(width, height, Image.SCALE_SMOOTH), 0, 0, null)
         graphics.dispose()
 
         return resizedImage

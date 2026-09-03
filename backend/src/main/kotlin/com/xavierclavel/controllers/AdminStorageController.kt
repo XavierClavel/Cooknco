@@ -2,12 +2,15 @@ package com.xavierclavel.controllers
 
 import com.xavierclavel.exceptions.BadRequestCause
 import com.xavierclavel.exceptions.BadRequestException
+import com.xavierclavel.services.DefaultImageService
 import com.xavierclavel.services.StorageService
 import com.xavierclavel.utils.Controller
+import com.xavierclavel.utils.getEnumPathParam
 import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getStringQueryParam
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.receiveImage
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -19,6 +22,7 @@ import io.ktor.server.routing.route
 import org.koin.java.KoinJavaComponent.inject
 import shared.dto.SearchResult
 import shared.dto.StorageCleanupDTO
+import shared.enums.DefaultImage
 import shared.enums.ImageBucket
 import shared.enums.ImageSort
 import shared.enums.ImageStatus
@@ -32,12 +36,18 @@ import shared.infodto.AdminImageInfo
  */
 object AdminStorageController: Controller("storage") {
     val storageService: StorageService by inject(StorageService::class.java)
+    val defaultImageService: DefaultImageService by inject(DefaultImageService::class.java)
 
     override fun Route.routes() {
         getOverview()
         route("/images") {
             searchImages()
             deleteImage()
+        }
+        route("/defaults") {
+            listDefaults()
+            replaceDefault()
+            resetDefault()
         }
         cleanup()
     }
@@ -79,5 +89,32 @@ object AdminStorageController: Controller("storage") {
     /** Sweeps superseded, orphaned or unrecognised files. Accepts `dryRun` to count first. */
     private fun Route.cleanup() = post("/cleanup") {
         call.respond(storageService.cleanup(call.receive<StorageCleanupDTO>()))
+    }
+
+    // ---------------------------------------------------------------- defaults
+
+    /**
+     * The pictures served in place of the ones users never uploaded.
+     *
+     * They are files on the volume like any other, but nobody owns them, so they are
+     * addressed by what they stand for rather than by bucket: replacing the recipe default
+     * writes both the full-size picture and its thumbnail from the one upload.
+     */
+    private fun Route.listDefaults() = get {
+        call.respond(defaultImageService.describe())
+    }
+
+    private fun Route.replaceDefault() = post("/{image}") {
+        val image = getEnumPathParam<DefaultImage>("image")
+        val (source, metadata) = receiveImage()
+        defaultImageService.replace(image, source, metadata)
+        call.respond(HttpStatusCode.OK)
+    }
+
+    /** Removes the uploaded default, putting the one packaged with the app back in service. */
+    private fun Route.resetDefault() = delete("/{image}") {
+        val image = getEnumPathParam<DefaultImage>("image")
+        if (!defaultImageService.reset(image)) call.respond(HttpStatusCode.NotFound)
+        else call.respond(HttpStatusCode.OK)
     }
 }
