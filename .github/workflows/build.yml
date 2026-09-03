@@ -248,8 +248,8 @@ jobs:
 
     - name: Configure SSH
       env:
-        SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-        SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
+        SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
       run: |
         if [ -z "$SSH_PRIVATE_KEY" ] || [ -z "$SSH_KNOWN_HOSTS" ]; then
           echo "::error::DEPLOY_SSH_KEY / DEPLOY_SSH_KNOWN_HOSTS are not set. See k8s/README.md."
@@ -266,8 +266,8 @@ jobs:
 
     - name: Apply to cluster
       env:
-        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        DEPLOY_HOST: ${{ secrets.SSH_HOST }}
+        DEPLOY_USER: ${{ secrets.SSH_USER }}
       run: |
         set -euo pipefail
 
@@ -372,8 +372,8 @@ jobs:
     - name: Report failure detail
       if: failure()
       env:
-        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        DEPLOY_HOST: ${{ secrets.SSH_HOST }}
+        DEPLOY_USER: ${{ secrets.SSH_USER }}
       run: |
         ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o BatchMode=yes \
           -o ConnectTimeout=15 -p "$DEPLOY_PORT" "${DEPLOY_USER}@${DEPLOY_HOST}" '
