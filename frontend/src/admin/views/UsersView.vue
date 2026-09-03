@@ -44,7 +44,8 @@
             <tr v-for="u in rows" :key="u.id">
               <td>
                 <div class="who">
-                  <span class="avatar" :style="{background: tint(u.username)}">{{ initials(u.username) }}</span>
+                  <ui-thumb :src="userIconUrl(u.id, u.version)" round
+                            :initials="initials(u.username)" :tint="tint(u.username)" />
                   <span class="truncate">{{ u.username }}</span>
                 </div>
               </td>
@@ -156,11 +157,13 @@ import {
   banUser, deleteUser, errorKey, listUsers, reinstateUser, setRole, suspendUser, verifyUser,
 } from '../lib/api'
 import {fmtAgo, fmtDate} from '../lib/format'
+import {userIconUrl} from '../lib/images'
 import {notifyError, notifyOk} from '../lib/toast'
 import UiIcon from '../components/UiIcon.vue'
 import UiModal from '../components/UiModal.vue'
 import UiPager from '../components/UiPager.vue'
 import UiEmpty from '../components/UiEmpty.vue'
+import UiThumb from '../components/UiThumb.vue'
 
 const {t, te} = useI18n()
 
@@ -183,7 +186,7 @@ const statusTone = (s: string) =>
   s === 'BANNED' ? 'danger' : s === 'SUSPENDED' ? 'warn' : s === 'UNVERIFIED' ? 'info' : 'ok'
 
 const initials = (name: string) => (name || '?').slice(0, 2).toUpperCase()
-/** Stable per-name avatar tint, so rows stay visually distinguishable while scanning. */
+/** Stable per-name tint behind the initials, for accounts with no picture. */
 const tint = (name: string) => {
   let h = 0
   for (const ch of name || '') h = (h * 31 + ch.charCodeAt(0)) % 360
@@ -258,12 +261,5 @@ onMounted(reload)
 .page { max-width: 1400px; }
 .filters { gap: 8px; flex-wrap: wrap; }
 .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.avatar {
-  width: 24px; height: 24px; flex: none;
-  border-radius: 50%;
-  display: grid; place-items: center;
-  font-size: 10px; font-weight: 600;
-  color: var(--c-text-muted);
-}
 .sm-select { height: 27px; font-size: 12.5px; width: 92px; }
 </style>

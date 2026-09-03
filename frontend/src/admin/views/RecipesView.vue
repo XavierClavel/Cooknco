@@ -44,7 +44,10 @@
           <tbody>
             <tr v-for="r in rows" :key="r.id">
               <td>
-                <button class="linkish truncate" @click="openDetail(r)">{{ r.title }}</button>
+                <button class="what" :title="$t('admin_open_recipe')" @click="openDetail(r)">
+                  <ui-thumb :src="recipeThumbnailUrl(r.id, r.version)" :width="44" :height="33" />
+                  <span class="title truncate">{{ r.title }}</span>
+                </button>
               </td>
               <td class="muted">{{ r.owner?.username ?? $t('admin_deleted_author') }}</td>
               <td>
@@ -117,6 +120,8 @@
     <ui-modal v-model="dialog.detail" :title="detail?.title ?? $t('recipe')" :width="640">
       <div v-if="!detail" class="progress"><i></i></div>
       <div v-else class="detail">
+        <img v-if="detail.version" class="hero" alt=""
+             :src="recipeImageUrl(detail.id, detail.version)" />
         <p v-if="detail.description">{{ detail.description }}</p>
         <div v-if="detail.ingredients?.length || detail.customIngredients?.length">
           <h4>{{ $t('ingredients') }}</h4>
@@ -148,11 +153,13 @@ import {
   deleteRecipe, errorKey, getRecipeDetail, hideRecipe, listRecipes, unhideRecipe,
 } from '../lib/api'
 import {fmtDate} from '../lib/format'
+import {recipeImageUrl, recipeThumbnailUrl} from '../lib/images'
 import {notifyError, notifyOk} from '../lib/toast'
 import UiIcon from '../components/UiIcon.vue'
 import UiModal from '../components/UiModal.vue'
 import UiPager from '../components/UiPager.vue'
 import UiEmpty from '../components/UiEmpty.vue'
+import UiThumb from '../components/UiThumb.vue'
 
 const {t, te, locale} = useI18n()
 
@@ -226,12 +233,18 @@ onMounted(reload)
 <style scoped>
 .page { max-width: 1400px; }
 .filters { gap: 8px; flex-wrap: wrap; }
-.linkish {
+.what {
+  display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 360px;
   border: 0; background: none; padding: 0; font: inherit;
-  color: var(--c-accent); cursor: pointer; text-align: left; max-width: 340px;
+  cursor: pointer; text-align: left;
 }
-.linkish:hover { text-decoration: underline; }
+.what .title { color: var(--c-accent); }
+.what:hover .title { text-decoration: underline; }
 .detail { display: flex; flex-direction: column; gap: 14px; }
+.detail .hero {
+  width: 100%; max-height: 260px; object-fit: cover;
+  border-radius: var(--radius); border: 1px solid var(--c-border);
+}
 .detail h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--c-text-subtle); margin-bottom: 5px; }
 .detail ul, .detail ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
 </style>
