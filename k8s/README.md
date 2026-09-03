@@ -67,20 +67,36 @@ Two workflows, both in `.github/workflows/`.
 2. `kubeconform -strict` against the Kubernetes schemas plus the
    [CRDs-catalog](https://github.com/datreeio/CRDs-catalog) for the
    out-of-tree kinds (`Certificate`, `KafkaTopic`).
-3. Rejects any image reference that is untagged or pinned to `:latest`, so a
-   rollout is always reproducible and always rollback-able.
+3. Rejects any untagged image reference, and any third-party image pinned to
+   `:latest`. The three `cooknco-*` images are exempt from the `:latest` rule —
+   see below for what stands in for the pinned tag.
 
-**`build.yml`** — on a push to `master`, after the images are pushed:
+**`build.yml`** — on a push to `master`:
 
-1. `kustomize edit set image` rewrites the three `newTag` values in
-   `overlays/prod` to the version from `./gradlew printVersion`, and commits
-   that back to `master` as `ci: pin cooknco images to <version> [skip ci]`.
-   The push uses `GITHUB_TOKEN`, which by design does not re-trigger workflows,
-   so this cannot loop.
-2. The `deploy` job re-pins to the version this run actually built (so a race
-   between the bump commit and its own checkout cannot deploy a stale tag),
-   renders both roots on the runner, and pipes them into `kubectl apply` over
-   SSH: `--dry-run=server` first, then the apply, then all six rollouts.
+1. Builds each subproject's image and pushes it twice, as `:<version>` (from
+   `./gradlew printVersion`) and as `:latest`, then tags the commit `v<version>`
+   and cuts a GitHub release. Nothing is committed back to `master`.
+2. `overlays/prod` pins the three app images to `:latest`, so the `deploy` job
+   does not rewrite any tag. It instead runs `kustomize edit add annotation` to
+   stamp `cooknco.dev/deployed-version` and `cooknco.dev/deployed-revision` into
+   the render. kustomize propagates those into
+   `spec.template.metadata.annotations`, which is what makes `kubectl apply` see
+   a changed pod template and roll the Deployments over — otherwise the render
+   would be byte-identical between builds and the apply a no-op, leaving the new
+   image sitting on Docker Hub. The containers carry `imagePullPolicy: Always`,
+   so the replacement pods pull the tag fresh.
+3. The job renders both roots on the runner and pipes them into `kubectl apply`
+   over SSH: `--dry-run=server` first, then the apply, then all six rollouts.
+
+The tradeoff `:latest` buys — one less commit on `master` per build, and no race
+between that commit and the deploy job's checkout — is paid for in provenance.
+The live objects no longer name their image by an immutable tag; what identifies
+a running build is the annotation pair above (`kubectl -n cooknco get deploy
+cooknco-backend -o jsonpath='{.metadata.annotations}'`). Rolling back means
+`kubectl -n cooknco set image deployment/cooknco-<app>
+<app>=xavierclavel/cooknco-<app>:<version>` against the `:<version>` tag every
+build also pushes, or `kubectl rollout undo`; re-deploying from CI puts `latest`
+back.
 
 The cluster API is never exposed to the internet. The only inbound door is
 sshd on the cluster host, and the only credential GitHub holds is the deploy

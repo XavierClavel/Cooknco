@@ -7,14 +7,15 @@ resources:
 - namespace.yaml
 - ../../base
 
-# CI rewrites the newTag values below with `kustomize edit set image`.
-# Pinned to what runs in the `default` namespace today so the namespace
-# migration changes the namespace and nothing else. The first master build
-# after the cutover bumps these to the current project version.
+# The three app images track `latest`, which every master build repoints at the
+# commit it just pushed. Nothing rewrites this file any more: the deploy job
+# stamps the built version into `commonAnnotations` instead, which is what makes
+# `kubectl apply` see a changed pod template and roll the Deployments over. The
+# containers carry `imagePullPolicy: Always`, so the new pods pull the tag fresh.
 images:
 - name: xavierclavel/cooknco-backend
-  newTag: 1.2.11
+  newTag: latest
 - name: xavierclavel/cooknco-frontend
-  newTag: 1.2.11
+  newTag: latest
 - name: xavierclavel/cooknco-mail-service
-  newTag: 1.2.11
+  newTag: latest
