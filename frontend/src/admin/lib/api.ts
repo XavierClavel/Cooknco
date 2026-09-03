@@ -86,6 +86,29 @@ export const cleanupStorage = (buckets: string[], statuses: string[], dryRun: bo
 export const imageUrl = (dir: string, filename: string) =>
   `${import.meta.env.VITE_IMG_URL}/${dir}/${filename}`
 
+// --------------------------------------------------------- default images
+export const getDefaultImages = () => api.get('/admin/storage/defaults')
+
+export const uploadDefaultImage = (image: string, file: File) => {
+  const body = new FormData()
+  body.append('file', file)
+  // Overrides the client's JSON default; axios drops it again so the browser can add the
+  // boundary, which is the same dance the consumer app does for its own uploads.
+  return api.post(`/admin/storage/defaults/${image}`, body, {
+    headers: {'Content-Type': 'multipart/form-data'},
+  })
+}
+
+/** Puts the picture packaged with the app back in service. */
+export const resetDefaultImage = (image: string) => api.delete(`/admin/storage/defaults/${image}`)
+
+/**
+ * A default keeps the same URL when it is replaced, so the preview asks for the version
+ * the server just reported rather than whatever the browser still holds.
+ */
+export const defaultImageUrl = (path: string, lastModified?: number | null) =>
+  `${import.meta.env.VITE_IMG_URL}/${path}?v=${lastModified ?? 0}`
+
 // --------------------------------------------------------------------- logs
 export const getLogs = (f: Record<string, unknown>) => api.get(`/admin/logs?${qs(f)}`)
 export const clearLogs = () => api.delete('/admin/logs')

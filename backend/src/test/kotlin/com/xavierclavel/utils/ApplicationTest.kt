@@ -6,6 +6,7 @@ import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.CustomIngredientService
 import com.xavierclavel.services.DashboardService
+import com.xavierclavel.services.DefaultImageService
 import com.xavierclavel.services.EncryptionService
 import com.xavierclavel.services.ExportService
 import com.xavierclavel.services.FollowService
@@ -78,6 +79,7 @@ abstract class ApplicationTest: KoinTest {
                 single { UserService() }
                 single { IngredientService() }
                 single { ImageService() }
+                single { DefaultImageService() }
                 single { ExportService() }
                 single { LikeService() }
                 single { CookbookService() }

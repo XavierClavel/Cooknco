@@ -150,14 +150,22 @@ const adminOnly = [
 ]
 
 
-const defaultImageUser = '/default_user.jpg'
-const defaultImageRecipe = '/default_recipe.png'
-const defaultImageCookbook = '/default_cookbook.png'
+/**
+ * The pictures shown for an entity that has none of its own.
+ *
+ * Served off the image volume rather than bundled with the app: they are managed from the
+ * backoffice, so replacing one must not need a deploy. The server always answers, falling
+ * back to the picture packaged with it until an administrator uploads another.
+ */
+const defaultImageUser = `${import.meta.env.VITE_IMG_URL}/users/default.webp`
+const defaultImageRecipe = `${import.meta.env.VITE_IMG_URL}/recipes/default.webp`
+const defaultImageRecipeThumbnail = `${import.meta.env.VITE_IMG_URL}/recipes-thumbnails/default.webp`
+const defaultImageCookbook = `${import.meta.env.VITE_IMG_URL}/cookbooks/default.webp`
 
 const getUserIconUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/users/${id}-v${version}.webp` : defaultImageUser
 const getCookbookIconUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/cookbooks/${id}-v${version}.webp` : defaultImageCookbook
 const getRecipeImageUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/recipes/${id}-v${version}.webp` : defaultImageRecipe
-const getRecipeThumbnailUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/recipes-thumbnails/${id}-v${version}.webp` : defaultImageRecipe
+const getRecipeThumbnailUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/recipes-thumbnails/${id}-v${version}.webp` : defaultImageRecipeThumbnail
 const getIngredientImageUrl = (type) => {
   try {
     const t = ingredientTypes.value.find((item) => item.value == type)

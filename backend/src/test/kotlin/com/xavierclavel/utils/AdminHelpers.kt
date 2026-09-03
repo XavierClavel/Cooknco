@@ -7,9 +7,12 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -24,11 +27,13 @@ import shared.dto.SuspensionDTO
 import shared.enums.ModerationAction
 import shared.enums.ReportReason
 import shared.enums.ReportStatus
+import shared.enums.DefaultImage
 import shared.enums.ImageBucket
 import shared.enums.ImageSort
 import shared.enums.ImageStatus
 import shared.enums.ReportTargetType
 import shared.enums.UserRole
+import shared.infodto.AdminDefaultImageInfo
 import shared.infodto.AdminImageInfo
 import shared.infodto.AdminIngredientInfo
 import shared.infodto.AdminOverview
@@ -308,3 +313,26 @@ suspend fun HttpClient.cleanupStorage(
         assertEquals(HttpStatusCode.OK, it.status)
         json.decodeFromString<AdminStorageCleanupResult>(it.bodyAsText())
     }
+
+// ------------------------------------------------------------ default images
+
+suspend fun HttpClient.listDefaultImagesRaw(): HttpResponse = this.get("$ADMIN_URL/storage/defaults")
+
+suspend fun HttpClient.listDefaultImages(): List<AdminDefaultImageInfo> =
+    this.listDefaultImagesRaw().let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<List<AdminDefaultImageInfo>>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.uploadDefaultImageRaw(image: DefaultImage, bytes: ByteArray) =
+    this.post("$ADMIN_URL/storage/defaults/${image.name}") {
+        setBody(MultiPartFormDataContent(formData {
+            append("file", bytes, Headers.build {
+                append(HttpHeaders.ContentType, ContentType.Image.PNG.toString())
+                append(HttpHeaders.ContentDisposition, "filename=\"default.png\"")
+            })
+        }))
+    }
+
+suspend fun HttpClient.resetDefaultImageRaw(image: DefaultImage) =
+    this.delete("$ADMIN_URL/storage/defaults/${image.name}")

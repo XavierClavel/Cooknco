@@ -13,6 +13,7 @@ import shared.infodto.AdminImageInfo
 import shared.infodto.AdminStorageBucket
 import shared.infodto.AdminStorageCleanupResult
 import shared.infodto.AdminStorageOverview
+import shared.utils.Filepath.DEFAULT_IMAGE
 import shared.utils.Filepath.IMG_ROOT
 import shared.utils.logger
 import java.io.File
@@ -41,11 +42,12 @@ class StorageService: KoinComponent {
         private val FILENAME = Regex("""^(\d+)-v(\d+)\.webp$""")
 
         /**
-         * Shipped fallbacks served by `staticFiles { default(...) }`. They have no owner
-         * row, so the ownership rules below would read them as orphans and offer to delete
-         * the image every missing picture on the site falls back to.
+         * The backoffice-managed defaults. They have no owner row, so the ownership rules
+         * below would read them as orphans and offer to delete the picture every missing
+         * image on the site falls back to; resetting one is done from the defaults panel,
+         * which puts the packaged picture back rather than leaving a hole.
          */
-        private val RESERVED_FILENAMES = setOf("default.webp")
+        private val RESERVED_FILENAMES = setOf(DEFAULT_IMAGE)
     }
 
     // ------------------------------------------------------------------ scan
