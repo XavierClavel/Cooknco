@@ -108,7 +108,30 @@
           elevation="2"
         ></v-btn>
       </admin-only>
+      <report-dialog v-if="!isOwner" target-type="RECIPE" :target-id="Number(recipeId)">
+        <template #activator="{props}">
+          <v-btn
+            v-bind="props"
+            :icon="ICON_REPORT"
+            :title="`${$t('report')}`"
+            color="background"
+            flat
+            class="mb-10 text-h6"
+            min-height="70px"
+            min-width="70px"
+            elevation="2"
+          ></v-btn>
+        </template>
+      </report-dialog>
     </span>
+
+    <v-alert
+      v-if="recipe.isHidden"
+      type="warning"
+      variant="tonal"
+      class="mb-4"
+      :text="$t('recipe_hidden_by_moderation')"
+    ></v-alert>
 
     <span class="d-flex flex-wrap">
         <picto-info :value="`${recipe.preparationTime} min`" icon="mdi-chef-hat" v-if="recipe.preparationTime"></picto-info>
@@ -344,7 +367,7 @@ import {
 import {useAuthStore} from "@/stores/auth";
 import {addLike, isLiked, removeLike} from "@/scripts/likes";
 import {addRecipeToCookbook, getStatusInCookbooks, listCookbooks, removeRecipeFromCookbook} from "@/scripts/cookbooks";
-import {getIngredientIcon} from "@/scripts/icons";
+import {getIngredientIcon, ICON_REPORT} from "@/scripts/icons";
 import {useI18n} from "vue-i18n";
 import {max100, requiredRule} from "@/scripts/rules";
 import {createNotes, getNotes, updateNotes} from "@/scripts/notes";

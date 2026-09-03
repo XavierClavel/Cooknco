@@ -138,6 +138,8 @@ object AuthController: Controller(AUTH_URL) {
         }
         var user = userService.findEntityByGoogleId(response.sub)
         if (user != null) {
+            if (user.isBanned) throw UnauthorizedException(UnauthorizedCause.ACCOUNT_BANNED)
+            if (user.isSuspended()) throw UnauthorizedException(UnauthorizedCause.ACCOUNT_SUSPENDED)
             val sessionId = createSession(user.toInfo())
             call.sessions.set(UserSession(sessionId))
             return sessionId

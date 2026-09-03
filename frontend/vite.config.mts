@@ -12,11 +12,47 @@ import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
 import {aliases, mdi} from "vuetify/iconsets/mdi";
 
+/**
+ * The backoffice is a second entry point (admin.html) rather than a route of the
+ * public app: it has its own design system and must not ship in the bundle every
+ * visitor downloads. In production nginx maps /admin -> /admin.html; the dev
+ * server needs the same rewrite.
+ */
+const adminEntry = () => ({
+  name: 'admin-entry',
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      const [path] = (req.url || '').split('?')
+      if (path === '/admin' || path.startsWith('/admin/')) req.url = '/admin.html'
+      next()
+    })
+  },
+  // unplugin-fonts injects Roboto + Material Design Icons into every HTML entry.
+  // The backoffice uses the system font stack and inline SVG icons, so those
+  // preloads would pull down the public app's font assets for nothing.
+  transformIndexHtml: {
+    order: 'post' as const,
+    handler(html: string, ctx: {path: string}) {
+      if (!ctx.path.includes('admin.html')) return html
+      return html.replace(
+        /^[ \t]*<link[^>]*(fonts\.gstatic|fonts\.googleapis|materialdesignicons)[^>]*>\r?\n?/gm,
+        '',
+      )
+    },
+  },
+})
+
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        admin: fileURLToPath(new URL('./admin.html', import.meta.url)),
+      },
+    },
   },
   icons: {
     defaultSet: 'mdi',
@@ -26,8 +62,11 @@ export default defineConfig({
     },
   },
   plugins: [
+    adminEntry(),
     VueRouter({
       dts: 'src/typed-router.d.ts',
+      // The backoffice has its own router; keep it out of the public app's routes
+      exclude: ['**/admin/**'],
     }),
     Layouts(),
     AutoImport({

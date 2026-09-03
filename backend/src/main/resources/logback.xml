@@ -21,9 +21,16 @@
         </encoder>
     </appender>
 
+    <!-- Keeps the most recent events in memory so the admin backoffice can read and tail
+         logs without access to the log volume. -->
+    <appender name="RINGBUFFER" class="com.xavierclavel.logging.RingBufferAppender">
+        <capacity>5000</capacity>
+    </appender>
+
     <root level="info">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>
+        <appender-ref ref="RINGBUFFER"/>
     </root>
     <logger name="org.eclipse.jetty" level="INFO"/>
     <logger name="io.netty" level="INFO"/>

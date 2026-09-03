@@ -15,4 +15,6 @@ object URL {
     const val EXPORT_URL = "api/v1/export"
     const val TEST_URL = "api/v1/test"
     const val HEALTH_URL = "api/v1/health"
+    const val REPORT_URL = "api/v1/report"
+    const val ADMIN_URL = "api/v1/admin"
 }

@@ -78,6 +78,26 @@
           :action="() => toEditUser(userId)"
           v-if="userId == currentUserId"
         ></action-button>
+        <report-dialog
+          v-if="userId != currentUserId"
+          target-type="USER"
+          :target-id="Number(userId)"
+        >
+          <template #activator="{props}">
+            <v-btn
+              v-bind="props"
+              height="48"
+              :prepend-icon="ICON_REPORT"
+              color="primary"
+              flat
+              rounded="lg"
+              class="text-h6 px-10 mx-sm-3 text-wrap"
+              min-height="70px"
+              min-width="200px"
+              :text="`${$t('report')}`"
+            ></v-btn>
+          </template>
+        </report-dialog>
       </v-row>
     </v-container>
 
@@ -98,7 +118,7 @@ import {getUser} from "@/scripts/users";
 import InteractiblePictoInfo from "@/components/InteractiblePictoInfo.vue";
 import {follow, isFollowingUser, unfollow} from "@/scripts/follows";
 import {useAuthStore} from "@/stores/auth";
-import {ICON_USER_FOLLOWERS, ICON_USER_FOLLOWS, ICON_USER_LIKES, ICON_USER_RECIPES} from "@/scripts/icons";
+import {ICON_REPORT, ICON_USER_FOLLOWERS, ICON_USER_FOLLOWS, ICON_USER_LIKES, ICON_USER_RECIPES} from "@/scripts/icons";
 import RecipesList from "@/components/RecipesList.vue";
 
 const route = useRoute();

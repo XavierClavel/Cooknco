@@ -1,6 +1,7 @@
 package com.xavierclavel
 
 import com.xavierclavel.config.appModules
+import com.xavierclavel.controllers.AdminController
 import com.xavierclavel.controllers.AuthController
 import com.xavierclavel.controllers.CookbookController
 import com.xavierclavel.controllers.DashboardController
@@ -13,6 +14,7 @@ import com.xavierclavel.controllers.ImageController
 import com.xavierclavel.controllers.LikeController
 import com.xavierclavel.controllers.NotificationController
 import com.xavierclavel.controllers.RecipeNotesController
+import com.xavierclavel.controllers.ReportController
 import com.xavierclavel.controllers.UserController
 import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.exceptions.UnauthorizedException
@@ -109,4 +111,6 @@ fun Application.serveRoutes() = routing {
     serve(CookbookController)
     serve(AuthController)
     serve(NotificationController)
+    serve(ReportController)
+    serve(AdminController)
 }

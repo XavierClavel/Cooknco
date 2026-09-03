@@ -1,0 +1,68 @@
+/*
+ * Design tokens for the backoffice.
+ *
+ * Deliberately independent of the consumer app's Vuetify theme: this is an
+ * operator tool, so it favours density, neutral colour and legibility over the
+ * playful styling of the public site.
+ */
+:root {
+  /* neutrals */
+  --c-bg:            #f5f6f8;
+  --c-surface:       #ffffff;
+  --c-surface-alt:   #fafbfc;
+  --c-surface-hover: #f4f6f8;
+  --c-border:        #e4e7ec;
+  --c-border-strong: #cdd3db;
+
+  --c-text:          #101828;
+  --c-text-muted:    #5a6675;
+  --c-text-subtle:   #8a94a3;
+  --c-text-inverse:  #ffffff;
+
+  /* accent */
+  --c-accent:        #3050c8;
+  --c-accent-hover:  #2743ad;
+  --c-accent-soft:   #eef1fd;
+  --c-accent-border: #c9d3f7;
+
+  /* semantic */
+  --c-danger:        #c0392f;
+  --c-danger-soft:   #fdecea;
+  --c-danger-border: #f4c9c4;
+  --c-warn:          #9a6414;
+  --c-warn-soft:     #fdf4e3;
+  --c-warn-border:   #eeddb6;
+  --c-ok:            #1f7a4d;
+  --c-ok-soft:       #e9f6ef;
+  --c-ok-border:     #bfe3d0;
+  --c-info:          #1f6f8b;
+  --c-info-soft:     #e8f3f7;
+  --c-info-border:   #bcdae5;
+
+  /* sidebar (always dark: separates chrome from content at a glance) */
+  --c-nav-bg:        #12161d;
+  --c-nav-bg-hover:  #1c222c;
+  --c-nav-bg-active: #232b38;
+  --c-nav-text:      #aab4c2;
+  --c-nav-text-active:#ffffff;
+  --c-nav-border:    #232a35;
+
+  /* terminal surface for the log viewer */
+  --c-term-bg:       #0f1319;
+  --c-term-text:     #ccd4de;
+  --c-term-dim:      #6b7684;
+
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 10px;
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, .06);
+  --shadow:    0 2px 6px rgba(16, 24, 40, .08);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 40, .16);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --nav-w: 232px;
+  --topbar-h: 56px;
+}

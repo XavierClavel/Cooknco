@@ -30,6 +30,9 @@ data class RecipeInfo (
 
     val likesCount: Int,
 
+    /** Set when a moderator has hidden the recipe; only its owner and admins ever see it. */
+    val isHidden: Boolean = false,
+
     ) {
     fun compareToDTO(dto: RecipeDTO): Boolean {
         return title == dto.title &&
@@ -49,5 +52,6 @@ data class RecipeInfo (
         owner = this.owner,
         likesCount = this.likesCount,
         creationDate = this.creationDate,
+        isHidden = this.isHidden,
     )
 }

@@ -61,6 +61,8 @@ fun Application.configureAuthentication() {
                 val user = userService.findEntityByMail(credentials.name) ?: throw UnauthorizedException(UnauthorizedCause.INVALID_MAIL_OR_PASSWORD)
                 if (user.passwordHash.isNullOrBlank()) throw BadRequestException(BadRequestCause.OAUTH_ONLY)
                 if (!user.isVerified) throw UnauthorizedException(UnauthorizedCause.USER_NOT_VERIFIED)
+                if (user.isBanned) throw UnauthorizedException(UnauthorizedCause.ACCOUNT_BANNED)
+                if (user.isSuspended()) throw UnauthorizedException(UnauthorizedCause.ACCOUNT_SUSPENDED)
                 if (userService.isPasswordValid(credentials.password, user.passwordHash!!)) {
                     UserIdPrincipal(credentials.name)
                 } else {

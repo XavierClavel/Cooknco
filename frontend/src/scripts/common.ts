@@ -44,6 +44,7 @@ export {
 
   toHome,
   toUsers,
+  toAdmin,
   toLogin,
   toSignup,
   toMaintenance,
@@ -106,6 +107,9 @@ const toMyCookbooks = () => {
 
 const toHome = () => navigateTo('/home')
 const toUsers = () => navigateTo('/user/list')
+// The backoffice is a separate application served at /admin, so this is a full
+// page navigation rather than a client-side route change.
+const toAdmin = () => { window.location.href = '/admin' }
 const toLogin = () => navigateTo('/login')
 const toSignup = () => navigateTo('/signup')
 const toMaintenance = () => navigateTo('/maintenance')
@@ -144,6 +148,7 @@ const allowNoLoginStartsWith = [
 const adminOnly = [
   '/user/list',
 ]
+
 
 const defaultImageUser = '/default_user.jpg'
 const defaultImageRecipe = '/default_recipe.png'

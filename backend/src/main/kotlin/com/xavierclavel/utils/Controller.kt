@@ -60,6 +60,24 @@ inline fun <reified T : Enum<T>> enumValueOfIgnoreCase(key: String): T =
         ?: throw IllegalArgumentException("no value for key $key")
 
 
+/**
+ * Reads an optional enum-valued query parameter, case-insensitively.
+ *
+ * @return null when the parameter is absent or blank
+ * @throws BadRequestException when present but not a value of [T]
+ */
+inline fun <reified T : Enum<T>> RoutingContext.getEnumQueryParam(name: String): T? =
+    call.request.queryParameters[name]
+        ?.takeIf { it.isNotBlank() }
+        ?.let {
+            enumValues<T>().find { value -> value.name.equals(it, ignoreCase = true) }
+                ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
+        }
+
+/** Reads an optional free-text query parameter, treating blank as absent. */
+fun RoutingContext.getStringQueryParam(name: String): String? =
+    call.request.queryParameters[name]?.takeIf { it.isNotBlank() }
+
 fun RoutingContext.getIdPathVariable(value: String): Long? = call.parameters[value]?.toLongOrNull()
 fun RoutingContext.getPathVariable(value: String): String? = call.parameters[value]
 

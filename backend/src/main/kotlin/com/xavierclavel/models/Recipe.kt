@@ -7,6 +7,7 @@ import com.xavierclavel.models.jointables.CustomIngredient
 import shared.dto.RecipeDTO
 import shared.enums.DishClass
 import shared.enums.Locale
+import shared.infodto.AdminRecipeInfo
 import shared.infodto.RecipeInfo
 import shared.overviewdto.RecipeOverview
 import jakarta.persistence.CascadeType
@@ -77,6 +78,15 @@ class Recipe (
 
     var taggedForDeletion: Boolean = false,
 
+    //Moderation
+    /** Hidden recipes stay in database but are only served to their owner and to admins. */
+    @DbDefault("false")
+    var isHidden: Boolean = false,
+
+    @Column(length = 1023)
+    @DbDefault("")
+    var hiddenReason: String = "",
+
     ) : Model() {
     fun mergeDTO(recipeDTO: RecipeDTO) : Recipe = apply {
         this.title = recipeDTO.title
@@ -126,6 +136,7 @@ class Recipe (
         preparationTime = this.preparationTime,
         cookingTime = this.cookingTime,
         cookingTemperature = this.cookingTemperature,
+        isHidden = this.isHidden,
     )
 
     fun toOverview() = RecipeOverview(
@@ -136,11 +147,37 @@ class Recipe (
         owner = this.owner!!.toOverview(),
         likesCount = this.likes.size,
         creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),
+        isHidden = this.isHidden,
     )
 
     fun tagForDeletion(): Recipe = this.apply {
             taggedForDeletion = true
     }
+
+    fun hide(reason: String): Recipe = this.apply {
+        isHidden = true
+        hiddenReason = reason.take(1023)
+    }
+
+    fun unhide(): Recipe = this.apply {
+        isHidden = false
+        hiddenReason = ""
+    }
+
+    fun toAdminInfo(pendingReportsCount: Int) = AdminRecipeInfo(
+        id = this.id,
+        version = this.imageVersion,
+        title = this.title,
+        owner = this.owner?.toOverview(),
+        creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),
+        modificationDate = this.modificationDate.toEpochSecond(ZoneOffset.UTC),
+        likesCount = this.likes.size,
+        cookbooksCount = this.cookbooks.size,
+        isHidden = this.isHidden,
+        hiddenReason = this.hiddenReason,
+        taggedForDeletion = this.taggedForDeletion,
+        pendingReportsCount = pendingReportsCount,
+    )
 
     fun hasReferences(): Boolean =
         likes.isNotEmpty() && cookbooks.isNotEmpty()
