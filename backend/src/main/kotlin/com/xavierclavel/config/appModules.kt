@@ -15,6 +15,7 @@ import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
+import com.xavierclavel.services.StorageService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.loadConfig
 import org.koin.dsl.module
@@ -37,6 +38,7 @@ val appModules = module {
     single { RecipeNotesService() }
     single { ModerationService() }
     single { AdminService() }
+    single { StorageService() }
     single { RedisService(getProperty("redis.url", "redis://:${System.getenv("REDIS_PASSWORD")}@cooknco-redis:6379")) }
     single { config }
     single { EncryptionService() }

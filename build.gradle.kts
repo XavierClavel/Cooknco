@@ -1,5 +1,5 @@
 allprojects {
-    version = "1.2.11"
+    version = "1.2.12"
     group = "eu.cooknco"
 }
 
@@ -90,6 +90,9 @@ subprojects {
             System.getenv("EBEAN_TEST_DBNAME")
                 ?: ("test_" + Integer.toHexString(rootProject.projectDir.absolutePath.hashCode()))
         )
+        // Images live on an absolute volume path in production; tests must not need to own
+        // /img to read or write one.
+        environment("COOKNCO_IMG_ROOT", layout.buildDirectory.dir("test-img").get().asFile.absolutePath)
     }
 }
 
