@@ -168,9 +168,9 @@ snapshot to restore the old Service/Ingress/Certificate, and brings `default`
 back up. Valid any time before `99-cleanup.sh`.
 
 Two things it cannot do for you: writes that landed while `cooknco` was serving
-stay in the `cooknco` volumes (dump them before retrying if they matter), and if
-CI pushed an image-tag bump you should revert that commit and disable the
-`deploy` job until you retry.
+stay in the `cooknco` volumes (dump them before retrying if they matter), and CI
+pushes nothing back to `master` to revert — so disable the `deploy` job until you
+retry, or the next push to `master` re-applies `cooknco` on top of the rollback.
 
 ## After cleanup
 
@@ -185,9 +185,10 @@ CI pushed an image-tag bump you should revert that commit and disable the
    [../README.md](../README.md#repository-setup-the-deploy-job-needs). The
    `deploy` job's pre-flight check passes once nodePort 30080 is held only by
    `cooknco`, so the next push to `master` deploys automatically.
-3. The overlay is still pinned to the pre-migration versions (backend and
-   frontend `1.1.0`, mail-service `1.2.9` — which is what its `latest` tag
-   already resolved to) so that this migration changed the namespace and nothing
-   else. The first `master` build after cleanup bumps all
-   three to the current project version — a normal deploy, separately
-   observable, which is the point.
+3. The overlay tracks the `latest` tag of each app image, and CI repoints
+   `latest` at the version it just built on every push to `master`. The first
+   `master` build after cleanup therefore moves all three off the pre-migration
+   versions (backend and frontend `1.1.0`, mail-service `1.2.9`) — a normal
+   deploy, separately observable from this migration, which is the point. Which
+   build is live is readable from the `cooknco.dev/deployed-version` annotation
+   the deploy job stamps on each Deployment.

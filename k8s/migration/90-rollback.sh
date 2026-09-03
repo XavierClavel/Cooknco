@@ -65,6 +65,7 @@ Rolled back. Note that any writes made while $DST_NS was serving are NOT in
 $SRC_NS — they are in the cooknco-namespace volumes, which this script left in
 place. Dump them before re-attempting the migration if they matter.
 
-Remember to revert the image-tag bump if CI pushed one, and to disable the
-deploy job until you retry.
+CI pushes nothing back to master, so there is no bump commit to revert — but do
+disable the deploy job until you retry, or the next push to master re-applies
+the cooknco namespace on top of this rollback.
 EOF

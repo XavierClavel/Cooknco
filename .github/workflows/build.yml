@@ -8,8 +8,8 @@ on:
 permissions:
   contents: write
 
-# Serialise master builds so two runs cannot race on the image-tag bump commit
-# or apply to the cluster at the same time.
+# Serialise master builds so two runs cannot race on the `latest` tag or apply
+# to the cluster at the same time.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: false
@@ -79,41 +79,6 @@ jobs:
           docker tag ${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project:${{ env.VERSION }} ${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project:latest
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project:latest
         done
-
-    - name: Install kustomize
-      if: github.ref == 'refs/heads/master'
-      run: |
-        # To a file, not piped into tar: a reset mid-stream would hand tar a
-        # truncated archive that curl retrying cannot undo.
-        curl -sSfL --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 15 \
-          -o /tmp/kustomize.tar.gz \
-          "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
-        tar xzf /tmp/kustomize.tar.gz -C /usr/local/bin kustomize
-        kustomize version
-
-    - name: Bump image tags in ${{ env.DEPLOY_OVERLAY }}
-      if: github.ref == 'refs/heads/master'
-      run: |
-        cd "${DEPLOY_OVERLAY}"
-        for project in backend frontend mail-service; do
-          # `=*:tag` rewrites only newTag and leaves the repository name alone.
-          kustomize edit set image \
-            "${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project=*:${{ env.VERSION }}"
-        done
-
-    - name: Commit image tag bump
-      if: github.ref == 'refs/heads/master'
-      run: |
-        if git diff --quiet -- "${DEPLOY_OVERLAY}"; then
-          echo "Overlay already pins ${VERSION}. Nothing to commit."
-          exit 0
-        fi
-        git config user.name  "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add "${DEPLOY_OVERLAY}"
-        git commit -m "ci: pin cooknco images to ${VERSION} [skip ci]"
-        # Pushes with GITHUB_TOKEN do not re-trigger workflows, so this cannot loop.
-        git push origin HEAD:master
 
     - name: Create tag if it does not exist
       run: |
@@ -205,9 +170,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        # Pick up the image-tag bump the build job just pushed.
-        ref: master
 
     - name: Install kustomize
       run: |
@@ -221,14 +183,39 @@ jobs:
 
     - name: Render manifests for ${{ needs.build.outputs.version }}
       run: |
-        # Re-pinning here is idempotent, and immune to the checkout above racing
-        # the bump commit: what gets applied is always the image this run pushed.
-        ( cd "${DEPLOY_OVERLAY}"
-          for project in backend frontend mail-service; do
-            # `=*:tag` rewrites only newTag and leaves the repository name alone.
-            kustomize edit set image \
-              "${{ secrets.DOCKERHUB_USERNAME }}/cooknco-$project=*:${VERSION}"
-          done )
+        # The overlay pins `latest`, so the render no longer changes from one
+        # build to the next: `kubectl apply` would be a no-op and the image this
+        # run just pushed would sit on Docker Hub until something else happened
+        # to restart a pod. Stamping the build into the pod template is what
+        # gives apply a change to roll over, and it records on the live objects
+        # which build is serving — which the mutable tag no longer says.
+        #
+        # Targeted at the three app Deployments by name: `commonAnnotations`
+        # would reach every pod template in the overlay and restart both
+        # Postgres Deployments and Redis on every deploy.
+        cat >> "${DEPLOY_OVERLAY}/kustomization.yaml" <<PATCH
+        patches:
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: cooknco-(backend|frontend|mail-service)
+          patch: |-
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              # Ignored: the target selector above is what matches.
+              name: deploy-stamp
+              annotations:
+                cooknco.dev/deployed-version: "${VERSION}"
+                cooknco.dev/deployed-revision: "${GITHUB_SHA}"
+            spec:
+              template:
+                metadata:
+                  annotations:
+                    cooknco.dev/deployed-version: "${VERSION}"
+                    cooknco.dev/deployed-revision: "${GITHUB_SHA}"
+        PATCH
 
         kustomize build "${DEPLOY_OVERLAY}" > "${RUNNER_TEMP}/app.yaml"
         # Rendered as its own root: Strimzi only reconciles KafkaTopics in the

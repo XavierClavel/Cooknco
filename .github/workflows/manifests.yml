@@ -72,11 +72,20 @@ jobs:
 
       - name: Check every image reference carries an explicit tag
         run: |
-          # A bare or :latest tag makes a rollout unreproducible and breaks
-          # rollback, so fail the build instead of shipping it.
+          # An untagged image is never acceptable: which digest a node ends up
+          # running then depends on what it already has cached.
+          #
+          # `:latest` is accepted only for the three cooknco-* images, which the
+          # deploy pipeline owns end to end — a master build pushes both
+          # `:<version>` and `:latest`, tags the commit, and stamps the version
+          # it built into the pod-template annotations, so the running build is
+          # still identifiable and still reachable by its immutable tag for a
+          # rollback. Third-party images get no such treatment, so a mutable tag
+          # on one is still a build failure.
           bad=0
           while read -r image; do
             case "$image" in
+              */cooknco-*:latest) echo "ok (pipeline-owned): $image" ;;
               *:latest) echo "::error::$image uses the mutable :latest tag"; bad=1 ;;
               *:*)      echo "ok: $image" ;;
               *)        echo "::error::$image has no tag"; bad=1 ;;
