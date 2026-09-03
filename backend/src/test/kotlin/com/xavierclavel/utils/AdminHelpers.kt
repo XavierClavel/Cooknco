@@ -19,14 +19,21 @@ import shared.dto.ModerationReasonDTO
 import shared.dto.ReportDTO
 import shared.dto.ReportResolutionDTO
 import shared.dto.SearchResult
+import shared.dto.StorageCleanupDTO
 import shared.dto.SuspensionDTO
 import shared.enums.ModerationAction
 import shared.enums.ReportReason
 import shared.enums.ReportStatus
+import shared.enums.ImageBucket
+import shared.enums.ImageSort
+import shared.enums.ImageStatus
 import shared.enums.ReportTargetType
 import shared.enums.UserRole
+import shared.infodto.AdminImageInfo
 import shared.infodto.AdminIngredientInfo
 import shared.infodto.AdminOverview
+import shared.infodto.AdminStorageCleanupResult
+import shared.infodto.AdminStorageOverview
 import shared.infodto.AdminRecipeInfo
 import shared.infodto.AdminTrends
 import shared.infodto.AdminUserInfo
@@ -237,4 +244,67 @@ suspend fun HttpClient.getLogs(level: String? = null, search: String? = null, lo
     this.getLogsRaw(level, search, logger).let {
         assertEquals(HttpStatusCode.OK, it.status)
         json.decodeFromString<LogPage>(it.bodyAsText())
+    }
+
+// --------------------------------------------------------------------- storage
+
+suspend fun HttpClient.getStorageOverviewRaw(): HttpResponse = this.get("$ADMIN_URL/storage")
+
+suspend fun HttpClient.getStorageOverview(): AdminStorageOverview =
+    this.getStorageOverviewRaw().let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminStorageOverview>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.listImagesRaw(
+    bucket: ImageBucket? = null,
+    status: ImageStatus? = null,
+    query: String? = null,
+    sort: ImageSort? = null,
+) = this.get("$ADMIN_URL/storage/images") {
+    url {
+        bucket?.let { parameters.append("bucket", it.name) }
+        status?.let { parameters.append("status", it.name) }
+        query?.let { parameters.append("query", it) }
+        sort?.let { parameters.append("sort", it.name) }
+    }
+}
+
+suspend fun HttpClient.listImages(
+    bucket: ImageBucket? = null,
+    status: ImageStatus? = null,
+    query: String? = null,
+    sort: ImageSort? = null,
+): SearchResult<AdminImageInfo> =
+    this.listImagesRaw(bucket, status, query, sort).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<SearchResult<AdminImageInfo>>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.deleteImageRaw(bucket: ImageBucket?, file: String?) =
+    this.delete("$ADMIN_URL/storage/images") {
+        url {
+            bucket?.let { parameters.append("bucket", it.name) }
+            file?.let { parameters.append("file", it) }
+        }
+    }
+
+suspend fun HttpClient.cleanupStorageRaw(
+    buckets: List<ImageBucket> = emptyList(),
+    statuses: List<ImageStatus> = listOf(ImageStatus.STALE, ImageStatus.ORPHAN),
+    dryRun: Boolean = false,
+) = this.post("$ADMIN_URL/storage/cleanup") {
+    contentType(ContentType.Application.Json)
+    header(HttpHeaders.ContentType, ContentType.Application.Json)
+    setBody(StorageCleanupDTO(buckets = buckets, statuses = statuses, dryRun = dryRun))
+}
+
+suspend fun HttpClient.cleanupStorage(
+    buckets: List<ImageBucket> = emptyList(),
+    statuses: List<ImageStatus> = listOf(ImageStatus.STALE, ImageStatus.ORPHAN),
+    dryRun: Boolean = false,
+): AdminStorageCleanupResult =
+    this.cleanupStorageRaw(buckets, statuses, dryRun).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminStorageCleanupResult>(it.bodyAsText())
     }

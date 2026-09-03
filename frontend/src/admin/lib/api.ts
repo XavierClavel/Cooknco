@@ -73,6 +73,19 @@ export const listReports = (f: Record<string, unknown>, page: number, size: numb
 export const resolveReport = (id: number, action: string, note: string, suspensionDays: number) =>
   api.post(`/admin/reports/${id}/resolve`, {action, note, suspensionDays})
 
+// ------------------------------------------------------------------ storage
+export const getStorageOverview = () => api.get('/admin/storage')
+export const listImages = (f: Record<string, unknown>, page: number, size: number) =>
+  api.get(`/admin/storage/images?${qs(f, page, size)}`)
+export const deleteImage = (bucket: string, file: string) =>
+  api.delete(`/admin/storage/images?${qs({bucket, file})}`)
+export const cleanupStorage = (buckets: string[], statuses: string[], dryRun: boolean) =>
+  api.post('/admin/storage/cleanup', {buckets, statuses, dryRun})
+
+/** Images are served straight off the volume, not through the admin API. */
+export const imageUrl = (dir: string, filename: string) =>
+  `${import.meta.env.VITE_IMG_URL}/${dir}/${filename}`
+
 // --------------------------------------------------------------------- logs
 export const getLogs = (f: Record<string, unknown>) => api.get(`/admin/logs?${qs(f)}`)
 export const clearLogs = () => api.delete('/admin/logs')

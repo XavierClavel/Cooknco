@@ -10,6 +10,7 @@ const router = createRouter({
     {path: '/recipes', name: 'recipes', component: () => import('./views/RecipesView.vue')},
     {path: '/ingredients', name: 'ingredients', component: () => import('./views/IngredientsView.vue')},
     {path: '/moderation', name: 'moderation', component: () => import('./views/ModerationView.vue')},
+    {path: '/storage', name: 'storage', component: () => import('./views/StorageView.vue')},
     {path: '/logs', name: 'logs', component: () => import('./views/LogsView.vue')},
     {path: '/:pathMatch(.*)*', redirect: '/'},
   ],

@@ -30,6 +30,20 @@ export function fmtLogTime(epochMillis: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
 }
 
+/**
+ * Byte counts in binary units, which is what `df` and the docker volume report.
+ * One decimal from MiB up: "1.4 GiB" is readable where "1468006400" is not.
+ */
+export function fmtBytes(bytes?: number | null): string {
+  if (bytes === null || bytes === undefined) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KiB', 'MiB', 'GiB', 'TiB']
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++ }
+  return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`
+}
+
 export function fmtNumber(n?: number | null): string {
   return typeof n === 'number' ? n.toLocaleString() : '—'
 }

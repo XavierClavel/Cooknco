@@ -36,4 +36,6 @@ export const ICONS = {
   gavel:      {p: ['M14 13l-7.8 7.8a2 2 0 0 1-2.8-2.8L11.2 10', 'M9.5 7.5l7 7', 'M12.5 4.5l7 7', 'M11 6l7 7', 'M14 20h8']},
   table:      {p: ['M3 5h18v14H3z', 'M3 10h18', 'M9 10v9']},
   userCheck:  {p: ['M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M17 11l2 2 4-4'], c: [[9, 7, 4]]},
+  disk:       {p: ['M3 6h18v12H3z', 'M7 10h.01', 'M7 14h.01', 'M11 14h6']},
+  image:      {p: ['M3 4h18v16H3z', 'M3 16l5-5 4 4 3-3 6 6'], c: [[9, 9, 1.4]]},
 } satisfies Record<string, IconDef>

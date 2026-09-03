@@ -16,6 +16,7 @@ import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
+import com.xavierclavel.services.StorageService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.loadConfig
 import io.ebean.DB
@@ -87,6 +88,7 @@ abstract class ApplicationTest: KoinTest {
                 single { RecipeNotesService() }
                 single { ModerationService() }
                 single { AdminService() }
+                single { StorageService() }
                 single { RedisService(getProperty("redis.url", "redis://redis:6379")) }
                 single { loadConfig() }
                 single { EncryptionService() }

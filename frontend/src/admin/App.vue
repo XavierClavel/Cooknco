@@ -77,6 +77,7 @@ const items = computed(() => [
   {to: '/recipes', label: 'recipes', icon: 'book' as const},
   {to: '/ingredients', label: 'ingredients', icon: 'leaf' as const},
   {to: '/moderation', label: 'admin_moderation', icon: 'gavel' as const, badge: pendingReports.value || null},
+  {to: '/storage', label: 'admin_storage', icon: 'disk' as const},
   {to: '/logs', label: 'admin_logs', icon: 'terminal' as const},
 ])
 
