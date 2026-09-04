@@ -42,6 +42,8 @@ import main.com.xavierclavel.utils.suspendUserRaw
 import main.com.xavierclavel.utils.unhideRecipe
 import org.junit.jupiter.api.Test
 import shared.dto.IngredientDTO
+import shared.dto.RecipeDTO
+import shared.enums.AmountUnit
 import shared.enums.AccountStatus
 import shared.enums.IngredientType
 import shared.enums.Locale
@@ -318,6 +320,40 @@ class AdminControllerTest : ApplicationTest() {
         val result = client.listAdminIngredients()
         assertEquals(1, result.count)
         assertEquals(0, result.items.first().recipesCount)
+    }
+
+    @Test
+    fun `ingredient catalogue counts the recipes using an ingredient`() = runTestAsAdmin {
+        val ingredient = client.createIngredient()
+        listOf("first recipe", "second recipe").forEach { title ->
+            client.createRecipe(RecipeDTO(
+                title = title,
+                ingredients = mutableListOf(
+                    RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = AmountUnit.GRAM, amount = 10f),
+                ),
+            ))
+        }
+
+        val row = client.listAdminIngredients().items.single { it.id == ingredient.id }
+        assertEquals(2, row.recipesCount)
+    }
+
+    @Test
+    fun `a report on a recipe counts against its author`() = runTest {
+        // The count is resolved by mapping recipe ids back to their owner, so a report filed on
+        // content — not on the account — must still land on the author's row.
+        var authorId: Long = 0
+        var recipe: RecipeInfo? = null
+        runAsUser1 {
+            authorId = client.getMe().id
+            recipe = client.createRecipe()
+        }
+        runAsUser2 { client.report(ReportTargetType.RECIPE, recipe!!.id) }
+
+        runAsAdmin {
+            assertEquals(1, client.listAdminUsers().items.single { it.id == authorId }.reportsAgainstCount)
+            assertEquals(0, client.listAdminUsers().items.single { it.username == "admin" }.reportsAgainstCount)
+        }
     }
 
     @Test

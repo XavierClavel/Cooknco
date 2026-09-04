@@ -61,9 +61,9 @@ class CookbookService: KoinComponent {
 
     fun listCookbooks(paging: Paging, sort:Sort, user: Long?, recipe: Long?, search: String?, currentUser: Long?) : List<CookbookInfo> =
         QCookbook()
-            .fetch("users", FetchConfig.ofLazy())
+            .users.fetchLazy()
             //.fetch(QCookbook.Alias.users.toString(), "count(*)", FetchConfig.ofLazy())
-            //.having().raw("count(users.user.id) >= 0")
+            //.having().raw("count(${QCookbook.Alias.users.user.id}) >= 0")
             .filterByUser(user)
             .filterByRecipe(recipe)
             .filterBySearch(search)
@@ -74,8 +74,8 @@ class CookbookService: KoinComponent {
 
     fun getRecipeStatusInUserCookbooks(user: Long, recipe: Long) : List<CookbookRecipeOverview> {
         val cookbooks = QCookbook()
-            .fetch("users", FetchConfig.ofLazy())
-            .fetch("recipes", FetchConfig.ofLazy())
+            .users.fetchLazy()
+            .recipes.fetchLazy()
             .filterByUser(user)
             .orderBy().title.desc()
             .findList()
