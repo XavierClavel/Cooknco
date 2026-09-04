@@ -2,8 +2,8 @@
  * Image URLs for the backoffice.
  *
  * Rebuilt here rather than reused from the consumer app's `scripts/common`,
- * which drags in the router, the auth store and Capacitor — none of which
- * belong in the admin bundle.
+ * which drags in the router and the auth store — neither of which belongs in
+ * the admin bundle.
  *
  * `version` is the entity's image version: 0 means nothing was ever uploaded,
  * so there is no file to ask for and the caller shows a placeholder instead.
