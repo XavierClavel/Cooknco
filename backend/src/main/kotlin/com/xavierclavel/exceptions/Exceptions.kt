@@ -43,6 +43,7 @@ enum class NotFoundCause(val key: String) {
     NOTES_NOT_FOUND("notes_not_found"),
     REPORT_NOT_FOUND("report_not_found"),
     REPORT_TARGET_NOT_FOUND("report_target_not_found"),
+    MAIL_TEMPLATE_NOT_FOUND("mail_template_not_found"),
 }
 
 enum class BadRequestCause (val key: String) {
@@ -73,5 +74,14 @@ enum class BadRequestCause (val key: String) {
     UNIT_NOT_ALLOWED_FOR_INGREDIENT("unit_not_allowed_for_ingredient"),
     INVALID_AMOUNT("invalid_amount"),
     INVALID_CONVERSION_FACTOR("invalid_conversion_factor"),
+
+    INVALID_MAIL_ADDRESS("invalid_mail_address"),
+    MAIL_TEMPLATE_KEY_INVALID("mail_template_key_invalid"),
+    MAIL_TEMPLATE_ALREADY_EXISTS("mail_template_already_exists"),
+    MAIL_TEMPLATE_IS_BUILT_IN("mail_template_is_built_in"),
+    MAIL_TEMPLATE_HAS_NO_PACKAGED_WORDING("mail_template_has_no_packaged_wording"),
+    MAIL_TEMPLATE_EMPTY("mail_template_empty"),
+    MAIL_TEMPLATE_TOO_LONG("mail_template_too_long"),
+    MAIL_TEMPLATE_MISSING_PLACEHOLDER("mail_template_missing_placeholder"),
 
 }

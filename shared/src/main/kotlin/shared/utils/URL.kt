@@ -18,4 +18,13 @@ object URL {
     const val HEALTH_URL = "api/v1/health"
     const val REPORT_URL = "api/v1/report"
     const val ADMIN_URL = "api/v1/admin"
+
+    /**
+     * Where mail-service reads the wordings an operator saved.
+     *
+     * Deliberately outside `api/`: `frontend/nginx.conf` proxies only `/api/`, `/image/`
+     * and the log stream, so nothing under this prefix is reachable from the internet, and
+     * the only callers are pods on the cluster network.
+     */
+    const val INTERNAL_MAIL_TEMPLATES_URL = "internal/email-templates"
 }

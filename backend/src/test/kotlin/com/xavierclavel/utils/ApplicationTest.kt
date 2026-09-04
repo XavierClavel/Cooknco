@@ -6,6 +6,7 @@ import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DashboardService
 import com.xavierclavel.services.DefaultImageService
+import com.xavierclavel.services.EmailTemplateService
 import com.xavierclavel.services.EncryptionService
 import com.xavierclavel.services.ExportService
 import com.xavierclavel.services.FollowService
@@ -89,6 +90,7 @@ abstract class ApplicationTest: KoinTest {
                 single { ModerationService() }
                 single { AdminService() }
                 single { StorageService() }
+                single { EmailTemplateService() }
                 single { RedisService(getProperty("redis.url", "redis://redis:6379")) }
                 single { loadConfig() }
                 single { EncryptionService() }

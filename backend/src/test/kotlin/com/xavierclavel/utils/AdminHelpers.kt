@@ -17,6 +17,11 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
+import shared.dto.EffectiveEmailTemplate
+import shared.dto.EmailPreviewDTO
+import shared.dto.EmailTemplateDTO
+import shared.dto.EmailTemplateKeyDTO
+import shared.dto.EmailTestDTO
 import shared.dto.LogPage
 import shared.dto.ModerationReasonDTO
 import shared.dto.ReportDTO
@@ -31,9 +36,11 @@ import shared.enums.DefaultImage
 import shared.enums.ImageBucket
 import shared.enums.ImageSort
 import shared.enums.ImageStatus
+import shared.enums.Locale
 import shared.enums.ReportTargetType
 import shared.enums.UserRole
 import shared.infodto.AdminDefaultImageInfo
+import shared.infodto.AdminEmailTemplateInfo
 import shared.infodto.AdminImageInfo
 import shared.infodto.AdminIngredientInfo
 import shared.infodto.AdminOverview
@@ -42,8 +49,10 @@ import shared.infodto.AdminStorageOverview
 import shared.infodto.AdminRecipeInfo
 import shared.infodto.AdminTrends
 import shared.infodto.AdminUserInfo
+import shared.infodto.EmailPreviewInfo
 import shared.infodto.ReportInfo
 import shared.utils.URL.ADMIN_URL
+import shared.utils.URL.INTERNAL_MAIL_TEMPLATES_URL
 import shared.utils.URL.REPORT_URL
 import kotlin.test.assertEquals
 
@@ -336,3 +345,65 @@ suspend fun HttpClient.uploadDefaultImageRaw(image: DefaultImage, bytes: ByteArr
 
 suspend fun HttpClient.resetDefaultImageRaw(image: DefaultImage) =
     this.delete("$ADMIN_URL/storage/defaults/${image.name}")
+
+// -------------------------------------------------------------- mail templates
+
+private const val MAIL_TEMPLATES_URL = "$ADMIN_URL/mails/templates"
+
+suspend fun HttpClient.listMailTemplatesRaw(): HttpResponse = this.get(MAIL_TEMPLATES_URL)
+
+suspend fun HttpClient.listMailTemplates(): List<AdminEmailTemplateInfo> =
+    this.listMailTemplatesRaw().let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<List<AdminEmailTemplateInfo>>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.mailTemplate(key: String): AdminEmailTemplateInfo =
+    this.listMailTemplates().first { it.key == key }
+
+suspend fun HttpClient.addMailTemplateRaw(key: String) = this.post(MAIL_TEMPLATES_URL) {
+    contentType(ContentType.Application.Json)
+    header(HttpHeaders.ContentType, ContentType.Application.Json)
+    setBody(EmailTemplateKeyDTO(key = key))
+}
+
+suspend fun HttpClient.deleteMailTemplateRaw(key: String) = this.delete("$MAIL_TEMPLATES_URL/$key")
+
+suspend fun HttpClient.saveMailTemplateRaw(key: String, locale: Locale, subject: String, body: String) =
+    this.put("$MAIL_TEMPLATES_URL/$key/${locale.name}") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(EmailTemplateDTO(subject = subject, body = body))
+    }
+
+suspend fun HttpClient.restoreMailTemplateRaw(key: String, locale: Locale) =
+    this.delete("$MAIL_TEMPLATES_URL/$key/${locale.name}")
+
+suspend fun HttpClient.previewMailTemplateRaw(key: String, subject: String, body: String) =
+    this.post("$MAIL_TEMPLATES_URL/$key/preview") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(EmailPreviewDTO(subject = subject, body = body))
+    }
+
+suspend fun HttpClient.previewMailTemplate(key: String, subject: String, body: String): EmailPreviewInfo =
+    this.previewMailTemplateRaw(key, subject, body).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<EmailPreviewInfo>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.sendTestMailRaw(key: String, recipient: String, locale: Locale = Locale.EN) =
+    this.post("$MAIL_TEMPLATES_URL/$key/test") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(EmailTestDTO(recipient = recipient, locale = locale))
+    }
+
+/** What mail-service reads. Deliberately not under [ADMIN_URL], and not behind its gate. */
+suspend fun HttpClient.getInternalMailTemplatesRaw(): HttpResponse = this.get(INTERNAL_MAIL_TEMPLATES_URL)
+
+suspend fun HttpClient.getInternalMailTemplates(): List<EffectiveEmailTemplate> =
+    this.getInternalMailTemplatesRaw().let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<List<EffectiveEmailTemplate>>(it.bodyAsText())
+    }

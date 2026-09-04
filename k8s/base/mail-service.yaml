@@ -19,6 +19,12 @@ spec:
           command: ["java", "-jar", "/app/mail-service.jar"]
           ports:
             - containerPort: 8080
+          env:
+            # Where the operator-saved mail wordings are read from. Cluster-internal: the
+            # ingress points at the frontend, which proxies neither this prefix nor this
+            # Service, so the endpoint has no path in from outside.
+            - name: BACKEND_INTERNAL_URL
+              value: http://cooknco-backend:8080
           envFrom:
             - secretRef:
                 name: cooknco-secrets
