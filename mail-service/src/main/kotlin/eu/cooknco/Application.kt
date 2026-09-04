@@ -91,7 +91,7 @@ private fun handleUnfollow(e: UnfollowedUserEvent) {
 
 private fun handleNotifications(e: NotificationsToggledEvent) {
     /*
-    val user = DB.find(User::class.java, e.userId) ?: return
+    val user = QUser().id.eq(e.userId).findOne() ?: return
     user.notificationsEnabled = e.enabled
     user.save()
      */
@@ -100,11 +100,10 @@ private fun handleNotifications(e: NotificationsToggledEvent) {
 private fun handleNewRecipe(e: NewRecipeEvent) {
     /*
     val authorId = e.authorId
-    val followers = DB.createQuery(Follower::class.java)
-        .where().eq("followed_id", authorId).findList()
+    val followers = QFollower().followed.id.eq(authorId).findList()
 
     for (f in followers) {
-        val user = DB.find(User::class.java, f.followerId) ?: continue
+        val user = QUser().id.eq(f.follower?.id).findOne() ?: continue
         if (user.notificationsEnabled) {
             eu.cooknco.Mail(user.email, PASSWORD_RESET_TITLE[user.locale], PASSWORD_RESET).send()
         }

@@ -40,8 +40,8 @@ class IngredientService: KoinComponent {
         if (ingredientIds.isEmpty()) return emptyMap()
         val counts = mutableMapOf<Long, Int>()
         QRecipeIngredient()
-            .select("id")
-            .fetch("ingredient", "id")
+            .select(QRecipeIngredient.Alias.id)
+            .ingredient.fetch(QIngredient.Alias.id)
             .ingredient.id.`in`(ingredientIds)
             .findList()
             .forEach { link -> link.ingredient?.id?.let { counts.merge(it, 1, Int::plus) } }
@@ -149,31 +149,23 @@ class IngredientService: KoinComponent {
         val ingredient = findEntityById(ingredientId)
             ?: throw NotFoundException(NotFoundCause.INGREDIENT_NOT_FOUND)
 
-        val nameMatch = """
-            custom_name is not null
-              and lower(unaccent(custom_name)) = lower(unaccent(:customName))
-            """.trimIndent()
+        // Names are compared case- and accent-insensitively, which no query bean operator
+        // expresses, so the comparison itself is a raw fragment over the alias-derived column.
+        val nameMatch = "lower(unaccent(${QRecipeIngredient.Alias.customName})) = lower(unaccent(?))"
 
         val allowedUnits = AmountUnit.entries.filter { it.type in ingredient.allowedTypes() }
-        // Named placeholders rather than an inlined list: Ebean binds them, and mixing in a
-        // positional one is not allowed alongside the named parameters above.
-        val unitParams = allowedUnits.indices.joinToString(", ") { ":unit$it" }
 
-        val matched = DB.sqlQuery("select count(*) as total from recipe_ingredients where $nameMatch")
-            .setParameter("customName", customName)
-            .findOne()!!
-            .getInteger("total")
+        val matched = QRecipeIngredient()
+            .raw(nameMatch, customName)
+            .findCount()
 
-        val converted = DB.sqlUpdate("""
-            update recipe_ingredients
-            set ingredient_id = :ingredientId, custom_name = null
-            where $nameMatch
-              and unit in ($unitParams)
-            """.trimIndent())
-            .setParameter("ingredientId", ingredient.id)
-            .setParameter("customName", customName)
-            .apply { allowedUnits.forEachIndexed { index, unit -> setParameter("unit$index", unit.name) } }
-            .execute()
+        val converted = QRecipeIngredient()
+            .raw(nameMatch, customName)
+            .unit.`in`(allowedUnits)
+            .asUpdate()
+            .set(QRecipeIngredient.Alias.ingredient.id, ingredient.id)
+            .setNull(QRecipeIngredient.Alias.customName)
+            .update()
 
         return AbsorbCustomIngredientResult(convertedRows = converted, skippedRows = matched - converted)
     }
@@ -202,6 +194,5 @@ class IngredientService: KoinComponent {
 
 
 
-    //Ebean.find(MyClass.class).order("id").findPagedList(page,size);
 
 }

@@ -9,6 +9,7 @@ import com.xavierclavel.models.Recipe
 import com.xavierclavel.models.User
 import com.xavierclavel.models.jointables.query.QCookbookRecipe
 import com.xavierclavel.models.query.QRecipe
+import com.xavierclavel.models.query.QUser
 import com.xavierclavel.utils.DbTransaction.insertAndGet
 import com.xavierclavel.utils.DbTransaction.updateAndGet
 import com.xavierclavel.utils.logger
@@ -56,7 +57,7 @@ class RecipeService: KoinComponent {
             .filter(recipeFilter)
             .filterOutDeletion(requestorId)
             .filterByVisibility(requestorId)
-            .having().raw("count(likes.id) >= 0") // Ensure recipes with no likes are included
+            .having().raw("count(${QRecipe.Alias.likes.id}) >= 0") // Ensure recipes with no likes are included
             .setPaging(paging)
             .sort(sort, recipeFilter)
             .findList()
@@ -73,8 +74,8 @@ class RecipeService: KoinComponent {
      */
     fun mapRecipeIdsToOwnerIds(ownerIds: Collection<Long>): Map<Long, Long> =
         QRecipe()
-            .select("id")
-            .fetch("owner", "id")
+            .select(QRecipe.Alias.id)
+            .owner.fetch(QUser.Alias.id)
             .owner.id.`in`(ownerIds)
             .findList()
             .mapNotNull { recipe -> recipe.owner?.let { recipe.id to it.id } }
@@ -120,14 +121,16 @@ class RecipeService: KoinComponent {
                         .owner.followers.follower.id.eq(userId)
                         .owner.followers.pending.isFalse
                     .endAnd()
-                    .exists("select 1 from likes l where l.recipe_id = t0.id and l.user_id = ?", userId)
-                    .exists("""
-                        select 1 
-                        from cookbook_recipes cr
-                        join cookbooks c on c.id = cr.cookbook_id
-                        join cookbook_users cu on cu.cookbook_id = c.id
-                        where cr.recipe_id = t0.id
-                        and cu.user_id = ?
+                    .raw("exists (select 1 from likes l where l.recipe_id = ${QRecipe.Alias.id} and l.user_id = ?)", userId)
+                    .raw("""
+                        exists (
+                            select 1
+                            from cookbook_recipes cr
+                            join cookbooks c on c.id = cr.cookbook_id
+                            join cookbook_users cu on cu.cookbook_id = c.id
+                            where cr.recipe_id = ${QRecipe.Alias.id}
+                            and cu.user_id = ?
+                        )
                         """.trimIndent(), userId
                     )
                 .endOr()
@@ -272,7 +275,7 @@ class RecipeService: KoinComponent {
                 JOIN users u ON f.user_id = u.id
                 WHERE f.follower_id = ?
                 AND f.pending = false
-                AND t0.owner_id = f.user_id
+                AND ${QRecipe.Alias.owner.id} = f.user_id
             )""".trimIndent(), followerId)
 
     private fun QRecipe.isPublic() =
@@ -309,8 +312,8 @@ class RecipeService: KoinComponent {
             Sort.NONE -> this
             Sort.NAME_ASCENDING -> this.orderBy().title.desc()
             Sort.NAME_DESCENDING -> this.orderBy().title.asc()
-            Sort.LIKES_ASCENDING -> this.orderBy("count(likes.id) asc")
-            Sort.LIKES_DESCENDING -> this.orderBy("count(likes.id) desc")
+            Sort.LIKES_ASCENDING -> this.orderBy("count(${QRecipe.Alias.likes.id}) asc")
+            Sort.LIKES_DESCENDING -> this.orderBy("count(${QRecipe.Alias.likes.id}) desc")
             Sort.DATE_ASCENDING -> this.orderBy().creationDate.asc()
             Sort.DATE_DESCENDING -> this.orderBy().creationDate.desc()
             Sort.RANDOM -> this.orderBy("random()")
