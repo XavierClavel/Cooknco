@@ -7,7 +7,6 @@ import {getLocale} from "@/scripts/localization";
 import {switchCase} from "@babel/types";
 import {ingredientTypes} from "@/scripts/values";
 import i18n from "@/plugins/i18n";
-import {Capacitor} from "@capacitor/core";
 
 export {
   login,
@@ -232,9 +231,7 @@ async function login(user) {
 
 async function loginOauthGoogle() {
   console.log("login oauth")
-  window.location.href = Capacitor.isNativePlatform() ?
-    `${import.meta.env.VITE_API_URL}/auth/login-oauth-google?redirect=app`
-    : `${import.meta.env.VITE_API_URL}/auth/login-oauth-google`
+  window.location.href = `${import.meta.env.VITE_API_URL}/auth/login-oauth-google`
 }
 
 async function signup(user) {
