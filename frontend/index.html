@@ -5,7 +5,33 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Cook&Co</title>
+
+    <!--
+      Everything between the two markers below is the head block the backend swaps out when
+      it serves this document for a shared entity link — see LinkPreviewService and the
+      `location`s in nginx.conf. Crawlers never run the app's JavaScript, so tags set after
+      mounting come too late for them; what is written here is what a bare link to the site
+      or to any route nginx does not send to the backend previews as.
+
+      Keep the markers, and keep the tags between them self-contained: the backend replaces
+      the whole region, so anything in here that must survive on an entity page has to live
+      outside it (and be rendered by LinkPreviewService.renderHead too).
+    -->
+    <!--preview:start-->
+    <title>Cook&amp;Co</title>
+    <meta name="description" content="Share your recipes, build your cookbooks and follow your friends on Cook&amp;Co.">
+    <meta property="og:site_name" content="Cook&amp;Co">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Cook&amp;Co">
+    <meta property="og:description" content="Share your recipes, build your cookbooks and follow your friends on Cook&amp;Co.">
+    <meta property="og:url" content="https://cooknco.eu">
+    <meta property="og:image" content="https://cooknco.eu/og-default.png">
+    <meta property="og:image:alt" content="Cook&amp;Co">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Cook&amp;Co">
+    <meta name="twitter:description" content="Share your recipes, build your cookbooks and follow your friends on Cook&amp;Co.">
+    <meta name="twitter:image" content="https://cooknco.eu/og-default.png">
+    <!--preview:end-->
 </head>
 
 <body>

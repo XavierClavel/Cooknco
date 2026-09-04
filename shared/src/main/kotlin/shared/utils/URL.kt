@@ -20,6 +20,24 @@ object URL {
     const val ADMIN_URL = "api/v1/admin"
 
     /**
+     * The public app routes whose HTML document the backend renders itself, so that a shared
+     * link carries the entity's own title, description and image in its `og:` tags.
+     *
+     * These are *app* paths, not API paths: `frontend/nginx.conf` sends them here instead of
+     * to `index.html`, and the response is that same shell with the head block swapped out
+     * (`LinkPreviewController`). Crawlers never run the SPA's JavaScript, so tags the app sets
+     * after mounting come too late for them.
+     *
+     * The id is a query parameter rather than a path segment because that is the shape the app
+     * already builds and users copy out of the address bar (`toViewRecipe` and friends in
+     * `frontend/src/scripts/common.ts`).
+     */
+    const val RECIPE_VIEW_URL = "recipe/view"
+    const val USER_VIEW_URL = "user/view"
+    const val COOKBOOK_VIEW_URL = "cookbook/view"
+    const val INGREDIENT_VIEW_URL = "ingredient/view"
+
+    /**
      * Where mail-service reads the wordings an operator saved.
      *
      * Deliberately outside `api/`: `frontend/nginx.conf` proxies only `/api/`, `/image/`
