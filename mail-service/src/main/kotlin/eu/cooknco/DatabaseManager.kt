@@ -9,6 +9,7 @@ import io.ebean.migration.MigrationConfig
 import io.ebean.migration.MigrationRunner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import eu.cooknco.models.query.QEmailTemplate
 import eu.cooknco.models.query.QFollower
 import eu.cooknco.models.query.QUser
 import shared.utils.logger
@@ -20,6 +21,7 @@ object DatabaseManager {
     fun getTables() = listOf(
         QUser(),
         QFollower(),
+        QEmailTemplate(),
     )
 
     private fun hikari(): HikariDataSource {

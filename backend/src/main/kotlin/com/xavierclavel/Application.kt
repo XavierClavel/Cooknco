@@ -9,6 +9,7 @@ import com.xavierclavel.controllers.ExportController
 import com.xavierclavel.controllers.FollowController
 import com.xavierclavel.controllers.HealthController
 import com.xavierclavel.controllers.IngredientController
+import com.xavierclavel.controllers.InternalMailTemplateController
 import com.xavierclavel.controllers.RecipeController
 import com.xavierclavel.controllers.ImageController
 import com.xavierclavel.controllers.LikeController
@@ -115,4 +116,7 @@ fun Application.serveRoutes() = routing {
     serve(NotificationController)
     serve(ReportController)
     serve(AdminController)
+    // Outside the admin gate on purpose: its only caller is mail-service, and nginx never
+    // proxies this prefix, so it is unreachable from outside the cluster. See the controller.
+    serve(InternalMailTemplateController)
 }

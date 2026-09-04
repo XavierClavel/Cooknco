@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="email_templates" pkName="pk_email_templates">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="mail_key" type="varchar(63)" notnull="true"/>
+            <column name="locale" type="integer(255)" notnull="true" checkConstraint="check ( locale in (0,1))" checkConstraintName="ck_email_templates_locale"/>
+            <column name="subject" type="varchar(255)" notnull="true"/>
+            <column name="body" type="varchar(16383)" notnull="true"/>
+            <uniqueConstraint name="uq_email_templates_mail_key_locale" columnNames="mail_key,locale" oneToOne="false" nullableColumns=""/>
+        </createTable>
+    </changeSet>
+</migration>

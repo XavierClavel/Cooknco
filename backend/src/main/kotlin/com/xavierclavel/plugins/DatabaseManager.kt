@@ -6,6 +6,7 @@ import com.xavierclavel.models.jointables.query.QFollow
 import com.xavierclavel.models.jointables.query.QLike
 import com.xavierclavel.models.jointables.query.QRecipeIngredient
 import com.xavierclavel.models.query.QCookbook
+import com.xavierclavel.models.query.QEmailTemplate
 import com.xavierclavel.models.query.QDietaryRestrictions
 import com.xavierclavel.models.query.QIngredient
 import com.xavierclavel.models.query.QRecipe
@@ -45,6 +46,8 @@ object DatabaseManager {
         QCookbookUser(),
         QCookbookRecipe(),
         QDietaryRestrictions(),
+        // Owned by nobody: mail wordings reference no other row
+        QEmailTemplate(),
     )
 
     private fun hikari(): HikariDataSource {

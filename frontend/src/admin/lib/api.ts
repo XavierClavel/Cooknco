@@ -129,6 +129,28 @@ export const resetDefaultImage = (image: string) => api.delete(`/admin/storage/d
 export const defaultImageUrl = (path: string, lastModified?: number | null) =>
   `${import.meta.env.VITE_IMG_URL}/${path}?v=${lastModified ?? 0}`
 
+// -------------------------------------------------------------------- mails
+export const listMailTemplates = () => api.get('/admin/mails/templates')
+
+/** A kind of the operator's own. It sends nothing until backend code names its key. */
+export const addMailTemplate = (key: string) => api.post('/admin/mails/templates', {key})
+export const deleteMailTemplate = (key: string) => api.delete(`/admin/mails/templates/${key}`)
+
+export const saveMailTemplate = (key: string, locale: string, subject: string, body: string) =>
+  api.put(`/admin/mails/templates/${key}/${locale}`, {subject, body})
+
+/** Drops the saved wording, putting the one packaged with the app back in service. */
+export const restoreMailTemplate = (key: string, locale: string) =>
+  api.delete(`/admin/mails/templates/${key}/${locale}`)
+
+/** Rendered by the server, from the draft in the editor, with the renderer that sends it. */
+export const previewMailTemplate = (key: string, subject: string, body: string) =>
+  api.post(`/admin/mails/templates/${key}/preview`, {subject, body})
+
+/** Queues one mail through mail-service. What comes back means handed over, not delivered. */
+export const sendTestMail = (key: string, recipient: string, locale: string) =>
+  api.post(`/admin/mails/templates/${key}/test`, {recipient, locale})
+
 // --------------------------------------------------------------------- logs
 export const getLogs = (f: Record<string, unknown>) => api.get(`/admin/logs?${qs(f)}`)
 export const clearLogs = () => api.delete('/admin/logs')

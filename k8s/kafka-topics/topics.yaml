@@ -27,3 +27,14 @@ metadata:
 spec:
   partitions: 3
   replicas: 1
+---
+# Mails the backoffice asks for by hand, which is currently only its test sends.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: cooknco-mails
+  labels:
+    strimzi.io/cluster: kafka-kraft
+spec:
+  partitions: 3
+  replicas: 1
