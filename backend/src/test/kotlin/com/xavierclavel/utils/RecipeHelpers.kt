@@ -32,13 +32,16 @@ val recipeDTO = RecipeDTO(
     )
 )
 
-suspend fun HttpClient.createRecipe(recipe: RecipeDTO = recipeDTO) : RecipeInfo {
-    logger.info { "Creating recipe ${recipe.title}" }
+suspend fun HttpClient.createRecipeRaw(recipe: RecipeDTO = recipeDTO) =
     this.post(RECIPE_URL){
         contentType(ContentType.Application.Json)
         header(HttpHeaders.ContentType, ContentType.Application.Json)
         setBody(recipe)
-    }.apply{
+    }
+
+suspend fun HttpClient.createRecipe(recipe: RecipeDTO = recipeDTO) : RecipeInfo {
+    logger.info { "Creating recipe ${recipe.title}" }
+    this.createRecipeRaw(recipe).apply{
         assertEquals(HttpStatusCode.Created, status)
         val a = bodyAsText()
         logger.info {a}
@@ -114,13 +117,16 @@ suspend fun HttpClient.listRecipesRaw(
         }
     }
 
-suspend fun HttpClient.updateRecipe(recipeId: Long, recipe: RecipeDTO): RecipeInfo {
-    logger.info {"update"}
+suspend fun HttpClient.updateRecipeRaw(recipeId: Long, recipe: RecipeDTO) =
     this.put("$RECIPE_URL/$recipeId"){
         contentType(ContentType.Application.Json)
         header(HttpHeaders.ContentType, ContentType.Application.Json)
         setBody(recipe)
-    }.apply{
+    }
+
+suspend fun HttpClient.updateRecipe(recipeId: Long, recipe: RecipeDTO): RecipeInfo {
+    logger.info {"update"}
+    this.updateRecipeRaw(recipeId, recipe).apply{
         assertEquals(HttpStatusCode.OK, status)
         val response = Json.decodeFromString<RecipeInfo>(bodyAsText())
         assertTrue(response.compareToDTO(recipe))

@@ -1,14 +1,13 @@
 import apiClient from '@/plugins/axios.js';
 import {getLocale} from "@/scripts/localization";
 
+// Ingredient writes and the custom-ingredient funnel are backoffice-only and go through
+// src/admin/lib/api.ts, which carries the admin session cookie.
 export{
   getIngredient,
   searchIngredients,
-  deleteIngredient,
   getCount,
   getIngredientRecipesCount,
-  createIngredient,
-  updateIngredient,
 }
 
 async function getIngredient(id) {
@@ -29,16 +28,4 @@ async function getCount() {
 
 async function getIngredientRecipesCount(id) {
   return await apiClient.get(`/ingredient/count/recipes/${id}`)
-}
-
-async function deleteIngredient(username) {
-  return await apiClient.delete(`/ingredient/${username}`)
-}
-
-async function createIngredient(ingredient) {
-  return await apiClient.post(`/ingredient`, ingredient)
-}
-
-async function updateIngredient(id, ingredient) {
-  return await apiClient.put(`/ingredient/${id}`, ingredient)
 }

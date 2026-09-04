@@ -61,6 +61,7 @@ export {
   adminOnly,
 
   unitToReadable,
+  formatAmount,
 
   getUserIconUrl,
   getCookbookIconUrl,
@@ -73,6 +74,7 @@ export {
   getHealth,
 
   defaultImageRecipe,
+  defaultImageIngredient,
 }
 
 const { t } = i18n.global
@@ -162,6 +164,10 @@ const defaultImageRecipe = `${import.meta.env.VITE_IMG_URL}/recipes/default.webp
 const defaultImageRecipeThumbnail = `${import.meta.env.VITE_IMG_URL}/recipes-thumbnails/default.webp`
 const defaultImageCookbook = `${import.meta.env.VITE_IMG_URL}/cookbooks/default.webp`
 
+// Bundled, unlike the ones above: this is the placeholder for an ingredient type with no
+// picture of its own, and the type pictures it stands in for ship with the app too.
+const defaultImageIngredient = '/ingredients/vegetable.png'
+
 const getUserIconUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/users/${id}-v${version}.webp` : defaultImageUser
 const getCookbookIconUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/cookbooks/${id}-v${version}.webp` : defaultImageCookbook
 const getRecipeImageUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/recipes/${id}-v${version}.webp` : defaultImageRecipe
@@ -171,7 +177,7 @@ const getIngredientImageUrl = (type) => {
     const t = ingredientTypes.value.find((item) => item.value == type)
     return `/ingredients/${t.image}`
   } catch (e) {
-    return ''
+    return defaultImageIngredient
   }
 
 }
@@ -306,8 +312,14 @@ const unitToReadable = (unit) => {
       return ""
     case "GRAM":
       return "g"
+    case "KILOGRAM":
+      return "kg"
     case "MILLILITERS":
       return "mL"
+    case "CENTILITER":
+      return "cL"
+    case "LITER":
+      return "L"
     case "POUND":
       return "lb"
     case "TEASPOON":
@@ -321,6 +333,21 @@ const unitToReadable = (unit) => {
     case null:
       return ""
   }
+}
+
+
+const formatAmount = (amount, unit) => {
+  if (!amount) return ""
+  let scaledAmount = amount
+  let scaledUnit = unit
+  if (unit == "GRAM" && amount >= 1000) {
+    scaledAmount = amount / 1000
+    scaledUnit = "KILOGRAM"
+  } else if (unit == "MILLILITERS" && amount >= 1000) {
+    scaledAmount = amount / 1000
+    scaledUnit = "LITER"
+  }
+  return `${scaledAmount.toFixed(2).replace(/[.,]?0+$/, '')}${unitToReadable(scaledUnit)}`
 }
 
 

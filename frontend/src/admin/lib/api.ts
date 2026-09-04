@@ -65,7 +65,27 @@ export const deleteRecipe = (id: number) => api.delete(`/admin/recipes/${id}`)
 // -------------------------------------------------------------- ingredients
 export const listIngredients = (f: Record<string, unknown>, page: number, size: number) =>
   api.get(`/admin/ingredients?${qs(f, page, size)}`)
+
+/**
+ * The catalogue row is too thin to edit, so the form loads the full ingredient. Reads are
+ * public; every write below is gated on admin-session, same as the rest of this client.
+ */
+export const getIngredient = (id: number) => api.get(`/ingredient/${id}`)
+export const createIngredient = (body: Record<string, unknown>) => api.post('/ingredient', body)
+export const updateIngredient = (id: number, body: Record<string, unknown>) =>
+  api.put(`/ingredient/${id}`, body)
 export const deleteIngredient = (id: number) => api.delete(`/ingredient/${id}`)
+
+/** Unit metadata: which family a unit belongs to, so the form need not restate it. */
+export const listUnits = () => api.get('/unit')
+
+/** The free-text ingredient names users type most, i.e. what to add to the catalogue next. */
+export const getCustomIngredientUsage = (page: number, size: number) =>
+  api.get(`/ingredient/custom-usage?${qs({}, page, size)}`)
+
+/** Re-points the recipe rows using a free-text name at a real ingredient. */
+export const absorbCustomIngredient = (id: number, name: string) =>
+  api.post(`/ingredient/${id}/absorb-custom`, {name})
 
 // --------------------------------------------------------------- moderation
 export const listReports = (f: Record<string, unknown>, page: number, size: number) =>

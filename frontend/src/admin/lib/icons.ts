@@ -40,4 +40,7 @@ export const ICONS = {
   image:      {p: ['M3 4h18v16H3z', 'M3 16l5-5 4 4 3-3 6 6'], c: [[9, 9, 1.4]]},
   upload:     {p: ['M12 16V4', 'M7 9l5-5 5 5', 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2']},
   undo:       {p: ['M3 8h11a6 6 0 0 1 0 12H8', 'M3 8l4-4', 'M3 8l4 4']},
+  plus:       {p: ['M12 5v14', 'M5 12h14']},
+  edit:       {p: ['M12 20h9', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z']},
+  arrowRight: {p: ['M5 12h14', 'M13 5l7 7-7 7']},
 } satisfies Record<string, IconDef>

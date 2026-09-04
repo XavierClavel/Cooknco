@@ -68,7 +68,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.network.ApiClient
-import com.xavierclavel.cooknco.network.dto.CustomIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
@@ -88,8 +87,11 @@ import kotlin.math.roundToInt
 private fun unitLabel(unit: String): String = when (unit) {
     "NONE", "UNIT" -> ""
     "GRAM" -> "g"
+    "KILOGRAM" -> "kg"
     "POUND" -> "lb"
     "MILLILITERS" -> "mL"
+    "CENTILITER" -> "cL"
+    "LITER" -> "L"
     "TEASPOON" -> "teaspoons"
     "TABLESPOON" -> "tablespoons"
     "CUP" -> "cup"
@@ -382,25 +384,16 @@ private fun RecipeContent(
         }
 
         // ── Ingredients ──────────────────────────────────────────────────────
-        val hasIngredients = recipe.ingredients.isNotEmpty() || recipe.customIngredients.isNotEmpty()
-        if (hasIngredients) {
+        if (recipe.ingredients.isNotEmpty()) {
             item {
                 SectionHeader(
                     title = "Ingredients",
-                    count = recipe.ingredients.size + recipe.customIngredients.size,
+                    count = recipe.ingredients.size,
                 )
             }
             itemsIndexed(recipe.ingredients) { _, ingredient ->
                 IngredientRow(
                     ingredient = ingredient,
-                    selectedYield = uiState.selectedYield,
-                    recipeYield = recipeYield,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                )
-            }
-            itemsIndexed(recipe.customIngredients) { _, ci ->
-                CustomIngredientRow(
-                    ingredient = ci,
                     selectedYield = uiState.selectedYield,
                     recipeYield = recipeYield,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
@@ -593,7 +586,7 @@ private fun IngredientRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Ingredient type icon
+            // Ingredient type icon, with a generic one for custom rows
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -601,53 +594,16 @@ private fun IngredientRow(
                     .background(CookncoGreenLight),
                 contentAlignment = Alignment.Center,
             ) {
-                AsyncImage(
-                    model = "${ApiClient.IMAGE_URL}/ingredients/${ingredient.type}.webp",
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(44.dp).clip(CircleShape),
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(ingredient.name, fontWeight = FontWeight.Bold, color = CookncoNavy, style = MaterialTheme.typography.bodyLarge)
-                if (subtitle.isNotBlank()) {
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = CookncoNavy.copy(alpha = 0.6f))
+                if (ingredient.type != null) {
+                    AsyncImage(
+                        model = "${ApiClient.IMAGE_URL}/ingredients/${ingredient.type}.webp",
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(44.dp).clip(CircleShape),
+                    )
+                } else {
+                    Text("🍽️", fontSize = 22.sp)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CustomIngredientRow(
-    ingredient: CustomIngredientInfo,
-    selectedYield: Int,
-    recipeYield: Int,
-    modifier: Modifier = Modifier,
-) {
-    val amountStr = scaleAmount(ingredient.amount, selectedYield, recipeYield)
-    val unitStr = unitLabel(ingredient.unit)
-    val subtitle = buildString {
-        if (amountStr.isNotEmpty()) append(amountStr)
-        if (unitStr.isNotEmpty()) append(if (amountStr.isEmpty()) unitStr else " $unitStr")
-    }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = CookncoWhite),
-        border = BorderStroke(1.5.dp, CookncoNavy),
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(
-                modifier = Modifier.size(44.dp).clip(CircleShape).background(CookncoGreenLight),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("🍽️", fontSize = 22.sp)
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(ingredient.name, fontWeight = FontWeight.Bold, color = CookncoNavy, style = MaterialTheme.typography.bodyLarge)
@@ -812,9 +768,10 @@ private val previewRecipe = RecipeInfo(
     cookingTime = 35,
     cookingTemperature = 100,
     ingredients = listOf(
-        RecipeIngredientInfo(id = 1L, name = "Salt", amount = 1f, unit = "NONE", complement = "1 pincée", type = "SALT", allowAmount = true, allowWeight = false, allowVolume = false),
-        RecipeIngredientInfo(id = 2L, name = "Baking powder", amount = 1f, unit = "TEASPOON", complement = null, type = "BAKING_POWDER", allowAmount = true, allowWeight = false, allowVolume = true),
-        RecipeIngredientInfo(id = 3L, name = "Semoule moyen", amount = 400f, unit = "GRAM", complement = null, type = "GRAIN", allowAmount = false, allowWeight = true, allowVolume = false),
+        RecipeIngredientInfo(id = 1L, name = "Salt", amount = null, unit = "NONE", complement = "1 pincée", type = "SALT", allowedTypes = listOf("NONE", "AMOUNT")),
+        RecipeIngredientInfo(id = 2L, name = "Baking powder", amount = 1f, unit = "TEASPOON", complement = null, type = "BAKING_POWDER", allowedTypes = listOf("NONE", "AMOUNT", "VOLUME")),
+        RecipeIngredientInfo(id = 3L, name = "Semoule moyen", amount = 400f, unit = "GRAM", complement = null, type = "GRAIN", allowedTypes = listOf("NONE", "WEIGHT")),
+        RecipeIngredientInfo(id = null, name = "Beurre végétal", amount = 100f, unit = "GRAM", complement = null, allowedTypes = listOf("NONE", "AMOUNT", "WEIGHT", "VOLUME")),
     ),
     steps = listOf(
         "Faire fondre le beurre végétal",

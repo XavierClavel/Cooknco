@@ -68,5 +68,10 @@ enum class BadRequestCause (val key: String) {
     CANNOT_REPORT_OWN_CONTENT("cannot_report_own_content"),
     REPORT_ALREADY_RESOLVED("report_already_resolved"),
     ACTION_NOT_APPLICABLE_TO_TARGET("action_not_applicable_to_target"),
+    INVALID_INGREDIENT_ROW("invalid_ingredient_row"),
+    CUSTOM_INGREDIENT_NAME_TOO_LONG("custom_ingredient_name_too_long"),
+    UNIT_NOT_ALLOWED_FOR_INGREDIENT("unit_not_allowed_for_ingredient"),
+    INVALID_AMOUNT("invalid_amount"),
+    INVALID_CONVERSION_FACTOR("invalid_conversion_factor"),
 
 }

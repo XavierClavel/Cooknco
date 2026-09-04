@@ -2,9 +2,14 @@ package com.xavierclavel.models
 
 import com.xavierclavel.models.localization.LocalizedIngredientName
 import shared.dto.IngredientDTO
+import shared.enums.AmountUnit
 import shared.enums.IngredientType
+import shared.enums.MeasurementType
 import shared.infodto.IngredientInfo
+import shared.utils.UnitCapabilities
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.Id
 import jakarta.persistence.Table
@@ -46,22 +51,29 @@ class Ingredient (
     var proteins: Float = 0f,
     var sodium: Float = 0f,
 
+    /**
+     * Weight of one piece, in grams. Non-null means the ingredient is countable, so [AmountUnit] values
+     * of type [MeasurementType.AMOUNT] are offered. Null means "not countable" — there is deliberately no
+     * separate flag, so an ingredient can never claim to be countable without saying what a piece weighs.
+     */
+    var gramsPerUnit: Float? = null,
+
+    /** Density in g/mL. Non-null means volume units are offered. Same reasoning as [gramsPerUnit]. */
+    var gramsPerMilliliter: Float? = null,
+
+    /** False only for ingredients that cannot sensibly be weighed, e.g. "salt, to taste". */
     @DbDefault(value = "true")
-    var allowAmount: Boolean = true,
+    var measurableByWeight: Boolean = true,
 
-    @DbDefault(value = "true")
-    var allowWeight: Boolean = true,
-
-    @DbDefault(value = "true")
-    var allowVolume: Boolean = true,
-
-    @DbDefault(value = "1.0")
-    var volumicMass: Float = 1f,
-
-    @DbDefault(value = "1.0")
-    var weightPerUnit: Float = 1f,
+    /** Preselected in the recipe editor. Null falls back to grams, or whatever is allowed. */
+    @Enumerated(EnumType.STRING)
+    var defaultUnit: AmountUnit? = null,
 
     ): Model() {
+
+    /** The measurement families this ingredient can be expressed in. */
+    fun allowedTypes(): Set<MeasurementType> =
+        UnitCapabilities.allowedTypes(gramsPerUnit, gramsPerMilliliter, measurableByWeight)
 
     fun mergeDTO(ingredientDTO: IngredientDTO): Ingredient {
         this.type = ingredientDTO.type
@@ -76,11 +88,10 @@ class Ingredient (
         this.proteins = ingredientDTO.proteins
         this.sodium = ingredientDTO.sodium
 
-        this.allowAmount = ingredientDTO.allowAmount
-        this.allowVolume = ingredientDTO.allowVolume
-        this.allowWeight = ingredientDTO.allowWeight
-        this.volumicMass = ingredientDTO.volumicMass
-        this.weightPerUnit = ingredientDTO.weightPerUnit
+        this.gramsPerUnit = ingredientDTO.gramsPerUnit
+        this.gramsPerMilliliter = ingredientDTO.gramsPerMilliliter
+        this.measurableByWeight = ingredientDTO.measurableByWeight
+        this.defaultUnit = ingredientDTO.defaultUnit
 
         return this
     }
@@ -98,11 +109,12 @@ class Ingredient (
         fibers = this.fibers,
         proteins = this.proteins,
         sodium = this.sodium,
-        allowAmount = this.allowAmount,
-        allowWeight = this.allowWeight,
-        allowVolume = this.allowVolume,
-        volumicMass = this.volumicMass,
-        weightPerUnit = this.weightPerUnit,
+
+        gramsPerUnit = this.gramsPerUnit,
+        gramsPerMilliliter = this.gramsPerMilliliter,
+        measurableByWeight = this.measurableByWeight,
+        defaultUnit = this.defaultUnit,
+        allowedTypes = this.allowedTypes(),
 
         name = translations.associate { it.locale to it.name },
     )

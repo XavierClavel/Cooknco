@@ -1,8 +1,11 @@
 package main.com.xavierclavel.utils
 
+import shared.dto.AbsorbCustomIngredientDTO
+import shared.dto.AbsorbCustomIngredientResult
 import shared.dto.IngredientDTO
 import shared.dto.SearchResult
 import shared.enums.IngredientType
+import shared.infodto.CustomIngredientUsage
 import shared.infodto.IngredientInfo
 import shared.utils.URL.INGREDIENT_URL
 import io.ktor.client.HttpClient
@@ -21,14 +24,24 @@ import kotlinx.serialization.json.Json
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-val ingredientDTO = IngredientDTO(type = IngredientType.VEGETABLE, calories = 1)
+// Conversions are set so the default fixture accepts every unit family; tests that care about
+// capability filtering build their own IngredientDTO.
+val ingredientDTO = IngredientDTO(
+    type = IngredientType.VEGETABLE,
+    calories = 1,
+    gramsPerUnit = 100f,
+    gramsPerMilliliter = 1f,
+)
 
-suspend fun HttpClient.createIngredient(ingredient: IngredientDTO = ingredientDTO) : IngredientInfo {
+suspend fun HttpClient.createIngredientRaw(ingredient: IngredientDTO = ingredientDTO) =
     this.post(INGREDIENT_URL){
         contentType(ContentType.Application.Json)
         header(HttpHeaders.ContentType, ContentType.Application.Json)
         setBody(ingredient)
-    }.apply{
+    }
+
+suspend fun HttpClient.createIngredient(ingredient: IngredientDTO = ingredientDTO) : IngredientInfo {
+    this.createIngredientRaw(ingredient).apply{
         assertEquals(HttpStatusCode.Created, status)
         val response = Json.decodeFromString<IngredientInfo>(bodyAsText())
         assertTrue(response.compareToDTO(ingredient))
@@ -46,6 +59,30 @@ suspend fun HttpClient.searchIngredients(query: String): SearchResult<Ingredient
     }.apply {
         assertEquals(HttpStatusCode.OK, status)
         return Json.decodeFromString(SearchResult.serializer(IngredientInfo.serializer()), bodyAsText())
+    }
+}
+
+suspend fun HttpClient.getCustomIngredientUsage(): SearchResult<CustomIngredientUsage> {
+    this.get("$INGREDIENT_URL/custom-usage").apply {
+        assertEquals(HttpStatusCode.OK, status)
+        return Json.decodeFromString(
+            SearchResult.serializer(CustomIngredientUsage.serializer()),
+            bodyAsText(),
+        )
+    }
+}
+
+suspend fun HttpClient.absorbCustomIngredientRaw(ingredientId: Long, name: String) =
+    this.post("$INGREDIENT_URL/$ingredientId/absorb-custom") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(AbsorbCustomIngredientDTO(name))
+    }
+
+suspend fun HttpClient.absorbCustomIngredient(ingredientId: Long, name: String): AbsorbCustomIngredientResult {
+    this.absorbCustomIngredientRaw(ingredientId, name).apply {
+        assertEquals(HttpStatusCode.OK, status)
+        return Json.decodeFromString<AbsorbCustomIngredientResult>(bodyAsText())
     }
 }
 

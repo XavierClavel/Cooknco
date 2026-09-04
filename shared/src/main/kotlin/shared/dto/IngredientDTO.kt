@@ -1,6 +1,9 @@
 package shared.dto
 
+import shared.enums.AmountUnit
 import shared.enums.IngredientType
+import shared.enums.MeasurementType
+import shared.utils.UnitCapabilities
 import shared.enums.Locale
 import kotlinx.serialization.Serializable
 
@@ -19,10 +22,15 @@ data class IngredientDTO(
     val sodium: Float = 0f,
     val sugars: Float = 0f,
 
-    val allowAmount: Boolean = false,
-    val allowWeight: Boolean = false,
-    val allowVolume: Boolean = false,
+    /** Grams per piece; null means the ingredient is not countable. */
+    val gramsPerUnit: Float? = null,
+    /** Density in g/mL; null means volume units don't apply. */
+    val gramsPerMilliliter: Float? = null,
+    val measurableByWeight: Boolean = true,
 
-    val volumicMass: Float = 1f,
-    val weightPerUnit: Float = 1f,
-)
+    /** Unit the recipe editor preselects for this ingredient. */
+    val defaultUnit: AmountUnit? = null,
+) {
+    fun allowedTypes(): Set<MeasurementType> =
+        UnitCapabilities.allowedTypes(gramsPerUnit, gramsPerMilliliter, measurableByWeight)
+}

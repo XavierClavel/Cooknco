@@ -4,7 +4,6 @@ import com.xavierclavel.plugins.DatabaseManager
 import com.xavierclavel.plugins.RedisService
 import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.CookbookService
-import com.xavierclavel.services.CustomIngredientService
 import com.xavierclavel.services.DashboardService
 import com.xavierclavel.services.DefaultImageService
 import com.xavierclavel.services.EncryptionService
@@ -85,7 +84,6 @@ abstract class ApplicationTest: KoinTest {
                 single { CookbookService() }
                 single { DashboardService() }
                 single { RecipeIngredientService() }
-                single { CustomIngredientService() }
                 single { FollowService() }
                 single { RecipeNotesService() }
                 single { ModerationService() }

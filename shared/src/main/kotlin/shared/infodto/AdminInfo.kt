@@ -2,8 +2,10 @@ package shared.infodto
 
 import kotlinx.serialization.Serializable
 import shared.enums.AccountStatus
+import shared.enums.AmountUnit
 import shared.enums.IngredientType
 import shared.enums.Locale
+import shared.enums.MeasurementType
 import shared.enums.UserRole
 import shared.overviewdto.UserOverview
 
@@ -82,4 +84,7 @@ data class AdminIngredientInfo(
     val type: IngredientType,
     val calories: Int,
     val recipesCount: Int,
+    /** Carried in the row so the catalogue shows which ingredients still lack a conversion. */
+    val allowedTypes: Set<MeasurementType> = setOf(MeasurementType.NONE),
+    val defaultUnit: AmountUnit? = null,
 )

@@ -148,7 +148,7 @@
       precision="0"
     ></v-number-input>
 
-    <v-container v-if="recipe?.ingredients?.length || recipe?.customIngredients?.length">
+    <v-container v-if="recipe?.ingredients?.length">
 
       <h2 class="my-3" >Ingredients</h2>
 
@@ -156,24 +156,25 @@
       <v-card color="background" rounded="lg">
       <v-list-item
         :key="index"
-        :subtitle="`${ingredient.amount ? (ingredient.amount * coefficient).toFixed(2).replace(/[.,]00$/, '') : ''}${unitToReadable(ingredient.unit)}`"
+        :subtitle="formatAmount(ingredient.amount * coefficient, ingredient.unit)"
         :title="`${ingredient.name} ${ingredient.complement ? '(' + ingredient.complement + ')' : ''}`"
       >
         <template v-slot:prepend>
           <v-avatar size="40" variant="elevated" class="mr-2" style="border:3px solid #0d1821 !important;">
             <v-img
               color="surface"
-              :src="getIngredientImageUrl(ingredient.type)"
+              :src="ingredient.id ? getIngredientImageUrl(ingredient.type) : defaultImageIngredient"
               cover
               v-bind="props"
-              class="clickable_image"
-              @click.stop="toViewIngredient(ingredient.id)"
+              :class="{clickable_image: ingredient.id}"
+              @click.stop="ingredient.id && toViewIngredient(ingredient.id)"
             ></v-img>
           </v-avatar>
         </template>
 
         <template v-slot:append>
           <v-btn
+            v-if="ingredient.id"
             color="surface"
             icon="mdi-information"
             variant="text"
@@ -183,29 +184,6 @@
         </template>
 
       </v-list-item>
-      </v-card>
-    </v-list>
-
-    <v-list v-for="(ingredient, index) in recipe.customIngredients">
-      <v-card color="background" class="py-1">
-        <v-list-item
-          :key="index"
-          :subtitle="`${ingredient.amount ? (ingredient.amount * coefficient).toFixed(2).replace(/[.,]00$/, '') : ''}${unitToReadable(ingredient.unit)}`"
-          :title="ingredient.name"
-        >
-          <template v-slot:prepend>
-            <v-avatar size="40" variant="elevated" class="mr-2" style="border:3px solid #0d1821 !important;">
-              <v-img
-                color="surface"
-                :src="getIngredientImageUrl('VEGETABLE')"
-                cover
-                v-bind="props"
-              ></v-img>
-            </v-avatar>
-          </template>
-
-
-        </v-list-item>
       </v-card>
     </v-list>
 
@@ -357,12 +335,13 @@ import { useRoute } from 'vue-router';
 import {deleteRecipe, downloadRecipe, getRecipe} from "@/scripts/recipes";
 import {ref} from "vue";
 import {
+  defaultImageIngredient,
+  formatAmount,
   getIngredientImageUrl,
   getRecipeImageUrl,
   toCreateCookbookAddRecipe,
   toEditRecipe,
   toListRecipe, toSignup, toViewIngredient, toViewUser,
-  unitToReadable
 } from "@/scripts/common";
 import {useAuthStore} from "@/stores/auth";
 import {addLike, isLiked, removeLike} from "@/scripts/likes";
@@ -388,8 +367,6 @@ const userCookbooks = ref([])
 const authStore = useAuthStore()
 const {t} = useI18n()
 const selectedYield = ref(null)
-
-const scaledAmount = computed((amount) => (amount * coefficient).toFixed(2).replace(/[.,]00$/, ''))
 
 const coefficient = computed(() =>  selectedYield.value / recipe.value.yield)
 

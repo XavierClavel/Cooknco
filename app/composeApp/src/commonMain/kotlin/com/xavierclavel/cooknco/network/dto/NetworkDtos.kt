@@ -59,22 +59,13 @@ data class RecipeOverview(
 
 @Serializable
 data class RecipeIngredientInfo(
-    val id: Long,
+    val id: Long? = null,
     val name: String,
     val amount: Float? = null,
     val unit: String,
     val complement: String? = null,
-    val type: String,
-    val allowAmount: Boolean,
-    val allowWeight: Boolean,
-    val allowVolume: Boolean,
-)
-
-@Serializable
-data class CustomIngredientInfo(
-    val name: String,
-    val amount: Float? = null,
-    val unit: String,
+    val type: String? = null,
+    val allowedTypes: List<String> = emptyList(),
 )
 
 @Serializable
@@ -90,7 +81,6 @@ data class RecipeInfo(
     val cookingTime: Int? = null,
     val cookingTemperature: Int? = null,
     val ingredients: List<RecipeIngredientInfo> = emptyList(),
-    val customIngredients: List<CustomIngredientInfo> = emptyList(),
     val steps: List<String> = emptyList(),
     val tips: String = "",
     val creationDate: Long,
@@ -107,24 +97,17 @@ data class RecipeSaveDto(
     val cookingTime: Int? = null,
     val cookingTemperature: Int? = null,
     val ingredients: List<RecipeIngredientSaveDto>,
-    val customIngredients: List<CustomIngredientSaveDto>,
     val steps: List<String>,
     val tips: String,
 )
 
 @Serializable
 data class RecipeIngredientSaveDto(
-    val id: Long,
+    val id: Long? = null,
+    val customName: String? = null,
     val unit: String,
     val amount: Float? = null,
     val complement: String? = null,
-)
-
-@Serializable
-data class CustomIngredientSaveDto(
-    val name: String,
-    val unit: String,
-    val amount: Float? = null,
 )
 
 @Serializable
@@ -132,9 +115,15 @@ data class IngredientSummary(
     val id: Long,
     val name: Map<String, String>,
     val type: String = "",
-    val allowAmount: Boolean,
-    val allowWeight: Boolean,
-    val allowVolume: Boolean,
+    val allowedTypes: List<String> = emptyList(),
+    val defaultUnit: String? = null,
+)
+
+@Serializable
+data class UnitInfo(
+    val name: String,
+    val type: String,
+    val factorToBase: Float,
 )
 
 @Serializable

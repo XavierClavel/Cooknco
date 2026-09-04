@@ -2,9 +2,11 @@ package main.com.xavierclavel.controllertests
 
 import com.xavierclavel.ApplicationTest
 import com.xavierclavel.utils.logger
+import shared.dto.IngredientDTO
 import shared.dto.RecipeDTO
 import shared.enums.AmountUnit
 import shared.enums.IngredientType
+import shared.enums.MeasurementType
 import shared.enums.Sort
 import shared.infodto.RecipeInfo
 import shared.infodto.RecipeIngredientInfo
@@ -23,6 +25,7 @@ import main.com.xavierclavel.utils.assertRecipeExists
 import main.com.xavierclavel.utils.createIngredient
 import main.com.xavierclavel.utils.createLike
 import main.com.xavierclavel.utils.createRecipe
+import main.com.xavierclavel.utils.createRecipeRaw
 import main.com.xavierclavel.utils.createUser
 import main.com.xavierclavel.utils.deleteLike
 import main.com.xavierclavel.utils.deleteRecipe
@@ -30,6 +33,7 @@ import main.com.xavierclavel.utils.getMe
 import main.com.xavierclavel.utils.getRecipe
 import main.com.xavierclavel.utils.listRecipes
 import main.com.xavierclavel.utils.updateRecipe
+import main.com.xavierclavel.utils.updateRecipeRaw
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.assertFalse
@@ -108,6 +112,14 @@ class RecipeControllerTest : ApplicationTest() {
             amount = 1f,
         )
 
+        // The default ingredient fixture declares both conversions, so every family is allowed.
+        val allowedTypes = setOf(
+            MeasurementType.NONE,
+            MeasurementType.AMOUNT,
+            MeasurementType.WEIGHT,
+            MeasurementType.VOLUME,
+        )
+
         val expected = setOf(
             RecipeIngredientInfo(
                 id = ingredient2.id,
@@ -116,6 +128,7 @@ class RecipeControllerTest : ApplicationTest() {
                 amount = 2f,
                 complement = null,
                 type = IngredientType.VEGETABLE,
+                allowedTypes = allowedTypes,
             ),
             RecipeIngredientInfo(
                 id = ingredient3.id,
@@ -123,7 +136,8 @@ class RecipeControllerTest : ApplicationTest() {
                 unit = AmountUnit.GRAM,
                 amount = 1f,
                 complement = null,
-                type = IngredientType.VEGETABLE
+                type = IngredientType.VEGETABLE,
+                allowedTypes = allowedTypes,
             ),
 
         )
@@ -147,78 +161,298 @@ class RecipeControllerTest : ApplicationTest() {
 
     @Test
     fun `create recipe with custom ingredients`() = runTestAsAdmin {
-        val customIngredient1 = RecipeDTO.CustomIngredientDTO(
-            name = "custom ingredient 1",
+        val customIngredient1 = RecipeDTO.RecipeIngredientDTO(
+            customName = "custom ingredient 1",
             unit = AmountUnit.GRAM,
             amount = 1f,
         )
 
-        val customIngredient2 = RecipeDTO.CustomIngredientDTO(
-            name = "custom ingredient 2",
+        val customIngredient2 = RecipeDTO.RecipeIngredientDTO(
+            customName = "custom ingredient 2",
             unit = AmountUnit.GRAM,
             amount = 1f,
         )
         val recipeDto = RecipeDTO(
             title = "My recipe",
-            customIngredients = mutableListOf(customIngredient1, customIngredient2)
+            ingredients = mutableListOf(customIngredient1, customIngredient2)
         )
         val recipe = client.createRecipe(recipeDto)
         val response = client.getRecipe(recipe.id)
         client.assertRecipeExists(response.id)
-        assertEquals(2, response.customIngredients.size)
+        assertEquals(2, response.ingredients.size)
+        assertTrue(response.ingredients.all { it.isCustom })
+        assertEquals(
+            listOf("custom ingredient 1", "custom ingredient 2"),
+            response.ingredients.map { it.name },
+        )
     }
 
     @Test
     fun `update recipe custom ingredients`() = runTestAsAdmin {
-        val customIngredient1 = RecipeDTO.CustomIngredientDTO(
-            name = "custom ingredient 1",
+        val customIngredient1 = RecipeDTO.RecipeIngredientDTO(
+            customName = "custom ingredient 1",
             unit = AmountUnit.GRAM,
             amount = 1f,
         )
 
-        val customIngredient2 = RecipeDTO.CustomIngredientDTO(
-            name = "custom ingredient 2",
+        val customIngredient2 = RecipeDTO.RecipeIngredientDTO(
+            customName = "custom ingredient 2",
             unit = AmountUnit.GRAM,
             amount = 1f,
         )
-        val customIngredient2bis = RecipeDTO.CustomIngredientDTO(
-            name = "custom ingredient 2",
+        val customIngredient2bis = RecipeDTO.RecipeIngredientDTO(
+            customName = "custom ingredient 2",
             unit = AmountUnit.UNIT,
             amount = 5f,
         )
 
-        val customIngredient3 = RecipeDTO.CustomIngredientDTO(
-            name = "custom ingredient 3",
+        val customIngredient3 = RecipeDTO.RecipeIngredientDTO(
+            customName = "custom ingredient 3",
             unit = AmountUnit.GRAM,
             amount = 1f,
         )
 
         val recipeDto1 = RecipeDTO(
             title = "My recipe",
-            customIngredients = mutableListOf(customIngredient1, customIngredient2)
+            ingredients = mutableListOf(customIngredient1, customIngredient2)
         )
         val recipeDto2 = RecipeDTO(
             title = "My recipe",
-            customIngredients = mutableListOf(customIngredient2bis, customIngredient3)
-        )
-
-        val expected1 = setOf(
-            customIngredient1.toInfo(),
-            customIngredient2.toInfo(),
-        )
-
-        val expected2 = setOf(
-            customIngredient2bis.toInfo(),
-            customIngredient3.toInfo(),
+            ingredients = mutableListOf(customIngredient2bis, customIngredient3)
         )
 
         val recipe = client.createRecipe(recipeDto1)
         val response = client.getRecipe(recipe.id)
-        assertEquals(expected1, response.customIngredients.toSet())
+        assertEquals(
+            setOf("custom ingredient 1" to AmountUnit.GRAM, "custom ingredient 2" to AmountUnit.GRAM),
+            response.ingredients.map { it.name to it.unit }.toSet(),
+        )
 
         client.updateRecipe(recipe.id, recipeDto2)
         val response2 = client.getRecipe(recipe.id)
-        assertEquals(expected2, response2.customIngredients.toSet())
+        assertEquals(
+            setOf("custom ingredient 2" to AmountUnit.UNIT, "custom ingredient 3" to AmountUnit.GRAM),
+            response2.ingredients.map { it.name to it.unit }.toSet(),
+        )
+    }
+
+    @Test
+    fun `rename a custom ingredient`() = runTestAsAdmin {
+        val recipe = client.createRecipe(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(
+                customName = "flour",
+                unit = AmountUnit.GRAM,
+                amount = 250f,
+            ))
+        ))
+
+        client.updateRecipe(recipe.id, RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(
+                customName = "wheat flour",
+                unit = AmountUnit.GRAM,
+                amount = 250f,
+            ))
+        ))
+
+        val response = client.getRecipe(recipe.id)
+        assertEquals(1, response.ingredients.size)
+        assertEquals("wheat flour", response.ingredients.single().name)
+        assertEquals(250f, response.ingredients.single().amount)
+    }
+
+    @Test
+    fun `custom ingredients sharing a name are both kept`() = runTestAsAdmin {
+        val recipe = client.createRecipe(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(
+                RecipeDTO.RecipeIngredientDTO(customName = "sugar", unit = AmountUnit.GRAM, amount = 100f),
+                RecipeDTO.RecipeIngredientDTO(customName = "sugar", unit = AmountUnit.TABLESPOON, amount = 2f),
+            )
+        ))
+
+        val response = client.getRecipe(recipe.id)
+        assertEquals(2, response.ingredients.size)
+        assertEquals(
+            listOf(AmountUnit.GRAM, AmountUnit.TABLESPOON),
+            response.ingredients.map { it.unit },
+        )
+    }
+
+    @Test
+    fun `mix referenced and custom ingredients`() = runTestAsAdmin {
+        val ingredient = client.createIngredient()
+
+        val recipe = client.createRecipe(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(
+                RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = AmountUnit.GRAM, amount = 10f),
+                RecipeDTO.RecipeIngredientDTO(customName = "yuzu zest", unit = AmountUnit.TEASPOON, amount = 1f),
+            )
+        ))
+
+        val response = client.getRecipe(recipe.id)
+        assertEquals(2, response.ingredients.size)
+        assertEquals(listOf(false, true), response.ingredients.map { it.isCustom })
+        assertEquals(ingredient.id, response.ingredients.first().id)
+        assertEquals("yuzu zest", response.ingredients.last().name)
+    }
+
+    @Test
+    fun `ingredient order is persisted`() = runTestAsAdmin {
+        val ingredient1 = client.createIngredient()
+        val ingredient2 = client.createIngredient()
+
+        val rows = mutableListOf(
+            RecipeDTO.RecipeIngredientDTO(id = ingredient1.id, unit = AmountUnit.GRAM, amount = 1f),
+            RecipeDTO.RecipeIngredientDTO(customName = "salt", unit = AmountUnit.TEASPOON, amount = 1f),
+            RecipeDTO.RecipeIngredientDTO(id = ingredient2.id, unit = AmountUnit.GRAM, amount = 2f),
+        )
+
+        val recipe = client.createRecipe(RecipeDTO(title = "My recipe", ingredients = rows))
+        assertEquals(
+            listOf(ingredient1.id, null, ingredient2.id),
+            client.getRecipe(recipe.id).ingredients.map { it.id },
+        )
+
+        client.updateRecipe(recipe.id, RecipeDTO(
+            title = "My recipe",
+            ingredients = rows.reversed().toMutableList(),
+        ))
+        assertEquals(
+            listOf(ingredient2.id, null, ingredient1.id),
+            client.getRecipe(recipe.id).ingredients.map { it.id },
+        )
+    }
+
+    @Test
+    fun `same ingredient can appear twice in a recipe`() = runTestAsAdmin {
+        val ingredient = client.createIngredient()
+
+        val recipe = client.createRecipe(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(
+                RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = AmountUnit.GRAM, amount = 100f, complement = "for the dough"),
+                RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = AmountUnit.GRAM, amount = 20f, complement = "for dusting"),
+            )
+        ))
+
+        val response = client.getRecipe(recipe.id)
+        assertEquals(2, response.ingredients.size)
+        assertEquals(listOf(100f, 20f), response.ingredients.map { it.amount })
+        assertEquals(listOf("for the dough", "for dusting"), response.ingredients.map { it.complement })
+    }
+
+    @Test
+    fun `an ingredient row must be either referenced or custom`() = runTestAsAdmin {
+        val ingredient = client.createIngredient()
+
+        // Neither.
+        client.createRecipeRaw(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(unit = AmountUnit.GRAM, amount = 1f)),
+        )).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+
+        // Both.
+        client.createRecipeRaw(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(
+                id = ingredient.id,
+                customName = "flour",
+                unit = AmountUnit.GRAM,
+                amount = 1f,
+            )),
+        )).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+    }
+
+    @Test
+    fun `a unit the ingredient does not allow is rejected`() = runTestAsAdmin {
+        // Weight only: no gramsPerUnit and no gramsPerMilliliter.
+        val ingredient = client.createIngredient(IngredientDTO(type = IngredientType.MEAT))
+
+        client.createRecipeRaw(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(
+                id = ingredient.id,
+                unit = AmountUnit.CUP,
+                amount = 1f,
+            )),
+        )).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+
+        // A custom row has no capability data, so any unit is fine.
+        client.createRecipe(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(
+                customName = "coconut milk",
+                unit = AmountUnit.CUP,
+                amount = 1f,
+            )),
+        ))
+    }
+
+    @Test
+    fun `amount and unit must agree`() = runTestAsAdmin {
+        val ingredient = client.createIngredient()
+
+        fun row(unit: AmountUnit, amount: Float?) = RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = unit, amount = amount)),
+        )
+
+        // An amount without a unit means nothing, and vice versa.
+        client.createRecipeRaw(row(AmountUnit.NONE, 5f)).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+        client.createRecipeRaw(row(AmountUnit.GRAM, null)).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+        client.createRecipeRaw(row(AmountUnit.GRAM, 0f)).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+
+        client.createRecipe(row(AmountUnit.NONE, null))
+        client.createRecipe(row(AmountUnit.GRAM, 5f))
+    }
+
+    @Test
+    fun `a rejected update leaves the stored ingredients untouched`() = runTestAsAdmin {
+        val ingredient = client.createIngredient()
+        val recipe = client.createRecipe(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(
+                id = ingredient.id,
+                unit = AmountUnit.GRAM,
+                amount = 100f,
+            )),
+        ))
+
+        // The second row is invalid, so the whole update must be refused.
+        client.updateRecipeRaw(recipe.id, RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(
+                RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = AmountUnit.GRAM, amount = 250f),
+                RecipeDTO.RecipeIngredientDTO(unit = AmountUnit.GRAM, amount = 1f),
+            ),
+        )).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+
+        val stored = client.getRecipe(recipe.id).ingredients.single()
+        assertEquals(100f, stored.amount)
+    }
+
+    @Test
+    fun `a rejected creation does not leave an orphaned recipe`() = runTestAsAdmin {
+        val user = client.getMe()
+        val before = client.listRecipes(user = user.id).size
+
+        client.createRecipeRaw(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(unit = AmountUnit.GRAM, amount = 1f)),
+        )).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+
+        assertEquals(before, client.listRecipes(user = user.id).size)
+    }
+
+    @Test
+    fun `referencing an unknown ingredient returns NotFound`() = runTestAsAdmin {
+        client.createRecipeRaw(RecipeDTO(
+            title = "My recipe",
+            ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(id = -1, unit = AmountUnit.GRAM, amount = 1f)),
+        )).apply { assertEquals(HttpStatusCode.NotFound, status) }
     }
 
     @Test
