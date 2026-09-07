@@ -1,0 +1,21 @@
+# Backend configuration for the local `docker compose` stack, mounted at
+# /app/config/application.yaml — the first source `loadConfig()` looks at.
+#
+# It has to exist: every source in that chain is optional, the packaged resources
+# ship no application.yaml (it is gitignored), and hoplite throws when nothing
+# fills in Configuration. Production keeps the real one in a k8s Secret
+# (cooknco-config); these are placeholders, not credentials.
+smtp:
+  email: dev@example.com
+  password: unused
+frontend:
+  url: http://localhost
+backend:
+  url: http://localhost/api/v1
+encryption:
+  # Must match AES_KEY in compose.yaml's mail-service. 16 bytes, as AES wants.
+  key: 6r5HI1W9n4U3tOMS
+oauth:
+  google:
+    client_id: unused
+    client_secret: unused
