@@ -16,6 +16,32 @@ Cooknco runs on a Kubernetes cluster. Here are the pods used:
   - cooknco-mail-database: its database
 - cooknco-frontend: the frontend, powered by nginx
 
+Kafka carries the events between the backend and the mail service; in the cluster it is a
+separate Strimzi deployment, and `k8s/kafka-topics` declares the topics.
+
+## Running locally
+`compose.yaml` brings the same set of services up on one machine. The app images copy an
+artefact the Gradle build already produced, exactly as CI builds them, so build first:
+
+```
+./gradlew build
+docker compose up --build
+```
+
+Then open <http://localhost> — not `127.0.0.1`, or the `SameSite=Lax` session cookie is
+never sent back and every call 401s. The default admin is `admin@mail.com` / `Passw0rd`.
+The backend is also published directly on `:8081` for poking at the API.
+
+On an arm64 machine every `/image/` request answers 500: the `libwebp-imageio` native
+library packaged in the dependency jar is x86_64 only. Set `BACKEND_PLATFORM=linux/amd64`
+to run the backend emulated, which serves images at the cost of a slower JVM.
+
+The stack needs no `.env`: every variable has a local default. Set `REDIS_PASSWORD`,
+`COOKNCO_SMTP_ADDRESS` / `COOKNCO_SMTP_PASSWORD` (the mail service sends through Gmail and
+logs a failure without them), or `BACKEND_PORT` / `FRONTEND_PORT` to override. The backend
+configuration compose mounts is `config/application.yaml` — placeholders, whereas
+production reads the real one from the `cooknco-config` Secret.
+
 ## Mobile app
 The native app in `app/` is a Kotlin Multiplatform project sharing one Compose UI
 across Android and iOS:
