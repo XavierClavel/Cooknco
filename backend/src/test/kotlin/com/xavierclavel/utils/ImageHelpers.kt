@@ -1,7 +1,6 @@
 package main.com.xavierclavel.utils
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.delete
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.post
@@ -36,6 +35,3 @@ suspend fun HttpClient.uploadImage(path: String, id: Long, bytes: ByteArray = te
 
 suspend fun HttpClient.uploadRecipeImage(recipeId: Long, bytes: ByteArray = testImageBytes()): HttpResponse =
     uploadImage("recipes", recipeId, bytes)
-
-suspend fun HttpClient.deleteRecipeImage(recipeId: Long): HttpResponse =
-    this.delete("$IMAGE_URL/recipes/$recipeId")
