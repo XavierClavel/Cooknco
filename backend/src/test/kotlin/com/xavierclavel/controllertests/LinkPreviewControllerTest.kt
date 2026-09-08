@@ -15,6 +15,7 @@ import shared.enums.Locale
 import shared.enums.Visibility
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.head
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -265,6 +266,29 @@ class LinkPreviewControllerTest : ApplicationTest() {
 
         assertEquals("Older build", document.metaContent("og:title"))
         assertTrue(document.contains(FakeAppShellSource.OUTSIDE_BODY), "the app's mount point was lost")
+    }
+
+    /**
+     * nginx answered these paths from disk before this feature, where a HEAD got a 200 like
+     * any other static file. Ktor answers 405 for an undeclared verb, and unfurlers and
+     * uptime monitors do probe with HEAD, so the 405 would cost the very preview this is for.
+     */
+    @Test
+    fun `HEAD is answered, not rejected as a bad method`() = runTest {
+        val owner = setupTestUser(uniqueMail())
+        val recipe = recipeService.createRecipe(RecipeDTO(title = "Probed"), userService.getEntityById(owner))
+
+        for (path in listOf(
+            "/recipe/view?id=${recipe.id}",
+            "/user/view/?user=$owner",
+            "/cookbook/view?cookbook=1",
+            "/ingredient/view?ingredient=1",
+        )) {
+            client.head(path).apply {
+                assertEquals(HttpStatusCode.OK, status, "HEAD $path")
+                assertEquals(ContentType.Text.Html, contentType()?.withoutParameters(), "HEAD $path")
+            }
+        }
     }
 
     /**

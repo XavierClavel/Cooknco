@@ -17,6 +17,7 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.get
+import io.ktor.server.routing.head
 import org.koin.java.KoinJavaComponent.inject
 
 /**
@@ -45,6 +46,14 @@ object LinkPreviewController: Controller() {
     private fun Route.preview(route: String, describe: RoutingContext.(Locale) -> LinkPreview) {
         listOf(route, "$route/").forEach { path ->
             get(path) { respondPreview(describe(previewLocale())) }
+            // nginx answered these paths from disk before this feature, where a HEAD got a
+            // 200 like any other static file. Ktor answers 405 for a verb a route does not
+            // declare, and unfurlers and uptime monitors do probe with HEAD, so the 405
+            // would cost the very preview this exists for. Ktor's AutoHeadResponse is
+            // application-scoped, and giving every API route a HEAD is not this feature's
+            // business — hence the explicit pairing. Same handler, so a HEAD reports the
+            // same status a GET would, 502 included.
+            head(path) { respondPreview(describe(previewLocale())) }
         }
     }
 
