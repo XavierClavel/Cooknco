@@ -1,5 +1,5 @@
 allprojects {
-    version = "1.3.4"
+    version = "1.4.0"
     group = "eu.cooknco"
 }
 
@@ -53,6 +53,8 @@ subprojects {
         implementation("io.ktor:ktor-server-status-pages:${ktorVersion}")
         implementation("io.ktor:ktor-server-sse:${ktorVersion}")
         testImplementation("io.ktor:ktor-server-test-host-jvm:${ktorVersion}")
+        // Lets AppShellSource's HTTP reads be driven without a server to read from.
+        testImplementation("io.ktor:ktor-client-mock:${ktorVersion}")
 
         //DB -> Ebean
         implementation("org.hibernate:hibernate-core:6.6.1.Final")

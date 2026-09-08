@@ -2,6 +2,9 @@ package com.xavierclavel.config
 
 import com.xavierclavel.plugins.RedisService
 import com.xavierclavel.services.AdminService
+import com.xavierclavel.services.AppShellSource
+import com.xavierclavel.services.HttpAppShellSource
+import com.xavierclavel.services.LinkPreviewService
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DashboardService
 import com.xavierclavel.services.DefaultImageService
@@ -41,6 +44,10 @@ val appModules = module {
     single { AdminService() }
     single { StorageService() }
     single { EmailTemplateService() }
+    single { LinkPreviewService() }
+    // Over the cluster network, because the shell it reads is baked into the frontend image
+    // and not this one. Tests swap in a stub.
+    single<AppShellSource> { HttpAppShellSource(config) }
     single { RedisService(getProperty("redis.url", "redis://:${System.getenv("REDIS_PASSWORD")}@cooknco-redis:6379")) }
     single { config }
     single { EncryptionService() }

@@ -13,6 +13,7 @@ import com.xavierclavel.controllers.InternalMailTemplateController
 import com.xavierclavel.controllers.RecipeController
 import com.xavierclavel.controllers.ImageController
 import com.xavierclavel.controllers.LikeController
+import com.xavierclavel.controllers.LinkPreviewController
 import com.xavierclavel.controllers.NotificationController
 import com.xavierclavel.controllers.RecipeNotesController
 import com.xavierclavel.controllers.ReportController
@@ -115,6 +116,8 @@ fun Application.serveRoutes() = routing {
     serve(AuthController)
     serve(NotificationController)
     serve(ReportController)
+    // Not an API: the documents behind the public app routes people share. See the controller.
+    serve(LinkPreviewController)
     serve(AdminController)
     // Outside the admin gate on purpose: its only caller is mail-service, and nginx never
     // proxies this prefix, so it is unreachable from outside the cluster. See the controller.

@@ -3,6 +3,7 @@ package com.xavierclavel
 import com.xavierclavel.plugins.DatabaseManager
 import com.xavierclavel.plugins.RedisService
 import com.xavierclavel.services.AdminService
+import com.xavierclavel.services.AppShellSource
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DashboardService
 import com.xavierclavel.services.DefaultImageService
@@ -13,6 +14,7 @@ import com.xavierclavel.services.FollowService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
+import com.xavierclavel.services.LinkPreviewService
 import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
@@ -32,6 +34,7 @@ import io.ktor.server.testing.*
 import io.ktor.utils.io.KtorDsl
 import kotlinx.serialization.json.Json
 import main.com.xavierclavel.containers.RedisTestContainer
+import main.com.xavierclavel.utils.FakeAppShellSource
 import main.com.xavierclavel.utils.login
 import main.com.xavierclavel.utils.logout
 import org.junit.jupiter.api.AfterAll
@@ -54,6 +57,8 @@ abstract class ApplicationTest: KoinTest {
     val encryptionService: EncryptionService by inject()
     val eventProducer: EventProducer by inject()
     val mockEventProducer by lazy{ eventProducer as MockEventProducer}
+    val appShellSource: AppShellSource by inject()
+    val fakeAppShellSource by lazy { appShellSource as FakeAppShellSource }
 
     companion object {
         const val USER1 = "user1"
@@ -91,6 +96,8 @@ abstract class ApplicationTest: KoinTest {
                 single { AdminService() }
                 single { StorageService() }
                 single { EmailTemplateService() }
+                single { LinkPreviewService() }
+                single<AppShellSource> { FakeAppShellSource() }
                 single { RedisService(getProperty("redis.url", "redis://redis:6379")) }
                 single { loadConfig() }
                 single { EncryptionService() }
@@ -180,6 +187,7 @@ abstract class ApplicationTest: KoinTest {
                 module()
             }
             mockEventProducer.clear()
+            fakeAppShellSource.reset()
             val wrapper = TestBuilderWrapper(this)
             wrapper.block() // Use the wrapper in the block
         }
