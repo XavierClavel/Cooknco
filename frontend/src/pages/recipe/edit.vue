@@ -435,12 +435,10 @@ async function submit() {
     if (recipeId.value == null) {
       const response = await createRecipe(submitted)
       recipeId.value = response.data.id
-      // Lets the picture component pick up the id of the recipe it belongs to.
-      await nextTick()
     } else {
       await updateRecipe(recipeId.value, submitted)
     }
-    await editablePicture.value.submitImage()
+    await editablePicture.value.submitImage(recipeId.value)
   } catch (error) {
     console.log(error)
     // The recipe itself may already be saved: stay on the form so that the

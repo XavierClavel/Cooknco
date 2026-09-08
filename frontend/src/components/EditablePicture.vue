@@ -169,15 +169,19 @@ function handleImageError(url) {
 /**
  * Sends the pending image change, if any, and returns the image version to
  * display from now on.
+ *
+ * A record that was just created passes [id] in: its id reaches the `id` prop
+ * only once the parent has re-rendered, and waiting for that render to upload
+ * the image is what made the image silently vanish on creation.
  */
-async function submitImage(): Promise<number> {
+async function submitImage(id: number = props.id): Promise<number> {
   const currentVersion = props.version ?? 0
   if (imageDeleted.value) {
-    await doDeleteImage(props.path, props.id)
+    await doDeleteImage(props.path, id)
     return 0
   } else if (imageUpdated.value) {
-    // On creation the record had no version yet, its first image is version 1.
-    await uploadImage(props.id, image.value, props.path)
+    // The record had no version yet, its first image is version 1.
+    await uploadImage(id, image.value, props.path)
     return currentVersion + 1
   }
   return currentVersion

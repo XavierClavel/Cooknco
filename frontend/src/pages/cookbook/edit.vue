@@ -232,8 +232,6 @@ async function submit() {
       if (addRecipeId != null) {
         await addRecipeToCookbook(cookbookId.value, addRecipeId)
       }
-      // Lets the picture component pick up the id of the cookbook it belongs to.
-      await nextTick()
     } else {
       await editCookbook(cookbookId.value, submitted)
     }
@@ -241,7 +239,7 @@ async function submit() {
     const membersInput = members.value.filter(item => item.id != null).map(item => ({ id: item.id, isAdmin: item.role == "ADMIN" }))
     await setCookbookUsers(cookbookId.value, membersInput)
 
-    await editablePicture.value.submitImage()
+    await editablePicture.value.submitImage(cookbookId.value)
   } catch (error) {
     console.log(error)
     errorMessage.value = toErrorMessage(error, "image_upload_failed")
