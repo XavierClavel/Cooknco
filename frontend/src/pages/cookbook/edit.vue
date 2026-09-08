@@ -225,6 +225,8 @@ async function submit() {
   submitted['visibility'] = cookbook.value.visibility
   console.log(submitted)
   errorMessage.value = null
+  // Saved and uploaded in two steps, each reporting its own failure: the fallback
+  // wording is only right for the step it guards.
   try {
     if (cookbookId.value == null) {
       const response = await createCookbook(submitted)
@@ -238,10 +240,18 @@ async function submit() {
 
     const membersInput = members.value.filter(item => item.id != null).map(item => ({ id: item.id, isAdmin: item.role == "ADMIN" }))
     await setCookbookUsers(cookbookId.value, membersInput)
+  } catch (error) {
+    console.log(error)
+    errorMessage.value = toErrorMessage(error)
+    return
+  }
 
+  try {
     await editablePicture.value.submitImage(cookbookId.value)
   } catch (error) {
     console.log(error)
+    // The cookbook itself is already saved: stay on the form so that the image
+    // can be submitted again instead of silently dropping it.
     errorMessage.value = toErrorMessage(error, "image_upload_failed")
     return
   }

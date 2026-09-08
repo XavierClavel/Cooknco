@@ -290,13 +290,21 @@ async function uploadImage(id, file, path) {
   )
 }
 
+// Every key the backend answers with is lowercase snake_case — they all come from the
+// `*Cause` enums in `exceptions/Exceptions.kt` — so anything else in the body is not a key.
+const translationKey = /^[a-z0-9_]+$/
+
 /**
  * Error message key to display for a failed request. Backend errors carry their
  * own translation key in the response body, anything else falls back to [fallback].
+ *
+ * The body is only trusted when it has the shape of a key: `<error>` renders it
+ * through `$t()`, which echoes an unknown key verbatim, so an unhandled 500 would
+ * otherwise put a raw server or database message on screen.
  */
 const toErrorMessage = (error, fallback = "unknown_error") => {
   const data = error?.response?.data
-  return typeof data === "string" && data ? data : fallback
+  return typeof data === "string" && translationKey.test(data) ? data : fallback
 }
 
 

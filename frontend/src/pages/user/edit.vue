@@ -91,18 +91,27 @@ async function submit() {
   submitted["username"] = user.value.username
   submitted["bio"] = user.value.bio
   console.log(submitted)
+  errorMessage.value = null
+  // Saved and uploaded in two steps, each reporting its own failure: the fallback
+  // wording is only right for the step it guards.
   try {
-    await updateUser(submitted).catch()
+    await updateUser(submitted)
+  } catch (e) {
+    console.log(e)
+    errorMessage.value = toErrorMessage(e)
+    return
+  }
+
+  try {
     const newVersion = await editablePicture.value.submitImage()
-    console.log(newVersion)
-    const authStore = useAuthStore()
-    authStore.setImgVersion(newVersion)
-    toViewUser(userId)
+    useAuthStore().setImgVersion(newVersion)
   } catch (e) {
     console.log(e)
     errorMessage.value = toErrorMessage(e, "image_upload_failed")
+    return
   }
 
+  toViewUser(userId)
 }
 
 </script>

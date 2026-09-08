@@ -431,6 +431,8 @@ async function submit() {
   delete submitted['version']
   console.log(submitted)
   errorMessage.value = null
+  // Saved and uploaded in two steps, each reporting its own failure: the fallback
+  // wording is only right for the step it guards.
   try {
     if (recipeId.value == null) {
       const response = await createRecipe(submitted)
@@ -438,11 +440,18 @@ async function submit() {
     } else {
       await updateRecipe(recipeId.value, submitted)
     }
+  } catch (error) {
+    console.log(error)
+    errorMessage.value = toErrorMessage(error)
+    return
+  }
+
+  try {
     await editablePicture.value.submitImage(recipeId.value)
   } catch (error) {
     console.log(error)
-    // The recipe itself may already be saved: stay on the form so that the
-    // image can be submitted again instead of silently dropping it.
+    // The recipe itself is already saved: stay on the form so that the image can
+    // be submitted again instead of silently dropping it.
     errorMessage.value = toErrorMessage(error, "image_upload_failed")
     return
   }
