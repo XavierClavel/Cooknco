@@ -120,8 +120,11 @@ const imageDeleted = ref<Boolean>(false)
 const hasImage = ref<Boolean>(false)
 
 const onImageUpload = () => {
+  // The picker also fires this when it is dismissed without picking a file.
+  if (!image.value) return
   imageUrl.value = URL.createObjectURL(image.value)
   imageUpdated.value = true
+  imageDeleted.value = false
 }
 
 function undoImageChange() {
@@ -148,7 +151,9 @@ function handleImageLoad(url) {
   // Only consider the primary image for setting imageExists
   if (url === baseImageUrl.value) {
     console.log("image success")
-    hasImage.value = true
+    // A record with no image resolves to the placeholder, which loads fine but
+    // is nothing to delete.
+    hasImage.value = baseImageUrl.value !== defaultImageUrl.value
   }
 }
 
@@ -161,15 +166,25 @@ function handleImageError(url) {
   }
 }
 
-async function submitImage(): Promise<number> {
-  console.log(imageDeleted.value)
+/**
+ * Sends the pending image change, if any, and returns the image version to
+ * display from now on.
+ *
+ * A record that was just created passes [id] in: its id reaches the `id` prop
+ * only once the parent has re-rendered, and waiting for that render to upload
+ * the image is what made the image silently vanish on creation.
+ */
+async function submitImage(id: number = props.id): Promise<number> {
+  const currentVersion = props.version ?? 0
   if (imageDeleted.value) {
-    await doDeleteImage(props.path, props.id)
+    await doDeleteImage(props.path, id)
     return 0
   } else if (imageUpdated.value) {
-    await uploadImage(props.id, image.value, props.path)
-    return props.version + 1
+    // The record had no version yet, its first image is version 1.
+    await uploadImage(id, image.value, props.path)
+    return currentVersion + 1
   }
+  return currentVersion
 }
 
 defineExpose({

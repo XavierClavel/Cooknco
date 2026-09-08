@@ -21,7 +21,7 @@ class UserRepository(
         userApi.updateUser(requireToken(), username, bio)
     }
 
-    suspend fun uploadProfileImage(userId: Long, imageBytes: ByteArray, mimeType: String): Result<Long> = runCatching {
+    suspend fun uploadProfileImage(userId: Long, imageBytes: ByteArray, mimeType: String): Result<Unit> = runCatching {
         userApi.uploadProfileImage(requireToken(), userId, imageBytes, mimeType)
     }
 

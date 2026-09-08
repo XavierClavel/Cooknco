@@ -251,6 +251,8 @@
           :rules="[max511]"
         ></v-textarea>
 
+      <error :error="errorMessage"></error>
+
       <v-container>
         <v-row
           class="d-flex align-center justify-center align-content-center mb-2 ga-4"
@@ -279,7 +281,7 @@ import { ref } from 'vue';
 import draggable from 'vuedraggable';
 import { useRoute } from 'vue-router';
 import {getRecipe, createRecipe, updateRecipe} from "@/scripts/recipes";
-import {defaultImageRecipe, toViewRecipe} from "@/scripts/common";
+import {defaultImageRecipe, toErrorMessage, toViewRecipe} from "@/scripts/common";
 import {searchIngredients} from "@/scripts/ingredients";
 import EditablePicture from "@/components/EditablePicture.vue";
 import {dishOptions} from "@/scripts/values";
@@ -296,6 +298,7 @@ const route = useRoute();
 let recipeId = ref(route.query.id)
 const ready = ref(false)
 const editablePicture = ref(null)
+const errorMessage = ref(null)
 
 const autocompleteList = ref([])
 const queryList = ref([])
@@ -427,14 +430,31 @@ async function submit() {
   submitted.steps = submitted.steps.filter((it) => it)
   delete submitted['version']
   console.log(submitted)
-  if (recipeId.value == null) {
-    const response = await createRecipe(submitted)
-    recipeId.value = response.data.id
-    await nextTick()
-  } else {
-    await updateRecipe(recipeId.value, submitted)
+  errorMessage.value = null
+  // Saved and uploaded in two steps, each reporting its own failure: the fallback
+  // wording is only right for the step it guards.
+  try {
+    if (recipeId.value == null) {
+      const response = await createRecipe(submitted)
+      recipeId.value = response.data.id
+    } else {
+      await updateRecipe(recipeId.value, submitted)
+    }
+  } catch (error) {
+    console.log(error)
+    errorMessage.value = toErrorMessage(error)
+    return
   }
-  await editablePicture.value.submitImage()
+
+  try {
+    await editablePicture.value.submitImage(recipeId.value)
+  } catch (error) {
+    console.log(error)
+    // The recipe itself is already saved: stay on the form so that the image can
+    // be submitted again instead of silently dropping it.
+    errorMessage.value = toErrorMessage(error, "image_upload_failed")
+    return
+  }
 
   toViewRecipe(recipeId.value)
 }

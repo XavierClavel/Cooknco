@@ -161,6 +161,8 @@ export default {
 
   invalid_request: "Invalid request",
   invalid_image: "Invalid image",
+  image_upload_failed: "The image could not be uploaded, please try again",
+  unknown_error: "Something went wrong, please try again",
   token_missing: "Missing token",
   mail_missing: "Mail missing",
   user_already_followed: "User already followed",

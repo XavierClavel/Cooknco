@@ -18,18 +18,24 @@ const apiClient = axios.create({
   },
 });
 
-apiClient.interceptors.request.use(
-  function (config) {
-    const token = localStorage.getItem("authToken");
-    console.log('token', token)
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config
-  },
-  function (error) {
-    return Promise.reject(error)
-  }
-)
+// The native app has no usable session cookie, it authenticates with a bearer
+// token. Every client talking to the backend needs it, images included.
+function attachAuthToken(client) {
+  client.interceptors.request.use(
+    function (config) {
+      const token = localStorage.getItem("authToken");
+      console.log('token', token)
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+      return config
+    },
+    function (error) {
+      return Promise.reject(error)
+    }
+  )
+}
 
+attachAuthToken(apiClient)
+attachAuthToken(imageClient)
 
 
 apiClient.interceptors.response.use(

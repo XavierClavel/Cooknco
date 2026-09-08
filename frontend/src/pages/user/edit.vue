@@ -62,7 +62,7 @@
 <script lang="ts" setup>
 import { useRoute } from 'vue-router';
 import {ref} from "vue";
-import {toEditUser, toViewUser} from "@/scripts/common";
+import {toEditUser, toErrorMessage, toViewUser} from "@/scripts/common";
 import {getUser, updateUser} from "@/scripts/users";
 import EditablePicture from "@/components/EditablePicture.vue";
 import {max255} from "@/scripts/rules";
@@ -83,7 +83,7 @@ getUser(userId).then (
     user.value = response.data
     ready.value = true
   }).catch(function (error) {
-    errorMessage.value = error.response.data
+    errorMessage.value = toErrorMessage(error)
 })
 
 async function submit() {
@@ -91,17 +91,27 @@ async function submit() {
   submitted["username"] = user.value.username
   submitted["bio"] = user.value.bio
   console.log(submitted)
+  errorMessage.value = null
+  // Saved and uploaded in two steps, each reporting its own failure: the fallback
+  // wording is only right for the step it guards.
   try {
-    await updateUser(submitted).catch()
-    const newVersion = await editablePicture.value.submitImage()
-    console.log(newVersion)
-    const authStore = useAuthStore()
-    authStore.setImgVersion(newVersion)
-    toViewUser(userId)
+    await updateUser(submitted)
   } catch (e) {
-    errorMessage.value = e.response.data
+    console.log(e)
+    errorMessage.value = toErrorMessage(e)
+    return
   }
 
+  try {
+    const newVersion = await editablePicture.value.submitImage()
+    useAuthStore().setImgVersion(newVersion)
+  } catch (e) {
+    console.log(e)
+    errorMessage.value = toErrorMessage(e, "image_upload_failed")
+    return
+  }
+
+  toViewUser(userId)
 }
 
 </script>

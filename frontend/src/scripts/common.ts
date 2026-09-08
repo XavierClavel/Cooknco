@@ -53,6 +53,7 @@ export {
 
   uploadImage,
   doDeleteImage,
+  toErrorMessage,
 
   noLoginRedirect,
   noLoginRedirectStartsWith,
@@ -267,34 +268,43 @@ async function logout() {
 }
 
 async function doDeleteImage(path,id) {
-  return await imageClient.delete( `/${path}/${id}`).then(function(response){
-    console.log('SUCCESS!!');
-    console.log(response)
-  })
-    .catch(function(error){
-      console.log('FAILURE!!');
-      console.log(error)
-    });
+  if (id == null) throw new Error(`Cannot delete image: missing ${path} id`)
+  return await imageClient.delete( `/${path}/${id}`)
 }
 
 async function uploadImage(id, file, path) {
+  if (id == null) throw new Error(`Cannot upload image: missing ${path} id`)
+  if (!file) throw new Error("Cannot upload image: no file selected")
   let formData = new FormData()
   formData.append('file', file)
   return await imageClient.post( `/${path}/${id}`,
     formData,
     {
+      // Overrides the client's json default: axios serializes a FormData body to
+      // json when the content type says json, and replaces this one with a
+      // properly delimited multipart type when sending.
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     }
-  ).then(function(response){
-    console.log('SUCCESS!!');
-    console.log(response)
-  })
-    .catch(function(error){
-      console.log('FAILURE!!');
-      console.log(error)
-    });
+  )
+}
+
+// Every key the backend answers with is lowercase snake_case — they all come from the
+// `*Cause` enums in `exceptions/Exceptions.kt` — so anything else in the body is not a key.
+const translationKey = /^[a-z0-9_]+$/
+
+/**
+ * Error message key to display for a failed request. Backend errors carry their
+ * own translation key in the response body, anything else falls back to [fallback].
+ *
+ * The body is only trusted when it has the shape of a key: `<error>` renders it
+ * through `$t()`, which echoes an unknown key verbatim, so an unhandled 500 would
+ * otherwise put a raw server or database message on screen.
+ */
+const toErrorMessage = (error, fallback = "unknown_error") => {
+  const data = error?.response?.data
+  return typeof data === "string" && translationKey.test(data) ? data : fallback
 }
 
 
