@@ -114,6 +114,8 @@
       >{{$t("user")}}</v-btn>
 
 
+      <error :error="errorMessage"></error>
+
       <v-container>
         <v-row
           class="d-flex align-center justify-center mb-2 ga-4"
@@ -140,7 +142,7 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
 import { useRoute } from 'vue-router';
-import {getUserIconUrl, toViewCookbook} from "@/scripts/common";
+import {getUserIconUrl, toErrorMessage, toViewCookbook} from "@/scripts/common";
 import EditablePicture from "@/components/EditablePicture.vue";
 import {listUsers} from "@/scripts/users";
 import {
@@ -162,6 +164,7 @@ const route = useRoute();
 let cookbookId = ref(route.query.cookbook)
 let addRecipeId = route.query.addRecipe
 const editablePicture = ref(null)
+const errorMessage = ref(null)
 const form = ref(null)
 const members = ref<Array<{ id: number, username: string, role: string }>>([]);
 const ready = ref(false)
@@ -221,21 +224,29 @@ async function submit() {
   submitted["description"] = cookbook.value.description
   submitted['visibility'] = cookbook.value.visibility
   console.log(submitted)
-  if (cookbookId.value == null) {
-    const response = await createCookbook(submitted)
-    cookbookId.value = response.data.id
-    if (addRecipeId != null) {
-      await addRecipeToCookbook(cookbookId.value, addRecipeId)
+  errorMessage.value = null
+  try {
+    if (cookbookId.value == null) {
+      const response = await createCookbook(submitted)
+      cookbookId.value = response.data.id
+      if (addRecipeId != null) {
+        await addRecipeToCookbook(cookbookId.value, addRecipeId)
+      }
+      // Lets the picture component pick up the id of the cookbook it belongs to.
+      await nextTick()
+    } else {
+      await editCookbook(cookbookId.value, submitted)
     }
-    await nextTick()
-  } else {
-    await editCookbook(cookbookId.value, submitted)
+
+    const membersInput = members.value.filter(item => item.id != null).map(item => ({ id: item.id, isAdmin: item.role == "ADMIN" }))
+    await setCookbookUsers(cookbookId.value, membersInput)
+
+    await editablePicture.value.submitImage()
+  } catch (error) {
+    console.log(error)
+    errorMessage.value = toErrorMessage(error, "image_upload_failed")
+    return
   }
-
-  const membersInput = members.value.filter(item => item.id != null).map(item => ({ id: item.id, isAdmin: item.role == "ADMIN" }))
-  await setCookbookUsers(cookbookId.value, membersInput)
-
-  await editablePicture.value.submitImage()
 
   toViewCookbook(cookbookId.value)
 }

@@ -42,8 +42,9 @@ class UserApi(private val client: HttpClient) {
         return response.body()
     }
 
-    suspend fun uploadProfileImage(token: String, userId: Long, imageBytes: ByteArray, mimeType: String): Long {
-        val response = client.put("$base/user/$userId/image") {
+    /** Images live outside the api: POST {IMAGE_URL}/users/{id}, answering with an empty body. */
+    suspend fun uploadProfileImage(token: String, userId: Long, imageBytes: ByteArray, mimeType: String) {
+        val response = client.post("${ApiClient.IMAGE_URL}/users/$userId") {
             bearerAuth(token)
             setBody(MultiPartFormDataContent(formData {
                 append("file", imageBytes, Headers.build {
@@ -53,7 +54,6 @@ class UserApi(private val client: HttpClient) {
             }))
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
-        return response.body()
     }
 
     suspend fun isFollowing(token: String, userId: Long): Boolean {

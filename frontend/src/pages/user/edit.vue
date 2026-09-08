@@ -62,7 +62,7 @@
 <script lang="ts" setup>
 import { useRoute } from 'vue-router';
 import {ref} from "vue";
-import {toEditUser, toViewUser} from "@/scripts/common";
+import {toEditUser, toErrorMessage, toViewUser} from "@/scripts/common";
 import {getUser, updateUser} from "@/scripts/users";
 import EditablePicture from "@/components/EditablePicture.vue";
 import {max255} from "@/scripts/rules";
@@ -83,7 +83,7 @@ getUser(userId).then (
     user.value = response.data
     ready.value = true
   }).catch(function (error) {
-    errorMessage.value = error.response.data
+    errorMessage.value = toErrorMessage(error)
 })
 
 async function submit() {
@@ -99,7 +99,8 @@ async function submit() {
     authStore.setImgVersion(newVersion)
     toViewUser(userId)
   } catch (e) {
-    errorMessage.value = e.response.data
+    console.log(e)
+    errorMessage.value = toErrorMessage(e, "image_upload_failed")
   }
 
 }

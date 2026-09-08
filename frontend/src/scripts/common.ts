@@ -53,6 +53,7 @@ export {
 
   uploadImage,
   doDeleteImage,
+  toErrorMessage,
 
   noLoginRedirect,
   noLoginRedirectStartsWith,
@@ -267,34 +268,35 @@ async function logout() {
 }
 
 async function doDeleteImage(path,id) {
-  return await imageClient.delete( `/${path}/${id}`).then(function(response){
-    console.log('SUCCESS!!');
-    console.log(response)
-  })
-    .catch(function(error){
-      console.log('FAILURE!!');
-      console.log(error)
-    });
+  if (id == null) throw new Error(`Cannot delete image: missing ${path} id`)
+  return await imageClient.delete( `/${path}/${id}`)
 }
 
 async function uploadImage(id, file, path) {
+  if (id == null) throw new Error(`Cannot upload image: missing ${path} id`)
+  if (!file) throw new Error("Cannot upload image: no file selected")
   let formData = new FormData()
   formData.append('file', file)
   return await imageClient.post( `/${path}/${id}`,
     formData,
     {
+      // Overrides the client's json default: axios serializes a FormData body to
+      // json when the content type says json, and replaces this one with a
+      // properly delimited multipart type when sending.
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     }
-  ).then(function(response){
-    console.log('SUCCESS!!');
-    console.log(response)
-  })
-    .catch(function(error){
-      console.log('FAILURE!!');
-      console.log(error)
-    });
+  )
+}
+
+/**
+ * Error message key to display for a failed request. Backend errors carry their
+ * own translation key in the response body, anything else falls back to [fallback].
+ */
+const toErrorMessage = (error, fallback = "unknown_error") => {
+  const data = error?.response?.data
+  return typeof data === "string" && data ? data : fallback
 }
 
 

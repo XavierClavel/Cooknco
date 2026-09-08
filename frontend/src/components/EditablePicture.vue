@@ -120,8 +120,11 @@ const imageDeleted = ref<Boolean>(false)
 const hasImage = ref<Boolean>(false)
 
 const onImageUpload = () => {
+  // The picker also fires this when it is dismissed without picking a file.
+  if (!image.value) return
   imageUrl.value = URL.createObjectURL(image.value)
   imageUpdated.value = true
+  imageDeleted.value = false
 }
 
 function undoImageChange() {
@@ -148,7 +151,9 @@ function handleImageLoad(url) {
   // Only consider the primary image for setting imageExists
   if (url === baseImageUrl.value) {
     console.log("image success")
-    hasImage.value = true
+    // A record with no image resolves to the placeholder, which loads fine but
+    // is nothing to delete.
+    hasImage.value = baseImageUrl.value !== defaultImageUrl.value
   }
 }
 
@@ -161,15 +166,21 @@ function handleImageError(url) {
   }
 }
 
+/**
+ * Sends the pending image change, if any, and returns the image version to
+ * display from now on.
+ */
 async function submitImage(): Promise<number> {
-  console.log(imageDeleted.value)
+  const currentVersion = props.version ?? 0
   if (imageDeleted.value) {
     await doDeleteImage(props.path, props.id)
     return 0
   } else if (imageUpdated.value) {
+    // On creation the record had no version yet, its first image is version 1.
     await uploadImage(props.id, image.value, props.path)
-    return props.version + 1
+    return currentVersion + 1
   }
+  return currentVersion
 }
 
 defineExpose({
