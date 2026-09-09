@@ -3,6 +3,7 @@ package com.xavierclavel.cooknco.network
 import com.xavierclavel.cooknco.network.dto.DeviceRegistrationDTO
 import com.xavierclavel.cooknco.network.dto.NotificationInfo
 import com.xavierclavel.cooknco.network.dto.UserNotificationInfo
+import com.xavierclavel.cooknco.platform.devicePlatform
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
@@ -31,7 +32,7 @@ class NotificationApi(private val client: HttpClient) {
             bearerAuth(token)
             parameter("locale", locale)
             contentType(ContentType.Application.Json)
-            setBody(DeviceRegistrationDTO(token = pushToken))
+            setBody(DeviceRegistrationDTO(token = pushToken, platform = devicePlatform))
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }
@@ -46,7 +47,7 @@ class NotificationApi(private val client: HttpClient) {
         val response = client.post("$base/devices/unregister") {
             bearerAuth(token)
             contentType(ContentType.Application.Json)
-            setBody(DeviceRegistrationDTO(token = pushToken))
+            setBody(DeviceRegistrationDTO(token = pushToken, platform = devicePlatform))
         }
         // A 404 means it was already gone, which is the outcome the caller wanted
         if (!response.status.isSuccess() && response.status.value != 404) {

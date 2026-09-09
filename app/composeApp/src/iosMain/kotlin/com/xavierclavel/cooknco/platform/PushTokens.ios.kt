@@ -11,3 +11,5 @@ package com.xavierclavel.cooknco.platform
 actual suspend fun currentPushToken(): String? = null
 
 actual val pushSupported: Boolean = false
+
+actual val devicePlatform: String = "IOS"

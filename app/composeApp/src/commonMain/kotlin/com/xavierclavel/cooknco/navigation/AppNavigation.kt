@@ -357,9 +357,14 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
      * Registers this device once there is an account to register it against, and again on
      * every launch: a token can be rotated while the app is not running, in which case
      * `onNewToken` fired with no session to send it under.
+     *
+     * Keyed on *whether* we are signed in rather than on [authState] itself. The state
+     * carries the user, so re-reading the profile would otherwise restart this effect and
+     * cancel the retries `registerCurrentDevice` needs on a fresh install.
      */
-    LaunchedEffect(authState) {
-        if (authState is AuthState.Authenticated) AppGraph.pushRepository.registerCurrentDevice()
+    val signedIn = authState is AuthState.Authenticated
+    LaunchedEffect(signedIn) {
+        if (signedIn) AppGraph.pushRepository.registerCurrentDevice()
     }
 
     /**
