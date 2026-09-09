@@ -45,6 +45,7 @@ import main.com.xavierclavel.utils.FakeAppShellSource
 import main.com.xavierclavel.utils.FakePushSender
 import main.com.xavierclavel.utils.login
 import main.com.xavierclavel.utils.logout
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -67,6 +68,7 @@ abstract class ApplicationTest: KoinTest {
     val mockEventProducer by lazy{ eventProducer as MockEventProducer}
     val appShellSource: AppShellSource by inject()
     val fakeAppShellSource by lazy { appShellSource as FakeAppShellSource }
+    val notificationService: NotificationService by inject()
     val pushSender: PushSender by inject()
     val fakePushSender by lazy { pushSender as FakePushSender }
 
@@ -145,6 +147,10 @@ abstract class ApplicationTest: KoinTest {
 
     @BeforeEach
     fun cleanDb() {
+        // Notification fan-out outlives the request that caused it, so a dispatch from the
+        // previous test may still be inserting. Draining it first keeps its rows out of this
+        // test, and keeps the wipe below from racing an insert.
+        runBlocking { notificationService.awaitDispatches() }
         DatabaseManager.getTables().forEach {
             it.findList().forEach { it.delete() }
         }

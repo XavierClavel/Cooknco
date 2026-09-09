@@ -6,10 +6,12 @@ import com.xavierclavel.models.jointables.query.QFollow
 import com.xavierclavel.models.jointables.query.QLike
 import com.xavierclavel.models.jointables.query.QRecipeIngredient
 import com.xavierclavel.models.query.QCookbook
+import com.xavierclavel.models.query.QDevice
 import com.xavierclavel.models.query.QEmailTemplate
 import com.xavierclavel.models.query.QPdfTemplate
 import com.xavierclavel.models.query.QDietaryRestrictions
 import com.xavierclavel.models.query.QIngredient
+import com.xavierclavel.models.query.QNotification
 import com.xavierclavel.models.query.QRecipe
 import com.xavierclavel.models.query.QReport
 import com.xavierclavel.models.query.QUser
@@ -37,6 +39,11 @@ object DatabaseManager {
     fun getTables() = listOf(
         // Reports point at users with ON DELETE RESTRICT, so they have to go first
         QReport(),
+        // So do notifications, twice over: the recipient cascades from the account, but the
+        // actor does not — a notification about what someone else did outlives their account
+        // (UserService.detachNotifications), so nothing clears it when that account goes
+        QNotification(),
+        QDevice(),
         QRecipe(),
         QRecipeIngredient(),
         QUser(),

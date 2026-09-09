@@ -17,6 +17,8 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -55,7 +57,27 @@ class NotificationService : KoinComponent {
      * follower, nor fail because one of them could not be reached. A [SupervisorJob] so one
      * failed fan-out does not cancel the next.
      */
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineName("notifications"))
+    private val dispatches = SupervisorJob()
+
+    private val scope = CoroutineScope(dispatches + Dispatchers.IO + CoroutineName("notifications"))
+
+    /**
+     * Waits until no fan-out is still running.
+     *
+     * Exists for the tests. A dispatch deliberately outlives the request that caused it, so
+     * a test that wiped the database straight after one would race the inserts it is about
+     * to assert on — or worse, leave them landing in the next test. Nothing in production
+     * calls this: there, outliving the request is the whole point.
+     */
+    suspend fun awaitDispatches() {
+        // A running dispatch can launch nothing further, but one may start between the two
+        // lines below, so this drains until it finds the scope genuinely idle
+        while (true) {
+            val running = dispatches.children.toList()
+            if (running.isEmpty()) return
+            running.joinAll()
+        }
+    }
 
     companion object {
         /** How many notifications the bell asks for. Enough to fill a menu, not a history. */
