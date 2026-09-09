@@ -156,18 +156,32 @@ the app rather than a migration of every notification already sent.
 
 ### 1. Firebase project
 
-In the [Firebase console](https://console.firebase.google.com/), on the Cook&co project:
+The project is `cooknco-9282f`. Both halves below are already in place; this is what to
+redo if the project is ever recreated or the key rotated. In the
+[Firebase console](https://console.firebase.google.com/):
 
-- **Add an Android app** with package name `com.xavierclavel.cooknco`.
-- Download its `google-services.json` and save it as **`app/androidApp/google-services.json`**.
-  It is gitignored — not because it is secret, but because it names one project, and a
-  checkout with somebody else's would build an app registering against the wrong one. There
-  is a `google-services.json.example` next to it. Until the real file is there, the app build
-  fails with a clear message from the Google Services plugin.
-- Under **Project settings → Service accounts**, generate a new private key. That JSON is the
-  backend's half.
+- **The Android app** is registered under package name `com.xavierclavel.cooknco`. Its
+  `google-services.json` is committed at `app/androidApp/google-services.json`, and the app
+  build fails with a clear message from the Google Services plugin if it goes missing.
+- Under **Project settings → Service accounts**, generate a private key. That JSON is the
+  backend's half, and it is the one real secret here — see below.
 
 Both halves must name the **same** Firebase project, or every push is refused.
+
+### Why only one of the two is a secret
+
+`google-services.json` is tracked, which surprises people. The Google Services plugin turns
+it into ordinary string resources — `google_api_key`, `google_app_id`, `gcm_defaultSenderId`
+— and they end up in `resources.arsc` of every build, so every install of the app already
+carries the lot. Hiding it from the repository would protect nothing and would only stop a
+clean clone from building. Firebase says as much itself: a Firebase API key identifies the
+project, and what guards the project is Security Rules and App Check, not the key's secrecy.
+Worth restricting the Android key to the package name and signing certificate in the Google
+Cloud console all the same, since it is public either way.
+
+The **service account private key** is the opposite. It authorises sending, so it can put a
+notification on every device the app is installed on. It is never committed, never in an
+image, and lives only in the `cooknco-config` Secret.
 
 ### 2. Backend
 

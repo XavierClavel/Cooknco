@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "287597425509",
+    "project_id": "cooknco-9282f",
+    "storage_bucket": "cooknco-9282f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:287597425509:android:bfed4709614a3d540e678c",
+        "android_client_info": {
+          "package_name": "com.xavierclavel.cooknco"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUCQ1AltvVTFjyXsskMD5-qcWZrW-oTyU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
