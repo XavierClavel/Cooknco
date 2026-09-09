@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="devices" identityType="identity" pkName="pk_devices">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="user_id" type="bigint" notnull="true" references="users.id" foreignKeyName="fk_devices_user_id" foreignKeyIndex="ix_devices_user_id"/>
+            <column name="token" type="varchar(4095)" notnull="true" unique="uq_devices_token"/>
+            <column name="platform" type="integer(255)" notnull="true" checkConstraint="check ( platform in (0,1,2))" checkConstraintName="ck_devices_platform"/>
+            <column name="locale" type="integer(255)" notnull="true" checkConstraint="check ( locale in (0,1))" checkConstraintName="ck_devices_locale"/>
+            <column name="created_at" type="localdatetime" notnull="true"/>
+            <column name="last_seen_at" type="localdatetime" notnull="true"/>
+        </createTable>
+        <createTable name="notifications" identityType="identity" pkName="pk_notifications">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="user_id" type="bigint" notnull="true" references="users.id" foreignKeyName="fk_notifications_user_id" foreignKeyIndex="ix_notifications_user_id"/>
+            <column name="kind" type="integer(255)" notnull="true" checkConstraint="check ( kind in (0,1,2,3,4))" checkConstraintName="ck_notifications_kind"/>
+            <column name="title" type="varchar(127)" notnull="true"/>
+            <column name="body" type="varchar(511)" notnull="true"/>
+            <column name="link" type="varchar(511)" defaultValue="''" notnull="true"/>
+            <column name="actor_id" type="bigint" references="users.id" foreignKeyName="fk_notifications_actor_id" foreignKeyIndex="ix_notifications_actor_id"/>
+            <column name="created_at" type="localdatetime" notnull="true"/>
+            <column name="read_at" type="localdatetime"/>
+        </createTable>
+    </changeSet>
+</migration>

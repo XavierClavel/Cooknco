@@ -39,6 +39,14 @@ out/
 /backend/.env
 /backend/src/main/resources/application.yaml
 
+### Firebase credentials (push notifications) ###
+# The service account key can send a notification to every install of the app.
+# Production keeps it in the cooknco-config Secret; see docs/notifications.md.
+/config/fcm-service-account.json
+# Not secret, but per-project: it names one Firebase project, and a checkout with
+# somebody else's would build an app that registers against the wrong one.
+/app/androidApp/google-services.json
+
 ### Kubernetes migration artefacts (contain database dumps and user uploads) ###
 /k8s/migration/backup-*/
 /k8s/migration/.last-backup

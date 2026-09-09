@@ -65,28 +65,70 @@
                 style="border: 3px solid #0d1821 !important;"
               ></v-btn>
 
+              <!-- Lit by either half of the bell: a request to act on, or something unread -->
               <div
-                v-if="pollingStore.data.followersPending?.length"
+                v-if="hasNotifications"
                 class="notification-dot"
               ></div>
             </div>
           </template>
 
-          <v-list v-if="pollingStore.data.followersPending?.length" base-color="black" bg-color="menu" style="border: 3px solid #0d1821 !important;">
-            <v-list-subheader class="text-left ml-n14" inset>{{$t("follow_requests")}}</v-list-subheader>
-            <v-list-item
-              v-for="user in pollingStore.data.followersPending"
-              :key="user.username"
-              :title="user.username"
-            >
-              <template v-slot:prepend>
-                <v-avatar color="black" class="mr-2" style="border:2px solid #0d1821;">
-                  <v-img
-                    :src="getUserIconUrl(user.id)"
-                  ></v-img>
-                </v-avatar>
-              </template>
-            </v-list-item>
+          <v-list v-if="hasNotifications" base-color="black" bg-color="menu" style="border: 3px solid #0d1821 !important;" max-width="380">
+            <!--
+              Follow requests stay a list of their own rather than being folded in with the
+              notifications: they are a queue the user has to act on, not news.
+            -->
+            <template v-if="pollingStore.data.followersPending?.length">
+              <v-list-subheader class="text-left ml-n14" inset>{{$t("follow_requests")}}</v-list-subheader>
+              <v-list-item
+                v-for="user in pollingStore.data.followersPending"
+                :key="user.username"
+                :title="user.username"
+                link
+                @click="toViewUser(user.id)"
+              >
+                <template v-slot:prepend>
+                  <v-avatar color="black" class="mr-2" style="border:2px solid #0d1821;">
+                    <v-img
+                      :src="getUserIconUrl(user.id)"
+                    ></v-img>
+                  </v-avatar>
+                </template>
+              </v-list-item>
+            </template>
+
+            <template v-if="pollingStore.data.notifications?.length">
+              <v-divider v-if="pollingStore.data.followersPending?.length" class="my-1" />
+              <v-list-subheader class="text-left ml-n14" inset>
+                {{$t("notifications")}}
+                <span v-if="pollingStore.data.unreadCount" class="ml-1">({{ pollingStore.data.unreadCount }})</span>
+              </v-list-subheader>
+              <v-list-item
+                v-for="notification in pollingStore.data.notifications"
+                :key="notification.id"
+                :title="notification.title"
+                :subtitle="notification.body"
+                link
+                :class="{'notification-unread': !notification.read}"
+                @click="openNotification(notification)"
+              >
+                <template v-slot:prepend>
+                  <v-avatar v-if="notification.actor" color="black" class="mr-2" style="border:2px solid #0d1821;">
+                    <v-img :src="getUserIconUrl(notification.actor.id, notification.actor.version)"></v-img>
+                  </v-avatar>
+                  <v-icon v-else class="mr-2">mdi-bullhorn-outline</v-icon>
+                </template>
+              </v-list-item>
+
+              <v-divider class="my-1" />
+              <v-list-item
+                v-if="pollingStore.data.unreadCount"
+                :title="$t('mark_all_read')"
+                prepend-icon="mdi-check-all"
+                link
+                @click="markAllNotificationsRead"
+              ></v-list-item>
+            </template>
           </v-list>
         </v-menu>
 
@@ -174,6 +216,7 @@ import {ICON_ADMIN, ICON_COOKBOOK, ICON_HOME, ICON_INGREDIENT, ICON_NOTIFICATION
 import {overrideLocaleFromCookie} from "@/scripts/localization";
 import {useDisplay} from "vuetify";
 import {usePollingStore} from "@/stores/pollingStore";
+import {markAllNotificationsRead as markAllRead, markNotificationRead} from "@/scripts/notifications";
 
 const route = useRoute();
 const router = useRouter()
@@ -220,6 +263,39 @@ onMounted(() => {
   pollingStore.startPolling()
 })
 
+/**
+ * Whether the bell has anything behind it.
+ *
+ * Either half counts: a follow request is something to act on, and an unread notification
+ * is something to read. The dot and the menu are driven off the same answer so the bell
+ * never lights up on an empty menu.
+ */
+const hasNotifications = computed(() =>
+  !!pollingStore.data.followersPending?.length || !!pollingStore.data.notifications?.length)
+
+/**
+ * Opens what a notification points at, and marks it read on the way.
+ *
+ * The link is an app-relative path the backend built, so it is pushed as it stands — the
+ * same value the mobile app maps onto its own routes.
+ */
+async function openNotification(notification) {
+  if (!notification.read) {
+    // Marked locally as well as server-side: the badge should drop on the click, not on
+    // the next poll five minutes later. A failed call is not worth blocking the navigation.
+    await markNotificationRead(notification.id).catch(() => {})
+    notification.read = true
+    pollingStore.data.unreadCount = Math.max(0, (pollingStore.data.unreadCount ?? 1) - 1)
+  }
+  if (notification.link) await router.push(notification.link)
+}
+
+async function markAllNotificationsRead() {
+  await markAllRead().catch(() => {})
+  pollingStore.data.notifications?.forEach((it) => { it.read = true })
+  pollingStore.data.unreadCount = 0
+}
+
 const removeAfterEach = router.afterEach((to, from) => {
   if (to.name != "/search") {
     search.value = null
@@ -264,6 +340,11 @@ watch(
 .relative-btn {
   position: relative;
   display: inline-block;
+}
+
+/* An unread row, marked with the same accent as the dot on the bell */
+.notification-unread {
+  border-left: 3px solid #ff6f59;
 }
 
 .notification-dot {

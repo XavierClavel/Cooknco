@@ -16,6 +16,7 @@ import org.koin.core.component.inject
 
 class FollowService: KoinComponent {
     val userService: UserService by inject()
+    private val notificationService: NotificationService by inject()
 
     fun countAll() =
         QFollow().findCount()
@@ -46,7 +47,8 @@ class FollowService: KoinComponent {
             .map { it.follower!!.toOverview() }
 
     fun acceptFollowRequest(userId: Long, followerId: Long) {
-        getFollow(userId, followerId).acceptRequest().updateAndGet()
+        val follow = getFollow(userId, followerId).acceptRequest().updateAndGet()
+        notificationService.onFollowRequestAccepted(followed = follow.user!!, follower = follow.follower!!)
     }
 
     fun acceptAllPendingFollowRequests(userId: Long) {
@@ -54,17 +56,24 @@ class FollowService: KoinComponent {
             .user.id.eq(userId)
             .pending.eq(true)
             .findList()
-            .forEach { it.acceptRequest().updateAndGet() }
+            .forEach {
+                it.acceptRequest().updateAndGet()
+                notificationService.onFollowRequestAccepted(followed = it.user!!, follower = it.follower!!)
+            }
     }
 
     fun createFollow(userId: Long, followerId: Long): FollowInfo {
         val user = userService.getEntityById(userId)
         val follower = userService.getEntityById(followerId)
-        return Follow(
+        val follow = Follow(
             user = user,
             follower = follower,
             pending = !user.autoAcceptsFollowRequests()
-        ).insertAndGet().toFollowsInfo()
+        ).insertAndGet()
+        // Tells the followed account, and says which of the two happened: a pending request
+        // is something to act on, an accepted follow is only news
+        notificationService.onFollowed(followed = user, follower = follower, pending = follow.pending)
+        return follow.toFollowsInfo()
     }
 
     fun deleteFollow(userId: Long, followerId: Long) =

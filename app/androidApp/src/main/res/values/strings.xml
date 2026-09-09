@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">Cooknco</string>
+    <!-- Shown in Android's own notification settings, so it names the app's notifications
+         from the user's side rather than by their internal kind. -->
+    <string name="notification_channel_name">Cook&amp;Co</string>
+    <string name="notification_channel_description">New recipes from people you follow, follow requests, and announcements.</string>
 </resources>

@@ -19,7 +19,45 @@ data class Configuration(
      * one required would crash the backend on the first rollout that shipped it.
      */
     val pdf: Pdf = Pdf(),
+
+    /** Defaulted whole, and off by default, for the reason [pdf] is. See [Push]. */
+    val push: Push = Push(),
 ) {
+    /**
+     * Firebase Cloud Messaging, which delivers the app's push notifications.
+     *
+     * Off unless an install says otherwise, because it cannot work without a service
+     * account key that only the cluster has: a developer running the backend locally, and
+     * the test suite, both get [com.xavierclavel.services.NoopPushSender] and a backend
+     * that stores notifications without pushing them.
+     */
+    data class Push(
+        val enabled: Boolean = false,
+
+        /**
+         * The service account key downloaded from the Firebase console, mounted from the
+         * `cooknco-fcm` secret (`k8s/base/backend.yaml`). Never in the image: it is a
+         * private key that can send notifications to every install of the app.
+         */
+        val credentialsPath: String = "/app/config/fcm-service-account.json",
+
+        /**
+         * The Firebase project to send under. Blank takes it from the key file, which is
+         * the normal case — the two disagreeing is a misconfiguration, not a feature.
+         */
+        val projectId: String = "",
+
+        /**
+         * Pushes in flight at once.
+         *
+         * FCM's v1 API takes one device per request, so a broadcast is one request per
+         * device. This is what keeps that from opening a connection per device at once;
+         * the pushes themselves run in the background, so a low number costs latency
+         * nobody is waiting on.
+         */
+        val maxConcurrentSends: Int = 8,
+    )
+
     data class Pdf(
         /**
          * In-cluster address of the Gotenberg that turns a rendered sheet into a PDF

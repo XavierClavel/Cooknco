@@ -194,3 +194,42 @@ data class UserSettingsDTO(
     val isAccountPublic: Boolean = false,
 )
 
+// ------------------------------------------------------------- notifications
+
+/**
+ * Where this install can be pushed to.
+ *
+ * The platform is sent rather than inferred: a registration token says nothing about where
+ * it came from, and the payload the backend builds differs per platform.
+ */
+@Serializable
+data class DeviceRegistrationDTO(
+    val token: String,
+    val platform: String = "ANDROID",
+)
+
+/**
+ * One notification as the backend delivered it.
+ *
+ * The wording arrives rendered — the backend stores what it pushed — so there is nothing to
+ * template here, and the list cannot disagree with the notification already on the device.
+ */
+@Serializable
+data class UserNotificationInfo(
+    val id: Long,
+    val kind: String,
+    val title: String,
+    val body: String,
+    /** App-relative path to open, or blank. Resolved by `PushNotifications.routeFor`. */
+    val link: String = "",
+    val actor: UserSummary? = null,
+    val createdAt: Long,
+    val read: Boolean = false,
+)
+
+@Serializable
+data class NotificationInfo(
+    val followersPending: List<UserSummary> = emptyList(),
+    val notifications: List<UserNotificationInfo> = emptyList(),
+    val unreadCount: Int = 0,
+)

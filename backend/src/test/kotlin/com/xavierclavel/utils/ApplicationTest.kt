@@ -7,6 +7,7 @@ import com.xavierclavel.services.AppShellSource
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DashboardService
 import com.xavierclavel.services.DefaultImageService
+import com.xavierclavel.services.DeviceService
 import com.xavierclavel.services.EmailTemplateService
 import com.xavierclavel.services.EncryptionService
 import com.xavierclavel.services.ExportService
@@ -17,7 +18,9 @@ import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
 import com.xavierclavel.services.LinkPreviewService
 import com.xavierclavel.services.ModerationService
+import com.xavierclavel.services.NotificationService
 import com.xavierclavel.services.PdfRenderer
+import com.xavierclavel.services.PushSender
 import com.xavierclavel.services.PdfTemplateService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
@@ -39,6 +42,7 @@ import kotlinx.serialization.json.Json
 import main.com.xavierclavel.containers.GotenbergTestContainer
 import main.com.xavierclavel.containers.RedisTestContainer
 import main.com.xavierclavel.utils.FakeAppShellSource
+import main.com.xavierclavel.utils.FakePushSender
 import main.com.xavierclavel.utils.login
 import main.com.xavierclavel.utils.logout
 import org.junit.jupiter.api.AfterAll
@@ -63,6 +67,8 @@ abstract class ApplicationTest: KoinTest {
     val mockEventProducer by lazy{ eventProducer as MockEventProducer}
     val appShellSource: AppShellSource by inject()
     val fakeAppShellSource by lazy { appShellSource as FakeAppShellSource }
+    val pushSender: PushSender by inject()
+    val fakePushSender by lazy { pushSender as FakePushSender }
 
     companion object {
         const val USER1 = "user1"
@@ -102,7 +108,12 @@ abstract class ApplicationTest: KoinTest {
                 single { EmailTemplateService() }
                 single { PdfTemplateService() }
                 single { LinkPreviewService() }
+                single { DeviceService() }
+                single { NotificationService() }
                 single<AppShellSource> { FakeAppShellSource() }
+                // Firebase is not reachable from a test, and would not be worth reaching:
+                // what matters is the payload, which this records. See FakePushSender.
+                single<PushSender> { FakePushSender() }
                 // The real Chromium, not a stub: see GotenbergTestContainer.
                 single<PdfRenderer> { GotenbergPdfRenderer(getProperty("gotenberg.url", "")) }
                 single { RedisService(getProperty("redis.url", "redis://redis:6379")) }
@@ -198,6 +209,7 @@ abstract class ApplicationTest: KoinTest {
             }
             mockEventProducer.clear()
             fakeAppShellSource.reset()
+            fakePushSender.reset()
             val wrapper = TestBuilderWrapper(this)
             wrapper.block() // Use the wrapper in the block
         }

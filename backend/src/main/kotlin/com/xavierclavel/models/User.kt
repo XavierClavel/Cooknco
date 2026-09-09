@@ -88,6 +88,14 @@ class User (
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     var cookbooks: Set<CookbookUser> = setOf(),
 
+    /** Where this account can be pushed to. Emptied by a sign-out, not by the account's end. */
+    @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var devices: Set<Device> = setOf(),
+
+    /** Notifications addressed to this account. Ones it *caused* hang off `Notification.actor`. */
+    @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var notifications: Set<Notification> = setOf(),
+
     @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true)
     var dietaryRestrictions: DietaryRestrictions = DietaryRestrictions(),
 

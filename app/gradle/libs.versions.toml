@@ -14,6 +14,11 @@ androidxNavigation = "2.9.2"
 activityCompose = "1.13.0"
 composeBom = "2026.02.01"
 browser = "1.10.0"
+core = "1.18.0"
+# Firebase Cloud Messaging, for push notifications. The BOM pins every firebase-*
+# artifact, so firebase-messaging is declared without a version of its own.
+firebaseBom = "34.17.0"
+googleServices = "4.5.0"
 datastore = "1.2.1"
 ktor = "3.5.2"
 coil = "3.5.0"
@@ -54,6 +59,10 @@ androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", versi
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
+# NotificationCompat, to draw a push while the app is in the foreground.
+androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 
 # ── iOS only ──────────────────────────────────────────────────────────────────
@@ -66,6 +75,8 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+# Reads androidApp/google-services.json into the resources Firebase initialises itself from.
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 # AGP 9 refuses `com.android.application` in a Kotlin Multiplatform module; the
 # KMP-aware library plugin is the supported way to give a KMP module an Android target.
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }

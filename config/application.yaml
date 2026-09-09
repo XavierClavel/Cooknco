@@ -19,3 +19,12 @@ oauth:
   google:
     client_id: unused
     client_secret: unused
+
+# Push notifications are off unless a section says otherwise, so the stack boots
+# without Firebase credentials: notifications are stored and listed, and only the
+# push is missing (NoopPushSender says so in the log). To send for real locally,
+# drop the service account key in config/fcm-service-account.json — gitignored —
+# and uncomment:
+#push:
+#  enabled: true
+#  credentialsPath: /app/config/fcm-service-account.json

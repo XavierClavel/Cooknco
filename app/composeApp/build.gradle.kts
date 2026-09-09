@@ -64,6 +64,10 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.browser)
             implementation(libs.ktor.client.okhttp)
+            // Only for the push token: the notification itself is drawn by :androidApp,
+            // which is where the service that receives one has to be declared.
+            implementation(project.dependencies.platform(libs.firebase.bom))
+            implementation(libs.firebase.messaging)
         }
 
         iosMain.dependencies {

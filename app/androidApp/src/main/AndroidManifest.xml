@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+. Asked for once signed in: see EnsureNotificationPermission. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -31,6 +33,32 @@
                 <data android:scheme="cooknco" android:host="login" />
             </intent-filter>
         </activity>
+
+        <!-- Receives pushes. Also started with the app not running, which is why it sets
+             up the object graph itself. -->
+        <service
+            android:name=".CookncoMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Used by the system for a notification it draws itself, i.e. every one that
+             arrives while the app is backgrounded or stopped. Without these, that case
+             falls back to the launcher icon, which is not a silhouette and renders as a
+             grey square. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
+        <!-- Must match FcmPushSender.DEFAULT_CHANNEL_ID and the channel MainActivity
+             creates: a message naming an absent channel is dropped on Android 8+. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="cooknco_default" />
     </application>
 
 </manifest>
