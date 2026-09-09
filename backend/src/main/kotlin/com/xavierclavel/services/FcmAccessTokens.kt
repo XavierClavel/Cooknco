@@ -38,6 +38,28 @@ private data class AccessTokenResponse(
 )
 
 /**
+ * What authorises a call to FCM.
+ *
+ * An interface so the sender can be tested without a service account key or a round trip to
+ * Google — which is the half of the transport that cannot be exercised in a test at all.
+ */
+interface FcmCredentials {
+    /** The Firebase project the credentials belong to. */
+    val projectId: String
+
+    /**
+     * A usable access token, minted if the one in hand is spent.
+     *
+     * @throws IllegalStateException when the credentials are refused — a revoked key, a
+     *   clock far out of step — neither of which resolves on a retry.
+     */
+    fun get(): String
+
+    /** Drops any cached token, so the next [get] mints a fresh one. Used after a 401. */
+    fun invalidate()
+}
+
+/**
  * Mints the OAuth2 access tokens the FCM HTTP v1 API is called with.
  *
  * Hand-rolled rather than pulled in with `google-auth-library`, which would bring the
@@ -53,7 +75,7 @@ class FcmAccessTokens(
     private val http: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(5))
         .build(),
-) {
+) : FcmCredentials {
     companion object {
         private const val SCOPE = "https://www.googleapis.com/auth/firebase.messaging"
         private const val GRANT_TYPE = "urn:ietf:params:oauth:grant-type:jwt-bearer"
@@ -84,7 +106,7 @@ class FcmAccessTokens(
     }
 
     /** The project the credentials belong to, so nothing has to state it twice. */
-    val projectId: String get() = key.projectId
+    override val projectId: String get() = key.projectId
 
     @Volatile
     private var cached: String? = null
@@ -99,7 +121,7 @@ class FcmAccessTokens(
      *   clock far out of step — which the caller reports as a failed push rather than
      *   retrying, since neither resolves on its own.
      */
-    fun get(): String {
+    override fun get(): String {
         cached?.takeIf { System.currentTimeMillis() < expiresAtMillis }?.let { return it }
         synchronized(this) {
             // Another thread may have refreshed while this one waited on the lock
@@ -112,7 +134,7 @@ class FcmAccessTokens(
     }
 
     /** Drops the cached token, so the next call mints a fresh one. Used after a 401. */
-    fun invalidate() {
+    override fun invalidate() {
         cached = null
         expiresAtMillis = 0
     }
