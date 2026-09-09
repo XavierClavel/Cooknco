@@ -3,6 +3,7 @@ package com.xavierclavel.controllers
 import com.xavierclavel.controllers.AuthController.getOptionalSessionId
 import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.ImageService
+import com.xavierclavel.services.NotificationService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.UserService
@@ -36,6 +37,7 @@ object RecipeController: Controller(RECIPE_URL) {
     val recipeIngredientService: RecipeIngredientService by inject(RecipeIngredientService::class.java)
     val userService: UserService by inject(UserService::class.java)
     val imageService: ImageService by inject(ImageService::class.java)
+    val notificationService: NotificationService by inject(NotificationService::class.java)
 
     override fun Route.routes() {
         getRecipe()
@@ -86,6 +88,9 @@ object RecipeController: Controller(RECIPE_URL) {
         recipeIngredientService.replaceRecipeIngredients(recipe.id, ingredients)
         val recipeInfo = recipeService.getRawById(recipe.id, getSessionUserId(), Locale.EN)
         logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) created by user ${user.username}"}
+        // After the ingredients, so the recipe a follower is sent to is a finished one.
+        // Fans out in the background: see NotificationService.
+        notificationService.onRecipeCreated(recipeService.getEntityById(recipe.id))
         call.respond(HttpStatusCode.Created, recipeInfo)
     }
 

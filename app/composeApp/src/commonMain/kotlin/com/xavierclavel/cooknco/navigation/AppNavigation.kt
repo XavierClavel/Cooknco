@@ -17,8 +17,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.xavierclavel.cooknco.PushNotifications
+import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.ui.auth.AuthState
 import com.xavierclavel.cooknco.ui.auth.AuthViewModel
+import com.xavierclavel.cooknco.platform.EnsureNotificationPermission
 import com.xavierclavel.cooknco.platform.rememberUrlOpener
 import com.xavierclavel.cooknco.ui.auth.EmailVerificationSentScreen
 import com.xavierclavel.cooknco.ui.auth.LoginScreen
@@ -342,6 +345,33 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
         }
         navController.navigate(destination) {
             popUpTo(Routes.SPLASH) { inclusive = true }
+        }
+    }
+
+    // Asked for once there is an account to notify, not on the login screen: Android shows
+    // this prompt exactly once, so it is worth spending on a user who has somewhere to be
+    // notified about. See EnsureNotificationPermission.
+    EnsureNotificationPermission(request = authState is AuthState.Authenticated)
+
+    /**
+     * Registers this device once there is an account to register it against, and again on
+     * every launch: a token can be rotated while the app is not running, in which case
+     * `onNewToken` fired with no session to send it under.
+     */
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Authenticated) AppGraph.pushRepository.registerCurrentDevice()
+    }
+
+    /**
+     * Opens what a tapped notification pointed at.
+     *
+     * Gated on being signed in, and replayed by [PushNotifications], so a tap that cold-starts
+     * the app waits for the session to be restored rather than bouncing off the login screen.
+     */
+    LaunchedEffect(authState) {
+        if (authState !is AuthState.Authenticated) return@LaunchedEffect
+        PushNotifications.taps.collect { route ->
+            navController.navigate(route)
         }
     }
 }

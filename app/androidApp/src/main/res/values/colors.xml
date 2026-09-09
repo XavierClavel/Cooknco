@@ -7,4 +7,6 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- CookncoOrange, the brand accent the theme and the web app's own bell both use. -->
+    <color name="notification_accent">#FFFF6F59</color>
 </resources>

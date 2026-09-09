@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 class AuthRepository(
     private val authApi: AuthApi,
     private val tokenDataStore: TokenDataStore,
+    private val pushRepository: PushRepository,
 ) {
     val tokenFlow: Flow<String?> = tokenDataStore.tokenFlow
 
@@ -25,6 +26,9 @@ class AuthRepository(
     suspend fun logout(): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first()
         if (token != null) {
+            // Before the session goes: it is an authenticated call, and an account left
+            // registered would keep pushing to a handset somebody else may now be holding.
+            pushRepository.unregisterCurrentDevice()
             authApi.logout(token)
         }
         tokenDataStore.clearToken()

@@ -38,3 +38,15 @@ suspend fun HttpClient.getFollows(id: Long): Set<FollowInfo> {
         return Json.decodeFromString<Set<FollowInfo>>(bodyAsText())
     }
 }
+
+/**
+ * Accepts a pending follow request, as the account that was asked.
+ *
+ * The path names the *follower* and the session names who is accepting — the opposite way
+ * round from [follow], which is what the endpoint does (`FollowController.acceptFollow`).
+ */
+suspend fun HttpClient.acceptFollowRequest(followerId: Long) {
+    this.post("$FOLLOW_URL/$followerId/request").apply {
+        assertEquals(HttpStatusCode.OK, status)
+    }
+}

@@ -46,4 +46,6 @@ export const ICONS = {
   arrowRight: {p: ['M5 12h14', 'M13 5l7 7-7 7']},
   mail:       {p: ['M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z', 'M22 7l-10 6L2 7']},
   send:       {p: ['M22 2L11 13', 'M22 2l-7 20-4-9-9-4z']},
+  bell:       {p: ['M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9', 'M13.7 21a2 2 0 0 1-3.4 0']},
+  phone:      {p: ['M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z', 'M11 19h2']},
 } satisfies Record<string, IconDef>

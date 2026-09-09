@@ -151,6 +151,31 @@ export const previewMailTemplate = (key: string, subject: string, body: string) 
 export const sendTestMail = (key: string, recipient: string, locale: string) =>
   api.post(`/admin/mails/templates/${key}/test`, {recipient, locale})
 
+// ------------------------------------------------------------ notifications
+
+/**
+ * How many users and devices a send would reach.
+ *
+ * Read before sending rather than after, so a broadcast is a decision taken with its size
+ * in view. `users` empty means everybody, exactly as it does on the send itself.
+ */
+export const getPushAudience = (userIds: number[], locale: string | null) =>
+  api.get(`/admin/notifications/audience?${qs({users: userIds.join(',') || '', locale: locale ?? ''})}`)
+
+/**
+ * Sends an announcement. An empty `userIds` is what asks for a broadcast.
+ *
+ * Answers 202: the notifications are stored, and the pushes are on their way. Only a device
+ * can say one arrived.
+ */
+export const sendAnnouncement = (
+  title: string, body: string, link: string, userIds: number[], locale: string | null,
+) => api.post('/admin/notifications/announce', {title, body, link, userIds, locale})
+
+/** One notification to the signed-in operator's own devices. Waited on, unlike the above. */
+export const sendTestNotification = (title: string, body: string, link: string) =>
+  api.post('/admin/notifications/test', {title, body, link})
+
 // ---------------------------------------------------------------- documents
 export const listPdfTemplates = () => api.get('/admin/documents/templates')
 

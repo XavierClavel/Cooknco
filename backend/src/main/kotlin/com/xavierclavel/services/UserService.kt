@@ -8,6 +8,7 @@ import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.exceptions.UnauthorizedCause
 import com.xavierclavel.exceptions.UnauthorizedException
 import com.xavierclavel.models.User
+import com.xavierclavel.models.query.QNotification
 import com.xavierclavel.models.query.QReport
 import com.xavierclavel.models.query.QUser
 import com.xavierclavel.utils.DbTransaction.insertAndGet
@@ -164,6 +165,7 @@ class UserService: KoinComponent {
 
     fun deleteUserById(userId: Long): Int {
         detachReports(userId)
+        detachNotifications(userId)
         return QUser().id.eq(userId).delete()
     }
 
@@ -175,6 +177,16 @@ class UserService: KoinComponent {
     private fun detachReports(userId: Long) {
         QReport().reporter.id.eq(userId).findList().forEach { it.reporter = null; it.update() }
         QReport().resolvedBy.id.eq(userId).findList().forEach { it.resolvedBy = null; it.update() }
+    }
+
+    /**
+     * Drops the deleted account from the notifications it caused, keeping the notifications
+     * themselves. Required for the delete to go through at all, for the reason
+     * [detachReports] is: notifications.actor_id is ON DELETE RESTRICT. The rows *addressed*
+     * to the account need no such care — they cascade with it.
+     */
+    private fun detachNotifications(userId: Long) {
+        QNotification().actor.id.eq(userId).findList().forEach { it.actor = null; it.update() }
     }
 
     fun deleteUserByUsername(username: String) =

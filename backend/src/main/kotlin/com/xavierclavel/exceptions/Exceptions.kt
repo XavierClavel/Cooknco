@@ -53,6 +53,7 @@ enum class NotFoundCause(val key: String) {
     REPORT_TARGET_NOT_FOUND("report_target_not_found"),
     MAIL_TEMPLATE_NOT_FOUND("mail_template_not_found"),
     PDF_TEMPLATE_NOT_FOUND("pdf_template_not_found"),
+    NOTIFICATION_NOT_FOUND("notification_not_found"),
 }
 
 enum class ServiceUnavailableCause(val key: String) {
@@ -98,6 +99,11 @@ enum class BadRequestCause (val key: String) {
     MAIL_TEMPLATE_EMPTY("mail_template_empty"),
     MAIL_TEMPLATE_TOO_LONG("mail_template_too_long"),
     MAIL_TEMPLATE_MISSING_PLACEHOLDER("mail_template_missing_placeholder"),
+
+    NOTIFICATION_EMPTY("notification_empty"),
+    NOTIFICATION_TOO_LONG("notification_too_long"),
+    NOTIFICATION_HAS_NO_AUDIENCE("notification_has_no_audience"),
+    NOTIFICATION_HAS_NO_DEVICE("notification_has_no_device"),
 
     PDF_TEMPLATE_EMPTY("pdf_template_empty"),
     PDF_TEMPLATE_TOO_LONG("pdf_template_too_long"),

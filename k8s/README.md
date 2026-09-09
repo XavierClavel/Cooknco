@@ -52,7 +52,7 @@ before the app will start. `k8s/migration/01-copy-config.sh` copies them from
 | Object | Kind | Consumed by |
 |---|---|---|
 | `cooknco-secrets` | Secret | backend (`redis-password`), database (`postgres-db`, `postgres-user`, `postgres-password`), mail-service (`envFrom`) |
-| `cooknco-config` | Secret | backend, mounted at `/app/config` |
+| `cooknco-config` | Secret | backend, mounted at `/app/config`: `application.yaml`, plus `fcm-service-account.json` if push is enabled |
 | `mail-database-secrets` | Secret | mail-service and its database (`envFrom`) |
 | `smtp-secrets` | ConfigMap | mail-service (`envFrom`) |
 | `cooknco-tls` | Secret | Ingress TLS; produced by the `cooknco` Certificate |
