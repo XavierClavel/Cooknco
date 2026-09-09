@@ -265,6 +265,15 @@ them: what the tests assert is the payload — the wording, the kind, and the no
 the clients mark read by. `FakePushSender.awaitKind` waits on a fan-out, since the request
 that triggers one returns before the push is made.
 
-The FCM transport itself is not covered: it is one HTTP call whose only interesting behaviour
-is which errors mean a dead token, and reaching Google from a test would prove nothing about
-that.
+`FcmPushSenderTest` covers the transport against a Ktor `MockEngine`, asserting on the
+request that goes out: that the body is serialised JSON, that the payload carries the fields
+both clients rely on, that the `channel_id` matches what the app registers, and that only
+`UNREGISTERED` / `INVALID_ARGUMENT` / `SENDER_ID_MISMATCH` are reported stale while a 503
+keeps the token. An earlier version of this file claimed the transport was not worth
+covering; it is the one class that builds an HTTP request, and it shipped two bugs on that
+excuse — a payload missing a required field, then a body the client could not serialise.
+
+What genuinely cannot be covered is [FcmAccessTokens]: signing a JWT and trading it at
+Google's endpoint needs a real key, and a fake one would only assert that the code does what
+it does. That is why `FcmCredentials` is an interface — it is the seam between the part worth
+testing and the part that is not.
