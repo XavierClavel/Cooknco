@@ -8,6 +8,7 @@ resources:
   - database.yaml
   - redis.yaml
   - backend.yaml
+  - gotenberg.yaml
   - frontend.yaml
   - mail-service-db.yaml
   - mail-service.yaml

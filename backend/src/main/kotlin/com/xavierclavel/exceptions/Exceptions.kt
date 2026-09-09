@@ -8,6 +8,14 @@ class BadRequestException(cause: BadRequestCause): Exception(cause.key)
 
 class NotFoundException(cause: NotFoundCause): Exception(cause.key)
 
+/**
+ * Something the request needs is not answering right now.
+ *
+ * Distinct from a 500 on purpose: nothing here is wrong with the request or with this
+ * service, and the caller is being told to try again rather than to change what it sent.
+ */
+class ServiceUnavailableException(cause: ServiceUnavailableCause): Exception(cause.key)
+
 enum class UnauthorizedCause(val key: String) {
     SESSION_NOT_FOUND("session_not_found"),
     USER_NOT_VERIFIED("user_not_verified"),
@@ -44,6 +52,13 @@ enum class NotFoundCause(val key: String) {
     REPORT_NOT_FOUND("report_not_found"),
     REPORT_TARGET_NOT_FOUND("report_target_not_found"),
     MAIL_TEMPLATE_NOT_FOUND("mail_template_not_found"),
+    PDF_TEMPLATE_NOT_FOUND("pdf_template_not_found"),
+}
+
+enum class ServiceUnavailableCause(val key: String) {
+    PDF_RENDERER_UNAVAILABLE("pdf_renderer_unavailable"),
+    PDF_RENDERER_BUSY("pdf_renderer_busy"),
+    PDF_RENDERER_FAILED("pdf_renderer_failed"),
 }
 
 enum class BadRequestCause (val key: String) {
@@ -83,5 +98,9 @@ enum class BadRequestCause (val key: String) {
     MAIL_TEMPLATE_EMPTY("mail_template_empty"),
     MAIL_TEMPLATE_TOO_LONG("mail_template_too_long"),
     MAIL_TEMPLATE_MISSING_PLACEHOLDER("mail_template_missing_placeholder"),
+
+    PDF_TEMPLATE_EMPTY("pdf_template_empty"),
+    PDF_TEMPLATE_TOO_LONG("pdf_template_too_long"),
+    PDF_TEMPLATE_MALFORMED("pdf_template_malformed"),
 
 }
