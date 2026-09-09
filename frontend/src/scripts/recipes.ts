@@ -42,20 +42,36 @@ async function deleteRecipe(id) {
   return await apiClient.delete(`/recipe/${id}`)
 }
 
+/**
+ * Saves a recipe as a PDF.
+ *
+ * Admin-only, and the backend enforces it: the button lives inside `<admin-only>`.
+ * Rejects on failure rather than logging, so the caller can tell the user the download
+ * did not happen.
+ */
 async function downloadRecipe(id) {
-  return await apiClient.get(`/export/recipe/${id}`, {
-    responseType: 'arraybuffer',
+  const response = await apiClient.get(`/export/recipe/${id}?locale=${getLocale()}`, {
+    responseType: 'blob',
     headers: {
       'Accept': 'application/pdf'
     }
   })
-    .then((response) => {
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'file.pdf'); //or any other extension
-      document.body.appendChild(link);
-      link.click();
-    })
-    .catch((error) => console.log(error));
+  const url = window.URL.createObjectURL(new Blob([response.data], {type: 'application/pdf'}));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filenameOf(response) ?? `recipe-${id}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Deferred, not immediate: some browsers only start reading the blob after the click
+  // returns, and revoking it first cancels the download. Without revoking at all it would
+  // sit in memory for as long as the page lives.
+  setTimeout(() => window.URL.revokeObjectURL(url), 0);
+}
+
+/** The name the backend chose for the file, from `Content-Disposition`. */
+function filenameOf(response) {
+  const disposition = response.headers['content-disposition']
+  if (!disposition) return null
+  return disposition.match(/filename="([^"]+)"/)?.[1] ?? null
 }

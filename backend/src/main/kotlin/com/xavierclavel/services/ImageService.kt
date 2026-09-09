@@ -13,14 +13,14 @@ import java.awt.geom.AffineTransform
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.nio.file.Files
-import java.nio.file.Paths
+import java.io.IOException
 import javax.imageio.ImageIO
 import kotlin.io.path.Path
 import kotlin.io.path.createFile
 import kotlin.io.path.createParentDirectories
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
+import kotlin.io.path.readBytes
 import net.coobird.thumbnailator.Thumbnails
 import shared.utils.logger
 import java.io.File
@@ -160,28 +160,36 @@ class ImageService: KoinComponent {
     }
 
 
-    private fun convertWebPToJpeg(webpBytes: ByteArray): ByteArray {
+    /**
+     * Re-encodes a stored picture as jpeg, the only raster format a PDF can carry: iText
+     * has no webp decoder, and everything on the volume is webp.
+     */
+    fun webpToJpeg(webpBytes: ByteArray): ByteArray {
         val image = ImageIO.read(ByteArrayInputStream(webpBytes))
-        ByteArrayOutputStream().use { baos ->
-            ImageIO.write(image, "jpg", baos)
-            return baos.toByteArray()
+            ?: throw IOException("Not a readable image")
+        return ByteArrayOutputStream().use { out ->
+            ImageIO.write(image, "jpg", out)
+            out.toByteArray()
         }
     }
 
     /**
-     * Reads a webp image and returns it as a jpeg byte array
+     * The picture a recipe holds on the volume, or null when it holds none.
+     *
+     * A filename carries the entity's `imageVersion` (see [ImageBucket]), so the version has
+     * to come from the caller's own read of the recipe: a recipe nobody ever gave a picture
+     * to sits at version 0, which no file is ever written for, and deleting a picture bumps
+     * the version past the file that was removed.
      */
-    fun getRecipeImageAsJpegBytes(id: Long): ByteArray {
-        // Specify the path to the WebP file
-        val webpPath = "$RECIPES_IMG_PATH/$id.webp"
-
-        // Read the WebP image from the filesystem
-        val webpBytes = Files.readAllBytes(Paths.get(webpPath))
-
-        // Convert WebP to JPEG format
-        val jpegBytes = convertWebPToJpeg(webpBytes)
-
-        return jpegBytes
+    fun findRecipeImage(id: Long, version: Long): ByteArray? {
+        val file = Path("$RECIPES_IMG_PATH/$id-v$version.webp")
+        if (!file.exists()) return null
+        return try {
+            file.readBytes()
+        } catch (e: IOException) {
+            logger.error(e) { "Could not read the image of recipe $id" }
+            null
+        }
     }
 
 }

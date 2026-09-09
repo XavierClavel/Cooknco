@@ -104,7 +104,7 @@
           class="mb-10 text-h6"
           min-height="70px"
           min-width="70px"
-          @click="downloadRecipe(recipeId)"
+          @click="onDownloadButtonClick"
           elevation="2"
         ></v-btn>
       </admin-only>
@@ -264,7 +264,7 @@
       :timeout="2000"
       height="60px"
     >
-      {{$t('successfully_copied')}}
+      {{ snackbarMessage }}
       <template v-slot:actions>
         <v-btn
           variant="flat"
@@ -362,6 +362,7 @@ const errorMessage = ref<string>("This recipe does not exist")
 const isOwner = ref<boolean>(false)
 const recipeLiked = ref<string>(null)
 const snackbar = ref(false)
+const snackbarMessage = ref<string>("")
 
 const userCookbooks = ref([])
 const authStore = useAuthStore()
@@ -435,9 +436,21 @@ const onLikeButtonClick = () => {
   recipeLiked.value = !recipeLiked.value
 }
 
+const notify = (message: string) => {
+  snackbarMessage.value = message
+  snackbar.value = true
+}
+
 const onShareButtonClick = () => {
   navigator.clipboard.writeText(window.location.href);
-  snackbar.value = true
+  notify(t('successfully_copied'))
+}
+
+const onDownloadButtonClick = () => {
+  downloadRecipe(recipeId).catch(function (error) {
+    console.log(error)
+    notify(t('unknown_error'))
+  })
 }
 
 const onSelectCookbook = (cookbook) => {
