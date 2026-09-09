@@ -205,7 +205,12 @@ data class UserSettingsDTO(
 @Serializable
 data class DeviceRegistrationDTO(
     val token: String,
-    val platform: String = "ANDROID",
+    /**
+     * Deliberately without a default. kotlinx.serialization does not encode defaults, so a
+     * default here would be a field the backend never receives — and it requires this one.
+     * Callers pass [com.xavierclavel.cooknco.platform.devicePlatform].
+     */
+    val platform: String,
 )
 
 /**
