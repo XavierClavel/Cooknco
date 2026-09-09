@@ -39,7 +39,7 @@ import kotlinx.serialization.json.putJsonObject
  * the foreground, and displays it itself otherwise.
  */
 class FcmPushSender(
-    private val credentials: FcmAccessTokens,
+    private val credentials: FcmCredentials,
     /** Overrides the project on the credentials. Only useful when the two disagree. */
     projectId: String = "",
     /** Pushes in flight at once. See `Configuration.Push.maxConcurrentSends`. */
@@ -106,7 +106,12 @@ class FcmPushSender(
             client.post(ENDPOINT.format(projectId)) {
                 header(HttpHeaders.Authorization, "Bearer $accessToken")
                 contentType(ContentType.Application.Json)
-                setBody(payload(message))
+                // Serialised here rather than handed over as a JsonObject for a plugin to
+                // convert: this client installs no ContentNegotiation, and passing an
+                // object it cannot convert fails at send time rather than at compile time.
+                // JsonElement.toString() is the JSON text, so what goes out is exactly what
+                // payload() built.
+                setBody(payload(message).toString())
             }
         } catch (e: Exception) {
             logger.error(e) { "Could not reach FCM" }
