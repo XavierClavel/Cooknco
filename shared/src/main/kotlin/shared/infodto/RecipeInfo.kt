@@ -38,7 +38,7 @@ data class RecipeInfo (
                 description == dto.description &&
                 yield == dto.yield &&
                 preparationTime == dto.preparationTime &&
-                cookingTime == dto.preparationTime &&
+                cookingTime == dto.cookingTime &&
                 cookingTemperature == dto.cookingTemperature &&
                 steps == dto.steps
     }

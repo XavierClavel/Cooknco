@@ -65,6 +65,10 @@ fun Application.module() {
         anyMethod()
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Authorization)
+        // The name a download saves itself under. Only a response header the server opts into
+        // is readable cross-origin, and in development the app runs off a different origin
+        // than the API.
+        exposeHeader(HttpHeaders.ContentDisposition)
         allowCredentials = true
 
     }
@@ -100,7 +104,6 @@ fun Application.module() {
 //Controllers declaration
 fun Application.serveRoutes() = routing {
     authenticate("auth-session", "bearer-auth") {
-        serve(ExportController)
         serve(LikeController)
         serve(DashboardController)
         serve(FollowController)
@@ -119,6 +122,8 @@ fun Application.serveRoutes() = routing {
     // Not an API: the documents behind the public app routes people share. See the controller.
     serve(LinkPreviewController)
     serve(AdminController)
+    // Declares its own admin gate, like AdminController. See the controller.
+    serve(ExportController)
     // Outside the admin gate on purpose: its only caller is mail-service, and nginx never
     // proxies this prefix, so it is unreachable from outside the cluster. See the controller.
     serve(InternalMailTemplateController)
