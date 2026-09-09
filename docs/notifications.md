@@ -175,18 +175,34 @@ The service account key is a genuine secret: it can send a notification to every
 the app. It is never in the image.
 
 Production reads it from the `cooknco-config` Secret, which is already mounted at
-`/app/config` — so it goes in as a second key alongside `application.yaml`:
+`/app/config` — so it goes in as a second key alongside `application.yaml`.
+
+> **Add the key; do not rewrite the Secret.** The production `application.yaml` exists only
+> in the cluster (k8s/README.md) — there is no copy in this repository. Anything of the shape
+> `kubectl create secret … --dry-run=client -o yaml | kubectl apply -f -` restates the whole
+> Secret from local files, so it overwrites `application.yaml` with whatever is on your disk.
+> The repo's `config/application.yaml` is the **local dev** placeholder, and applying that
+> would point production at `localhost`, blank the SMTP credentials, and replace
+> `encryption.key` with the dev key — after which no existing user's mail address decrypts.
+> Patch one key at a time instead.
 
 ```sh
-kubectl -n cooknco create secret generic cooknco-config \
-  --from-file=application.yaml=./application.yaml \
-  --from-file=fcm-service-account.json=./fcm-service-account.json \
-  --dry-run=client -o yaml | kubectl apply -f -
+# 1. See what is actually in there. Never assume it is only application.yaml.
+kubectl -n cooknco get secret cooknco-config -o go-template='{{range $k,$_ := .data}}{{$k}}{{"\n"}}{{end}}'
+
+# 2. Add the service account key. A merge patch on `data` touches no other key.
+kubectl -n cooknco patch secret cooknco-config --type merge \
+  -p "{\"data\":{\"fcm-service-account.json\":\"$(base64 < ./fcm-service-account.json | tr -d '\n')\"}}"
 ```
 
-Then turn it on in that `application.yaml`:
+Then turn it on — by editing the **live** `application.yaml`, not a local one:
 
-```yaml
+```sh
+# 3. Pull the one that is in service, and append the push block to it.
+kubectl -n cooknco get secret cooknco-config \
+  -o go-template='{{index .data "application.yaml" | base64decode}}' > application.live.yaml
+
+cat >> application.live.yaml <<'YAML'
 push:
   enabled: true
   # Defaults, listed for the record. projectId blank takes it from the key file,
@@ -194,7 +210,21 @@ push:
   credentialsPath: /app/config/fcm-service-account.json
   projectId: ""
   maxConcurrentSends: 8
+YAML
+
+# 4. Put it back, again one key at a time.
+kubectl -n cooknco patch secret cooknco-config --type merge \
+  -p "{\"data\":{\"application.yaml\":\"$(base64 < application.live.yaml | tr -d '\n')\"}}"
+
+# 5. Restart: loadConfig() reads the file once, at startup.
+kubectl -n cooknco rollout restart deployment/cooknco-backend
 ```
+
+The log line on the way up says which sender the container got, which is the quickest
+confirmation that step 4 landed.
+
+(`base64 -d` is `base64 -D` on macOS, and `base64 -w0` is a GNU-only shorthand for the
+`| tr -d '\n'` above.)
 
 Locally, drop the key at `config/fcm-service-account.json` and uncomment the `push:` block in
 `config/application.yaml`.
