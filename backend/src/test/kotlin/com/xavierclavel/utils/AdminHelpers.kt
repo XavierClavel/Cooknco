@@ -55,6 +55,10 @@ import shared.utils.URL.ADMIN_URL
 import shared.utils.URL.INTERNAL_MAIL_TEMPLATES_URL
 import shared.utils.URL.REPORT_URL
 import kotlin.test.assertEquals
+import io.ktor.client.statement.bodyAsBytes
+import shared.infodto.AdminPdfTemplateInfo
+import shared.dto.PdfTemplateDTO
+import shared.dto.PdfPreviewDTO
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -406,4 +410,42 @@ suspend fun HttpClient.getInternalMailTemplates(): List<EffectiveEmailTemplate> 
     this.getInternalMailTemplatesRaw().let {
         assertEquals(HttpStatusCode.OK, it.status)
         json.decodeFromString<List<EffectiveEmailTemplate>>(it.bodyAsText())
+    }
+
+// ---------------------------------------------------------- document templates
+
+private const val PDF_TEMPLATES_URL = "$ADMIN_URL/documents/templates"
+
+suspend fun HttpClient.listPdfTemplatesRaw(): HttpResponse = this.get(PDF_TEMPLATES_URL)
+
+suspend fun HttpClient.listPdfTemplates(): List<AdminPdfTemplateInfo> =
+    this.listPdfTemplatesRaw().let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<List<AdminPdfTemplateInfo>>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.pdfTemplate(key: String): AdminPdfTemplateInfo =
+    this.listPdfTemplates().first { it.key == key }
+
+suspend fun HttpClient.savePdfTemplateRaw(key: String, locale: Locale, body: String) =
+    this.put("$PDF_TEMPLATES_URL/$key/${locale.name}") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(PdfTemplateDTO(body = body))
+    }
+
+suspend fun HttpClient.restorePdfTemplateRaw(key: String, locale: Locale) =
+    this.delete("$PDF_TEMPLATES_URL/$key/${locale.name}")
+
+suspend fun HttpClient.previewPdfTemplateRaw(key: String, locale: Locale, body: String, recipeId: Long? = null) =
+    this.post("$PDF_TEMPLATES_URL/$key/${locale.name}/preview") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(PdfPreviewDTO(body = body, recipeId = recipeId))
+    }
+
+suspend fun HttpClient.previewPdfTemplate(key: String, locale: Locale, body: String, recipeId: Long? = null): ByteArray =
+    this.previewPdfTemplateRaw(key, locale, body, recipeId).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        it.bodyAsBytes()
     }

@@ -57,6 +57,10 @@ before the app will start. `k8s/migration/01-copy-config.sh` copies them from
 | `smtp-secrets` | ConfigMap | mail-service (`envFrom`) |
 | `cooknco-tls` | Secret | Ingress TLS; produced by the `cooknco` Certificate |
 
+`cooknco-gotenberg` needs none of these: it is a stateless headless-Chromium
+printer reached only by the backend, and it is configured entirely by the flags
+in `base/gotenberg.yaml`.
+
 ## CI
 
 Two workflows, both in `.github/workflows/`.
@@ -86,7 +90,7 @@ Two workflows, both in `.github/workflows/`.
    image sitting on Docker Hub. The containers carry `imagePullPolicy: Always`,
    so the replacement pods pull the tag fresh.
 3. The job renders both roots on the runner and pipes them into `kubectl apply`
-   over SSH: `--dry-run=server` first, then the apply, then all six rollouts.
+   over SSH: `--dry-run=server` first, then the apply, then all seven rollouts.
 
 The tradeoff `:latest` buys — one less commit on `master` per build, and no race
 between that commit and the deploy job's checkout — is paid for in provenance.

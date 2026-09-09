@@ -315,7 +315,8 @@ jobs:
         # A green apply only says "the API server accepted the objects". Without
         # the wait below the job would report success while an image crash-loops.
         for deploy in cooknco-database cooknco-redis mail-service-database \
-                      cooknco-backend cooknco-frontend cooknco-mail-service; do
+                      cooknco-gotenberg cooknco-backend cooknco-frontend \
+                      cooknco-mail-service; do
           echo "--- rollout $deploy"
           kubectl -n cooknco rollout status "deployment/$deploy" --timeout=5m
         done

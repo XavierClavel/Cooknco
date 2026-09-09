@@ -53,6 +53,7 @@ services:
       - frontend-network
       - auth-network
       - event-network
+      - render-network
     healthcheck:
       test: [ "CMD", "curl", "--fail", "http://localhost:8080/api/v1/health" ]
       interval: 10s
@@ -68,6 +69,42 @@ services:
       # KafkaEventProducer throws when KAFKA_BOOTSTRAP_SERVERS is unset or dead.
       kafka:
         condition: service_healthy
+      # Only the PDF export needs it, and that answers 503 without it rather than
+      # failing to start — but waiting means the first export of a fresh stack works.
+      gotenberg:
+        condition: service_healthy
+
+  # Headless Chromium behind an HTTP form: what actually prints a recipe sheet.
+  #
+  # A document layout is markup an operator saved in the backoffice, so the browser
+  # printing it must not become a way to reach the rest of the stack. The two deny
+  # flags leave the page with no network at all — the only files it can read are the
+  # ones the backend posts alongside it — and the internal network it sits on, shared
+  # with the backend and nothing else, is the second lock.
+  gotenberg:
+    container_name: cooknco-gotenberg
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - gotenberg
+      # Allow-list rather than the stock deny-list: that default is
+      # `^file:(?!//\/tmp/).*`, a negative lookahead, which Go's RE2 cannot compile — so
+      # Gotenberg matches it on a backtracking engine with a timeout, and under concurrent
+      # prints that timeout fires and the conversion 500s. This says the same thing (only
+      # the files posted with the document, which land under /tmp) in linear-time regex.
+      - --chromium-allow-list=^file:///tmp/.*
+      - --chromium-deny-list=^$$
+      - --chromium-deny-private-ips
+      - --chromium-deny-public-ips
+      - --chromium-disable-javascript
+    networks:
+      - render-network
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:3000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   frontend:
     container_name: cooknco-frontend
@@ -243,4 +280,7 @@ networks:
     internal: true
   # Kafka, plus the one direct call mail-service makes back to the backend.
   event-network:
+    internal: true
+  # The backend and the browser that prints its PDFs. Nothing else belongs here.
+  render-network:
     internal: true

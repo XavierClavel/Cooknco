@@ -1,0 +1,258 @@
+<!--
+  The recipe sheet, as Chromium prints it.
+
+  Editable from the backoffice: everything below is markup and CSS, and the values come from
+  the recipe through the {{names}} listed in the tab. A section — {{#steps}}…{{/steps}} —
+  disappears when there is nothing to show and repeats once per row for a list.
+
+  Rendered by headless Chromium, so modern CSS is fair game: grid, flexbox, object-fit all
+  work here. The one rule is that nothing may be fetched from the network — fonts, pictures
+  and styles have to be in this file or sent with it, and a URL is silently dropped.
+-->
+<meta charset="utf-8">
+<title>{{title}}</title>
+<style>
+  /* Sent alongside this file by the exporter; no other face is available offline. */
+  @font-face {
+    font-family: Roboto;
+    src: url(Roboto-Regular.ttf);
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm 15mm;
+  }
+
+  :root {
+    --accent: #ff6f59;
+    --ink: #2f2b28;
+    --muted: #8a8178;
+    --rule: #ece7e1;
+    --wash: #fdf7f4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Roboto, "Liberation Sans", sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: var(--ink);
+    /* Roboto ligates fl and fi, and the glyph is what ends up in the PDF's text: with
+       ligatures on, searching the sheet for "flour" finds nothing. A sheet people print
+       is also a sheet people search, and the typography is worth less than that. */
+    font-variant-ligatures: none;
+  }
+
+  /* ------------------------------------------------------------------ header */
+
+  .title {
+    margin: 0;
+    font-size: 26pt;
+    line-height: 1.15;
+    letter-spacing: -0.4pt;
+    color: var(--accent);
+  }
+
+  .byline {
+    margin: 3mm 0 0;
+    font-size: 9.5pt;
+    color: var(--muted);
+  }
+
+  .photo {
+    display: block;
+    width: 100%;
+    /* A band, not the whole picture: cropping to a fixed height is what keeps a full
+       recipe — picture, ingredients, steps and tips — on a single sheet. */
+    height: 48mm;
+    margin: 6mm 0 0;
+    object-fit: cover;
+    border-radius: 3mm;
+  }
+
+  .description {
+    margin: 6mm 0 0;
+    font-size: 11pt;
+    color: #574f49;
+  }
+
+  /* -------------------------------------------------------------- meta strip */
+
+  .facts {
+    display: flex;
+    gap: 4mm;
+    margin: 7mm 0 0;
+    padding: 4mm 0;
+    border-top: 0.4mm solid var(--rule);
+    border-bottom: 0.4mm solid var(--rule);
+  }
+
+  .fact { flex: 1; }
+
+  .fact dt {
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6pt;
+    color: var(--muted);
+  }
+
+  .fact dd {
+    margin: 1mm 0 0;
+    font-size: 12pt;
+    font-weight: 700;
+  }
+
+  /* -------------------------------------------------------------------- body */
+
+  .body { margin: 8mm 0 0; }
+
+  /*
+     Two columns only when there is an ingredient list to fill the narrow one. A recipe
+     with none would otherwise print its steps in the right-hand column with 62mm of
+     nothing beside them.
+  */
+  .body.split {
+    display: grid;
+    grid-template-columns: 62mm 1fr;
+    gap: 10mm;
+  }
+
+  h2 {
+    margin: 0 0 3mm;
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1pt;
+    color: var(--accent);
+  }
+
+  .ingredients {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ingredients li {
+    display: flex;
+    gap: 2mm;
+    padding: 1.6mm 0;
+    border-bottom: 0.3mm dotted var(--rule);
+    break-inside: avoid;
+  }
+
+  .ingredients .amount {
+    flex: 0 0 18mm;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ingredients .complement {
+    color: var(--muted);
+  }
+
+  .steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+
+  .steps li {
+    position: relative;
+    padding: 0 0 4mm 10mm;
+    break-inside: avoid;
+  }
+
+  .steps li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0.2mm;
+    width: 6.5mm;
+    height: 6.5mm;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 9pt;
+    font-weight: 700;
+    line-height: 6.5mm;
+    text-align: center;
+  }
+
+  .tips {
+    margin: 6mm 0 0;
+    padding: 4mm 5mm;
+    background: var(--wash);
+    border-left: 1mm solid var(--accent);
+    border-radius: 0 2mm 2mm 0;
+    break-inside: avoid;
+  }
+
+  .tips h2 { margin-bottom: 1.5mm; }
+
+  .footer {
+    margin: 7mm 0 0;
+    padding-top: 2.5mm;
+    border-top: 0.4mm solid var(--rule);
+    font-size: 8pt;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+
+<h1 class="title">{{title}}</h1>
+<p class="byline">By {{author}}</p>
+
+{{#photo}}<img class="photo" src="{{photo}}" alt="">{{/photo}}
+
+{{#description}}<p class="description">{{description}}</p>{{/description}}
+
+<dl class="facts">
+  {{#yield}}<div class="fact"><dt>Servings</dt><dd>{{yield}}</dd></div>{{/yield}}
+  {{#preparationTime}}<div class="fact"><dt>Preparation</dt><dd>{{preparationTime}} min</dd></div>{{/preparationTime}}
+  {{#cookingTime}}<div class="fact"><dt>Cooking</dt><dd>{{cookingTime}} min</dd></div>{{/cookingTime}}
+  {{#cookingTemperature}}<div class="fact"><dt>Temperature</dt><dd>{{cookingTemperature}} °C</dd></div>{{/cookingTemperature}}
+</dl>
+
+<div class="body{{#hasIngredients}} split{{/hasIngredients}}">
+  <section>
+    {{#hasIngredients}}
+    <h2>Ingredients</h2>
+    <ul class="ingredients">
+      {{#ingredients}}
+      <li>
+        <span class="amount">{{amount}}</span>
+        <span>{{name}}{{#complement}} <span class="complement">({{complement}})</span>{{/complement}}</span>
+      </li>
+      {{/ingredients}}
+    </ul>
+    {{/hasIngredients}}
+
+    {{#tips}}
+    <div class="tips">
+      <h2>Tips</h2>
+      <div>{{tips}}</div>
+    </div>
+    {{/tips}}
+  </section>
+
+  <section>
+    {{#hasSteps}}
+    <h2>Steps</h2>
+    <ol class="steps">
+      {{#steps}}<li>{{text}}</li>{{/steps}}
+    </ol>
+    {{/hasSteps}}
+
+  </section>
+</div>
+
+<div class="footer">
+  <span>{{siteName}}</span>
+  <span>{{url}}</span>
+</div>

@@ -10,12 +10,15 @@ import com.xavierclavel.services.DefaultImageService
 import com.xavierclavel.services.EmailTemplateService
 import com.xavierclavel.services.EncryptionService
 import com.xavierclavel.services.ExportService
+import com.xavierclavel.services.GotenbergPdfRenderer
 import com.xavierclavel.services.FollowService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
 import com.xavierclavel.services.LinkPreviewService
 import com.xavierclavel.services.ModerationService
+import com.xavierclavel.services.PdfRenderer
+import com.xavierclavel.services.PdfTemplateService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
@@ -33,6 +36,7 @@ import io.ktor.server.application.Plugin
 import io.ktor.server.testing.*
 import io.ktor.utils.io.KtorDsl
 import kotlinx.serialization.json.Json
+import main.com.xavierclavel.containers.GotenbergTestContainer
 import main.com.xavierclavel.containers.RedisTestContainer
 import main.com.xavierclavel.utils.FakeAppShellSource
 import main.com.xavierclavel.utils.login
@@ -96,8 +100,11 @@ abstract class ApplicationTest: KoinTest {
                 single { AdminService() }
                 single { StorageService() }
                 single { EmailTemplateService() }
+                single { PdfTemplateService() }
                 single { LinkPreviewService() }
                 single<AppShellSource> { FakeAppShellSource() }
+                // The real Chromium, not a stub: see GotenbergTestContainer.
+                single<PdfRenderer> { GotenbergPdfRenderer(getProperty("gotenberg.url", "")) }
                 single { RedisService(getProperty("redis.url", "redis://redis:6379")) }
                 single { loadConfig() }
                 single { EncryptionService() }
@@ -106,7 +113,10 @@ abstract class ApplicationTest: KoinTest {
 
             startKoin {
                 modules(testModules)
-                properties(mapOf("redis.url" to RedisTestContainer.getRedisUri()))
+                properties(mapOf(
+                    "redis.url" to RedisTestContainer.getRedisUri(),
+                    "gotenberg.url" to GotenbergTestContainer.getGotenbergUrl(),
+                ))
             }
         }
 

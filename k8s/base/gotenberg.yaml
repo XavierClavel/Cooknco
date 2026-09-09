@@ -1,0 +1,87 @@
+# Headless Chromium behind an HTTP form: what actually prints a recipe sheet.
+#
+# The backend renders the sheet as HTML — from a layout an operator can rewrite in the
+# backoffice — and posts it here to be printed. Chromium rather than a PDF library laying
+# the boxes out itself, so that what the operator previews and what the export produces
+# come from the same engine. See `GotenbergPdfRenderer`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cooknco-gotenberg
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cooknco-gotenberg
+  template:
+    metadata:
+      labels:
+        app: cooknco-gotenberg
+    spec:
+      containers:
+        - name: gotenberg
+          image: gotenberg/gotenberg:8
+          args:
+            - gotenberg
+            # The page being printed is markup an operator saved, so the browser must not
+            # be a way to reach the cluster from inside it. The allow-list leaves it exactly
+            # the files the backend posted alongside the document, which Gotenberg unpacks
+            # under /tmp — every other URL, remote or local, is refused.
+            #
+            # Spelled as an allow-list rather than left to the stock deny-list, which is
+            # `^file:(?!//\/tmp/).*`: Go's RE2 cannot compile a negative lookahead, so that
+            # default is matched by a backtracking engine under a timeout, and concurrent
+            # prints make the timeout fire and the conversion fail with a 500.
+            - --chromium-allow-list=^file:///tmp/.*
+            - --chromium-deny-list=^$
+            # Belt and braces, and what stops a DNS name resolving somewhere useful.
+            - --chromium-deny-private-ips
+            - --chromium-deny-public-ips
+            # Nothing in a sheet needs scripting, and a layout is not a place to run any.
+            - --chromium-disable-javascript
+            # One backend, one export at a time in practice. Held down because each
+            # concurrent conversion is a Chromium tab with a tab's appetite for memory.
+            - --chromium-max-concurrency=2
+          ports:
+            - containerPort: 3000
+          # The only pod here with a ceiling, because it is the only one that runs a
+          # browser: an unbounded Chromium is what would evict the backend beside it.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          # Chromium maps its shared memory here, and the container default of 64Mi is
+          # what makes a tab die mid-render on a page with a large picture in it.
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cooknco-gotenberg
+spec:
+  selector:
+    app: cooknco-gotenberg
+  ports:
+    - port: 3000
+      targetPort: 3000

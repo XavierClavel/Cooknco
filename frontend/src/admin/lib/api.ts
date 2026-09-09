@@ -151,6 +151,30 @@ export const previewMailTemplate = (key: string, subject: string, body: string) 
 export const sendTestMail = (key: string, recipient: string, locale: string) =>
   api.post(`/admin/mails/templates/${key}/test`, {recipient, locale})
 
+// ---------------------------------------------------------------- documents
+export const listPdfTemplates = () => api.get('/admin/documents/templates')
+
+export const savePdfTemplate = (key: string, locale: string, body: string) =>
+  api.put(`/admin/documents/templates/${key}/${locale}`, {body})
+
+/** Drops the saved layout, putting the one packaged with the app back in service. */
+export const restorePdfTemplate = (key: string, locale: string) =>
+  api.delete(`/admin/documents/templates/${key}/${locale}`)
+
+/**
+ * Comes back as the printed PDF, not as the HTML behind it.
+ *
+ * The point of printing through a browser is that the print is not the screen — page
+ * boxes, print media queries, where the pages break — so the preview has to be the
+ * document itself for any of that to be checkable.
+ */
+export const previewPdfTemplate = (key: string, locale: string, body: string, recipeId: number | null) =>
+  api.post(
+    `/admin/documents/templates/${key}/${locale}/preview`,
+    {body, recipeId},
+    {responseType: 'blob'},
+  )
+
 // --------------------------------------------------------------------- logs
 export const getLogs = (f: Record<string, unknown>) => api.get(`/admin/logs?${qs(f)}`)
 export const clearLogs = () => api.delete('/admin/logs')

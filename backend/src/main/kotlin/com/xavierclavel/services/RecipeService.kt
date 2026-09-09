@@ -85,6 +85,18 @@ class RecipeService: KoinComponent {
         findEntityById(recipeId)
             ?: throw NotFoundException(NotFoundCause.RECIPE_NOT_FOUND)
 
+    /**
+     * The newest recipe there is, for the backoffice to preview a document layout against
+     * when the operator has not picked one. Hidden recipes included: this is only ever
+     * reached from behind the admin gate, and a moderated recipe still shows a layout off.
+     */
+    fun findMostRecent() : Recipe =
+        QRecipe()
+            .orderBy().creationDate.desc()
+            .setMaxRows(1)
+            .findOne()
+            ?: throw NotFoundException(NotFoundCause.RECIPE_NOT_FOUND)
+
     fun existsById(recipeId:Long, userId: Long?) =
         QRecipe()
             .id.eq(recipeId)

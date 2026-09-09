@@ -1,8 +1,10 @@
 # Cooknco
 
 Kotlin monolith (`backend`) + Vue web app (`frontend`) + `mail-service`, sharing `shared`.
-A Kotlin Multiplatform mobile app lives in `app/` with its own Gradle build. Deployed to
-Kubernetes from `k8s/` by `.github/workflows/build.yml` on every push to `master`.
+A Kotlin Multiplatform mobile app lives in `app/` with its own Gradle build. One third-party
+service rides along: `cooknco-gotenberg`, headless Chromium, which prints the PDF exports.
+Deployed to Kubernetes from `k8s/` by `.github/workflows/build.yml` on every push to
+`master`.
 
 ## Always bump the version when a feature is done
 
@@ -116,6 +118,42 @@ sources are out of scope: fixtures may set up rows with raw SQL.
 
 Reference: [`Pictarine/backend-zourite-api` — `docs/product-v2/ebean-patterns.md`](https://github.com/Pictarine/backend-zourite-api/blob/develop/docs/product-v2/ebean-patterns.md)
 (that project's Kotlin query beans call the alias `_alias`; ours are Java beans and use `Q<Entity>.Alias`).
+
+## PDF exports are HTML, printed by Chromium
+
+The recipe sheet is **not** laid out in Kotlin. `ExportService` fills a Mustache layout in
+and posts the resulting HTML to Gotenberg, which prints it (`GotenbergPdfRenderer`). iText
+is a test-only dependency now — it reads exports back so tests can assert on them — and
+nothing should go back to building a PDF box by box.
+
+The layout itself is operator-owned, on the same design as the mail wordings: a saved row in
+`pdf_templates` overrides the copy packaged in `backend/src/main/resources/pdf/`, restoring
+one is a delete, and the backoffice edits them in the documents tab. What a layout may name
+is `PdfDocumentKind.RECIPE.variables` and nothing else — adding a value to a sheet means
+adding it there and in `ExportService.modelOf`, not just writing it into the HTML.
+
+Two constraints the layouts have to respect, both enforced by the deployment rather than by
+review:
+
+- **No network.** Gotenberg runs with `--chromium-allow-list=^file:///tmp/.*` (plus the two
+  `deny-*-ips` flags), so a URL in a layout fetches nothing — remote, a neighbouring service,
+  or a file off the renderer's disk. Fonts and pictures are posted alongside the document as
+  named files (`assets` in `PdfRenderer.render`) and referenced by that name.
+  Do **not** fall back to Gotenberg's stock deny-list: it is `^file:(?!//\/tmp/).*`, and Go's
+  RE2 cannot compile a negative lookahead, so it is matched by a backtracking engine under a
+  timeout that fires under concurrent prints and fails the conversion with a 500.
+- **Values are escaped.** Mustache's `{{name}}` escapes HTML, which is what keeps a recipe
+  title from being markup. Do not reach for the raw `{{{name}}}` form on anything a user typed.
+
+`GotenbergPdfRenderer` bounds how many prints are in flight (`Configuration.Pdf.maxConcurrentRenders`,
+matching the renderer's own `--chromium-max-concurrency`) and refuses with a 503 rather than
+queueing for ever. Keep that bound: the backoffice paces its live preview, but nothing else
+calling the endpoint does.
+
+`:backend:test` starts a real Gotenberg container (`GotenbergTestContainer`) rather than
+stubbing the renderer, so the export tests assert on PDFs Chromium actually produced. The
+bound itself is tested against a mock engine instead (`GotenbergPdfRendererTest`), because a
+real renderer answers too fast to hold two prints open at once.
 
 ## Build and test
 

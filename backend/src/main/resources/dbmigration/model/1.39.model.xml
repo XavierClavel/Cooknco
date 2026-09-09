@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="pdf_templates" identityType="identity" pkName="pk_pdf_templates">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="document_key" type="varchar(63)" notnull="true"/>
+            <column name="locale" type="integer(255)" notnull="true" checkConstraint="check ( locale in (0,1))" checkConstraintName="ck_pdf_templates_locale"/>
+            <column name="body" type="varchar(65535)" notnull="true"/>
+            <column name="updated_at" type="localdatetime" notnull="true"/>
+            <uniqueConstraint name="uq_pdf_templates_document_key_locale" columnNames="document_key,locale" oneToOne="false" nullableColumns=""/>
+        </createTable>
+    </changeSet>
+</migration>

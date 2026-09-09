@@ -45,9 +45,13 @@ dependencies {
     //
     implementation("net.coobird:thumbnailator:0.4.20")
 
-    //PDF write
-    implementation("com.itextpdf:itext-core:$itextVersion")
-    implementation("com.itextpdf:bouncy-castle-adapter:$itextVersion")
+    //Document layouts: logic-less templating, so a layout an operator saved stays markup
+    implementation("com.samskivert:jmustache:1.16")
+
+    //PDF reading, to assert on what an export actually contains. The writing is Chromium's,
+    //in its own service: see GotenbergPdfRenderer.
+    testImplementation("com.itextpdf:itext-core:$itextVersion")
+    testImplementation("com.itextpdf:bouncy-castle-adapter:$itextVersion")
 
     //Mocking
     testImplementation("io.mockk:mockk:1.13.16")
