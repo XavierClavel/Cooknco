@@ -59,6 +59,13 @@ dependencies {
     //Job scheduling
     implementation("dev.inmo:krontab:2.7.1")
 
+    //MCP server: the /mcp endpoint speaks Model Context Protocol over Streamable HTTP.
+    //Held at the last release built against this build's Ktor and Kotlin (3.2.3 / 2.2.21) — every
+    //release after it compiles here but fails at runtime, reaching for Ktor internals that moved
+    //(0.15.0: "tried to access private field io.ktor.http.HttpMethod.Post"). Moving up means
+    //moving Ktor with it; McpControllerTest is what would catch the mismatch again.
+    implementation("io.modelcontextprotocol:kotlin-sdk-server:0.10.0")
+
     //Redis for session storage
     implementation("io.lettuce:lettuce-core:6.5.3.RELEASE")
 
