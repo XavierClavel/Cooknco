@@ -23,13 +23,21 @@ class AuthRepository(
         Unit
     }
 
+    /**
+     * Ends the session on this device, and on the server if it can be reached.
+     *
+     * The server call is best effort on purpose: its session expires on its own, but the
+     * token on disk does not. Letting a failed request skip [TokenDataStore.clearToken]
+     * would leave the user on the login screen and signed straight back in at the next
+     * launch — a sign-out that only looked like one.
+     */
     suspend fun logout(): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first()
         if (token != null) {
             // Before the session goes: it is an authenticated call, and an account left
             // registered would keep pushing to a handset somebody else may now be holding.
             pushRepository.unregisterCurrentDevice()
-            authApi.logout(token)
+            runCatching { authApi.logout(token) }
         }
         tokenDataStore.clearToken()
     }

@@ -130,9 +130,11 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
 
         composable(Routes.MAIN) {
             val user = (authState as? AuthState.Authenticated)?.user ?: return@composable
+            val isLoggingOut by viewModel.isLoggingOut.collectAsState()
             MainScreen(
                 user = user,
                 onLogout = viewModel::logout,
+                isLoggingOut = isLoggingOut,
                 onNavigateToSearch = { navController.navigate(Routes.RECIPES) },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 onNavigateToEditProfile = { navController.navigate("user/${user.id}/edit") },
@@ -343,8 +345,13 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             is AuthState.Authenticated -> Routes.MAIN
             is AuthState.Unauthenticated -> Routes.LOGIN
         }
+        // The whole stack goes, not just the splash. Popping to SPLASH stops working the
+        // moment it leaves the stack — which is on the very first transition — so signing
+        // out would otherwise leave the session's screens one back-press away, and signing
+        // back in would stack a second MAIN on top of the first, ViewModels and all.
         navController.navigate(destination) {
-            popUpTo(Routes.SPLASH) { inclusive = true }
+            popUpTo(navController.graph.id) { inclusive = true }
+            launchSingleTop = true
         }
     }
 
