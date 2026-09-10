@@ -99,7 +99,10 @@
                 <span class="small muted">{{ $t('admin_releases_reach_blocked') }}</span>
                 <b class="tnum">{{ reach[gate.platform].blockedDevices }}</b>
                 <span class="small subtle">
-                  {{ $t('admin_releases_reach_blocked_users', {users: reach[gate.platform].blockedUsers}) }}
+                  {{ $t('admin_releases_reach_blocked_users', {
+                    users: reach[gate.platform].blockedUsers,
+                    share: fmtShare(reach[gate.platform].blockedUsers, reach[gate.platform].users),
+                  }) }}
                 </span>
               </div>
             </div>
@@ -111,18 +114,36 @@
             <!--
               Where the install base actually sits, which is what a floor is chosen from.
               A build nobody is on is free to block; the one under half the users is not.
+              Counted in people first and devices second: what an operator hesitates over
+              is how many users a save stops, and one person's two handsets are one
+              hesitation, not two.
             -->
             <div v-if="reach[gate.platform].distribution.length" class="dist">
+              <div class="dist-row head">
+                <span class="small subtle">{{ $t('admin_releases_reach_col_version') }}</span>
+                <span></span>
+                <span class="small subtle dist-num">{{ $t('admin_releases_reach_col_share') }}</span>
+                <span class="small subtle dist-num">{{ $t('admin_releases_reach_col_users') }}</span>
+                <span class="small subtle dist-num">{{ $t('admin_releases_reach_col_devices') }}</span>
+              </div>
               <div v-for="row in reach[gate.platform].distribution" :key="row.version || 'unknown'"
                    class="dist-row" :class="{blocked: row.blocked}">
                 <span class="mono dist-name">
                   {{ row.version || $t('admin_releases_reach_unknown') }}
                 </span>
-                <span class="bar"><i :style="{width: share(gate.platform, row.devices)}"></i></span>
-                <span class="small tnum dist-count">{{ row.devices }}</span>
+                <span class="bar"><i :style="{width: barWidth(gate.platform, row.users)}"></i></span>
+                <span class="small tnum dist-num dist-share">
+                  {{ fmtShare(row.users, reach[gate.platform].users) }}
+                </span>
+                <span class="small tnum dist-num">{{ row.users }}</span>
+                <span class="small tnum dist-num subtle">{{ row.devices }}</span>
               </div>
             </div>
             <p v-else class="small subtle" style="margin:0">{{ $t('admin_releases_reach_empty') }}</p>
+
+            <div v-if="overlapping(gate.platform) > 0" class="small subtle">
+              {{ $t('admin_releases_reach_overlap', {users: overlapping(gate.platform)}) }}
+            </div>
 
             <div v-if="reach[gate.platform].unknownDevices > 0" class="small subtle">
               {{ $t('admin_releases_reach_unknown_hint', {devices: reach[gate.platform].unknownDevices}) }}
@@ -223,6 +244,7 @@
             devices: pendingReach.blockedDevices,
             users: pendingReach.blockedUsers,
             total: pendingReach.devices,
+            share: fmtShare(pendingReach.blockedUsers, pendingReach.users),
           }) }}</span>
         </div>
         <div v-else-if="pendingReach" class="alert info">
@@ -258,7 +280,7 @@ import {
   checkAppVersion, clearAppVersion, errorKey, getAppVersionReach, listAppVersions, saveAppVersion,
 } from '../lib/api'
 import {debounce} from 'lodash'
-import {fmtAgo} from '../lib/format'
+import {fmtAgo, fmtShare} from '../lib/format'
 import {notifyError, notifyOk} from '../lib/toast'
 import UiIcon from '../components/UiIcon.vue'
 import UiModal from '../components/UiModal.vue'
@@ -437,11 +459,33 @@ watch(
   {deep: true},
 )
 
-/** One bar's width, as a share of the platform's largest bucket rather than of the total. */
-function share(platform: string, devices: number): string {
-  const rows = reach.value[platform]?.distribution ?? []
-  const peak = Math.max(1, ...rows.map(r => r.devices))
-  return `${Math.round((devices / peak) * 100)}%`
+/**
+ * One bar's width: the share of users on that build, so the bar and the figure printed
+ * beside it say the same thing rather than two different ones.
+ *
+ * Floored at a sliver instead of at zero. The long tail is precisely what this list exists
+ * to show — a build with four people on it is the one worth noticing before blocking it —
+ * and a bucket that renders as an empty track reads as a build nobody is on.
+ */
+function barWidth(platform: string, users: number): string {
+  const total = reach.value[platform]?.users ?? 0
+  if (!total || users <= 0) return '0%'
+  return `${Math.max(2, Math.round((users / total) * 100))}%`
+}
+
+/**
+ * How many people the list above counts more than once.
+ *
+ * A build's user count is "people with at least one device on it" — the same reading as
+ * the blocked figure, deliberately, so the two can be compared — which means somebody
+ * whose phone and tablet are on different builds appears in two rows and the shares add
+ * up to more than everyone. Said only when it actually happens: on a base where each
+ * person carries one handset the shares do total 100% and the caveat would be noise.
+ */
+function overlapping(platform: string): number {
+  const measured = reach.value[platform]
+  if (!measured) return 0
+  return Math.max(0, measured.distribution.reduce((n, row) => n + row.users, 0) - measured.users)
 }
 
 function revert(platform: string) {
@@ -543,16 +587,26 @@ onMounted(load)
 .stat.alarm { background: var(--c-danger-soft); border-color: var(--c-danger-border); }
 .stat.alarm b { color: var(--c-danger); }
 
-/* Where the install base sits. Bars are relative to the biggest bucket, not to the
-   total: what a floor is chosen against is the shape of the distribution, and against
-   a total the long tail this exists to show would be invisible. */
-.dist { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
-.dist-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
-.dist-name { width: 88px; flex: none; }
-.dist-count { width: 40px; flex: none; text-align: right; color: var(--c-text-muted); }
-.bar { flex: 1; height: 8px; border-radius: 999px; background: var(--c-surface-alt); overflow: hidden; }
+/* Where the install base sits, in people. One grid for the whole table rather than one
+   per row, so the columns size themselves to the longest version string and to whichever
+   header a translation is longest in, and the figures still line up under them. */
+.dist {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content max-content max-content;
+  align-items: center;
+  gap: 3px 10px;
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+.dist-row { display: contents; }
+.dist-num { text-align: right; }
+.dist-row.head > * { padding-bottom: 3px; }
+/* The percentage is the figure the decision is made on; devices are context for it. */
+.dist-share { font-weight: 600; }
+.bar { height: 8px; border-radius: 999px; background: var(--c-surface-alt); overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--c-accent); }
-.dist-row.blocked .dist-name { color: var(--c-danger); }
+.dist-row.blocked .dist-name,
+.dist-row.blocked .dist-share { color: var(--c-danger); }
 .dist-row.blocked .bar > i { background: var(--c-danger); }
 
 /* ----------------------------------------------------------------- checker */

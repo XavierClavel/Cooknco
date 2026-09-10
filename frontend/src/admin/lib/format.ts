@@ -52,3 +52,17 @@ export function fmtNumber(n?: number | null): string {
 export function shortLogger(logger: string): string {
   return logger.split('.').pop() || logger
 }
+
+/**
+ * A count as a share of a whole, e.g. "57%".
+ *
+ * A non-zero count never rounds down to "0%". Where these are read — how much of the
+ * install base sits on a build somebody is about to lock out — a bucket printed as zero
+ * reads as "nobody is there", and that is the one misreading with a cost, so anything
+ * under half a percent says "<1%" instead.
+ */
+export function fmtShare(part: number, whole: number): string {
+  if (!whole || part <= 0) return '0%'
+  const pct = (part / whole) * 100
+  return pct < 1 ? '<1%' : `${Math.round(pct)}%`
+}
