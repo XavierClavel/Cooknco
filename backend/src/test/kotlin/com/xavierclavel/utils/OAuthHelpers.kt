@@ -46,9 +46,13 @@ data class Pkce(val verifier: String, val challenge: String) {
     }
 }
 
-suspend fun HttpClient.registerClientRaw(body: String): HttpResponse =
+/** [type] is nullable because a client is free to send no content type at all, and some do. */
+suspend fun HttpClient.registerClientRaw(
+    body: String,
+    type: ContentType? = ContentType.Application.Json,
+): HttpResponse =
     post("/$OAUTH_URL/register") {
-        contentType(ContentType.Application.Json)
+        type?.let { contentType(it) }
         setBody(body)
     }
 

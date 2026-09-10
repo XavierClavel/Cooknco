@@ -16,9 +16,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.encodeURLParameter
-import io.ktor.server.request.receive
 import io.ktor.server.request.queryString
 import io.ktor.server.request.receiveParameters
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
@@ -57,6 +57,28 @@ private val oauthJson = Json {
 
 private suspend inline fun <reified T> RoutingContext.respondOAuth(status: HttpStatusCode, body: T) =
     call.respondText(oauthJson.encodeToString(body), ContentType.Application.Json, status)
+
+/**
+ * A registration is read with this rather than through `call.receive`, and the difference is
+ * the whole point: unknown members are ignored.
+ *
+ * RFC 7591 has a server ignore the metadata it does not understand, and every real client
+ * sends some — `software_id`, `software_version`, `logo_uri`, `application_type`. The
+ * application-wide `json()` refuses an unknown key, so the parse threw and every one of them
+ * was answered `invalid_client_metadata` before a single field had been looked at. Reading the
+ * body as text also drops the requirement that the client label it `application/json`, which
+ * content negotiation would otherwise turn into the same error.
+ *
+ * A field this server *does* know keeps its meaning: a redirect URI that is not a URI is still
+ * a refusal, from [OAuthService.register] and with a description saying which one.
+ */
+private val registrationJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    // A null where a list is expected reads as the default, so it reaches the field-level
+    // refusal ("redirect_uris is required") instead of the parser's blanket one.
+    coerceInputValues = true
+}
 
 /**
  * The two discovery documents that let an MCP client find its way in knowing only `/mcp`.
@@ -139,8 +161,9 @@ object OAuthController : Controller(OAUTH_URL) {
     /** RFC 7591. Open, and grants nothing on its own: see [OAuthService.register]. */
     private fun Route.register() = post("/register") {
         val request = try {
-            call.receive<ClientRegistrationRequest>()
+            registrationJson.decodeFromString<ClientRegistrationRequest>(call.receiveText())
         } catch (e: Exception) {
+            logger.info { "Refused a client registration whose body did not parse: ${e.message}" }
             return@post respondOAuth(
                 HttpStatusCode.BadRequest,
                 OAuthError("invalid_client_metadata", "The registration request is not valid JSON"),
