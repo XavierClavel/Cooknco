@@ -200,6 +200,40 @@ export const previewPdfTemplate = (key: string, locale: string, body: string, re
     {responseType: 'blob'},
   )
 
+// ----------------------------------------------------------------- releases
+
+/** Every mobile platform, gated or not. The web app has no row: see AppPlatform. */
+export const listAppVersions = () => api.get('/admin/app-versions')
+
+export const saveAppVersion = (
+  platform: string, minimumVersion: string, latestVersion: string, storeUrl: string,
+) => api.put(`/admin/app-versions/${platform}`, {minimumVersion, latestVersion, storeUrl})
+
+/** Removes the gate, which lets every build of that platform run again. */
+export const clearAppVersion = (platform: string) => api.delete(`/admin/app-versions/${platform}`)
+
+/**
+ * What a floor would cost, measured on the installs that are actually in use.
+ *
+ * Read against the draft rather than against what is saved, and read *before* the save,
+ * for the same reason the notifications tab reads its audience first: the apps a version
+ * gate applies to have stopped asking anything else by then. Omitting `minimum` measures
+ * the gate already in force.
+ */
+export const getAppVersionReach = (platform: string, minimum?: string) =>
+  api.get(`/admin/app-versions/${platform}/reach?${qs({minimum: minimum ?? ''})}`)
+
+/**
+ * The verdict a device on `version` would get, from the endpoint a device actually calls.
+ *
+ * Deliberately the real thing rather than the same comparison rewritten here: what an
+ * operator needs to trust before raising a floor is what phones will be told, and a second
+ * implementation of "is this version older" is a second chance to get it wrong. It reflects
+ * what is *saved*, so the tab only offers it once there is nothing unsaved in the form.
+ */
+export const checkAppVersion = (platform: string, version: string) =>
+  api.get(`/app-version?${qs({platform, version})}`)
+
 // --------------------------------------------------------------------- logs
 export const getLogs = (f: Record<string, unknown>) => api.get(`/admin/logs?${qs(f)}`)
 export const clearLogs = () => api.delete('/admin/logs')

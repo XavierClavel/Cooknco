@@ -5,6 +5,7 @@ import com.xavierclavel.models.jointables.query.QCookbookUser
 import com.xavierclavel.models.jointables.query.QFollow
 import com.xavierclavel.models.jointables.query.QLike
 import com.xavierclavel.models.jointables.query.QRecipeIngredient
+import com.xavierclavel.models.query.QAppVersion
 import com.xavierclavel.models.query.QCookbook
 import com.xavierclavel.models.query.QDevice
 import com.xavierclavel.models.query.QEmailTemplate
@@ -57,6 +58,7 @@ object DatabaseManager {
         // Owned by nobody: mail wordings and document layouts reference no other row
         QEmailTemplate(),
         QPdfTemplate(),
+        QAppVersion(),
     )
 
     private fun hikari(): HikariDataSource {

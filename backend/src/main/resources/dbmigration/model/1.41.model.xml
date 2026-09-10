@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="app_versions" identityType="identity" pkName="pk_app_versions">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="platform" type="integer(255)" notnull="true" checkConstraint="check ( platform in (0,1))" checkConstraintName="ck_app_versions_platform" unique="uq_app_versions_platform"/>
+            <column name="minimum_version" type="varchar(23)" notnull="true"/>
+            <column name="latest_version" type="varchar(23)" notnull="true"/>
+            <column name="store_url" type="varchar(511)" notnull="true"/>
+            <column name="updated_at" type="localdatetime" notnull="true"/>
+        </createTable>
+    </changeSet>
+</migration>

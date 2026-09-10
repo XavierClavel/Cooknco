@@ -109,4 +109,8 @@ enum class BadRequestCause (val key: String) {
     PDF_TEMPLATE_TOO_LONG("pdf_template_too_long"),
     PDF_TEMPLATE_MALFORMED("pdf_template_malformed"),
 
+    APP_VERSION_INVALID("app_version_invalid"),
+    APP_VERSION_MINIMUM_ABOVE_LATEST("app_version_minimum_above_latest"),
+    APP_VERSION_STORE_URL_INVALID("app_version_store_url_invalid"),
+
 }

@@ -211,6 +211,16 @@ data class DeviceRegistrationDTO(
      * Callers pass [com.xavierclavel.cooknco.platform.devicePlatform].
      */
     val platform: String,
+    /**
+     * The build doing the registering, so the backoffice can see what a version floor
+     * would cost before raising it.
+     *
+     * No default, for the reason [platform] has none. Empty is a legitimate value — a
+     * build that cannot read its own version sends it and is counted as unknown — but it
+     * has to be sent rather than omitted, since an omitted field and an empty one would
+     * otherwise be the same thing on the wire and only one of them is deliberate.
+     */
+    val appVersion: String,
 )
 
 /**
@@ -237,4 +247,24 @@ data class NotificationInfo(
     val followersPending: List<UserSummary> = emptyList(),
     val notifications: List<UserNotificationInfo> = emptyList(),
     val unreadCount: Int = 0,
+)
+
+/**
+ * What the backend thinks of this build.
+ *
+ * [status] arrives as a string rather than an enum for the same reason the rest of this
+ * file does: adding a verdict on the server must not stop an older app from parsing the
+ * answer, and an unrecognised one has to degrade to "let it run". See
+ * `AppVersionRepository`.
+ *
+ * No copy travels with it. The sentence a user reads lives in the app, in the app's own
+ * language, because that is the only place that knows it.
+ */
+@Serializable
+data class AppVersionCheckInfo(
+    val status: String,
+    val currentVersion: String = "",
+    val minimumVersion: String? = null,
+    val latestVersion: String? = null,
+    val storeUrl: String? = null,
 )
