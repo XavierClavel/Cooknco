@@ -146,7 +146,7 @@
     <!-- ------------------------------------------------------------ restore -->
     <ui-modal v-model="restoreDialog" :title="$t('admin_documents_restore')" :width="440">
       <p>{{ $t('admin_documents_restore_confirm', {locale: LOCALE_LABELS[locale]}) }}</p>
-      <template #footer>
+      <template #actions>
         <button class="btn" @click="restoreDialog = false">{{ $t('cancel') }}</button>
         <button class="btn danger" @click="confirmRestore">{{ $t('admin_documents_restore') }}</button>
       </template>

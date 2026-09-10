@@ -42,10 +42,16 @@
       </div>
     </div>
 
-    <!-- ------------------------------------------------------------- editor -->
-    <div v-if="selected" class="panel">
-      <div class="panel-head">
-        <span class="panel-title">{{ label(selected) }}</span>
+    <template v-if="selected">
+      <!-- Which language is being written, and the two things that act on the kind itself -->
+      <div class="tabs standalone">
+        <button v-for="l in selected.locales" :key="l.locale" class="tab"
+                :class="{on: l.locale === locale}" @click="locale = l.locale">
+          {{ LOCALE_LABELS[l.locale] }}
+          <span class="badge" :class="l.custom ? 'ok' : 'info'">
+            {{ $t(l.custom ? 'admin_mails_wording_custom' : 'admin_mails_wording_packaged') }}
+          </span>
+        </button>
         <span class="spacer"></span>
         <!-- A custom kind is authored here but nothing emits it yet; say so where it is edited -->
         <span v-if="!selected.builtIn" class="badge info">
@@ -58,96 +64,108 @@
         </button>
       </div>
 
-      <div class="tabs">
-        <button v-for="l in selected.locales" :key="l.locale" class="tab"
-                :class="{on: l.locale === locale}" @click="locale = l.locale">
-          {{ LOCALE_LABELS[l.locale] }}
-          <span class="badge" :class="l.custom ? 'ok' : 'info'">
-            {{ $t(l.custom ? 'admin_mails_wording_custom' : 'admin_mails_wording_packaged') }}
-          </span>
-        </button>
-      </div>
-
-      <div class="panel-body col" style="gap:14px">
-        <div v-if="!current.subject && !current.body" class="alert warn">
-          <ui-icon name="alert" />
-          <span>{{ $t('admin_mails_empty_wording') }}</span>
-        </div>
-
-        <label class="field">
-          <span>{{ $t('admin_mails_subject') }}</span>
-          <input v-model="draft.subject" class="input" :maxlength="MAX_SUBJECT" />
-        </label>
-
-        <div class="field">
-          <div class="row">
-            <label for="mail-body">{{ $t('admin_mails_body') }}</label>
+      <!-- ------------------------------------------------ editor and preview -->
+      <div class="split">
+        <!-- ---------------------------------------------------------- editor -->
+        <div class="panel pane">
+          <div class="panel-head">
+            <span class="panel-title">{{ label(selected) }}</span>
             <span class="spacer"></span>
             <span class="small subtle tnum">{{ draft.body.length }} / {{ MAX_BODY }}</span>
           </div>
-          <textarea id="mail-body" ref="bodyInput" v-model="draft.body" class="input mono body"
-                    :maxlength="MAX_BODY" spellcheck="false"></textarea>
+
+          <div class="panel-body pane-body">
+            <div v-if="!current.subject && !current.body" class="alert warn">
+              <ui-icon name="alert" />
+              <span>{{ $t('admin_mails_empty_wording') }}</span>
+            </div>
+
+            <label class="field">
+              <span>{{ $t('admin_mails_subject') }}</span>
+              <input v-model="draft.subject" class="input" :maxlength="MAX_SUBJECT" />
+            </label>
+
+            <div class="field grow">
+              <label for="mail-body">{{ $t('admin_mails_body') }}</label>
+              <textarea id="mail-body" ref="bodyInput" v-model="draft.body" class="input mono editor"
+                        :maxlength="MAX_BODY" spellcheck="false"></textarea>
+            </div>
+
+            <div v-if="selected.placeholders.length" class="row-wrap small">
+              <span class="muted">{{ $t('admin_mails_placeholders') }}</span>
+              <button v-for="name in selected.placeholders" :key="name" class="chip mono"
+                      :title="$t('admin_mails_insert_placeholder')" @click="insert(name)">
+                {{ token(name) }}
+              </button>
+              <span class="subtle">{{ $t('admin_mails_placeholders_hint') }}</span>
+            </div>
+
+            <!-- Refused by the server too: a reset mail with no link is one nobody can act on -->
+            <div v-if="missingPlaceholders.length" class="alert danger">
+              <ui-icon name="alert" />
+              <span>{{ $t('admin_mails_missing_placeholder', {names: missingPlaceholders.join(', ')}) }}</span>
+            </div>
+          </div>
+
+          <div class="panel-foot">
+            <button class="btn primary" :disabled="!dirty || !!missingPlaceholders.length || saving" @click="save">
+              <ui-icon name="check" :size="14" />
+              {{ saving ? $t('admin_mails_saving') : $t('admin_mails_save') }}
+            </button>
+            <button class="btn" :disabled="dirty" :title="dirty ? $t('admin_mails_test_needs_save') : ''"
+                    @click="openTest">
+              <ui-icon name="send" :size="14" />
+              {{ $t('admin_mails_test') }}
+            </button>
+            <span class="spacer"></span>
+            <span v-if="current.updatedAt" class="small subtle">
+              {{ $t('admin_mails_edited', {when: fmtAgo(current.updatedAt)}) }}
+            </span>
+            <button class="btn ghost" :disabled="!current.custom || !selected.builtIn" @click="restoreDialog = true">
+              <ui-icon name="undo" :size="14" />
+              {{ $t('admin_mails_restore') }}
+            </button>
+          </div>
         </div>
 
-        <div v-if="selected.placeholders.length" class="row-wrap small">
-          <span class="muted">{{ $t('admin_mails_placeholders') }}</span>
-          <button v-for="name in selected.placeholders" :key="name" class="chip mono"
-                  :title="$t('admin_mails_insert_placeholder')" @click="insert(name)">
-            {{ token(name) }}
-          </button>
-          <span class="subtle">{{ $t('admin_mails_placeholders_hint') }}</span>
-        </div>
+        <!-- --------------------------------------------------------- preview -->
+        <div class="panel pane">
+          <div class="panel-head">
+            <span class="panel-title">{{ $t('admin_mails_preview') }}</span>
+            <span class="dot" :class="statusClass" :title="statusTitle"></span>
+            <span class="spacer"></span>
+            <button class="btn icon" :disabled="!draft.body.trim()" :title="$t('admin_mails_preview_refresh')"
+                    @click="render(true, true)">
+              <ui-icon name="refresh" />
+            </button>
+          </div>
 
-        <!-- Refused by the server too: a reset mail with no link is one nobody can act on -->
-        <div v-if="missingPlaceholders.length" class="alert danger">
-          <ui-icon name="alert" />
-          <span>{{ $t('admin_mails_missing_placeholder', {names: missingPlaceholders.join(', ')}) }}</span>
+          <!-- The last good render stays on screen underneath, so a failed round trip does
+               not blank the pane the operator is working against. -->
+          <div v-if="renderError" class="alert danger" style="margin:10px 14px 0">
+            <ui-icon name="alert" />
+            <span>{{ renderError }}</span>
+          </div>
+
+          <div class="pane-body preview">
+            <template v-if="preview">
+              <div class="mail-head">
+                <span class="small subtle">{{ $t('admin_mails_preview_subject') }}</span>
+                <b>{{ preview.subject }}</b>
+              </div>
+              <div v-if="preview.unfilled?.length" class="alert warn" style="margin:10px 14px">
+                <ui-icon name="alert" />
+                <span>{{ $t('admin_mails_preview_unfilled', {names: preview.unfilled.join(', ')}) }}</span>
+              </div>
+              <!-- Operators paste raw HTML in here, so the preview runs none of it -->
+              <iframe class="rendered" sandbox="" :srcdoc="preview.body"></iframe>
+            </template>
+
+            <div v-else class="placeholder small subtle">{{ $t('admin_mails_preview_empty') }}</div>
+          </div>
         </div>
       </div>
-
-      <div class="panel-foot">
-        <button class="btn primary" :disabled="!dirty || !!missingPlaceholders.length || saving" @click="save">
-          <ui-icon name="check" :size="14" />
-          {{ saving ? $t('admin_mails_saving') : $t('admin_mails_save') }}
-        </button>
-        <button class="btn" :disabled="!draft.body.trim()" @click="openPreview">
-          <ui-icon name="eye" :size="14" />
-          {{ $t('admin_mails_preview') }}
-        </button>
-        <button class="btn" :disabled="dirty" :title="dirty ? $t('admin_mails_test_needs_save') : ''"
-                @click="openTest">
-          <ui-icon name="send" :size="14" />
-          {{ $t('admin_mails_test') }}
-        </button>
-        <span class="spacer"></span>
-        <span v-if="current.updatedAt" class="small subtle">
-          {{ $t('admin_mails_edited', {when: fmtAgo(current.updatedAt)}) }}
-        </span>
-        <button class="btn ghost" :disabled="!current.custom || !selected.builtIn" @click="restoreDialog = true">
-          <ui-icon name="undo" :size="14" />
-          {{ $t('admin_mails_restore') }}
-        </button>
-      </div>
-    </div>
-
-    <!-- ------------------------------------------------------------ preview -->
-    <ui-modal v-model="previewDialog" :title="$t('admin_mails_preview')" :width="720">
-      <div class="col" style="gap:12px">
-        <div class="field">
-          <span>{{ $t('admin_mails_preview_subject') }}</span>
-          <p><b>{{ preview?.subject }}</b></p>
-        </div>
-        <div v-if="preview?.unfilled?.length" class="alert warn">
-          <ui-icon name="alert" />
-          <span>{{ $t('admin_mails_preview_unfilled', {names: preview.unfilled.join(', ')}) }}</span>
-        </div>
-        <!-- Operators paste raw HTML in here, so the preview runs none of it -->
-        <iframe class="rendered" sandbox="" :srcdoc="preview?.body ?? ''"></iframe>
-      </div>
-      <template #actions>
-        <button class="btn" @click="previewDialog = false">{{ $t('close') }}</button>
-      </template>
-    </ui-modal>
+    </template>
 
     <!-- --------------------------------------------------------- test send -->
     <ui-modal v-model="testDialog" :title="$t('admin_mails_test')">
@@ -205,7 +223,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, reactive, ref, watch} from 'vue'
+import {computed, onMounted, onUnmounted, reactive, ref, watch} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {
   addMailTemplate, deleteMailTemplate, errorKey, listMailTemplates, previewMailTemplate,
@@ -223,6 +241,15 @@ const {t, te} = useI18n()
 const MAX_SUBJECT = 255
 const MAX_BODY = 16383
 const KEY_FORMAT = /^[a-z][a-z0-9_]{2,62}$/
+
+/**
+ * How long the editor sits still before the preview is filled in again.
+ *
+ * Shorter than the documents tab's: a mail preview is the server substituting placeholders
+ * into a string, not a Chromium print, so it costs a round trip and little else. Still not
+ * per keystroke — a fast typist would otherwise leave a request behind every letter.
+ */
+const LIVE_DEBOUNCE = 350
 
 /** A language's own name is the same in every locale, so these are not translated. */
 const LOCALE_LABELS: Record<string, string> = {FR: 'Français', EN: 'English'}
@@ -248,7 +275,8 @@ const saving = ref(false)
 const drafts = reactive<Record<string, {subject: string; body: string}>>({})
 
 const preview = ref<any>(null)
-const previewDialog = ref(false)
+const rendering = ref(false)
+const renderError = ref('')
 const testDialog = ref(false)
 const testRecipient = ref('')
 const restoreDialog = ref(false)
@@ -276,16 +304,6 @@ const syncDraft = () => {
   drafts[draftId.value] = {subject: current.value.subject, body: current.value.body}
 }
 
-/**
- * The pair on screen always has a draft entry.
- *
- * The subject and body are bound straight into it, so an absent entry would have `draft`
- * handing out a fresh object on every read and every keystroke writing to a temporary.
- */
-watch([selectedKey, locale], () => {
-  if (selectedKey.value && !drafts[draftId.value]) syncDraft()
-}, {immediate: true})
-
 const dirty = computed(() =>
   draft.value.subject !== current.value.subject || draft.value.body !== current.value.body)
 
@@ -302,6 +320,17 @@ const dirtyKeys = computed(() => {
 /** A declared placeholder the draft dropped: the server refuses the save, so say it here. */
 const missingPlaceholders = computed(() =>
   (selected.value?.placeholders ?? []).filter((name: string) => !draft.value.body.includes(`{{${name}}}`)))
+
+const statusClass = computed(() => {
+  if (renderError.value) return 'bad'
+  if (rendering.value) return 'busy'
+  return 'ok'
+})
+
+const statusTitle = computed(() => t(
+  renderError.value ? 'admin_mails_status_error'
+    : rendering.value ? 'admin_mails_rendering' : 'admin_mails_status_live',
+))
 
 const label = (tpl: any) => (KIND_LABELS[tpl.key] ? t(KIND_LABELS[tpl.key]) : tpl.key)
 
@@ -322,6 +351,7 @@ async function load() {
     const locales = selected.value?.locales ?? []
     if (locales.length && !locales.some((l: any) => l.locale === locale.value)) locale.value = locales[0].locale
     syncDraft()
+    render(true)
   } catch (e) { fail(e) } finally { loading.value = false }
 }
 
@@ -345,6 +375,74 @@ function insert(name: string) {
   })
 }
 
+// -------------------------------------------------------------------- preview
+
+let timer: ReturnType<typeof setTimeout> | undefined
+/** One render at a time, and at most one more waiting: see [render]. */
+let inFlight = false
+let queued = false
+
+function schedule() {
+  clearTimeout(timer)
+  timer = setTimeout(() => render(), LIVE_DEBOUNCE)
+}
+
+/**
+ * What the server is being asked to fill in.
+ *
+ * The locale is in here even though the endpoint takes none — the sample values are the
+ * same in every language — because what changes on a tab switch is the draft it names.
+ */
+const signature = computed(
+  () => `${selectedKey.value}|${locale.value}|${draft.value.subject}|${draft.value.body}`,
+)
+
+/** What the preview on screen was filled in from, so the same thing is not asked for twice. */
+let rendered = ''
+
+/**
+ * Fills the draft in and shows it.
+ *
+ * Single-flight: two round trips in the air can come back in the other order, and the pane
+ * would then settle on the older text. Edits that land mid-render set [queued] instead and
+ * are picked up by one more render when this one returns.
+ *
+ * @param now skips the debounce, for a click or a change of kind
+ * @param force renders even when nothing has changed, which is how the refresh button
+ *   retries after a failed round trip
+ */
+async function render(now = false, force = false) {
+  if (now) clearTimeout(timer)
+  const key = selectedKey.value
+  if (!key || !draft.value.body.trim()) {
+    // Nothing to show, and nothing rendered: typing the same body back has to render again
+    preview.value = null
+    rendered = ''
+    return
+  }
+
+  const asked = signature.value
+  if (!force && asked === rendered) return
+  if (inFlight) { queued = true; return }
+
+  inFlight = true
+  rendering.value = true
+  try {
+    preview.value = (await previewMailTemplate(key, draft.value.subject, draft.value.body)).data
+    rendered = asked
+    renderError.value = ''
+  } catch (e) {
+    const cause = errorKey(e)
+    renderError.value = cause && te(cause) ? t(cause) : t('admin_action_failed')
+  } finally {
+    inFlight = false
+    rendering.value = false
+    if (queued) { queued = false; render(true) }
+  }
+}
+
+// --------------------------------------------------------------------- saving
+
 async function save() {
   saving.value = true
   try {
@@ -358,13 +456,6 @@ async function save() {
 /** The write endpoints answer with the whole kind, so the list needs no second round trip. */
 function replace(info: any) {
   templates.value = templates.value.map(tpl => (tpl.key === info.key ? info : tpl))
-}
-
-async function openPreview() {
-  try {
-    preview.value = (await previewMailTemplate(selectedKey.value!, draft.value.subject, draft.value.body)).data
-    previewDialog.value = true
-  } catch (e) { fail(e) }
 }
 
 function openTest() {
@@ -387,6 +478,7 @@ async function confirmRestore() {
     const {data} = await restoreMailTemplate(selectedKey.value!, locale.value)
     replace(data)
     syncDraft()
+    render(true)
     notifyOk(t('admin_action_done'))
   } catch (e) { fail(e) }
 }
@@ -419,11 +511,29 @@ async function confirmDelete() {
   } catch (e) { fail(e) }
 }
 
+// -------------------------------------------------------------------- wiring
+
+/**
+ * The pair on screen always has a draft entry.
+ *
+ * The subject and body are bound straight into it, so an absent entry would have `draft`
+ * handing out a fresh object on every read and every keystroke writing to a temporary.
+ */
+watch([selectedKey, locale], () => {
+  if (selectedKey.value && !drafts[draftId.value]) syncDraft()
+  render(true)
+}, {immediate: true})
+
+// Watched through the signature rather than the draft itself: the draft is one reactive
+// object that is mutated in place, so a plain watcher on it would never see a keystroke.
+watch(signature, schedule)
+
 onMounted(load)
+onUnmounted(() => clearTimeout(timer))
 </script>
 
 <style scoped>
-.page { display: flex; flex-direction: column; gap: 16px; max-width: 1000px; }
+.page { display: flex; flex-direction: column; gap: 14px; max-width: 1600px; }
 
 .kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
 .kind {
@@ -442,7 +552,8 @@ onMounted(load)
 .kind:hover { background: var(--c-surface-hover); }
 .kind.on { border-color: var(--c-accent); background: var(--c-accent-soft); }
 
-.tabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--c-border); }
+.tabs { display: flex; align-items: center; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--c-border); }
+.tabs.standalone { padding: 0 0 6px; }
 .tab {
   display: inline-flex;
   align-items: center;
@@ -461,7 +572,54 @@ onMounted(load)
 .tab:hover { color: var(--c-text); }
 .tab.on { color: var(--c-text); border-bottom-color: var(--c-accent); }
 
-textarea.body { min-height: 260px; font-size: 12.5px; }
+/* Wording and mail side by side, each filling the window rather than the page scrolling */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 1180px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+}
+
+.pane { display: flex; flex-direction: column; height: calc(100vh - 300px); min-height: 520px; }
+.pane-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+
+/* The body is what the pane is for, so it takes whatever the rest of the form leaves */
+.field.grow { flex: 1; min-height: 0; }
+.editor { flex: 1; min-height: 120px; resize: none; font-size: 12.5px; line-height: 1.5; }
+
+.preview { padding: 0; gap: 0; background: var(--c-surface-alt); }
+
+/* Read like a mail client's header line, above the mail itself */
+.mail-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+/* Framed on white: mails are not theme-aware */
+.rendered {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: #fff;
+}
+
+.placeholder { flex: 1; display: grid; place-items: center; }
+
+/* Live-render state, next to the pane title */
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c-text-muted); }
+.dot.ok { background: #2e9e5b; }
+.dot.busy { background: var(--c-accent); animation: pulse 1s ease-in-out infinite; }
+.dot.bad { background: #d64545; }
+@keyframes pulse { 50% { opacity: 0.25; } }
 
 /* A placeholder reads as something to click, not as a label */
 .chip {
@@ -475,13 +633,4 @@ textarea.body { min-height: 260px; font-size: 12.5px; }
   cursor: pointer;
 }
 .chip:hover { border-style: solid; color: var(--c-accent); border-color: var(--c-accent); }
-
-/* Framed like a mail client's reading pane, on white: mails are not theme-aware */
-.rendered {
-  width: 100%;
-  height: 340px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius);
-  background: #fff;
-}
 </style>
