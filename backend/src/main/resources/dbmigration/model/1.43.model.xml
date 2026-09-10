@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="oauth_clients" identityType="identity" pkName="pk_oauth_clients">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="client_id" type="varchar(64)" notnull="true" unique="uq_oauth_clients_client_id"/>
+            <column name="client_name" type="varchar(255)" notnull="true"/>
+            <column name="registered_at" type="localdatetime" notnull="true"/>
+            <column name="last_used_at" type="localdatetime" notnull="true"/>
+        </createTable>
+        <createTable name="oauth_clients_redirect_uris" pkName="pk_oauth_clients_redirect_uris">
+            <column name="oauth_clients_id" type="bigint" notnull="true" references="oauth_clients.id" foreignKeyName="fk_oauth_clients_redirect_uris_oauth_clients_id" foreignKeyIndex="ix_oauth_clients_redirect_uris_oauth_clients_id"/>
+            <column name="value" type="varchar" notnull="true"/>
+        </createTable>
+    </changeSet>
+</migration>

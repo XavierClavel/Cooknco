@@ -226,6 +226,43 @@ Only devices registered for push are visible, so reach is a floor on the real nu
 Tools are advertised with `ToolAnnotations`: reads carry `readOnlyHint`, `delete_recipe` carries
 `destructiveHint`. Clients decide what to confirm from those, so a new tool needs them set.
 
+## The backend is an OAuth 2.1 server, for `/mcp` only
+
+`OAuthService` and `OAuthController` exist so that adding the MCP endpoint to a client is a URL
+and a browser login rather than a token pasted into a config file. What a client does — read
+`/.well-known/oauth-protected-resource/mcp`, follow it to `/.well-known/oauth-authorization-server`,
+register itself, send the user to `/oauth/authorize`, exchange the code at `/oauth/token` — is
+[the MCP authorization spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization),
+and the parts of it that are MUSTs are the parts not to relax:
+
+- **The 401 from `/mcp` carries `WWW-Authenticate: Bearer resource_metadata="…"`.** That header
+  is the entire discovery chain; without it a client cannot find the login and the endpoint is
+  back to needing a hand-pasted token. `McpController` resolves its own bearer token for this
+  reason — Ktor's `bearer` provider sends a challenge of its own making.
+- **Tokens are audience-bound.** Every token records the resource it was issued for and
+  `/mcp` accepts only its own (`OAuthService.tokenFor`), which is what stops a token minted for
+  another service being replayed here.
+- **PKCE S256, and redirect URIs matched exactly.** A public client has no secret, so the
+  verifier is all that ties a code to the process that asked for it. An unregistered redirect
+  URI is refused *on the page*, never redirected to — redirecting to it is the attack.
+- **Refresh tokens rotate.** OAuth 2.1 requires it of public clients: each refresh destroys the
+  token presented, so a stolen one is worth one use.
+
+Codes and tokens live in Redis as opaque strings, next to the sessions. That is deliberate: the
+store enforces expiry, revocation is a delete, and — unlike a JWT — no signing key has to be
+added to `cooknco-config`. Registered clients live in Postgres instead, because a client keeps
+its `client_id` on disk indefinitely and `invalid_client` is not an error it can recover from.
+
+The consent and error pages are Mustache templates in `backend/src/main/resources/oauth/`,
+rendered by `OAuthPages`. Unlike the mail wordings and document layouts they are *not*
+operator-editable: the sentence naming the client and where its code will be sent is a security
+control, not copy. The client name on that page is attacker-controlled, which is why it is
+escaped and printed next to the redirect URI it registered.
+
+Signing in is delegated to the app's login page (`?redirect=` in `frontend/src/scripts/common.ts`,
+same-origin paths only), so the flow keeps Google sign-in and there is still one page in the
+product that asks for a password.
+
 ## Build and test
 
 Use `sh ./gradlew` (the wrapper lacks the exec bit in worktrees) with JDK 23 — Gradle 8.10.2

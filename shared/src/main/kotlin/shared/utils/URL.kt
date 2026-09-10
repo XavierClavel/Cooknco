@@ -37,6 +37,21 @@ object URL {
     const val MCP_URL = "mcp"
 
     /**
+     * The OAuth 2.1 authorization server the MCP endpoint points its clients at, and the two
+     * discovery documents that let a client find it without being told anything but the MCP
+     * URL itself (RFC 9728 for the resource, RFC 8414 for the server).
+     *
+     * Outside `api/` like [MCP_URL], and for the same reason: these are the paths the specs
+     * and the clients expect, and `frontend/nginx.conf` publishes exactly them. The well-known
+     * paths are fixed by the specs and cannot move; the endpoints could, but a browser shows
+     * the authorize URL to the user, so the short form is the kinder one.
+     */
+    const val OAUTH_URL = "oauth"
+    const val WELL_KNOWN_URL = ".well-known"
+    const val OAUTH_PROTECTED_RESOURCE_METADATA = "oauth-protected-resource"
+    const val OAUTH_AUTHORIZATION_SERVER_METADATA = "oauth-authorization-server"
+
+    /**
      * The public app routes whose HTML document the backend renders itself, so that a shared
      * link carries the entity's own title, description and image in its `og:` tags.
      *

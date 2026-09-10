@@ -23,6 +23,7 @@ import com.xavierclavel.services.LikeService
 import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.NoopPushSender
 import com.xavierclavel.services.NotificationService
+import com.xavierclavel.services.OAuthService
 import com.xavierclavel.services.PdfRenderer
 import com.xavierclavel.services.PushSender
 import com.xavierclavel.services.PdfTemplateService
@@ -61,6 +62,7 @@ val appModules = module {
     single { LinkPreviewService() }
     single { DeviceService() }
     single { AppVersionService() }
+    single { OAuthService() }
     single { NotificationService() }
     // Over the cluster network, because the shell it reads is baked into the frontend image
     // and not this one. Tests swap in a stub.
