@@ -56,6 +56,16 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     private val _signupSuccess = MutableStateFlow(false)
     val signupSuccess: StateFlow<Boolean> = _signupSuccess.asStateFlow()
 
+    /**
+     * Whether a sign-out is in flight.
+     *
+     * Worth showing: [AuthRepository.logout] unregisters the device and drops the server
+     * session before it returns, and no timeout is configured on the client, so on a bad
+     * network the tap can sit there for as long as the platform's socket timeout.
+     */
+    private val _isLoggingOut = MutableStateFlow(false)
+    val isLoggingOut: StateFlow<Boolean> = _isLoggingOut.asStateFlow()
+
     init {
         checkCurrentSession()
     }
@@ -111,10 +121,15 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     }
 
     fun logout() {
+        if (_isLoggingOut.value) return
         viewModelScope.launch {
+            _isLoggingOut.value = true
+            // Unauthenticated either way: logout only fails at the parts that are best
+            // effort anyway, and the local session is gone by the time it returns.
             authRepository.logout()
-            _authState.value = AuthState.Unauthenticated
+            _isLoggingOut.value = false
             _loginState.value = LoginUiState()
+            _authState.value = AuthState.Unauthenticated
         }
     }
 

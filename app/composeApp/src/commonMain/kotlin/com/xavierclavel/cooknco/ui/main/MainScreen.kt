@@ -17,12 +17,19 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,9 +40,12 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,6 +77,7 @@ private val tabs = listOf("Home", "Cookbooks", "Profile")
 fun MainScreen(
     user: UserInfo,
     onLogout: () -> Unit,
+    isLoggingOut: Boolean = false,
     onNavigateToRecipe: (Long) -> Unit = {},
     onNavigateToEditRecipe: (Long?) -> Unit = {},
     onNavigateToCookbook: (Long) -> Unit = {},
@@ -81,6 +92,7 @@ fun MainScreen(
     val profileViewModel: UserProfileViewModel = viewModel(factory = UserProfileViewModel.factory(user.id, user.id))
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -90,6 +102,7 @@ fun MainScreen(
                 onMenuClick = { /* TODO: side drawer */ },
                 onSearchClick = onNavigateToSearch,
                 onProfileClick = { selectedTab = 2 },
+                onLogoutClick = { showLogoutConfirm = true },
             )
         },
         bottomBar = {
@@ -179,6 +192,42 @@ fun MainScreen(
             )
         }
     }
+
+    if (showLogoutConfirm) {
+        // Nothing dismisses this once the sign-out is in flight: the session is already
+        // being torn down, and there is nothing to come back to if it is cancelled. It
+        // goes away with the screen, which the auth state pops as soon as logout lands.
+        AlertDialog(
+            onDismissRequest = { if (!isLoggingOut) showLogoutConfirm = false },
+            title = { Text("Log out", fontWeight = FontWeight.Bold) },
+            text = { Text("You will need to sign in again to reach your recipes on this device.") },
+            confirmButton = {
+                Button(
+                    onClick = onLogout,
+                    enabled = !isLoggingOut,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CookncoOrange,
+                        contentColor = CookncoWhite,
+                    ),
+                ) {
+                    if (isLoggingOut) {
+                        CircularProgressIndicator(
+                            color = CookncoWhite,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    } else {
+                        Text("Log out", fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirm = false }, enabled = !isLoggingOut) {
+                    Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -187,8 +236,11 @@ private fun MainTopBar(
     onMenuClick: () -> Unit,
     onSearchClick: () -> Unit,
     onProfileClick: () -> Unit,
+    onLogoutClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var accountMenuOpen by remember { mutableStateOf(false) }
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = CookncoBackground,
@@ -245,17 +297,42 @@ private fun MainTopBar(
                 }
             }
 
-            // User avatar — tapping opens the profile tab
-            UserAvatar(
-                userId = user.id,
-                version = user.version,
-                contentDescription = "My profile",
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .border(1.5.dp, CookncoNavy, CircleShape)
-                    .clickable(onClick = onProfileClick),
-            )
+            // User avatar — tapping opens the account menu, which is where the web app
+            // keeps the way out of a session too. The profile is still one tap away on
+            // the bottom bar, so nothing is buried by hanging the menu here.
+            Box {
+                UserAvatar(
+                    userId = user.id,
+                    version = user.version,
+                    contentDescription = "Account menu",
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, CookncoNavy, CircleShape)
+                        .clickable { accountMenuOpen = true },
+                )
+                DropdownMenu(
+                    expanded = accountMenuOpen,
+                    onDismissRequest = { accountMenuOpen = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("My profile") },
+                        leadingIcon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
+                        onClick = {
+                            accountMenuOpen = false
+                            onProfileClick()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Log out") },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null) },
+                        onClick = {
+                            accountMenuOpen = false
+                            onLogoutClick()
+                        },
+                    )
+                }
+            }
         }
     }
 }
@@ -272,7 +349,13 @@ private val previewUser = UserInfo(
 fun MainTopBarPreview() {
     CookncoTheme {
         Surface(color = CookncoBackground) {
-            MainTopBar(user = previewUser, onMenuClick = {}, onSearchClick = {}, onProfileClick = {})
+            MainTopBar(
+                user = previewUser,
+                onMenuClick = {},
+                onSearchClick = {},
+                onProfileClick = {},
+                onLogoutClick = {},
+            )
         }
     }
 }

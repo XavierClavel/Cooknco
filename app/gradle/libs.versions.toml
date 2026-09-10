@@ -21,6 +21,9 @@ firebaseBom = "34.17.0"
 googleServices = "4.5.0"
 datastore = "1.2.1"
 ktor = "3.5.2"
+# Only the test artifact is declared: everything else pulls coroutines in transitively,
+# and kotlinx-coroutines-test has to match the version they resolve to.
+kotlinxCoroutines = "1.11.0"
 coil = "3.5.0"
 kotlinxSerializationJson = "1.9.0"
 kotlinxDatetime = "0.8.0"
@@ -69,6 +72,8 @@ ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.r
 ktor-client-darwin = { group = "io.ktor", name = "ktor-client-darwin", version.ref = "ktor" }
 
 # ── Test ──────────────────────────────────────────────────────────────────────
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock", version.ref = "ktor" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
