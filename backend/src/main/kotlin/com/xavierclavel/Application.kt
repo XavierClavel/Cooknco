@@ -2,6 +2,7 @@ package com.xavierclavel
 
 import com.xavierclavel.config.appModules
 import com.xavierclavel.controllers.AdminController
+import com.xavierclavel.controllers.AppVersionController
 import com.xavierclavel.controllers.AuthController
 import com.xavierclavel.controllers.CookbookController
 import com.xavierclavel.controllers.DashboardController
@@ -117,6 +118,8 @@ fun Application.serveRoutes() = routing {
     serve(UnitController)
     serve(UserController)
     serve(HealthController)
+    // Unauthenticated on purpose: asked at launch, before there is a session. See the controller.
+    serve(AppVersionController)
     serve(ImageController)
     serve(RecipeController)
     serve(CookbookController)

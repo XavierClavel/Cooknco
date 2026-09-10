@@ -37,6 +37,9 @@ class DeviceService: KoinComponent {
             val moved = existing.user?.id != userId
             existing.user = user
             existing.platform = dto.platform
+            // Overwritten on every launch, so an install that updated is counted as the
+            // build it is now rather than as the one it first registered under
+            existing.appVersion = dto.appVersion.trim()
             existing.locale = locale
             existing.updateAndGet()
             if (moved) logger.info { "Device ${existing.id} re-registered to user $userId" }
@@ -47,6 +50,7 @@ class DeviceService: KoinComponent {
             user = user,
             token = dto.token,
             platform = dto.platform,
+            appVersion = dto.appVersion.trim(),
             locale = locale,
         ).apply { insert() }
             .also { logger.info { "Device ${it.id} registered for user $userId on ${dto.platform}" } }

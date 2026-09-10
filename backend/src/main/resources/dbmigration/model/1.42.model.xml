@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <addColumn tableName="devices">
+            <column name="app_version" type="varchar(23)" defaultValue="''" notnull="true"/>
+        </addColumn>
+    </changeSet>
+</migration>

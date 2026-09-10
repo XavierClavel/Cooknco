@@ -3,6 +3,7 @@ package com.xavierclavel.config
 import com.xavierclavel.plugins.RedisService
 import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.AppShellSource
+import com.xavierclavel.services.AppVersionService
 import com.xavierclavel.services.HttpAppShellSource
 import com.xavierclavel.services.LinkPreviewService
 import com.xavierclavel.services.CookbookService
@@ -59,6 +60,7 @@ val appModules = module {
     single { PdfTemplateService() }
     single { LinkPreviewService() }
     single { DeviceService() }
+    single { AppVersionService() }
     single { NotificationService() }
     // Over the cluster network, because the shell it reads is baked into the frontend image
     // and not this one. Tests swap in a stub.

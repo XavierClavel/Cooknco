@@ -33,6 +33,7 @@ object AdminController: Controller(ADMIN_URL) {
             AdminMailController.serve(this)
             AdminNotificationController.serve(this)
             AdminPdfController.serve(this)
+            AdminAppVersionController.serve(this)
             AdminLogController.serve(this)
         }
     }

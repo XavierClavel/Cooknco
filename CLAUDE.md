@@ -155,6 +155,51 @@ stubbing the renderer, so the export tests assert on PDFs Chromium actually prod
 bound itself is tested against a mock engine instead (`GotenbergPdfRendererTest`), because a
 real renderer answers too fast to hold two prints open at once.
 
+## The mobile version gate fails open, on purpose
+
+`app_versions` holds at most one row per `AppPlatform`, and **a platform with no row is not
+gated at all**. That is the floor the whole feature is built on: a fresh install, a restored
+backup or a wiped table lets every build run rather than locking every build out, because a
+blocked app has no other screen to reach and nothing on the phone can undo it. Every other
+uncertainty resolves the same way — a version string we cannot parse, a failed request, a
+verdict a build predates, a platform the backend does not know — all answer `OK`
+(`AppVersionService.check`, `AppVersionRepository.refresh`).
+
+Two consequences worth keeping:
+
+- **The backend never enforces the block.** It answers `GET /api/v1/app-version` and the
+  client stops itself. Do not add a 426 on the other endpoints: it would break the sign-in
+  and the update prompt along with everything else, and still not stop a client that
+  ignored it.
+- **A minimum above the latest version is refused, not warned about** — it blocks everyone
+  including the users who did update, and the only way back is the backoffice screen that
+  just accepted it. `1.10` vs `1.9` is one typo away at all times, which is also why
+  versions are compared component-wise by `shared.utils.AppVersions` and never as strings.
+
+The store link is part of the gate rather than optional: a build that stops with nowhere to
+go is one nobody can fix. The block screen's copy lives in the app, not in the database —
+unlike the mail and PDF wordings — because the app has no locale to render server copy in
+(`ApiClient.LOCALE` is a constant) and a wrong-language block screen is worse than none.
+
+### What a floor costs is measured, not guessed
+
+`devices.app_version` is what each client reported at its last launch, and
+`AppVersionService.reach` counts it against a *candidate* floor so the backoffice can price
+a save before making it. Three things about those figures:
+
+- **They are scoped to a 90-day window.** Nothing prunes `devices` on a timer — only a token
+  FCM rejects is removed — so without one, handsets replaced years ago would make every
+  floor look more expensive than it is.
+- **`blockedUsers` is "people with at least one stale device"**, not "people locked out": a
+  stale phone and a current tablet is one of each.
+- **A device reporting no version is counted apart and blocked by nothing**, matching the
+  gate. Empty is what every build that predates the column sends, which is why
+  `DeviceRegistrationDTO.appVersion` is defaulted on the server side and *not* defaulted in
+  the app's copy — kotlinx omits defaults when encoding, so a default there would be a field
+  the backend never sees (the same trap `devicePlatform` documents).
+
+Only devices registered for push are visible, so reach is a floor on the real number.
+
 ## Build and test
 
 Use `sh ./gradlew` (the wrapper lacks the exec bit in worktrees) with JDK 23 — Gradle 8.10.2

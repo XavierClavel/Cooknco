@@ -20,6 +20,15 @@ object URL {
     const val ADMIN_URL = "api/v1/admin"
 
     /**
+     * What a mobile build asks before it lets anyone in.
+     *
+     * Unauthenticated, and it has to stay that way: the check runs at launch, before
+     * there is a session, and a build old enough to be blocked is exactly the one whose
+     * sign-in flow we can least rely on.
+     */
+    const val APP_VERSION_URL = "api/v1/app-version"
+
+    /**
      * The public app routes whose HTML document the backend renders itself, so that a shared
      * link carries the entity's own title, description and image in its `og:` tags.
      *

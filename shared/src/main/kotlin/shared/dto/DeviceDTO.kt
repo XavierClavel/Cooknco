@@ -15,4 +15,14 @@ import shared.enums.DevicePlatform
 data class DeviceRegistrationDTO(
     val token: String,
     val platform: DevicePlatform,
+    /**
+     * The build reporting itself, so the backoffice can see what a version floor would
+     * cost before it is raised (`AppVersionService.reach`).
+     *
+     * Defaulted here because the *server* decodes this: a build that shipped before the
+     * field existed still has to register, and it simply counts as an unknown version. The
+     * app's own copy of this DTO gives it no default, for the reason its `platform` has
+     * none — see `PushTokens.devicePlatform`.
+     */
+    val appVersion: String = "",
 )

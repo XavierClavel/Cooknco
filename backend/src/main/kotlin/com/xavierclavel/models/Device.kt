@@ -1,6 +1,7 @@
 package com.xavierclavel.models
 
 import io.ebean.Model
+import io.ebean.annotation.DbDefault
 import io.ebean.annotation.WhenModified
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -11,6 +12,7 @@ import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import shared.enums.DevicePlatform
 import shared.enums.Locale
+import shared.utils.AppVersions
 import java.time.LocalDateTime
 
 /**
@@ -45,6 +47,23 @@ class Device(
 
     @Column(nullable = false)
     var platform: DevicePlatform = DevicePlatform.ANDROID,
+
+    /**
+     * The build the client was running when it last registered.
+     *
+     * Reported rather than derived, and empty for anything that does not report it — the
+     * web client, and every mobile build that predates this column. Empty means "unknown",
+     * never "old": `AppVersionService.reach` counts those separately and never among the
+     * builds a floor would block, for the same reason the gate itself lets an unreadable
+     * version run.
+     *
+     * Refreshed on every launch along with [lastSeenAt], which is what makes the reach
+     * figures describe the installs that are actually in use rather than the ones that ever
+     * existed.
+     */
+    @DbDefault("")
+    @Column(name = "app_version", nullable = false, length = AppVersions.MAX_LENGTH)
+    var appVersion: String = "",
 
     /**
      * The language this client is running in, as it reported at registration.

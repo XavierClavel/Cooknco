@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.di
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.xavierclavel.cooknco.data.AppVersionRepository
 import com.xavierclavel.cooknco.data.AuthRepository
 import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.PushRepository
@@ -10,6 +11,7 @@ import com.xavierclavel.cooknco.data.TokenDataStore
 import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.data.UserRepository
 import com.xavierclavel.cooknco.network.ApiClient
+import com.xavierclavel.cooknco.network.AppVersionApi
 import com.xavierclavel.cooknco.network.AuthApi
 import com.xavierclavel.cooknco.network.CookbookApi
 import com.xavierclavel.cooknco.network.NotificationApi
@@ -41,6 +43,7 @@ object AppGraph {
         TokenDataStore(factory())
     }
 
+    private val appVersionApi by lazy { AppVersionApi(ApiClient.httpClient) }
     private val authApi by lazy { AuthApi(ApiClient.httpClient) }
     private val userApi by lazy { UserApi(ApiClient.httpClient) }
     private val cookbookApi by lazy { CookbookApi(ApiClient.httpClient) }
@@ -59,4 +62,10 @@ object AppGraph {
     val recipeRepository by lazy { RecipeRepository(recipeApi, tokenDataStore) }
     val cookbookRepository by lazy { CookbookRepository(cookbookApi, tokenDataStore) }
     val unitRepository by lazy { UnitRepository(recipeApi) }
+
+    /**
+     * Whether this build may still run. Needs no session and no data store, so it is
+     * reachable from the very first frame — which is when it is asked.
+     */
+    val appVersionRepository by lazy { AppVersionRepository(appVersionApi) }
 }

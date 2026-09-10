@@ -33,18 +33,38 @@ suspend fun HttpClient.registerDeviceRaw(
     token: String,
     platform: DevicePlatform = DevicePlatform.ANDROID,
     locale: Locale = Locale.EN,
+    appVersion: String = "",
 ) = this.post("$NOTIFICATION_URL/devices?locale=${locale.name}") {
     contentType(ContentType.Application.Json)
     header(HttpHeaders.ContentType, ContentType.Application.Json)
-    setBody(DeviceRegistrationDTO(token = token, platform = platform))
+    setBody(DeviceRegistrationDTO(token = token, platform = platform, appVersion = appVersion))
 }
 
 suspend fun HttpClient.registerDevice(
     token: String,
     platform: DevicePlatform = DevicePlatform.ANDROID,
     locale: Locale = Locale.EN,
-) = this.registerDeviceRaw(token, platform, locale).apply {
+    appVersion: String = "",
+) = this.registerDeviceRaw(token, platform, locale, appVersion).apply {
     assertEquals(HttpStatusCode.Created, status)
+}
+
+/**
+ * Registers exactly what an app that predates `appVersion` sends: a body with no such
+ * field at all, rather than one carrying an empty string.
+ *
+ * Written as raw JSON because the DTO cannot express it — a Kotlin caller always has the
+ * property, and the server's `Json` encodes defaults, so a typed helper would put the
+ * field on the wire and never exercise the case this is here for.
+ */
+suspend fun HttpClient.registerLegacyDeviceRaw(
+    token: String,
+    platform: DevicePlatform = DevicePlatform.ANDROID,
+    locale: Locale = Locale.EN,
+) = this.post("$NOTIFICATION_URL/devices?locale=${locale.name}") {
+    contentType(ContentType.Application.Json)
+    header(HttpHeaders.ContentType, ContentType.Application.Json)
+    setBody("""{"token":"$token","platform":"${platform.name}"}""")
 }
 
 suspend fun HttpClient.unregisterDeviceRaw(token: String) =
