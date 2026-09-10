@@ -200,6 +200,32 @@ a save before making it. Three things about those figures:
 
 Only devices registered for push are visible, so reach is a floor on the real number.
 
+## The MCP endpoint holds the SDK back on purpose
+
+`POST /mcp` serves Model Context Protocol from the backend (`McpController`, tools in
+`mcp/CookncoMcpServer.kt`). Three things about it are load-bearing:
+
+- **`io.modelcontextprotocol:kotlin-sdk-server` stays at 0.10.0**, the last release built against
+  this build's Ktor 3.2.3 and Kotlin 2.2.21. Later releases compile here and then fail at runtime
+  reaching for Ktor internals that moved — 0.15.0 throws `tried to access private field
+  io.ktor.http.HttpMethod.Post` on the first request. Upgrading the SDK means upgrading Ktor
+  across the build in the same change, and `McpControllerTest` is what catches it either way:
+  it drives a real handshake and real tool calls over HTTP rather than asserting on types.
+- **`ContentNegotiation` lives on the routing root**, not on the application (`configureSerialization`).
+  MCP needs its own JSON settings (`explicitNulls = false`, `encodeDefaults = true`, no class
+  discriminator) or JSON-RPC replies come out with an explicit `"error": null`, and Ktor refuses a
+  route-scoped install whose key is already installed application-wide. Moving it back to the
+  application silently breaks `/mcp`.
+- **A tool goes through the services, and repeats the checks the controller makes.** `RecipeController`
+  and friends enforce some rights themselves (`checkRecipeEditionRights`, cookbook membership)
+  rather than in the service, so a tool that skips them is a hole. Where a tool deliberately
+  differs from its REST counterpart, the reason is a comment at the call site — `like_recipe` only
+  purges a recipe that is actually tagged for deletion, because `RecipeService.tryDelete` does not
+  check the tag itself.
+
+Tools are advertised with `ToolAnnotations`: reads carry `readOnlyHint`, `delete_recipe` carries
+`destructiveHint`. Clients decide what to confirm from those, so a new tool needs them set.
+
 ## Build and test
 
 Use `sh ./gradlew` (the wrapper lacks the exec bit in worktrees) with JDK 23 — Gradle 8.10.2

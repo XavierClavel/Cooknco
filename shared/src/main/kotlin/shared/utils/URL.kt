@@ -29,6 +29,14 @@ object URL {
     const val APP_VERSION_URL = "api/v1/app-version"
 
     /**
+     * The Model Context Protocol endpoint, for MCP clients registered against this server.
+     *
+     * Outside `api/` because `/mcp` is where MCP clients look, and it is what
+     * `frontend/nginx.conf` publishes. See [com.xavierclavel.controllers.McpController].
+     */
+    const val MCP_URL = "mcp"
+
+    /**
      * The public app routes whose HTML document the backend renders itself, so that a shared
      * link carries the entity's own title, description and image in its `og:` tags.
      *

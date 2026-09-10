@@ -42,6 +42,29 @@ logs a failure without them), or `BACKEND_PORT` / `FRONTEND_PORT` to override. T
 configuration compose mounts is `config/application.yaml` — placeholders, whereas
 production reads the real one from the `cooknco-config` Secret.
 
+## MCP server
+The backend answers Model Context Protocol at `POST /mcp`, so an MCP client — Claude Code,
+Claude Desktop — can read and write Cook&co as one account. It exposes twelve tools:
+searching recipes, reading one in full, the followed-users feed, cookbooks, ingredients and
+profiles; and, as writes, creating, editing and deleting a recipe, liking one, and saving one
+into a cookbook.
+
+The endpoint authenticates with a session token in an `Authorization: Bearer` header — the
+same token `POST /api/v1/auth/login` returns — and, unlike the rest of the API, deliberately
+does not accept the session cookie:
+
+```
+TOKEN=$(curl -su mail@example.com:password -X POST https://cooknco.eu/api/v1/auth/login | jq -r .token)
+claude mcp add --transport http cooknco https://cooknco.eu/mcp --header "Authorization: Bearer $TOKEN"
+```
+
+Point it at `http://localhost/mcp` to drive the local stack instead. A token belongs to a
+session, so it stops working once that session is logged out or expires.
+
+The tools are defined in `backend/.../mcp/CookncoMcpServer.kt` and call the same services the
+REST controllers do, which is what keeps a tool inside the visibility and ownership rules the
+app itself obeys.
+
 ## Mobile app
 The native app in `app/` is a Kotlin Multiplatform project sharing one Compose UI
 across Android and iOS:
