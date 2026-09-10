@@ -208,6 +208,20 @@ const getDefaultImageUrl = (path) => {
   }
 }
 
+/**
+ * Where to go once signed in, when the login page was opened with `?redirect=`.
+ *
+ * Only a same-origin path is honoured: anything absolute would turn the login page into an
+ * open redirect. What needs this is the OAuth consent flow an MCP client starts — the backend
+ * sends an unauthenticated visitor here and expects them back at `/oauth/authorize`, a page it
+ * renders itself, which is why the return trip is a document load rather than `navigateTo`.
+ */
+function postLoginRedirect(): string | null {
+  const value = new URLSearchParams(window.location.search).get("redirect")
+  if (!value) return null
+  return value.startsWith("/") && !value.startsWith("//") ? value : null
+}
+
 async function login(user) {
   const result = await apiClient.post(`/auth/login`, {}, {
     auth: {
@@ -217,12 +231,17 @@ async function login(user) {
     withCredentials: true
   })
   if (result.status == 200) {
-    const redirectPath = getCookie("redirectedFrom")
-    if (redirectPath) {
-      navigateTo(redirectPath)
-      deleteCookie("redirectedFrom")
+    const redirect = postLoginRedirect()
+    if (redirect) {
+      window.location.href = redirect
     } else {
-      toHome()
+      const redirectPath = getCookie("redirectedFrom")
+      if (redirectPath) {
+        navigateTo(redirectPath)
+        deleteCookie("redirectedFrom")
+      } else {
+        toHome()
+      }
     }
     const authStore = useAuthStore();
     authStore.login()
@@ -232,7 +251,12 @@ async function login(user) {
 
 async function loginOauthGoogle() {
   console.log("login oauth")
-  window.location.href = `${import.meta.env.VITE_API_URL}/auth/login-oauth-google`
+  // Carried through to the backend, which sends the browser back here after Google answers
+  // (AuthController keeps it against the OAuth state). Without it a Google sign-in would land
+  // on the home page and lose the consent request that sent the user to log in.
+  const redirect = postLoginRedirect()
+  const url = `${import.meta.env.VITE_API_URL}/auth/login-oauth-google`
+  window.location.href = redirect ? `${url}?redirect=${encodeURIComponent(redirect)}` : url
 }
 
 async function signup(user) {

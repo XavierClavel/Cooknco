@@ -16,6 +16,8 @@ import com.xavierclavel.controllers.ImageController
 import com.xavierclavel.controllers.LikeController
 import com.xavierclavel.controllers.LinkPreviewController
 import com.xavierclavel.controllers.McpController
+import com.xavierclavel.controllers.OAuthController
+import com.xavierclavel.controllers.OAuthMetadataController
 import com.xavierclavel.controllers.NotificationController
 import com.xavierclavel.controllers.RecipeNotesController
 import com.xavierclavel.controllers.ReportController
@@ -129,8 +131,14 @@ fun Application.serveRoutes() = routing {
     serve(ReportController)
     // Not an API: the documents behind the public app routes people share. See the controller.
     serve(LinkPreviewController)
-    // Declares its own bearer-only gate, deliberately narrower than the rest. See the controller.
+    // Resolves its own bearer token so the 401 can point at the metadata below, and refuses
+    // the session cookie the rest of the API accepts. See the controller.
     serve(McpController)
+    // The OAuth 2.1 authorization server the MCP endpoint sends its clients to, and the two
+    // discovery documents that lead them there. Unauthenticated by necessity: a client reads
+    // them precisely because it has no credentials yet.
+    serve(OAuthMetadataController)
+    serve(OAuthController)
     serve(AdminController)
     // Declares its own admin gate, like AdminController. See the controller.
     serve(ExportController)

@@ -49,17 +49,30 @@ searching recipes, reading one in full, the followed-users feed, cookbooks, ingr
 profiles; and, as writes, creating, editing and deleting a recipe, liking one, and saving one
 into a cookbook.
 
-The endpoint authenticates with a session token in an `Authorization: Bearer` header — the
-same token `POST /api/v1/auth/login` returns — and, unlike the rest of the API, deliberately
-does not accept the session cookie:
+Adding it takes the URL and nothing else:
+
+```
+claude mcp add --transport http cooknco https://cooknco.eu/mcp
+```
+
+Then `/mcp` inside the client opens a browser: sign in as you would to the app — password or
+Google — and approve the client on the consent screen. Cook&co is its own OAuth 2.1
+authorization server, so the client registers itself, gets a token bound to this endpoint, and
+refreshes it on its own; nothing is pasted into a config file, and revoking a client is a
+matter of the tokens expiring or Redis being cleared. Point it at `http://localhost/mcp` to
+drive the local stack instead.
+
+A session token still works in an `Authorization: Bearer` header, which is the easy path for a
+script or a test:
 
 ```
 TOKEN=$(curl -su mail@example.com:password -X POST https://cooknco.eu/api/v1/auth/login | jq -r .token)
 claude mcp add --transport http cooknco https://cooknco.eu/mcp --header "Authorization: Bearer $TOKEN"
 ```
 
-Point it at `http://localhost/mcp` to drive the local stack instead. A token belongs to a
-session, so it stops working once that session is logged out or expires.
+Either way the session *cookie* is refused, unlike on the rest of the API. A session token
+lasts 30 days and slides forward whenever it is used, and signing out of the web app does not
+affect it — only logging out with that token does.
 
 The tools are defined in `backend/.../mcp/CookncoMcpServer.kt` and call the same services the
 REST controllers do, which is what keeps a tool inside the visibility and ownership rules the

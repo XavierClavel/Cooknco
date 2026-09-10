@@ -13,6 +13,7 @@ import com.xavierclavel.models.query.QPdfTemplate
 import com.xavierclavel.models.query.QDietaryRestrictions
 import com.xavierclavel.models.query.QIngredient
 import com.xavierclavel.models.query.QNotification
+import com.xavierclavel.models.query.QOAuthClient
 import com.xavierclavel.models.query.QRecipe
 import com.xavierclavel.models.query.QReport
 import com.xavierclavel.models.query.QUser
@@ -59,6 +60,8 @@ object DatabaseManager {
         QEmailTemplate(),
         QPdfTemplate(),
         QAppVersion(),
+        // Owned by nobody either: a registered MCP client references no row of ours
+        QOAuthClient(),
     )
 
     private fun hikari(): HikariDataSource {

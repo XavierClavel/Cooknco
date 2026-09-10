@@ -20,6 +20,7 @@ import com.xavierclavel.services.LikeService
 import com.xavierclavel.services.LinkPreviewService
 import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.NotificationService
+import com.xavierclavel.services.OAuthService
 import com.xavierclavel.services.PdfRenderer
 import com.xavierclavel.services.PushSender
 import com.xavierclavel.services.PdfTemplateService
@@ -114,6 +115,7 @@ abstract class ApplicationTest: KoinTest {
                 single { DeviceService() }
                 single { AppVersionService() }
                 single { NotificationService() }
+                single { OAuthService() }
                 single<AppShellSource> { FakeAppShellSource() }
                 // Firebase is not reachable from a test, and would not be worth reaching:
                 // what matters is the payload, which this records. See FakePushSender.
@@ -228,6 +230,32 @@ abstract class ApplicationTest: KoinTest {
 
 
 class TestBuilderWrapper(private val builder: ApplicationTestBuilder) {
+    /**
+     * A client that leaves redirects where they are, for tests that assert on *where* a
+     * response sends the browser — the OAuth flow, whose every step is a redirect.
+     *
+     * Its own client rather than a derived one: `HttpClient.config {}` builds a new client with
+     * a fresh cookie jar, so deriving one mid-test silently drops the session and every
+     * authenticated request afterwards behaves as though nobody were logged in. A test using
+     * this one therefore logs in with it.
+     */
+    val noRedirectClient: HttpClient by lazy { newNoRedirectClient() }
+
+    /**
+     * Another one, with a cookie jar of its own — a second browser, for a test that needs two
+     * accounts signed in at once.
+     */
+    fun newNoRedirectClient(): HttpClient = builder.createClient {
+        install(HttpCookies)
+        install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+            json(Json {
+                prettyPrint = true
+                isLenient = true
+            })
+        }
+        followRedirects = false
+    }
+
     val client: HttpClient by lazy {
         builder.client.config {
             install(HttpCookies)
