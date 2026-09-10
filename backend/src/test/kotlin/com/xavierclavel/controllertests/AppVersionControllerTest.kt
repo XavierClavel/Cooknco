@@ -463,6 +463,45 @@ class AppVersionControllerTest : ApplicationTest() {
         }
     }
 
+    /**
+     * The unit the tab reads the distribution in: how many *people* are on each build.
+     *
+     * Not the device count, as soon as anybody owns two handsets, and counted the same way
+     * as `blockedUsers` — one row per person with at least one device on that build — so
+     * the two figures on that panel answer the same question and can be compared. The
+     * consequence is that a person split across two builds is in both rows, which is why
+     * the per-build totals here come to more than the base and why the tab says so.
+     */
+    @Test
+    fun `the distribution counts people per build, and counts one twice when their devices disagree`() = runTest {
+        runAsUser1 {
+            client.registerDevice("phone", appVersion = "1.2.0")
+            client.registerDevice("tablet", appVersion = "1.6.0")
+        }
+        runAsUser2 {
+            client.registerDevice("second-phone", appVersion = "1.6.0")
+            client.registerDevice("second-tablet", appVersion = "1.6.0")
+        }
+
+        runAsAdmin {
+            val reach = client.appVersionReach(AppPlatform.ANDROID, minimum = "1.4.0")
+            val rows = reach.distribution.associateBy { it.version }
+
+            assertEquals(4, reach.devices)
+            assertEquals(2, reach.users)
+
+            // Three handsets on 1.6.0, but only two people: one of them carries two of them
+            assertEquals(3, rows.getValue("1.6.0").devices)
+            assertEquals(2, rows.getValue("1.6.0").users)
+            assertEquals(1, rows.getValue("1.2.0").devices)
+            assertEquals(1, rows.getValue("1.2.0").users)
+
+            // user1 is on both builds, so the rows total more than the base does
+            assertEquals(3, reach.distribution.sumOf { it.users })
+            assertEquals(1, reach.blockedUsers)
+        }
+    }
+
     @Test
     fun `each build in the distribution says whether the candidate floor stops it`() = runTest {
         runAsUser1 {
