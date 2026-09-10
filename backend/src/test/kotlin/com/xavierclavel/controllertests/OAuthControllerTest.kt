@@ -132,6 +132,52 @@ class OAuthControllerTest : ApplicationTest() {
         assertFalse(body.containsKey("client_secret"))
     }
 
+    /**
+     * The registration a client actually sends, unknown members and all.
+     *
+     * RFC 7591 has a server ignore metadata it does not understand, and there is always some:
+     * strict parsing here refused every real client before looking at a single field.
+     */
+    @Test
+    fun `a registration carrying metadata this server does not know is still accepted`() = runTest {
+        val response = noRedirectClient.registerClientRaw(
+            """
+            {
+              "redirect_uris": ["$loopbackRedirect"],
+              "client_name": "Claude Code",
+              "client_uri": "https://claude.ai/code",
+              "grant_types": ["authorization_code", "refresh_token"],
+              "response_types": ["code"],
+              "token_endpoint_auth_method": "none",
+              "logo_uri": "https://claude.ai/logo.png",
+              "application_type": "native",
+              "contacts": ["support@example.com"],
+              "software_id": "claude-code",
+              "software_version": "1.2.3"
+            }
+            """.trimIndent(),
+        )
+        assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+        assertEquals("Claude Code", response.asJson()["client_name"]!!.jsonPrimitive.content)
+    }
+
+    /** Content negotiation would have made a missing content type the same 400. */
+    @Test
+    fun `a registration sent without a content type is accepted`() = runTest {
+        val response = noRedirectClient.registerClientRaw(
+            """{"redirect_uris":["$loopbackRedirect"],"client_name":"Unlabelled client"}""",
+            type = null,
+        )
+        assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+    }
+
+    @Test
+    fun `a registration that is not JSON at all is refused`() = runTest {
+        val response = noRedirectClient.registerClientRaw("not json")
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals("invalid_client_metadata", response.asJson()["error"]!!.jsonPrimitive.content)
+    }
+
     @Test
     fun `a registration with no redirect uri is refused`() = runTest {
         val response = noRedirectClient.registerClientRaw("""{"client_name":"No way back"}""")

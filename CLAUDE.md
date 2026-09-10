@@ -247,6 +247,11 @@ and the parts of it that are MUSTs are the parts not to relax:
   URI is refused *on the page*, never redirected to — redirecting to it is the attack.
 - **Refresh tokens rotate.** OAuth 2.1 requires it of public clients: each refresh destroys the
   token presented, so a stolen one is worth one use.
+- **Registration ignores the metadata it does not know.** RFC 7591 asks for that, and every
+  real client sends some (`logo_uri`, `software_id`, `application_type`…). `/oauth/register`
+  therefore reads the body as text and parses it with its own lenient `Json`, not through
+  `call.receive`: the strict application-wide converter threw on the first unknown key, and
+  every client got `400 invalid_client_metadata` before a field had been looked at.
 
 Codes and tokens live in Redis as opaque strings, next to the sessions. That is deliberate: the
 store enforces expiry, revocation is a delete, and — unlike a JWT — no signing key has to be
