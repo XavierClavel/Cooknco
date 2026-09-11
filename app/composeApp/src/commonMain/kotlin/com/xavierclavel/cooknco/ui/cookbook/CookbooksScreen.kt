@@ -1,7 +1,8 @@
 package com.xavierclavel.cooknco.ui.cookbook
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,22 +11,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.MenuBook
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,9 +26,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
@@ -43,16 +41,18 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoBlueLight
+import com.xavierclavel.cooknco.ui.theme.CookncoBlueDark
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
-import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
-import com.xavierclavel.cooknco.ui.theme.CookncoWhite
+import com.xavierclavel.cooknco.ui.theme.StickerCard
 
 @Composable
 fun CookbooksScreen(
     viewModel: CookbooksViewModel,
     onCookbookClick: (Long) -> Unit = {},
+    onNewCookbook: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -60,6 +60,7 @@ fun CookbooksScreen(
         cookbooks = uiState.cookbooks,
         isLoading = uiState.isLoading,
         onCookbookClick = onCookbookClick,
+        onNewCookbook = onNewCookbook,
         modifier = modifier,
     )
 }
@@ -69,57 +70,40 @@ private fun CookbooksScreenContent(
     cookbooks: List<CookbookInfo>,
     isLoading: Boolean,
     onCookbookClick: (Long) -> Unit,
+    onNewCookbook: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(modifier = modifier.fillMaxSize(), color = CookncoBackground) {
+    Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 14.dp),
+        ) {
+            Text("Cookbooks", fontSize = 27.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 33.sp)
+            Text(
+                text = "${cookbooks.size} book${if (cookbooks.size == 1) "" else "s"}",
+                fontSize = 13.sp,
+                color = CookncoNavy,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+        }
+
         when {
-            isLoading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp)
-                }
+            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
             }
 
-            cookbooks.isEmpty() -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.MenuBook,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = CookncoOrange.copy(alpha = 0.6f),
-                        )
-                        Text(
-                            text = "No cookbooks yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = CookncoNavy.copy(alpha = 0.6f),
-                        )
-                        Text(
-                            text = "Tap + to create your first one",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = CookncoNavy.copy(alpha = 0.4f),
-                        )
-                    }
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
+                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                items(cookbooks, key = { it.id }) { cookbook ->
+                    CookbookRow(cookbook = cookbook, onClick = { onCookbookClick(cookbook.id) })
                 }
-            }
-
-            else -> {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    contentPadding = PaddingValues(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(cookbooks, key = { it.id }) { cookbook ->
-                        CookbookCard(
-                            cookbook = cookbook,
-                            onClick = { onCookbookClick(cookbook.id) },
-                        )
-                    }
+                item {
+                    NewCookbookRow(onClick = onNewCookbook)
                 }
             }
         }
@@ -127,43 +111,72 @@ private fun CookbooksScreenContent(
 }
 
 @Composable
-private fun CookbookCard(cookbook: CookbookInfo, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = CookncoGreen),
-        border = BorderStroke(1.5.dp, CookncoNavy),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+private fun NewCookbookRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(20.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .dashedBorder(shape, CookncoNavy)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column {
+        Text("+", fontSize = 20.sp, color = CookncoNavy)
+        Text("New cookbook", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+    }
+}
+
+/** A dashed outline in [shape] — the "+ New cookbook" row is the only sticker element
+ * without a solid border, so this isn't part of [com.xavierclavel.cooknco.ui.theme.Sticker]. */
+private fun Modifier.dashedBorder(shape: RoundedCornerShape, color: Color, width: Dp = 3.dp): Modifier = drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val stroke = Stroke(width = width.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
+    onDrawBehind { drawOutline(outline, color = color, style = stroke) }
+}
+
+@Composable
+private fun CookbookRow(cookbook: CookbookInfo, onClick: () -> Unit) {
+    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), onClick = onClick) {
+        Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CookbookImage(
                 cookbookId = cookbook.id,
                 version = cookbook.version,
                 contentDescription = cookbook.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(140.dp),
+                modifier = Modifier.size(92.dp).clip(RoundedCornerShape(14.dp)).border(2.dp, CookncoNavy, RoundedCornerShape(14.dp)),
             )
-            Column(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = cookbook.title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    lineHeight = 20.sp,
+                    lineHeight = 22.sp,
                 )
                 Text(
-                    text = "${cookbook.recipesCount} recipe${if (cookbook.recipesCount != 1) "s" else ""}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CookncoNavy.copy(alpha = 0.6f),
+                    text = "${cookbook.recipesCount} recipe${if (cookbook.recipesCount != 1) "s" else ""} · " +
+                        "${cookbook.usersCount} member${if (cookbook.usersCount != 1) "s" else ""}",
+                    fontSize = 12.5.sp,
+                    color = CookncoNavy.copy(alpha = 0.62f),
                 )
-                if (cookbook.members.isNotEmpty()) {
-                    MemberAvatars(members = cookbook.members)
+                Spacer(Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (cookbook.members.isNotEmpty()) {
+                        MemberAvatars(members = cookbook.members)
+                    }
+                    if (cookbook.usersCount > 1) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(percent = 50))
+                                .background(CookncoBlueLight)
+                                .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+                                .padding(horizontal = 9.dp, vertical = 2.dp),
+                        ) {
+                            Text("Shared", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CookncoBlueDark)
+                        }
+                    }
                 }
             }
         }
@@ -172,12 +185,8 @@ private fun CookbookCard(cookbook: CookbookInfo, onClick: () -> Unit) {
 
 @Composable
 private fun MemberAvatars(members: List<RecipeOwner>, modifier: Modifier = Modifier) {
-    val visible = members.take(5)
-    val overflow = members.size - visible.size
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy((-8).dp),
-    ) {
+    val visible = members.take(3)
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
         visible.forEach { member ->
             UserAvatar(
                 userId = member.id,
@@ -186,29 +195,11 @@ private fun MemberAvatars(members: List<RecipeOwner>, modifier: Modifier = Modif
                 modifier = Modifier
                     .size(26.dp)
                     .clip(CircleShape)
-                    .then(
-                        Modifier.background(CookncoBackground, CircleShape)
-                            .padding(1.5.dp)
-                            .clip(CircleShape)
-                    ),
-            )
-        }
-        if (overflow > 0) {
-            Box(
-                modifier = Modifier
-                    .size(26.dp)
+                    .background(CookncoBackground, CircleShape)
+                    .padding(1.5.dp)
                     .clip(CircleShape)
-                    .background(CookncoNavy.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "+$overflow",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = CookncoNavy,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp,
-                )
-            }
+                    .border(2.dp, CookncoNavy, CircleShape),
+            )
         }
     }
 }
@@ -219,19 +210,13 @@ private val previewOwner = RecipeOwner(id = 1L, version = 1L, username = "Xavier
 private val previewCookbooks = listOf(
     CookbookInfo(id = 1L, version = 1L, title = "My Favourites", description = "Best picks", recipesCount = 12, usersCount = 3, members = listOf(previewOwner)),
     CookbookInfo(id = 2L, version = 1L, title = "Vegan Delights", description = "", recipesCount = 5, usersCount = 1, members = listOf(previewOwner)),
-    CookbookInfo(id = 3L, version = 1L, title = "Quick Meals for Busy Weekdays", description = "", recipesCount = 8, usersCount = 2, members = listOf(previewOwner)),
-    CookbookInfo(id = 4L, version = 1L, title = "Desserts", description = "", recipesCount = 4, usersCount = 1, members = emptyList()),
 )
 
 @Preview(showBackground = true)
 @Composable
 fun CookbooksScreenPreview() {
     CookncoTheme {
-        CookbooksScreenContent(
-            cookbooks = previewCookbooks,
-            isLoading = false,
-            onCookbookClick = {},
-        )
+        CookbooksScreenContent(cookbooks = previewCookbooks, isLoading = false, onCookbookClick = {}, onNewCookbook = {})
     }
 }
 
@@ -239,6 +224,6 @@ fun CookbooksScreenPreview() {
 @Composable
 fun CookbooksEmptyPreview() {
     CookncoTheme {
-        CookbooksScreenContent(cookbooks = emptyList(), isLoading = false, onCookbookClick = {})
+        CookbooksScreenContent(cookbooks = emptyList(), isLoading = false, onCookbookClick = {}, onNewCookbook = {})
     }
 }

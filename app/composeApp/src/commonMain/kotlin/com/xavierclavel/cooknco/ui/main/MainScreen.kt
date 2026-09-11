@@ -69,17 +69,14 @@ private enum class MainTab { FEED, SEARCH, COOKBOOKS, PROFILE }
  * Search / Cookbooks / Profile screenshots (their nav bar is otherwise identical, only
  * the active segment differs).
  *
- * PHASE 2 SEAM: this screen used to draw a shared `MainTopBar` (hamburger + search pill
- * + avatar) above whichever tab was showing. The redesign drops it — none of the mockup's
- * four tab screens have one, each has its own header content instead (Feed's "Friday, 11
- * September / What's cooking?" greeting, Profile's avatar card, ...). That per-screen
- * header is phase 2's job. Two things fell out with the old bar and need a new home:
- *   - Logging out: was the account-menu's only exit. `onLogout`/`isLoggingOut` and the
- *     confirmation dialog below are all still here and work — only the button that used
- *     to open it is gone. UserProfileScreen (or a settings screen phase 2 adds) is the
- *     obvious place for it.
- *   - Jumping to another user's profile by tapping the avatar: no longer needed as a
- *     shortcut now that Profile is a first-class tab.
+ * The old shared `MainTopBar` (hamburger + search pill + avatar) that used to sit above
+ * whichever tab was showing is gone — each tab draws its own header instead (Feed's
+ * "Friday, 11 September / What's cooking?" greeting, Profile's avatar card, ...).
+ * Logging out — the account menu's only exit before — now lives behind the gear icon
+ * on the Profile tab's own header: `onLogoutClick` below just flips [showLogoutConfirm],
+ * which this screen still owns since it also owns `onLogout`/`isLoggingOut`. Jumping to
+ * another user's profile by tapping the avatar is gone for good — Profile is a
+ * first-class tab now, so that shortcut has no reason to exist.
  */
 @Composable
 fun MainScreen(
@@ -89,10 +86,6 @@ fun MainScreen(
     onNavigateToRecipe: (Long) -> Unit = {},
     onNavigateToEditRecipe: (Long?) -> Unit = {},
     onNavigateToCookbook: (Long) -> Unit = {},
-    // Unused here for now: the old FAB called this for "new cookbook" while the
-    // Cookbooks tab was showing. The mockup replaces that with an inline "+ New
-    // cookbook" row inside the cookbooks list itself, which is CookbooksScreen's own
-    // restyle to add (phase 2) — kept as a parameter so it's ready to wire in then.
     onNavigateToEditCookbook: (Long?) -> Unit = {},
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
@@ -130,11 +123,9 @@ fun MainScreen(
             )
             MainTab.SEARCH -> RecipesScreen(
                 viewModel = recipesViewModel,
-                // RecipesScreen's back arrow doesn't belong on a tab — it still requires
-                // the callback (non-nullable), so this is a no-op rather than a pop.
-                // Phase 2, restyling this screen's header anyway, should make it
-                // optional the way UserProfileScreen.onNavigateBack already is.
-                onNavigateBack = {},
+                // A tab has nowhere to pop back to, so no back button — RecipesScreen's
+                // onNavigateBack is nullable exactly like UserProfileScreen's is.
+                onNavigateBack = null,
                 onRecipeClick = onNavigateToRecipe,
                 onUserClick = onNavigateToUser,
                 modifier = Modifier.padding(innerPadding),
@@ -142,12 +133,14 @@ fun MainScreen(
             MainTab.COOKBOOKS -> CookbooksScreen(
                 viewModel = cookbooksViewModel,
                 onCookbookClick = onNavigateToCookbook,
+                onNewCookbook = { onNavigateToEditCookbook(null) },
                 modifier = Modifier.padding(innerPadding),
             )
             MainTab.PROFILE -> UserProfileScreen(
                 viewModel = profileViewModel,
                 onNavigateToEdit = onNavigateToEditProfile,
                 onNavigateToRecipe = onNavigateToRecipe,
+                onLogoutClick = { showLogoutConfirm = true },
                 modifier = Modifier.padding(innerPadding),
             )
         }
