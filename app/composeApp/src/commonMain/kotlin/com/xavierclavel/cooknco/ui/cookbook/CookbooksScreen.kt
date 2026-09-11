@@ -28,7 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -131,8 +133,9 @@ private fun NewCookbookRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * without a solid border, so this isn't part of [com.xavierclavel.cooknco.ui.theme.Sticker]. */
 private fun Modifier.dashedBorder(shape: RoundedCornerShape, color: Color, width: Dp = 3.dp): Modifier = drawWithCache {
     val outline = shape.createOutline(size, layoutDirection, this)
+    val path = Path().apply { addOutline(outline) }
     val stroke = Stroke(width = width.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
-    onDrawBehind { drawOutline(outline, color = color, style = stroke) }
+    onDrawBehind { drawPath(path, color = color, style = stroke) }
 }
 
 @Composable

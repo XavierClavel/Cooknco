@@ -32,9 +32,9 @@ import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -535,7 +535,7 @@ private fun IngredientEditCard(
                         colors = editFieldColors(),
                         shape = fieldShape,
                     )
-                    ExposedDropdownMenu(expanded = ingredient.showDropdown, onDismissRequest = onDismiss) {
+                    DropdownMenu(expanded = ingredient.showDropdown, onDismissRequest = onDismiss) {
                         ingredient.searchResults.forEach { result ->
                             val name = result.name["EN"] ?: result.name.values.firstOrNull() ?: ""
                             DropdownMenuItem(text = { Text(name) }, onClick = { onSelect(result) })
@@ -573,7 +573,7 @@ private fun IngredientEditCard(
                         colors = editFieldColors(),
                         shape = fieldShape,
                     )
-                    ExposedDropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
+                    DropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
                         availableUnits.forEach { unit ->
                             DropdownMenuItem(text = { Text(unitFieldLabel(unit.name)) }, onClick = { onUnitChange(unit.name); unitExpanded = false })
                         }

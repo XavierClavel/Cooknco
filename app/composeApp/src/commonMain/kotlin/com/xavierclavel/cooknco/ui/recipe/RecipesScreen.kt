@@ -87,7 +87,7 @@ fun RecipesScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 18.dp, top = 10.dp, bottom = 6.dp),
+                .padding(start = 18.dp, top = 10.dp, end = 18.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {

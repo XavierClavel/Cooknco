@@ -21,8 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.drawOutline
+import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -46,8 +47,9 @@ fun Modifier.stickerShadow(
     offsetY: Dp = 6.dp,
 ): Modifier = drawBehind {
     val outline = shape.createOutline(size, layoutDirection, this)
+    val path = Path().apply { addOutline(outline) }
     translate(left = offsetX.toPx(), top = offsetY.toPx()) {
-        drawOutline(outline, color = color)
+        drawPath(path, color = color)
     }
 }
 
