@@ -13,6 +13,7 @@ import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
@@ -39,6 +40,8 @@ object NotificationController: Controller(NOTIFICATION_URL) {
             listNotifications()
             markRead()
             markAllRead()
+            clearNotification()
+            clearAll()
             route("/devices") {
                 registerDevice()
                 unregisterDevice()
@@ -78,6 +81,33 @@ object NotificationController: Controller(NOTIFICATION_URL) {
 
     private fun Route.markAllRead() = post("/read") {
         call.respond(HttpStatusCode.OK, notificationService.markAllRead(getSessionUserId()))
+    }
+
+    /**
+     * Clears one notification, read or not.
+     *
+     * A 404 for a notification that is somebody else's says exactly what a 404 for one that
+     * is already gone says, which is deliberate: telling the two apart would let a caller
+     * learn which ids exist, and to the caller they mean the same thing — it is not in
+     * their list.
+     */
+    private fun Route.clearNotification() = delete("/{id}") {
+        if (!notificationService.clear(getSessionUserId(), getPathId())) {
+            call.respond(HttpStatusCode.NotFound)
+        } else {
+            call.respond(HttpStatusCode.OK)
+        }
+    }
+
+    /**
+     * Clears the lot, and answers how many that was.
+     *
+     * Unread ones included: "clear" is the user saying they are done with the list, not that
+     * they have read it — [markAllRead] is the one that says that, and it is the other
+     * action offered next to this one.
+     */
+    private fun Route.clearAll() = delete {
+        call.respond(HttpStatusCode.OK, notificationService.clearAll(getSessionUserId()))
     }
 
     /**

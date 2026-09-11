@@ -20,6 +20,37 @@ That order matters and is the reason the two halves exist:
 `NotificationService` is the only thing that writes them, and it always does so before it
 pushes.
 
+## Clearing
+
+A notification is the recipient's to be rid of. `DELETE /api/v1/notification/{id}` clears one
+and `DELETE /api/v1/notification` clears the lot, both scoped to the caller — one that is not
+theirs answers 404 rather than 403, because an answer that told the two apart would let a
+caller learn which ids exist.
+
+**It is a delete, not a flag.** The row *is* the notification, so a cleared one left in the
+table would put a filter on every read from then on to keep the list and the table agreeing,
+and `unreadCount` — a count over unread rows — would be the first thing to get it wrong.
+Deleting keeps that count honest with nothing said to it.
+
+Three things clearing deliberately does not do:
+
+- **It does not recall the push.** The buzz has already happened, and the notification may
+  still be sitting in the handset's own tray. A client that then taps it marks a row that is
+  gone, which is the 404 both clients already tolerate on `markRead`.
+- **It does not touch follow requests.** They are the other half of the bell and a queue the
+  user has to answer rather than news, so clearing the notification that announced a request
+  leaves the request itself waiting. A "clear all" that declined everybody would be the same
+  gesture with a very different meaning.
+- **It is not per client.** The list is one list — the same rows the app reads — so clearing
+  on the website clears it everywhere. That follows from a notification being a row rather
+  than a copy per device, and it is worth keeping: the alternative is a cleared-state per
+  client, a second thing to keep in sync for nobody's benefit.
+
+Clearing all clears everything addressed to the user, not the page they were shown. The bell
+asks for `DEFAULT_PAGE_SIZE` at a time, so a clear bounded by what came back would empty a
+list that fills itself again on the next poll, with no way for the user to tell how many
+presses it takes.
+
 ## The kinds
 
 `shared.enums.NotificationKind` is the list, and `shared.utils.NotificationWordings` holds
@@ -135,6 +166,9 @@ A preference — per kind, or one switch — would be a reasonable next step, an
 | `PushNotifications` | replays the tap to `AppNavigation`, translating the backend's path to an app route |
 | `PushRepository` | registers on launch and on rotation, unregisters on sign-out |
 
+The app lists notifications and marks them read; it does not clear them yet. Nothing in the
+endpoints is web-specific, so adding it there is a screen rather than a backend change.
+
 iOS is a stub: `currentPushToken()` returns null there, and `pushSupported` is false. Reaching
 a working one needs an APNs key, the Firebase iOS SDK in a real Xcode project, and a
 `UNUserNotificationCenter` delegate — none of which exists yet.
@@ -144,6 +178,13 @@ a working one needs an APNs key, the Firebase iOS SDK in a real Xcode project, a
 No web push. The bell in `App.vue` polls `GET /api/v1/notification` (already on a five-minute
 `pollingStore`) and shows the notification list next to the follow-request queue. Tapping one
 marks it read and navigates to its `link`.
+
+Every row also carries a clear button, and the foot of the menu offers "mark all as read" and
+"clear all" side by side — the two things a user can mean by being done with a notification.
+Both clearing actions take the row out of the list on the spot rather than waiting for the
+next poll, but only once the backend has agreed: a clear that silently failed would otherwise
+reappear five minutes later. The per-row button stops the click from reaching the row, so
+clearing one neither opens it nor closes the menu on the way.
 
 ### Links
 
