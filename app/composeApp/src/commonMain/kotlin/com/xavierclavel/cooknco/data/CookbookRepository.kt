@@ -33,6 +33,11 @@ class CookbookRepository(
         cookbookApi.updateCookbook(id, token, dto)
     }
 
+    suspend fun uploadCookbookImage(cookbookId: Long, imageBytes: ByteArray, mimeType: String): Result<Unit> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        cookbookApi.uploadCookbookImage(token, cookbookId, imageBytes, mimeType)
+    }
+
     suspend fun deleteCookbook(id: Long): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         cookbookApi.deleteCookbook(id, token)

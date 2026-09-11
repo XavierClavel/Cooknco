@@ -1,8 +1,6 @@
 package com.xavierclavel.cooknco.ui.cookbook
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,19 +26,12 @@ import androidx.compose.material.icons.outlined.ExitToApp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -54,18 +46,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeInfo
+import com.xavierclavel.cooknco.network.dto.CookbookUserInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
-import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
+import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerIconButton
+import com.xavierclavel.cooknco.ui.theme.StickerPill
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CookbookScreen(
     cookbookId: Long,
@@ -84,160 +78,150 @@ fun CookbookScreen(
 
     val cookbook = uiState.cookbook
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = cookbook?.title ?: "",
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (uiState.isAdmin && cookbook != null) {
-                        IconButton(onClick = { onNavigateToEdit(cookbook.id) }) {
-                            Icon(Icons.Outlined.Edit, contentDescription = "Edit")
-                        }
-                        IconButton(onClick = { viewModel.confirmDelete() }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CookncoGreen,
-                    titleContentColor = CookncoNavy,
-                    navigationIconContentColor = CookncoNavy,
-                    actionIconContentColor = CookncoNavy,
-                ),
-            )
-        },
-        containerColor = CookncoBackground,
-    ) { innerPadding ->
+    Surface(modifier = modifier.fillMaxSize(), color = CookncoGreen) {
         when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp)
-                }
+            uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
             }
 
-            uiState.error != null && cookbook == null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(innerPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = uiState.error ?: "Unknown error",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
+            uiState.error != null && cookbook == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(uiState.error!!, color = CookncoNavy, modifier = Modifier.padding(16.dp))
             }
 
-            cookbook != null -> {
-                CookbookContent(
-                    cookbook = cookbook,
-                    recipes = uiState.recipes,
-                    isAdmin = uiState.isAdmin,
-                    error = uiState.error,
-                    onLeave = { viewModel.confirmLeave() },
-                    onNavigateToRecipe = onNavigateToRecipe,
-                    onNavigateToUser = onNavigateToUser,
-                    modifier = Modifier.padding(innerPadding),
-                )
-            }
+            cookbook != null -> CookbookContent(
+                cookbook = cookbook,
+                recipes = uiState.recipes,
+                members = uiState.members,
+                isAdmin = uiState.isAdmin,
+                error = uiState.error,
+                onLeave = viewModel::confirmLeave,
+                onEdit = { onNavigateToEdit(cookbook.id) },
+                onDelete = viewModel::confirmDelete,
+                onNavigateToRecipe = onNavigateToRecipe,
+                onNavigateToUser = onNavigateToUser,
+                onNavigateBack = onNavigateBack,
+            )
         }
     }
 
     if (uiState.showLeaveConfirm) {
-        ConfirmationDialog(
-            title = "Leave Cookbook",
-            body = "Are you sure you want to leave this cookbook?",
-            confirmLabel = "Leave",
-            onConfirm = { viewModel.leave() },
-            onDismiss = { viewModel.cancelLeave() },
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelLeave() },
+            title = { Text("Leave Cookbook", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to leave this cookbook?") },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.leave() },
+                    colors = ButtonDefaults.buttonColors(containerColor = CookncoOrange, contentColor = CookncoWhite),
+                ) { Text("Leave", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelLeave() }) {
+                    Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f))
+                }
+            },
         )
     }
 
     if (uiState.showDeleteConfirm) {
-        ConfirmationDialog(
-            title = "Delete Cookbook",
-            body = "Are you sure you want to delete this cookbook? This cannot be undone.",
-            confirmLabel = "Delete",
-            onConfirm = { viewModel.delete() },
-            onDismiss = { viewModel.cancelDelete() },
-            isDestructive = true,
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDelete() },
+            title = { Text("Delete Cookbook", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete this cookbook? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.delete() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                ) { Text("Delete", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelDelete() }) {
+                    Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f))
+                }
+            },
         )
     }
 }
+
+// ── Cookbook content ────────────────────────────────────────────────────────────
 
 @Composable
 private fun CookbookContent(
     cookbook: CookbookInfo,
     recipes: List<CookbookRecipeInfo>,
+    members: List<CookbookUserInfo>,
     isAdmin: Boolean,
     error: String?,
     onLeave: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
     onNavigateToRecipe: (Long) -> Unit = {},
     onNavigateToUser: (Long) -> Unit = {},
+    onNavigateBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
     ) {
-        // ── Cookbook image ───────────────────────────────────────────────────
+        // ── Banner image with the back / edit / delete overlay ───────────────
         item {
-            CookbookImage(
-                cookbookId = cookbook.id,
-                version = cookbook.version,
-                contentDescription = cookbook.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp),
-            )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                CookbookImage(
+                    cookbookId = cookbook.id,
+                    version = cookbook.version,
+                    contentDescription = cookbook.title,
+                    modifier = Modifier.fillMaxWidth().height(240.dp),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    }
+                    if (isAdmin) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            StickerIconButton(onClick = onEdit, shadowOffset = 3.dp) {
+                                Icon(Icons.Outlined.Edit, contentDescription = "Edit")
+                            }
+                            StickerIconButton(onClick = onDelete, shadowOffset = 3.dp) {
+                                Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // ── Info card ────────────────────────────────────────────────────────
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = CookncoGreen),
-                border = BorderStroke(1.5.dp, CookncoNavy),
-                elevation = CardDefaults.cardElevation(2.dp),
+            StickerCard(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+                shape = RoundedCornerShape(20.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(11.dp),
                 ) {
                     Text(
                         text = cookbook.title,
-                        style = MaterialTheme.typography.headlineSmall,
+                        fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                         color = CookncoNavy,
+                        lineHeight = 31.sp,
                     )
-
                     if (cookbook.description.isNotBlank()) {
                         Text(
                             text = cookbook.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = CookncoNavy.copy(alpha = 0.75f),
+                            fontSize = 14.sp,
+                            lineHeight = 21.sp,
+                            color = CookncoNavy.copy(alpha = 0.72f),
                         )
                     }
-
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatChip("${cookbook.recipesCount} recipe${if (cookbook.recipesCount != 1) "s" else ""}")
                         StatChip("${cookbook.usersCount} member${if (cookbook.usersCount != 1) "s" else ""}")
@@ -251,21 +235,13 @@ private fun CookbookContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                Button(
-                    onClick = onLeave,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CookncoNavy.copy(alpha = 0.08f),
-                        contentColor = CookncoNavy,
-                    ),
-                    border = BorderStroke(1.5.dp, CookncoNavy),
-                ) {
+                StickerPill(onClick = onLeave, height = 40.dp, shadowOffset = 3.dp) {
                     Icon(Icons.Outlined.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Leave", fontWeight = FontWeight.Bold)
+                    Text("Leave", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
         }
@@ -273,34 +249,27 @@ private fun CookbookContent(
         // ── Recipes section ──────────────────────────────────────────────────
         if (recipes.isNotEmpty()) {
             item {
-                SectionHeader(
-                    title = "Recipes",
-                    count = recipes.size,
-                )
+                SectionHeader(title = "Recipes", count = recipes.size)
             }
             items(recipes, key = { "recipe_${it.id}" }) { recipe ->
                 RecipeRow(
                     recipe = recipe,
                     onClick = { onNavigateToRecipe(recipe.id) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
                 )
             }
         }
 
         // ── Members section ──────────────────────────────────────────────────
-        val members = cookbook.members
         if (members.isNotEmpty()) {
             item {
-                SectionHeader(
-                    title = "Members",
-                    count = members.size,
-                )
+                SectionHeader(title = "Members", count = members.size)
             }
             items(members, key = { "member_${it.id}" }) { member ->
                 MemberRow(
                     member = member,
                     onClick = { onNavigateToUser(member.id) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
                 )
             }
         }
@@ -310,8 +279,8 @@ private fun CookbookContent(
                 Text(
                     text = error,
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
                 )
             }
         }
@@ -323,13 +292,13 @@ private fun SectionHeader(title: String, count: Int, modifier: Modifier = Modifi
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = CookncoNavy,
         )
@@ -354,14 +323,13 @@ private fun SectionHeader(title: String, count: Int, modifier: Modifier = Modifi
 private fun StatChip(label: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(50.dp))
+            .clip(RoundedCornerShape(percent = 50))
             .background(CookncoWhite)
-            .border(1.5.dp, CookncoNavy, RoundedCornerShape(50.dp))
             .padding(horizontal = 12.dp, vertical = 4.dp),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            fontSize = 12.5.sp,
             fontWeight = FontWeight.Medium,
             color = CookncoNavy,
         )
@@ -370,14 +338,7 @@ private fun StatChip(label: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = CookncoWhite),
-        border = BorderStroke(1.5.dp, CookncoNavy),
-        elevation = CardDefaults.cardElevation(0.dp),
-    ) {
+    StickerCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), onClick = onClick) {
         Row(
             modifier = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -387,9 +348,7 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier:
                 recipeId = recipe.id,
                 version = 1L,
                 contentDescription = recipe.title,
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -397,7 +356,7 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier:
             ) {
                 Text(
                     text = recipe.title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
                     maxLines = 1,
@@ -405,7 +364,7 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier:
                 )
                 Text(
                     text = "Added by ${recipe.addedByUsername}",
-                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 12.sp,
                     color = CookncoNavy.copy(alpha = 0.55f),
                 )
             }
@@ -414,15 +373,8 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier:
 }
 
 @Composable
-private fun MemberRow(member: RecipeOwner, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = CookncoWhite),
-        border = BorderStroke(1.5.dp, CookncoNavy),
-        elevation = CardDefaults.cardElevation(0.dp),
-    ) {
+private fun MemberRow(member: CookbookUserInfo, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
+    StickerCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), onClick = onClick) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -430,22 +382,20 @@ private fun MemberRow(member: RecipeOwner, onClick: () -> Unit = {}, modifier: M
         ) {
             UserAvatar(
                 userId = member.id,
-                version = member.version,
+                version = 1L,
                 contentDescription = member.username,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape),
+                modifier = Modifier.size(44.dp).clip(CircleShape),
             )
 
             Text(
                 text = member.username,
-                style = MaterialTheme.typography.bodyLarge,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
                 color = CookncoNavy,
                 modifier = Modifier.weight(1f),
             )
 
-            if (member.role == "ADMIN") {
+            if (member.isAdmin) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
@@ -456,42 +406,12 @@ private fun MemberRow(member: RecipeOwner, onClick: () -> Unit = {}, modifier: M
                         text = "Admin",
                         color = CookncoWhite,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                     )
                 }
             }
         }
     }
-}
-
-@Composable
-private fun ConfirmationDialog(
-    title: String,
-    body: String,
-    confirmLabel: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-    isDestructive: Boolean = false,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title, fontWeight = FontWeight.Bold) },
-        text = { Text(body) },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = if (isDestructive) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                else ButtonDefaults.buttonColors(containerColor = CookncoOrange),
-            ) {
-                Text(confirmLabel, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f))
-            }
-        },
-    )
 }
 
 // ── Previews ─────────────────────────────────────────────────────────────────
@@ -508,6 +428,10 @@ private val previewCookbook = CookbookInfo(
         RecipeOwner(id = 2L, version = 1L, username = "Aya Amayri", role = "ADMIN"),
     ),
 )
+private val previewMembers = listOf(
+    CookbookUserInfo(id = 1L, username = "Xavier", isAdmin = true, joinDate = 0L),
+    CookbookUserInfo(id = 2L, username = "Aya Amayri", isAdmin = false, joinDate = 0L),
+)
 private val previewRecipes = listOf(
     CookbookRecipeInfo(id = 10L, title = "Harcha", addedById = 2L, addedByUsername = "Aya Amayri", additionDate = 0L),
     CookbookRecipeInfo(id = 11L, title = "Chocolate Fondant", addedById = 1L, addedByUsername = "Xavier", additionDate = 0L),
@@ -517,13 +441,16 @@ private val previewRecipes = listOf(
 @Composable
 fun CookbookContentPreview() {
     CookncoTheme {
-        Surface(color = CookncoBackground) {
+        Surface(color = CookncoGreen) {
             CookbookContent(
                 cookbook = previewCookbook,
                 recipes = previewRecipes,
+                members = previewMembers,
                 isAdmin = true,
                 error = null,
                 onLeave = {},
+                onEdit = {},
+                onDelete = {},
             )
         }
     }
@@ -533,13 +460,16 @@ fun CookbookContentPreview() {
 @Composable
 fun CookbookContentMemberPreview() {
     CookncoTheme {
-        Surface(color = CookncoBackground) {
+        Surface(color = CookncoGreen) {
             CookbookContent(
                 cookbook = previewCookbook,
                 recipes = previewRecipes,
+                members = previewMembers,
                 isAdmin = false,
                 error = null,
                 onLeave = {},
+                onEdit = {},
+                onDelete = {},
             )
         }
     }
