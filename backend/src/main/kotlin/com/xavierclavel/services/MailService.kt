@@ -25,6 +25,7 @@ import shared.events.UserMailRequestedEvent
 class MailService: KoinComponent {
     private val configuration: Configuration by inject()
     private val userService: UserService by inject()
+    private val unsubscribeService: UnsubscribeService by inject()
     private val eventProducer: EventProducer by inject()
 
     /**
@@ -74,10 +75,24 @@ class MailService: KoinComponent {
                     encryptedRecipient = recipient.mailEncrypted,
                     recipientId = recipient.id,
                     dedupeKey = "${kind.key}:$target:${recipient.id}",
-                    values = values + (MailPlaceholder.LINK to link),
+                    values = values + (MailPlaceholder.LINK to link) + unsubscribeValue(kind, recipient),
                 )
             }
         }
         logger.info { "Requested ${kind.key} mail for ${addressees.size} user(s)" }
     }
+
+    /**
+     * The way out of these mails, for the mails there is a way out of.
+     *
+     * Resolved per recipient rather than once per send, unlike the link above: it names the
+     * account, and is the only thing in a notification mail that has to.
+     *
+     * A transactional mail gets nothing, matching the placeholder its kind declares — an
+     * unsubscribe offered on a password reset is one we would not honour, since that mail
+     * goes out whatever the setting says.
+     */
+    private fun unsubscribeValue(kind: EmailTemplateKind, recipient: User): Map<String, String> =
+        if (kind.isTransactional) emptyMap()
+        else mapOf(MailPlaceholder.UNSUBSCRIBE to unsubscribeService.linkFor(recipient.id))
 }

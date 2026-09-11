@@ -648,6 +648,32 @@ carries a `podAffinity` onto the backend's node. Without it the job can be sched
 the volume cannot attach, and the backup fails for a reason that has nothing to do with
 backups.
 
+## A notification mail carries its own way out
+
+A mail that arrives because somebody *else* published a recipe has to say how to stop it, and
+the link has to work from an inbox — no session, and years after the mail went out. So
+`UnsubscribeService` **derives** the token rather than storing one: `<user id>.<HMAC over the
+id>`, keyed on `encryption.key`, which adds no row to migrate, no expiry to get wrong and
+nothing to `cooknco-config`. It is deliberately *not* `users.token`, which resets passwords
+and confirms addresses — a link in every notification mail is the widest distribution any
+credential of ours gets, so the one it carries must be worth nothing else.
+
+Three rules hold it together:
+
+- **It only ever switches the mails off.** Never on, and that asymmetry is the point: a token
+  holder can silence an address, but if the same token could put it back on the list, a leaked
+  mail would be a way to mail somebody who had already said no. Re-subscribing is the settings
+  screen, behind a real session.
+- **`{{unsubscribe}}` is declared by every kind that is not `isTransactional`**, which is what
+  makes the backoffice *refuse* a reworded notification mail that drops it
+  (`EmailTemplateService.validate`) rather than leaving it to review. A transactional mail
+  declares it nowhere, because it goes out whatever the setting says and the offer would be one
+  we could not keep. `EmailTemplatesTest` holds the packaged wordings to the same rule — they
+  are files rather than saves, so nothing else would.
+- **`POST`, not `GET`.** Links in mail get followed by scanners and prefetchers that mean
+  nothing by it. The link lands on `/user/unsubscribe`, an app page that posts on arrival, so a
+  fetch of the URL gets the shell and changes nothing.
+
 ## The MCP endpoint holds the SDK back on purpose
 
 `POST /mcp` serves Model Context Protocol from the backend (`McpController`, tools in

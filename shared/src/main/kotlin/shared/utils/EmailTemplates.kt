@@ -57,17 +57,29 @@ object EmailTemplates {
      * What to fill a preview or a test mail with.
      *
      * Only a built-in kind has values to offer, since only a built-in is sent by code that
-     * knows what they mean. The token is deliberately not a real one — a preview link has
-     * to be inert, and a test mail goes to whoever asked for it, not to an account.
+     * knows what they mean. No token here is a real one — a preview link has to be inert,
+     * and a test mail goes to whoever asked for it, not to an account. That matters most
+     * for the unsubscribe link, which is the one sample that would otherwise *do* something:
+     * signed for nobody, it is refused rather than switching an operator's mails off from
+     * under them.
      */
-    fun sampleValues(kind: EmailTemplateKind?, frontendUrl: String): Map<String, String> = when (kind) {
-        null -> emptyMap()
-        EmailTemplateKind.NEW_RECIPE -> mapOf(
-            MailPlaceholder.LINK to kind.link(frontendUrl, SAMPLE_RECIPE_ID),
-            MailPlaceholder.USERNAME to SAMPLE_USERNAME,
-            MailPlaceholder.TITLE to SAMPLE_TITLE,
-        )
-        else -> mapOf(MailPlaceholder.LINK to kind.link(frontendUrl, SAMPLE_TOKEN))
+    fun sampleValues(kind: EmailTemplateKind?, frontendUrl: String): Map<String, String> {
+        if (kind == null) return emptyMap()
+        return buildMap {
+            when (kind) {
+                EmailTemplateKind.NEW_RECIPE -> {
+                    put(MailPlaceholder.LINK, kind.link(frontendUrl, SAMPLE_RECIPE_ID))
+                    put(MailPlaceholder.USERNAME, SAMPLE_USERNAME)
+                    put(MailPlaceholder.TITLE, SAMPLE_TITLE)
+                }
+                else -> put(MailPlaceholder.LINK, kind.link(frontendUrl, SAMPLE_TOKEN))
+            }
+            // Exactly the mails that declare it, so what a preview fills in and what a send
+            // fills in stay the same set
+            if (!kind.isTransactional) {
+                put(MailPlaceholder.UNSUBSCRIBE, EmailTemplateKind.unsubscribeLink(frontendUrl, SAMPLE_TOKEN))
+            }
+        }
     }
 
     private const val SAMPLE_TOKEN = "sample-token"
