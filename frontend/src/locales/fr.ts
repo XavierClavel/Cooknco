@@ -729,7 +729,7 @@ export default {
   mcp_client_other_hint: "Un client qui ne sait lancer que des commandes locales atteint le serveur par ce pont.",
   mcp_permissions: "Ce qu'un assistant peut faire",
   mcp_grant_read: "lire tes recettes, tes carnets et ton fil",
-  mcp_grant_write: "écrire, modifier et supprimer tes recettes",
+  mcp_grant_write: "écrire, modifier et supprimer tes recettes, photos comprises",
   mcp_grant_collect: "liker des recettes et les ajouter à tes carnets",
   mcp_permissions_note: "Il ne peut pas changer ton mot de passe, ton adresse mail ni les paramètres de ton compte.",
   mcp_expiry_note: "Une connexion que tu n'utilises plus expire au bout de 30 jours, et l'assistant doit redemander l'autorisation.",

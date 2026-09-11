@@ -22,7 +22,24 @@ data class Configuration(
 
     /** Defaulted whole, and off by default, for the reason [pdf] is. See [Push]. */
     val push: Push = Push(),
+
+    /** Defaulted whole, for the reason [pdf] is. */
+    val images: Images = Images(),
 ) {
+    data class Images(
+        /**
+         * The largest picture the ticket endpoint reads into memory
+         * (`ImageController.redeemRecipeImageTicket`).
+         *
+         * Matches `client_max_body_size` in `frontend/nginx.conf`, which is what stops a
+         * larger one reaching the backend at all: this is the same bound restated where a
+         * caller gets a reason for it instead of the edge's own 413, and it is enforced
+         * here because that endpoint is the one reachable without an account behind it.
+         * Lowering it below the proxy's is safe; raising it above only moves the refusal.
+         */
+        val maxUploadBytes: Long = 20L * 1024 * 1024,
+    )
+
     /**
      * Firebase Cloud Messaging, which delivers the app's push notifications.
      *

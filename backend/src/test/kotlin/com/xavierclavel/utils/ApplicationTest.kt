@@ -15,6 +15,7 @@ import com.xavierclavel.services.ExportService
 import com.xavierclavel.services.GotenbergPdfRenderer
 import com.xavierclavel.services.FollowService
 import com.xavierclavel.services.ImageService
+import com.xavierclavel.services.ImageUploadTicketService
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
 import com.xavierclavel.services.LinkPreviewService
@@ -29,6 +30,7 @@ import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.StorageService
 import com.xavierclavel.services.UserService
+import com.xavierclavel.utils.Configuration
 import com.xavierclavel.utils.loadConfig
 import io.ebean.DB
 import shared.dto.UserDTO
@@ -65,6 +67,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class ApplicationTest: KoinTest {
     val userService: UserService by inject()
+    val configuration: Configuration by inject()
     val encryptionService: EncryptionService by inject()
     val eventProducer: EventProducer by inject()
     val mockEventProducer by lazy{ eventProducer as MockEventProducer}
@@ -98,6 +101,7 @@ abstract class ApplicationTest: KoinTest {
                 single { UserService() }
                 single { IngredientService() }
                 single { ImageService() }
+                single { ImageUploadTicketService() }
                 single { DefaultImageService() }
                 single { ExportService() }
                 single { LikeService() }

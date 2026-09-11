@@ -1,17 +1,21 @@
 package com.xavierclavel.controllers
 
 import com.xavierclavel.controllers.AuthController.getSessionUserId
+import com.xavierclavel.exceptions.BadRequestCause
+import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.exceptions.ForbiddenCause
 import com.xavierclavel.exceptions.ForbiddenException
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DefaultImageService
 import com.xavierclavel.services.ImageService
+import com.xavierclavel.services.ImageUploadTicketService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.checkRecipeEditionRights
 import com.xavierclavel.utils.checkUserEditionRights
 import com.xavierclavel.utils.getPathId
+import com.xavierclavel.utils.logger
 import com.xavierclavel.utils.receiveImage
 import shared.enums.ImageBucket
 import shared.utils.Filepath.COOKBOOKS_IMG_PATH
@@ -34,6 +38,8 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import org.koin.java.KoinJavaComponent.inject
+import com.drew.metadata.Metadata
+import java.awt.image.BufferedImage
 import java.io.File
 
 object ImageController: Controller(IMAGE_URL) {
@@ -42,11 +48,16 @@ object ImageController: Controller(IMAGE_URL) {
     val recipeService: RecipeService by inject(RecipeService::class.java)
     val cookbookService: CookbookService by inject(CookbookService::class.java)
     val userService: UserService by inject(UserService::class.java)
+    val imageUploadTicketService: ImageUploadTicketService by inject(ImageUploadTicketService::class.java)
 
     private val WEBP = ContentType("image", "webp")
 
     override fun Route.routes() {
         ImageBucket.entries.forEach { serveBucket(it) }
+
+        // Outside the authenticate block on purpose: the ticket in the URL is what authenticates
+        // this one, and its holder has no session. See ImageUploadTicketService.
+        redeemRecipeImageTicket()
 
         authenticate("auth-session", "bearer-auth") {
             uploadRecipeImage()
@@ -90,6 +101,35 @@ object ImageController: Controller(IMAGE_URL) {
         val id = getPathId()
         checkRecipeEditionRights(recipeService.getRecipeOwner(id).id)
         val (image, metadata) = receiveImage()
+        saveRecipeImage(id, image, metadata)
+        call.respond(HttpStatusCode.OK)
+    }
+
+    /**
+     * The same upload, for a caller holding a ticket instead of a session — an MCP client,
+     * which cannot carry a picture through a tool call at all. What the ticket is worth, and
+     * why the rights are checked again as it is spent, is in [ImageUploadTicketService].
+     *
+     * The size bound is passed here and nowhere else: this is the one image endpoint reachable
+     * without an account behind it.
+     */
+    private fun Route.redeemRecipeImageTicket() = post("/upload/{ticket}") {
+        val ticket = call.parameters["ticket"] ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
+        val redeemed = imageUploadTicketService.redeemRecipeTicket(ticket)
+        val (image, metadata) = receiveImage(maxBytes = imageUploadTicketService.maxUploadBytes)
+        saveRecipeImage(redeemed.recipeId, image, metadata)
+        logger.info { "Recipe ${redeemed.recipeId} was given a picture by user ${redeemed.userId} over an upload ticket" }
+        call.respond(HttpStatusCode.OK)
+    }
+
+    /**
+     * Writes both sizes a recipe is shown at, then drops the pair it replaced.
+     *
+     * Shared by the two ways in so that they cannot drift: the version bump is what every URL
+     * to the picture is built from, and a caller that wrote the files without it would leave
+     * every reader on the old one.
+     */
+    private fun saveRecipeImage(id: Long, image: BufferedImage, metadata: Metadata) {
         val recipe = recipeService.getEntityById(id)
 
         imageService.saveImage(RECIPES_IMG_PATH, id, recipe.imageVersion + 1, ImageBucket.RECIPE.size, image, metadata)
@@ -98,7 +138,6 @@ object ImageController: Controller(IMAGE_URL) {
         recipe.increaseVersion()
         imageService.deleteImage(RECIPES_IMG_PATH, id, recipe.imageVersion - 1)
         imageService.deleteImage(RECIPES_THUMBNAIL_PATH, id, recipe.imageVersion - 1)
-        call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.uploadCookbookImage() = post("/cookbooks/{id}") {

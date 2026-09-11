@@ -8,6 +8,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import io.ktor.http.Url
 import shared.utils.URL.IMAGE_URL
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -35,3 +36,19 @@ suspend fun HttpClient.uploadImage(path: String, id: Long, bytes: ByteArray = te
 
 suspend fun HttpClient.uploadRecipeImage(recipeId: Long, bytes: ByteArray = testImageBytes()): HttpResponse =
     uploadImage("recipes", recipeId, bytes)
+
+/**
+ * Posts a picture to an upload URL a ticket was minted for, the way a client holding one does.
+ *
+ * Takes the absolute URL the tool returned and keeps only its path: the test server answers on
+ * its own host, while the tool builds the URL against the configured `frontend.url`.
+ */
+suspend fun HttpClient.uploadToTicketUrl(uploadUrl: String, bytes: ByteArray = testImageBytes()): HttpResponse =
+    this.post(Url(uploadUrl).encodedPath) {
+        setBody(MultiPartFormDataContent(formData {
+            append("file", bytes, Headers.build {
+                append(HttpHeaders.ContentType, "image/jpeg")
+                append(HttpHeaders.ContentDisposition, "filename=pic.jpg")
+            })
+        }))
+    }

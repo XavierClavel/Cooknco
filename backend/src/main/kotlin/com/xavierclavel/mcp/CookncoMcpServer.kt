@@ -9,12 +9,14 @@ import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.exceptions.ServiceUnavailableException
 import com.xavierclavel.exceptions.UnauthorizedException
 import com.xavierclavel.services.CookbookService
+import com.xavierclavel.services.ImageUploadTicketService
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
 import com.xavierclavel.services.NotificationService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.UserService
+import com.xavierclavel.utils.Configuration
 import com.xavierclavel.utils.logger
 import io.ebean.Paging
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -38,6 +40,7 @@ import shared.enums.Locale
 import shared.enums.Sort
 import shared.infodto.IngredientInfo
 import shared.infodto.RecipeInfo
+import shared.utils.URL.RECIPE_VIEW_URL
 import java.util.Properties
 
 /**
@@ -52,7 +55,7 @@ import java.util.Properties
  *
  * A [Server] is built per request ([forUser]) because the endpoint is stateless: the tools
  * close over the caller's user id, so there is no ambient session to get wrong, and nothing
- * survives the request that produced it. Registering twelve tools costs a handful of data
+ * survives the request that produced it. Registering thirteen tools costs a handful of data
  * class allocations, the schemas being shared vals.
  */
 object CookncoMcpServer {
@@ -63,6 +66,8 @@ object CookncoMcpServer {
     private val userService: UserService by inject(UserService::class.java)
     private val likeService: LikeService by inject(LikeService::class.java)
     private val notificationService: NotificationService by inject(NotificationService::class.java)
+    private val imageUploadTicketService: ImageUploadTicketService by inject(ImageUploadTicketService::class.java)
+    private val configuration: Configuration by inject(Configuration::class.java)
 
     const val SERVER_NAME = "cooknco"
 
@@ -105,6 +110,7 @@ object CookncoMcpServer {
         server.tool(deleteRecipe) { deleteRecipe(userId, it) }
         server.tool(likeRecipe) { likeRecipe(userId, it) }
         server.tool(addRecipeToCookbook) { addRecipeToCookbook(userId, it) }
+        server.tool(prepareRecipeImageUpload) { prepareRecipeImageUpload(userId, it) }
 
         return server
     }
@@ -120,7 +126,7 @@ object CookncoMcpServer {
      * An unexpected exception is logged and answered generically — a stack trace is for the
      * server's logs, not for a model's context.
      */
-    private fun Server.tool(definition: Tool, handler: (JsonObject) -> String) =
+    private fun Server.tool(definition: Tool, handler: suspend (JsonObject) -> String) =
         addTool(definition) { request ->
             val arguments = request.arguments ?: JsonObject(emptyMap())
             try {
@@ -400,7 +406,9 @@ object CookncoMcpServer {
         name = "create_recipe",
         title = "Create a recipe",
         description = "Write a new recipe into the authenticated user's account. It is published immediately: " +
-            "the user's followers are notified, and it appears in their feed. Returns the created recipe.",
+            "the user's followers are notified, and it appears in their feed. Returns the created recipe, " +
+            "where it can be opened, and whether it still shows the default picture — " +
+            "prepare_recipe_image_upload is how it gets one of its own.",
         inputSchema = createRecipeSchema,
         annotations = ToolAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = false),
     )
@@ -417,7 +425,7 @@ object CookncoMcpServer {
         logger.info { "Recipe ${created.id} (${created.title}) created by user ${owner.username} over MCP" }
         // After the ingredients, so what a follower is sent points at a finished recipe.
         notificationService.onRecipeCreated(recipeService.getEntityById(recipe.id))
-        return payload.encodeToString(created)
+        return payload.encodeToString(created.toWriteResult())
     }
 
     private val updateRecipeSchema = toolSchema(
@@ -431,7 +439,8 @@ object CookncoMcpServer {
         title = "Update a recipe",
         description = "Change a recipe the authenticated user owns. Only the fields given are changed; " +
             "anything omitted keeps its current value. Passing ingredients or steps replaces that whole " +
-            "list, so send it complete. Returns the updated recipe.",
+            "list, so send it complete. The picture is not one of these fields: it is replaced through " +
+            "prepare_recipe_image_upload. Returns the updated recipe.",
         inputSchema = updateRecipeSchema,
         annotations = ToolAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true),
     )
@@ -450,7 +459,7 @@ object CookncoMcpServer {
         recipeIngredientService.updateRecipeIngredients(recipeId, recipeDto)
         val updated = recipeService.updateRecipe(recipeId, recipeDto)
         logger.info { "Recipe ${updated.id} (${updated.title}) edited by user ${current.owner.username} over MCP" }
-        return payload.encodeToString(recipeService.getRawById(recipeId, userId, Locale.EN))
+        return payload.encodeToString(recipeService.getRawById(recipeId, userId, Locale.EN).toWriteResult())
     }
 
     private val deleteRecipeSchema = toolSchema(
@@ -587,6 +596,47 @@ object CookncoMcpServer {
         )
     }
 
+    private val prepareRecipeImageUploadSchema = toolSchema(
+        "recipe_id" to intArg("Id of the recipe to give a picture to. Must belong to the authenticated user."),
+        required = listOf("recipe_id"),
+    )
+
+    private val prepareRecipeImageUpload = Tool(
+        name = "prepare_recipe_image_upload",
+        title = "Prepare a recipe picture upload",
+        description = "Hand back a URL that accepts one picture for a recipe the authenticated user owns. " +
+            "The picture does not travel through this tool: post the file to the URL returned, as the " +
+            "instructions in the result spell out. A URL is good for a single upload and expires shortly, " +
+            "so ask for a new one per picture. Uploading replaces whatever picture the recipe has now.",
+        inputSchema = prepareRecipeImageUploadSchema,
+        annotations = ToolAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = false),
+    )
+
+    private suspend fun prepareRecipeImageUpload(userId: Long, arguments: JsonObject): String {
+        val recipeId = arguments.requiredLong("recipe_id")
+        // The read is the existence check; the ownership one the REST endpoint makes in
+        // checkRecipeEditionRights is made by the ticket service, at both ends of the ticket.
+        val recipe = recipeService.getRawById(recipeId, userId, Locale.EN)
+        val uploadUrl = imageUploadTicketService.mintRecipeTicket(userId, recipeId)
+        logger.info { "Image upload ticket issued for recipe $recipeId by user ${recipe.owner.username} over MCP" }
+
+        return payload.encodeToString(
+            ImageUploadTicketResult(
+                recipeId = recipeId,
+                title = recipe.title,
+                uploadUrl = uploadUrl,
+                expiresInSeconds = imageUploadTicketService.expiresInSeconds,
+                maxBytes = imageUploadTicketService.maxUploadBytes,
+                replacesExistingImage = recipe.version > 0,
+                instructions = "Post the file as multipart form data under the field name 'file', for " +
+                    "example: curl -X POST -F 'file=@photo.jpg' '$uploadUrl'. A jpeg or png off a camera " +
+                    "or disk is what this expects; it is cropped and resized on the way in. Do not read " +
+                    "the file into this conversation to send it — post it directly. The answer is 200 on " +
+                    "success, and the picture is live as soon as it returns.",
+            ),
+        )
+    }
+
     // ------------------------------------------------------------------- helpers
 
     private fun JsonObject.paging(): Paging =
@@ -607,6 +657,22 @@ object CookncoMcpServer {
             ?: throw InvalidToolArgument(
                 "'$argument' must contain only ${enumValues<T>().joinToString(", ") { it.name }}, got '$value'"
             )
+
+    /**
+     * A written recipe, with the two things the caller needs next.
+     *
+     * `version` is the recipe's *image* version (see `Recipe.toInfo`), so zero is a recipe that
+     * has never been given a picture and is showing the shared default one.
+     */
+    private fun RecipeInfo.toWriteResult() = RecipeWriteResult(
+        recipe = this,
+        url = recipeUrl(id),
+        hasImage = version > 0,
+    )
+
+    /** The address the app itself builds for a recipe (`toViewRecipe` in `common.ts`). */
+    private fun recipeUrl(recipeId: Long): String =
+        "${configuration.frontend.url.trimEnd('/')}/$RECIPE_VIEW_URL?id=$recipeId"
 
     private fun usernameToId(username: String): Long =
         userService.findByUsername(username)?.id

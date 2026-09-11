@@ -24,6 +24,7 @@ enum class UnauthorizedCause(val key: String) {
     INVALID_TOKEN("invalid_token"),
     OAUTH_FAILED("oauth_failed"),
     OAUTH_NOT_SETUP("oauth_not_setup"),
+    INVALID_UPLOAD_TICKET("invalid_upload_ticket"),
     ACCOUNT_SUSPENDED("account_suspended"),
     ACCOUNT_BANNED("account_banned"),
 }
@@ -65,6 +66,7 @@ enum class ServiceUnavailableCause(val key: String) {
 enum class BadRequestCause (val key: String) {
     INVALID_REQUEST("invalid_request"),
     INVALID_IMAGE("invalid_image"),
+    IMAGE_TOO_LARGE("image_too_large"),
 
     TOKEN_MISSING("token_missing"),
     MAIL_MISSING("mail_missing"),

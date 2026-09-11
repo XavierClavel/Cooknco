@@ -67,6 +67,20 @@ data class PendingAuthorizationData(
     val state: String?,
 )
 
+/**
+ * A one-shot permission to write the picture of one recipe.
+ *
+ * Deliberately not a token that speaks for the account: it names the single recipe it may
+ * write and nothing else. The URL carrying it is handed to an MCP client, and from there it
+ * travels through a shell and nginx's access log, so what it is worth has to stay small —
+ * one image, on one recipe, for [RedisService.IMAGE_UPLOAD_TICKET_TTL] seconds.
+ */
+@Serializable
+data class ImageUploadTicketData(
+    val userId: Long,
+    val recipeId: Long,
+)
+
 class RedisService(redisUrl: String): KoinComponent {
     companion object {
         /** Idle timeout: a session survives this long without activity. */
@@ -97,6 +111,13 @@ class RedisService(redisUrl: String): KoinComponent {
          * new token with a full TTL and destroys the old one.
          */
         const val REFRESH_TOKEN_TTL = 30L * 24 * 60 * 60
+
+        /**
+         * How long an upload ticket can sit unused. Long enough for a client to read a file
+         * off the disk and post it, short enough that a URL left behind in a shell history
+         * is worthless by the time anyone reads it.
+         */
+        const val IMAGE_UPLOAD_TICKET_TTL = 10L * 60
     }
 
     private val client = RedisClient.create(redisUrl)
@@ -240,6 +261,20 @@ class RedisService(redisUrl: String): KoinComponent {
         val json = redis.get(key) ?: return null
         redis.del(key)
         return Json.decodeFromString<OAuthTokenData>(json)
+    }
+
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun createImageUploadTicket(ticket: String, data: ImageUploadTicketData) {
+        redis.setex("image-ticket:$ticket", IMAGE_UPLOAD_TICKET_TTL, Json.encodeToString(data))
+    }
+
+    /** Reads a ticket and destroys it, so a URL that has been posted to is spent. */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun takeImageUploadTicket(ticket: String): ImageUploadTicketData? {
+        val key = "image-ticket:$ticket"
+        val json = redis.get(key) ?: return null
+        redis.del(key)
+        return Json.decodeFromString<ImageUploadTicketData>(json)
     }
 
 }

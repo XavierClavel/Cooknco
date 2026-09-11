@@ -226,6 +226,36 @@ Only devices registered for push are visible, so reach is a floor on the real nu
 Tools are advertised with `ToolAnnotations`: reads carry `readOnlyHint`, `delete_recipe` carries
 `destructiveHint`. Clients decide what to confirm from those, so a new tool needs them set.
 
+### A picture is a ticket, not an argument
+
+`prepare_recipe_image_upload` answers with a URL and no bytes pass through the tool call, because
+they cannot: a tool's arguments are JSON the *model* writes, and a photograph base64'd into them is
+an order of magnitude past what a model can emit. The client posts the file to that URL itself
+(`POST /image/upload/{ticket}`, outside the authenticate block in `ImageController`), so the image
+never enters the model's context.
+
+The URL is not a credential for the account, and that is what makes handing one out safe: a ticket
+names one recipe, survives one redemption, and expires in ten minutes (`ImageUploadTicketService`,
+stored in Redis beside the OAuth codes so that expiry and revocation are the store's problem).
+Ownership is checked **again** as it is spent — the ticket outlives the request that minted it, and
+the recipe can be deleted or handed over in between. Keep both ends of that check.
+
+Two smaller things it depends on:
+
+- **The size bound is enforced in the backend, not just at the edge.** This is the one image
+  endpoint reachable with no account behind it, so `receiveImage(maxBytes)` stops a byte past
+  `Configuration.Images.maxUploadBytes` instead of trusting a declared `Content-Length` — a
+  chunked body declares none. The session endpoints still pass no bound and stay as they were,
+  behind nginx's `client_max_body_size`.
+- **What a client may do is enumerated in two places, and they are consent, not copy.** The
+  OAuth consent screen (`backend/src/main/resources/oauth/consent.html`) and the setup page's
+  grant list (`mcp_grant_*` in the locales) both name the picture. A capability missing from
+  those is one the user never agreed to.
+
+`create_recipe` and `update_recipe` answer with `RecipeWriteResult` rather than the bare recipe:
+the URL the recipe opens at, and `hasImage`, which is false while it is still showing the default
+picture every recipe without one shows. That is what tells a model there is a picture to offer.
+
 ## The backend is an OAuth 2.1 server, for `/mcp` only
 
 `OAuthService` and `OAuthController` exist so that adding the MCP endpoint to a client is a URL

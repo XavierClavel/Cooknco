@@ -21,3 +21,8 @@ oauth:
   google:
     client_id: test
     client_secret: test
+
+images:
+  # Small on purpose: it is what lets the ticket endpoint's size refusal be exercised
+  # without moving twenty megabytes through the test client.
+  max_upload_bytes: 65536

@@ -3,6 +3,7 @@ package com.xavierclavel.mcp
 import kotlinx.serialization.Serializable
 import shared.infodto.CookbookInfo
 import shared.infodto.CookbookRecipeInfo
+import shared.infodto.RecipeInfo
 import shared.infodto.UserInfo
 
 /**
@@ -71,6 +72,41 @@ data class LikeResult(
     /** False when the recipe was already in the requested state. */
     val changed: Boolean,
     val detail: String,
+)
+
+/**
+ * A recipe that has just been written, and the two things a caller needs next: where the user
+ * can open it, and whether it is still showing the picture every recipe without one shows.
+ *
+ * The recipe is nested rather than spread out so that the wrapper cannot collide with a field
+ * [RecipeInfo] grows later.
+ */
+@Serializable
+data class RecipeWriteResult(
+    val recipe: RecipeInfo,
+    /** Where this recipe opens in the app. */
+    val url: String,
+    /** False while the recipe still shows the shared default picture. */
+    val hasImage: Boolean,
+)
+
+/**
+ * Permission to upload one picture, which a tool call cannot carry itself.
+ *
+ * [instructions] spells the upload out as a command rather than describing it: what reads this
+ * is a model deciding what to run next, and the shape of a multipart post is exactly the kind
+ * of detail it would otherwise guess at.
+ */
+@Serializable
+data class ImageUploadTicketResult(
+    val recipeId: Long,
+    val title: String,
+    val uploadUrl: String,
+    val expiresInSeconds: Long,
+    val maxBytes: Long,
+    /** True when a successful upload would replace a picture the recipe already has. */
+    val replacesExistingImage: Boolean,
+    val instructions: String,
 )
 
 @Serializable

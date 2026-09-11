@@ -33,6 +33,8 @@ import main.com.xavierclavel.utils.createRecipe
 import main.com.xavierclavel.utils.follow
 import main.com.xavierclavel.utils.getRecipe
 import main.com.xavierclavel.utils.getRecipeRaw
+import main.com.xavierclavel.utils.uploadRecipeImage
+import main.com.xavierclavel.utils.uploadToTicketUrl
 import main.com.xavierclavel.utils.jsonRpc
 import main.com.xavierclavel.utils.mcpPostRaw
 import main.com.xavierclavel.utils.mcpResult
@@ -45,7 +47,12 @@ import shared.enums.AmountUnit
 import shared.enums.DishClass
 import shared.enums.IngredientType
 import shared.enums.Locale
+import shared.utils.Filepath.RECIPES_IMG_PATH
+import shared.utils.Filepath.RECIPES_THUMBNAIL_PATH
 import shared.utils.URL.MCP_URL
+import kotlin.io.path.Path
+import kotlin.io.path.exists
+import kotlin.io.path.fileSize
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -84,6 +91,7 @@ class McpControllerTest : ApplicationTest() {
         "delete_recipe",
         "like_recipe",
         "add_recipe_to_cookbook",
+        "prepare_recipe_image_upload",
     )
 
     // ------------------------------------------------------------- the endpoint
@@ -487,8 +495,13 @@ class McpControllerTest : ApplicationTest() {
                 },
             )
 
-            val recipeId = created["id"]!!.jsonPrimitive.long
-            assertEquals(username, created["owner"]!!.jsonObject["username"]!!.jsonPrimitive.content)
+            val recipe = created["recipe"]!!.jsonObject
+            val recipeId = recipe["id"]!!.jsonPrimitive.long
+            assertEquals(username, recipe["owner"]!!.jsonObject["username"]!!.jsonPrimitive.content)
+            // What the caller is told to do next: where the recipe opens, and that it is still
+            // on the default picture.
+            assertContains(created["url"]!!.jsonPrimitive.content, "id=$recipeId")
+            assertFalse(created["hasImage"]!!.jsonPrimitive.boolean)
 
             // Read it back over the REST API: what the tool wrote has to be the same recipe the
             // app serves, not just what the tool chose to echo.
@@ -732,6 +745,117 @@ class McpControllerTest : ApplicationTest() {
         val outcome = client.callTool(token, "add_recipe_to_cookbook", arguments)
         assertTrue(outcome.isError)
         assertContains(outcome.text, "recipe_already_in_cookbook")
+    }
+
+    // --------------------------------------------------------- the picture upload
+
+    /**
+     * The whole point of the ticket: a client that cannot put a photograph in a tool call posts
+     * it to the URL the tool answered with, and the recipe is wearing it afterwards.
+     */
+    @Test
+    fun `prepare_recipe_image_upload returns a URL that accepts one picture`() = runTestAsUser {
+        val token = client.tokenFor(USER1)
+        val recipe = client.createRecipe(RecipeDTO(title = "Ratatouille"))
+        assertEquals(0, recipe.version)
+
+        val ticket = client.callToolOk(
+            token,
+            "prepare_recipe_image_upload",
+            buildJsonObject { put("recipe_id", recipe.id) },
+        )
+        assertEquals(recipe.id, ticket["recipeId"]!!.jsonPrimitive.long)
+        assertEquals("Ratatouille", ticket["title"]!!.jsonPrimitive.content)
+        assertFalse(ticket["replacesExistingImage"]!!.jsonPrimitive.boolean)
+        // The instructions are what the model acts on, so they have to name the URL it must post to.
+        val uploadUrl = ticket["uploadUrl"]!!.jsonPrimitive.content
+        assertContains(ticket["instructions"]!!.jsonPrimitive.content, uploadUrl)
+
+        assertEquals(HttpStatusCode.OK, client.uploadToTicketUrl(uploadUrl).status)
+
+        // The version bump is what every URL to the picture is built from.
+        assertEquals(1, client.getRecipe(recipe.id).version)
+        assertImageExists(RECIPES_IMG_PATH, recipe.id, 1)
+        assertImageExists(RECIPES_THUMBNAIL_PATH, recipe.id, 1)
+    }
+
+    @Test
+    fun `an upload URL is spent by the first post to it`() = runTestAsUser {
+        val token = client.tokenFor(USER1)
+        val recipe = client.createRecipe(RecipeDTO(title = "Ratatouille"))
+        val uploadUrl = client.callToolOk(
+            token,
+            "prepare_recipe_image_upload",
+            buildJsonObject { put("recipe_id", recipe.id) },
+        )["uploadUrl"]!!.jsonPrimitive.content
+
+        assertEquals(HttpStatusCode.OK, client.uploadToTicketUrl(uploadUrl).status)
+
+        client.uploadToTicketUrl(uploadUrl).apply {
+            assertEquals(HttpStatusCode.Unauthorized, status)
+            assertContains(bodyAsText(), "invalid_upload_ticket")
+        }
+        // And the second post changed nothing.
+        assertEquals(1, client.getRecipe(recipe.id).version)
+    }
+
+    @Test
+    fun `a ticket says the recipe already has a picture when it does`() = runTestAsUser {
+        val token = client.tokenFor(USER1)
+        val recipe = client.createRecipe(RecipeDTO(title = "Ratatouille"))
+        client.uploadRecipeImage(recipe.id)
+
+        val ticket = client.callToolOk(
+            token,
+            "prepare_recipe_image_upload",
+            buildJsonObject { put("recipe_id", recipe.id) },
+        )
+        assertTrue(ticket["replacesExistingImage"]!!.jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun `prepare_recipe_image_upload refuses someone else's recipe`() = runTest {
+        var recipeId = 0L
+        runAsUser2 {
+            recipeId = client.createRecipe(RecipeDTO(title = "Not yours")).id
+        }
+        runAsUser1 {
+            val outcome = client.callTool(
+                client.tokenFor(USER1),
+                "prepare_recipe_image_upload",
+                buildJsonObject { put("recipe_id", recipeId) },
+            )
+            assertTrue(outcome.isError)
+            assertContains(outcome.text, "not_allowed_to_edit_recipe")
+        }
+    }
+
+    /**
+     * A ticket outlives the request that minted it, so what it was worth then is not what it is
+     * worth when it is spent.
+     */
+    @Test
+    fun `a ticket for a recipe that has since been deleted is refused`() = runTestAsUser {
+        val token = client.tokenFor(USER1)
+        val recipe = client.createRecipe(RecipeDTO(title = "Ratatouille"))
+        val uploadUrl = client.callToolOk(
+            token,
+            "prepare_recipe_image_upload",
+            buildJsonObject { put("recipe_id", recipe.id) },
+        )["uploadUrl"]!!.jsonPrimitive.content
+
+        client.callToolOk(token, "delete_recipe", buildJsonObject { put("recipe_id", recipe.id) })
+
+        client.uploadToTicketUrl(uploadUrl).apply {
+            assertEquals(HttpStatusCode.NotFound, status)
+            assertContains(bodyAsText(), "recipe_not_found")
+        }
+    }
+
+    private fun assertImageExists(path: String, id: Long, version: Long) {
+        val file = Path("$path/$id-v$version.webp")
+        assertTrue(file.exists(), "expected an image at $file")
+        assertTrue(file.fileSize() > 0, "expected $file not to be empty")
     }
 
     // ------------------------------------------------------------ bad arguments
