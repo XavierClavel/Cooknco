@@ -37,6 +37,8 @@ import com.xavierclavel.cooknco.ui.user.UserEditScreen
 import com.xavierclavel.cooknco.ui.user.UserEditViewModel
 import com.xavierclavel.cooknco.ui.user.UserProfileScreen
 import com.xavierclavel.cooknco.ui.user.UserProfileViewModel
+import com.xavierclavel.cooknco.ui.user.UserSettingsScreen
+import com.xavierclavel.cooknco.ui.user.UserSettingsViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipesScreen
@@ -59,6 +61,7 @@ private object Routes {
     const val USER = "user/{userId}"
     const val USER_EDIT = "user/{userId}/edit"
     const val RECIPES = "recipes"
+    const val SETTINGS = "settings"
 }
 
 @Composable
@@ -132,11 +135,9 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
 
         composable(Routes.MAIN) {
             val user = (authState as? AuthState.Authenticated)?.user ?: return@composable
-            val isLoggingOut by viewModel.isLoggingOut.collectAsState()
             MainScreen(
                 user = user,
-                onLogout = viewModel::logout,
-                isLoggingOut = isLoggingOut,
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 onNavigateToEditProfile = { navController.navigate("user/${user.id}/edit") },
                 onNavigateToRecipe = { recipeId ->
@@ -333,6 +334,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToEdit = { navController.navigate("user/$userId/edit") },
                 onNavigateToRecipe = { recipeId -> navController.navigate("recipe/$recipeId") },
+                onNavigateToSettings = null,
             )
         }
 
@@ -348,6 +350,17 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             UserEditScreen(
                 viewModel = editViewModel,
                 onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            val isLoggingOut by viewModel.isLoggingOut.collectAsState()
+            val settingsViewModel: UserSettingsViewModel = viewModel(factory = UserSettingsViewModel.factory())
+            UserSettingsScreen(
+                viewModel = settingsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onLogout = viewModel::logout,
+                isLoggingOut = isLoggingOut,
             )
         }
     }

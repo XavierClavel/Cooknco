@@ -66,8 +66,8 @@ import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 /**
  * Reachable both as the bottom nav's own-profile tab and, via `Routes.USER`, to view
  * someone else's — [onNavigateBack] is nullable for the same reason `RecipesScreen`'s
- * is (a tab has no back stack), and [onLogoutClick] stays null everywhere except the
- * own-profile tab call site in `MainScreen`, since logging out only makes sense there:
+ * is (a tab has no back stack), and [onNavigateToSettings] stays null everywhere except
+ * the own-profile tab call site in `MainScreen`, since settings only makes sense there:
  * `UserProfileViewModel.isOwnProfile` alone gates the gear icon that opens it.
  */
 @Composable
@@ -76,7 +76,7 @@ fun UserProfileScreen(
     onNavigateBack: (() -> Unit)? = null,
     onNavigateToEdit: (() -> Unit)? = null,
     onNavigateToRecipe: (Long) -> Unit = {},
-    onLogoutClick: (() -> Unit)? = null,
+    onNavigateToSettings: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -100,7 +100,7 @@ fun UserProfileScreen(
                 onToggleFollow = { viewModel.toggleFollow() },
                 onNavigateBack = onNavigateBack,
                 onNavigateToEdit = onNavigateToEdit,
-                onLogoutClick = onLogoutClick,
+                onNavigateToSettings = onNavigateToSettings,
                 onLoadMore = { viewModel.loadMoreRecipes() },
                 allLoaded = uiState.allRecipesLoaded,
                 onRecipeClick = onNavigateToRecipe,
@@ -119,7 +119,7 @@ private fun ProfileContent(
     onToggleFollow: () -> Unit,
     onNavigateBack: (() -> Unit)?,
     onNavigateToEdit: (() -> Unit)?,
-    onLogoutClick: (() -> Unit)?,
+    onNavigateToSettings: (() -> Unit)?,
     onLoadMore: () -> Unit,
     allLoaded: Boolean,
     onRecipeClick: (Long) -> Unit,
@@ -154,8 +154,8 @@ private fun ProfileContent(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                     }
                 }
-                if (isOwnProfile && onLogoutClick != null) {
-                    StickerIconButton(onClick = onLogoutClick, shadowOffset = 3.dp) {
+                if (isOwnProfile && onNavigateToSettings != null) {
+                    StickerIconButton(onClick = onNavigateToSettings, shadowOffset = 3.dp) {
                         Icon(Icons.Outlined.Settings, contentDescription = "Settings")
                     }
                 }
@@ -326,7 +326,7 @@ fun UserProfileOwnPreview() {
                 onToggleFollow = {},
                 onNavigateBack = null,
                 onNavigateToEdit = {},
-                onLogoutClick = {},
+                onNavigateToSettings = {},
                 onLoadMore = {},
                 allLoaded = true,
                 onRecipeClick = {},
@@ -349,7 +349,7 @@ fun UserProfileOtherPreview() {
                 onToggleFollow = {},
                 onNavigateBack = {},
                 onNavigateToEdit = null,
-                onLogoutClick = null,
+                onNavigateToSettings = null,
                 onLoadMore = {},
                 allLoaded = true,
                 onRecipeClick = {},

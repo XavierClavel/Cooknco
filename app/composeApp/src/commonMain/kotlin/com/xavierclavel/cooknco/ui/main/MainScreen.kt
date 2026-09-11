@@ -20,14 +20,9 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,23 +68,21 @@ private enum class MainTab { FEED, SEARCH, COOKBOOKS, PROFILE }
  * The old shared `MainTopBar` (hamburger + search pill + avatar) that used to sit above
  * whichever tab was showing is gone — each tab draws its own header instead (Feed's
  * "Friday, 11 September / What's cooking?" greeting, Profile's avatar card, ...).
- * Logging out — the account menu's only exit before — now lives behind the gear icon
- * on the Profile tab's own header: `onLogoutClick` below just flips [showLogoutConfirm],
- * which this screen still owns since it also owns `onLogout`/`isLoggingOut`. Jumping to
- * another user's profile by tapping the avatar is gone for good — Profile is a
- * first-class tab now, so that shortcut has no reason to exist.
+ * The gear icon on the Profile tab's own header now opens a real Settings screen
+ * (`onNavigateToSettings`) — logging out lives there instead of behind a bare tap.
+ * Jumping to another user's profile by tapping the avatar is gone for good — Profile is
+ * a first-class tab now, so that shortcut has no reason to exist.
  */
 @Composable
 fun MainScreen(
     user: UserInfo,
-    onLogout: () -> Unit,
-    isLoggingOut: Boolean = false,
     onNavigateToRecipe: (Long) -> Unit = {},
     onNavigateToEditRecipe: (Long?) -> Unit = {},
     onNavigateToCookbook: (Long) -> Unit = {},
     onNavigateToEditCookbook: (Long?) -> Unit = {},
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(user.id))
@@ -98,7 +91,6 @@ fun MainScreen(
     val profileViewModel: UserProfileViewModel = viewModel(factory = UserProfileViewModel.factory(user.id, user.id))
 
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.FEED) }
-    var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -148,46 +140,10 @@ fun MainScreen(
                 viewModel = profileViewModel,
                 onNavigateToEdit = onNavigateToEditProfile,
                 onNavigateToRecipe = onNavigateToRecipe,
-                onLogoutClick = { showLogoutConfirm = true },
+                onNavigateToSettings = onNavigateToSettings,
                 modifier = Modifier.padding(innerPadding),
             )
         }
-    }
-
-    if (showLogoutConfirm) {
-        // Nothing dismisses this once the sign-out is in flight: the session is already
-        // being torn down, and there is nothing to come back to if it is cancelled. It
-        // goes away with the screen, which the auth state pops as soon as logout lands.
-        AlertDialog(
-            onDismissRequest = { if (!isLoggingOut) showLogoutConfirm = false },
-            title = { Text("Log out", fontWeight = FontWeight.Bold) },
-            text = { Text("You will need to sign in again to reach your recipes on this device.") },
-            confirmButton = {
-                Button(
-                    onClick = onLogout,
-                    enabled = !isLoggingOut,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CookncoOrange,
-                        contentColor = CookncoWhite,
-                    ),
-                ) {
-                    if (isLoggingOut) {
-                        CircularProgressIndicator(
-                            color = CookncoWhite,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    } else {
-                        Text("Log out", fontWeight = FontWeight.Bold)
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutConfirm = false }, enabled = !isLoggingOut) {
-                    Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f))
-                }
-            },
-        )
     }
 }
 
