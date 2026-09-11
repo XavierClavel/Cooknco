@@ -3,11 +3,13 @@ package com.xavierclavel.cooknco.network
 import com.xavierclavel.cooknco.network.dto.SessionDto
 import com.xavierclavel.cooknco.network.dto.UserDTO
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.platform.deviceLocale
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -22,10 +24,16 @@ class AuthApi(private val client: HttpClient) {
 
     private val base = ApiClient.BASE_URL
 
+    /**
+     * Signing in also reports the phone's language, which an account with none of its own
+     * adopts. Sent here as well as at device registration because signing in is the one
+     * thing every user does, registration needing a push token they may have refused.
+     */
     suspend fun login(email: String, password: String): SessionDto {
         val credentials = Base64.encode("$email:$password".encodeToByteArray())
         val response = client.post("$base/auth/login") {
             header(HttpHeaders.Authorization, "Basic $credentials")
+            parameter("locale", deviceLocale)
         }
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
@@ -33,8 +41,14 @@ class AuthApi(private val client: HttpClient) {
         return response.body()
     }
 
+    /**
+     * The locale matters most here: the verification mail goes out on this request, before
+     * any device of theirs has registered, so this is the only thing that can put the first
+     * mail an account ever receives in the language of the phone that asked for it.
+     */
     suspend fun signup(username: String, email: String, password: String): UserInfo {
         val response = client.post("$base/auth/signup") {
+            parameter("locale", deviceLocale)
             contentType(ContentType.Application.Json)
             setBody(UserDTO(username = username, mail = email, password = password))
         }

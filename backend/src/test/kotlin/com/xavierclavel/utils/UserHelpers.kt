@@ -3,6 +3,8 @@ package main.com.xavierclavel.utils
 import com.xavierclavel.services.UserService
 import shared.dto.SearchResult
 import shared.dto.UserDTO
+import shared.dto.UserSettingsDTO
+import shared.enums.Locale
 import shared.infodto.UserInfo
 import shared.utils.URL.AUTH_URL
 import shared.utils.URL.USER_URL
@@ -11,6 +13,7 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -25,8 +28,17 @@ import kotlin.test.assertEquals
 
 val userService: UserService by inject(UserService::class.java)
 
-suspend fun HttpClient.createUser(mail: String = UUID.randomUUID().toString()): UserInfo  {
-    this.post("$AUTH_URL/signup?locale=EN"){
+/**
+ * @param locale what the signing-up client reports, as a real one does. Null signs up
+ *   without saying, which is the only way to get an account whose language is unknown —
+ *   the state every account was in before this was managed, and the one the fallbacks are
+ *   there for.
+ */
+suspend fun HttpClient.createUser(
+    mail: String = UUID.randomUUID().toString(),
+    locale: Locale? = Locale.EN,
+): UserInfo  {
+    this.post("$AUTH_URL/signup${locale?.let { "?locale=$it" } ?: ""}"){
         contentType(ContentType.Application.Json)
         header(HttpHeaders.ContentType, ContentType.Application.Json)
         setBody(UserDTO(mail = mail, username = UUID.randomUUID().toString(), password="password"))
@@ -38,6 +50,23 @@ suspend fun HttpClient.createUser(mail: String = UUID.randomUUID().toString()): 
     }
     //val response = this.getUser(username)
     //assertEquals(username, response.username)
+}
+
+/**
+ * Signs up reporting a locale the API cannot possibly parse, which no client of ours sends
+ * and any caller may. Raw rather than typed because the point is the unparseable string.
+ */
+suspend fun HttpClient.createUserRawLocale(mail: String, locale: String): UserInfo {
+    this.post("$AUTH_URL/signup?locale=$locale") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(UserDTO(mail = mail, username = UUID.randomUUID().toString(), password = "password"))
+    }.apply {
+        assertEquals(HttpStatusCode.Created, status, "an unreadable locale is not worth an account")
+        val user = Json.decodeFromString<UserInfo>(bodyAsText())
+        userService.validateUser(user.id)
+        return user
+    }
 }
 
 suspend fun HttpClient.getUser(id: Long): UserInfo {
@@ -72,6 +101,29 @@ suspend fun HttpClient.assertUserDoesNotExist(id: Long) {
         assertEquals(HttpStatusCode.NotFound, status)
     }
 }
+
+suspend fun HttpClient.getSettingsRaw() = this.get("$USER_URL/settings")
+
+suspend fun HttpClient.getSettings(): UserSettingsDTO {
+    this.getSettingsRaw().apply {
+        assertEquals(HttpStatusCode.OK, status)
+        return Json.decodeFromString<UserSettingsDTO>(bodyAsText())
+    }
+}
+
+suspend fun HttpClient.updateSettingsRaw(settings: UserSettingsDTO) =
+    this.put("$USER_URL/settings") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(settings)
+    }
+
+suspend fun HttpClient.updateSettings(settings: UserSettingsDTO) =
+    this.updateSettingsRaw(settings).apply { assertEquals(HttpStatusCode.OK, status) }
+
+/** Saves a language the way the settings screen does, leaving the other settings as they are. */
+suspend fun HttpClient.chooseLocale(locale: Locale) =
+    this.updateSettings(this.getSettings().copy(locale = locale))
 
 suspend fun HttpClient.listUsers() : SearchResult<UserInfo> {
     this.get(USER_URL).apply {

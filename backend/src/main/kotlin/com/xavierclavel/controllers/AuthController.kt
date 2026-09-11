@@ -14,10 +14,10 @@ import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Configuration
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.UserSession
-import com.xavierclavel.utils.getLocale
 import com.xavierclavel.utils.logger
 import shared.dto.GoogleOauthDto
 import shared.dto.UserDTO
+import shared.enums.Locale
 import shared.infodto.UserInfo
 import shared.utils.URL.AUTH_URL
 import io.ktor.client.HttpClient
@@ -60,6 +60,15 @@ object AuthController: Controller(AUTH_URL) {
     val redisService: RedisService by inject(RedisService::class.java)
     val configuration: Configuration by inject(Configuration::class.java)
     val redirects = mutableMapOf<String, String>()
+
+    /**
+     * The language each in-flight Google sign-in was started from, keyed by OAuth state.
+     *
+     * Google's callback is a redirect it builds itself, so the only moment the client's
+     * language is visible in that flow is the moment it leaves — captured next to
+     * `?redirect=` in `configureAuthentication`, and consumed once when the state comes back.
+     */
+    val oauthLocales = mutableMapOf<String, Locale>()
     val applicationHttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
             json()
@@ -84,14 +93,37 @@ object AuthController: Controller(AUTH_URL) {
         resetPassword()
     }
 
+    /**
+     * Signing in also reports the client's language, through `?locale=`.
+     *
+     * This is the web's equivalent of what registering a device does for the app: it is the
+     * one request every client makes that says something about the person rather than about
+     * the page they happened to open. Only an account that has no language yet takes it —
+     * [UserService.adoptLocale] — so signing in from a borrowed English laptop cannot
+     * rewrite a choice made in the settings.
+     */
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     private fun Route.login() = post("/login") {
         val mail = call.principal<UserIdPrincipal>()?.name.toString()
-        val user = userService.findByMail(mail).toInfo()
-        val sessionId = createSession(user)
+        val entity = userService.findByMail(mail)
+        reportedLocale()?.let { userService.adoptLocale(entity, it) }
+        val sessionId = createSession(entity.toInfo())
         call.sessions.set(UserSession(sessionId))
         call.respond(SessionDto(sessionId))
     }
+
+    /**
+     * The language the calling client says it is running in, or null.
+     *
+     * Lenient on purpose, unlike [com.xavierclavel.utils.getLocale]: this rides along with
+     * requests whose real job is signing in or signing up, and neither should fail over the
+     * spelling of a language. Unreadable means unknown, and unknown has a well-defined
+     * meaning here — see `User.locale`.
+     */
+    private fun RoutingContext.reportedLocale(): Locale? =
+        call.request.queryParameters["locale"]
+            ?.takeIf { it.isNotBlank() }
+            ?.let { reported -> Locale.entries.find { it.name.equals(reported, ignoreCase = true) } }
 
     private fun Route.loginGoogleOauth() = get("/login-oauth-google") {
     }
@@ -104,7 +136,9 @@ object AuthController: Controller(AUTH_URL) {
             val accessToken = principal.accessToken
 
             if (state != null) {
-                val sessionId = googleOauthLogin(accessToken)
+                // Consumed rather than read: one sign-in, one state, and nothing later can
+                // match it again
+                val sessionId = googleOauthLogin(accessToken, oauthLocales.remove(state))
 
                 val redirect = redirects[state]
 
@@ -125,7 +159,8 @@ object AuthController: Controller(AUTH_URL) {
 
 
     private suspend fun RoutingContext.googleOauthLogin(
-        oauthToken: String
+        oauthToken: String,
+        reported: Locale?,
     ): String {
         val data = applicationHttpClient.get("https://openidconnect.googleapis.com/v1/userinfo") {
             bearerAuth(oauthToken)
@@ -140,6 +175,9 @@ object AuthController: Controller(AUTH_URL) {
         if (user != null) {
             if (user.isBanned) throw UnauthorizedException(UnauthorizedCause.ACCOUNT_BANNED)
             if (user.isSuspended()) throw UnauthorizedException(UnauthorizedCause.ACCOUNT_SUSPENDED)
+            // Same reporting as a password sign-in: a returning account with no language
+            // takes the one its client came in with
+            reported?.let { userService.adoptLocale(user, it) }
             val sessionId = createSession(user.toInfo())
             call.sessions.set(UserSession(sessionId))
             return sessionId
@@ -149,13 +187,13 @@ object AuthController: Controller(AUTH_URL) {
             throw UnauthorizedException(UnauthorizedCause.OAUTH_NOT_SETUP)
         }
 
-        user = createGoogleOauthUser(response)
+        user = createGoogleOauthUser(response, reported)
         val sessionId = createSession(user.toInfo())
         call.sessions.set(UserSession(sessionId))
         return sessionId
     }
 
-    private fun RoutingContext.createGoogleOauthUser(oauthDto: GoogleOauthDto): User {
+    private fun RoutingContext.createGoogleOauthUser(oauthDto: GoogleOauthDto, reported: Locale?): User {
         val baseName = oauthDto.name?.trim() ?: UUID.randomUUID().toString()
         var name = baseName
         var index = 1
@@ -168,7 +206,7 @@ object AuthController: Controller(AUTH_URL) {
             mail = oauthDto.email,
             googleId = oauthDto.sub
             )
-        val userCreated = userService.createUser(userDTO, true)
+        val userCreated = userService.createUser(userDTO, true, reported)
         logger.info {"Account created through Google Oauth by ${userCreated.username}"}
         return userCreated
     }
@@ -199,6 +237,14 @@ object AuthController: Controller(AUTH_URL) {
         call.respond(userInfo)
     }
 
+    /**
+     * Creates an account, in the language its client says it is running in.
+     *
+     * `?locale=` is read leniently — absent or unreadable simply leaves the account without
+     * one, and the fallbacks in `User.locale` apply. Refusing a signup over the spelling of
+     * a language would trade an account for a preference, and the verification mail that
+     * goes out next is the only thing riding on it.
+     */
     private fun Route.signup() = post("/signup") {
         val userDTO = call.receive(UserDTO::class)
         userDTO.username = userDTO.username.trim()
@@ -206,7 +252,7 @@ object AuthController: Controller(AUTH_URL) {
         if (userService.existsByUsername(userDTO.username)) throw BadRequestException(BadRequestCause.USERNAME_ALREADY_USED)
         if (userService.existsByMail(userDTO.mail)) throw BadRequestException(BadRequestCause.MAIL_ALREADY_USED)
 
-        val userCreated = userService.createUser(userDTO, false)
+        val userCreated = userService.createUser(userDTO, false, reportedLocale())
         logger.info {"Account created through basic auth by ${userCreated.username}"}
         call.respond(HttpStatusCode.Created, userCreated.toInfo())
     }

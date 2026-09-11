@@ -112,9 +112,19 @@ private fun handleNewRecipe(e: NewRecipeEvent) {
      */
 }
 
+/**
+ * Who to write to, and in what language.
+ *
+ * The account's own language, which the backend keeps filled in from whatever its clients
+ * report — this service has no devices or requests of its own to infer one from, and reading
+ * a single column is the whole reason that resolution happens over there.
+ *
+ * [Locale.FR] when the account has none, which is what every mail this service has ever sent
+ * used, so an account nothing has reported for keeps receiving what it already received.
+ */
 private fun getMailAndLocale(id: Long): Pair<String, Locale> {
     val user = QUser().id.eq(id).findOne()!!
-    return decrypt(user.encryptedMail) to user.locale
+    return decrypt(user.encryptedMail) to (user.locale ?: Locale.FR)
 }
 
 
