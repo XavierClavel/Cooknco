@@ -36,6 +36,11 @@ class RecipeRepository(
         recipeApi.deleteRecipe(id, token)
     }
 
+    suspend fun uploadRecipeImage(recipeId: Long, imageBytes: ByteArray, mimeType: String): Result<Unit> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        recipeApi.uploadRecipeImage(token, recipeId, imageBytes, mimeType)
+    }
+
     suspend fun isLiked(recipeId: Long): Result<Boolean> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         recipeApi.isLiked(recipeId, token)

@@ -74,6 +74,7 @@ import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberImagePicker
+import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
@@ -163,10 +164,6 @@ fun RecipeEditScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var currentStep by rememberSaveable { mutableIntStateOf(0) }
-    // Local-only preview: there is no recipe-image upload endpoint wired up on the
-    // mobile client yet (only the user avatar has one, via UserRepository), so the
-    // Photo step lets you pick an image but does not persist it — see the PR body.
-    var pickedImage by remember { mutableStateOf<PickedImage?>(null) }
     val steps = EditorStep.entries
 
     LaunchedEffect(uiState.saved) {
@@ -249,8 +246,8 @@ fun RecipeEditScreen(
                 EditorStep.PHOTO -> PhotoStep(
                     uiState = uiState,
                     viewModel = viewModel,
-                    pickedImage = pickedImage,
-                    onImagePicked = { pickedImage = it },
+                    pickedImage = uiState.pendingImage,
+                    onImagePicked = viewModel::setPendingImage,
                 )
             }
         }
@@ -743,6 +740,9 @@ private fun PhotoStep(
     val pickedBitmap = pickedImage?.let { picked ->
         remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
     }
+    // A version of 0 means the recipe is still on the backend's default placeholder —
+    // RecipeInfo.version doubles as the image version (see ImageController on the backend).
+    val hasExistingPhoto = uiState.recipeId != null && (uiState.recipeVersion ?: 0) > 0
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
@@ -762,10 +762,21 @@ private fun PhotoStep(
                     .clickable { imagePicker.launch() },
                 contentAlignment = Alignment.Center,
             ) {
-                if (pickedBitmap != null) {
-                    Image(bitmap = pickedBitmap, contentDescription = "Recipe photo", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                when {
+                    pickedBitmap != null -> Image(
+                        bitmap = pickedBitmap,
+                        contentDescription = "Recipe photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    hasExistingPhoto -> RecipeImage(
+                        recipeId = uiState.recipeId!!,
+                        version = uiState.recipeVersion!!,
+                        contentDescription = "Recipe photo",
+                        thumbnail = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Outlined.CameraAlt, contentDescription = null, tint = CookncoNavy.copy(alpha = 0.5f), modifier = Modifier.size(36.dp))
                         Text("Tap to add a photo", color = CookncoNavy.copy(alpha = 0.6f), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
                     }
@@ -775,7 +786,7 @@ private fun PhotoStep(
         if (pickedImage != null) {
             item {
                 Text(
-                    text = "Saved locally for now — uploading a recipe photo isn't wired up on mobile yet.",
+                    text = "Uploaded when you save.",
                     color = CookncoNavy.copy(alpha = 0.6f),
                     fontSize = 11.5.sp,
                 )

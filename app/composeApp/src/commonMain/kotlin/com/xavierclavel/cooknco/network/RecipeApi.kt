@@ -9,6 +9,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
@@ -16,6 +18,8 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
@@ -101,6 +105,20 @@ class RecipeApi(private val client: HttpClient) {
             throw ApiException(response.status, response.bodyAsText())
         }
         return response.body()
+    }
+
+    /** Images live outside the api: POST {IMAGE_URL}/recipes/{id}, answering with an empty body. */
+    suspend fun uploadRecipeImage(token: String, recipeId: Long, imageBytes: ByteArray, mimeType: String) {
+        val response = client.post("${ApiClient.IMAGE_URL}/recipes/$recipeId") {
+            bearerAuth(token)
+            setBody(MultiPartFormDataContent(formData {
+                append("file", imageBytes, Headers.build {
+                    append(HttpHeaders.ContentType, mimeType)
+                    append(HttpHeaders.ContentDisposition, "filename=recipe.webp")
+                })
+            }))
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }
 
     suspend fun deleteRecipe(id: Long, token: String) {
