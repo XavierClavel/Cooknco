@@ -50,6 +50,7 @@ export {
 
   toMyProfile,
   toSettings,
+  toMcp,
 
   uploadImage,
   doDeleteImage,
@@ -92,6 +93,7 @@ const toMyProfile = () => {
 }
 const toEditUser = (id) => navigateTo(`/user/edit?user=${id}`)
 const toSettings = () => navigateTo(`/user/settings`)
+const toMcp = () => navigateTo(`/user/mcp`)
 
 const toListIngredient = () => navigateTo(`/ingredient/list`)
 const toViewIngredient = (id) => navigateTo(`/ingredient/view?ingredient=${id}`)

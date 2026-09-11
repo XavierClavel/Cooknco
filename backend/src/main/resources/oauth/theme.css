@@ -1,0 +1,209 @@
+/*
+ * The consumer app's look, restated in plain CSS and shared by both OAuth pages.
+ *
+ * These pages are rendered by the authorization server, with no app state, no API call and no
+ * JavaScript, so they cannot reach the Vue app's Vuetify theme. They are also the only part of
+ * the flow a person actually looks at, and a consent screen that does not look like the site
+ * it speaks for is one a careful user is right to distrust — so the values here are the app's,
+ * copied rather than imported: the palette from `frontend/src/plugins/vuetify.ts` (a card is
+ * `surface`, green, on a `background` page, and an action is `primary`, coral), the 3px ink
+ * border and 6px field radius from `frontend/src/styles/global.scss`, and Geologica from
+ * `settings.scss`. Keep them in step when the theme moves.
+ *
+ * Light only, like the app: it declares a single Vuetify theme with `dark: false`, so a page
+ * that answered `prefers-color-scheme` would be the one dark surface in the product.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Geologica:wght@400;500;700;900&display=swap');
+
+:root {
+  --background: #f0f4ef;
+  --surface: #629677;
+  --ink: #0d1821;
+  --primary: #ff6f59;
+  --muted: #4c565b;
+  /* A pale wash of the theme's `secondary` (#f4b634), light enough to carry body text */
+  --caution: #fdf3de;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--background);
+  color: var(--ink);
+  font-family: Geologica, 'Trebuchet MS', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+main {
+  width: 100%;
+  max-width: 34rem;
+  background: var(--surface);
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  padding: 28px 26px 24px;
+}
+
+/*
+ * The logo is `frontend/public/logo.png`, served at `/logo.png` by the app's nginx — the same
+ * picture the app's drawer shows, kept in `public/` as well because these pages have no bundler
+ * to resolve a hashed asset name for them.
+ *
+ * Sized here rather than relying on the width/height attributes so that the alt text, which is
+ * what a browser reaching the backend without the app shows instead, reads as a wordmark rather
+ * than as a 205px-wide gap.
+ */
+.logo {
+  display: block;
+  width: 108px;
+  height: auto;
+  margin: 0 auto 14px;
+  font-weight: 900;
+  font-size: 1.1rem;
+}
+
+/* Centred over left-aligned body copy, the way the app composes a card */
+.head {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.55rem, 6vw, 2rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+p {
+  margin: 0 0 14px;
+}
+
+.head p {
+  margin: 4px 0 0;
+  font-size: .95rem;
+}
+
+.note {
+  font-size: .9rem;
+}
+
+strong {
+  font-weight: 700;
+}
+
+/* A pale panel on the green card, like the app's fields and its nested cards */
+.panel {
+  padding: 12px 14px;
+  background: var(--background);
+  border: 3px solid var(--ink);
+  border-radius: 6px;
+}
+
+/* The one block on the page a stranger writes into, and the address it goes with */
+.client {
+  margin: 0 0 18px;
+}
+
+.client-name {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.client-uri {
+  display: block;
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .82rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+/*
+ * Square ink markers instead of the browser's discs. Solid, and the only thing on these pages
+ * without the 3px ink outline: outlined, a small square on a consent screen reads as an
+ * unticked checkbox, and these are statements, not choices. Ink rather than the coral accent
+ * because nothing sits straight on the green surface without the border between — the accent
+ * appears here only on the button, where it has one.
+ */
+.grants {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+/* A flex line, so the marker centres against its text however the two measure */
+.grants li {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: 6px;
+}
+
+.grants li::before {
+  content: '';
+  flex: 0 0 auto;
+  width: .6rem;
+  height: .6rem;
+  margin-left: .2rem;
+  background: var(--ink);
+  border-radius: 2px;
+}
+
+/*
+ * What the user is being asked to check for themselves. Tinted with the app's secondary accent
+ * rather than bordered with it: the 3px ink border belongs on every panel, so the colour has to
+ * come from the fill to read as a caution at all.
+ */
+.caution {
+  margin: 0;
+  background: var(--caution);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+button {
+  flex: 1 1 10rem;
+  min-height: 54px;
+  padding: 12px 16px;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.allow {
+  background: var(--primary);
+  color: #fff;
+}
+
+.deny {
+  background: var(--background);
+  color: var(--ink);
+}
+
+button:hover {
+  filter: brightness(.95);
+}
+
+button:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}

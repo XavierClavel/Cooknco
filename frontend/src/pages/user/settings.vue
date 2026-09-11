@@ -61,6 +61,11 @@
                 :action="toUpdatePassword"
               ></action-button>
               <action-button
+                icon="mdi-robot-outline"
+                :text="`${$t('mcp_settings')}`"
+                :action="toMcp"
+              ></action-button>
+              <action-button
                 :icon="ICON_SAVE"
                 :text="`${$t('save')}`"
                 :action="submit"
@@ -80,7 +85,7 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import {login, toMyProfile, toSignup, toUpdatePassword} from '@/scripts/common'
+import {login, toMcp, toMyProfile, toSignup, toUpdatePassword} from '@/scripts/common'
 import {useI18n} from "vue-i18n";
 import {ICON_LOCALIZATION, ICON_SAVE} from "@/scripts/icons";
 import {forceLocale, getLocale} from "@/scripts/localization";
