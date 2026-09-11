@@ -13,6 +13,7 @@ declare module 'vue' {
     ChipRow: typeof import('./components/ChipRow.vue')['default']
     Cookbook: typeof import('./components/Cookbook.vue')['default']
     CookbooksGrid: typeof import('./components/CookbooksGrid.vue')['default']
+    CopyBlock: typeof import('./components/CopyBlock.vue')['default']
     EditablePicture: typeof import('./components/EditablePicture.vue')['default']
     Error: typeof import('./components/Error.vue')['default']
     FollowersDisplay: typeof import('./components/FollowersDisplay.vue')['default']
