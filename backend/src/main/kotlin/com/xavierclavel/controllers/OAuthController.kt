@@ -265,11 +265,7 @@ object OAuthController : Controller(OAUTH_URL) {
 
         if (form["decision"] != "allow") {
             val denied = oauthService.takeDenied(requestId, userId)
-                ?: return@post call.respondText(
-                    OAuthPages.error("This request has expired. Start the connection again from your client."),
-                    ContentType.Text.Html,
-                    HttpStatusCode.BadRequest,
-                )
+                ?: return@post respondNoLongerPending(requestId, userId)
             return@post call.respondRedirect(
                 redirectWith(denied.redirectUri, denied.state) {
                     parameters.append("error", "access_denied")
@@ -279,11 +275,7 @@ object OAuthController : Controller(OAUTH_URL) {
         }
 
         val approved = oauthService.approve(requestId, userId)
-            ?: return@post call.respondText(
-                OAuthPages.error("This request has expired. Start the connection again from your client."),
-                ContentType.Text.Html,
-                HttpStatusCode.BadRequest,
-            )
+            ?: return@post respondNoLongerPending(requestId, userId)
 
         logger.info { "User $userId authorized an MCP client" }
         call.respondRedirect(
@@ -343,6 +335,56 @@ object OAuthController : Controller(OAUTH_URL) {
         } catch (e: InvalidTokenRequest) {
             val status = if (e.error == "unsupported_grant_type") HttpStatusCode.BadRequest else HttpStatusCode.BadRequest
             respondOAuth(status, OAuthError(e.error, e.description))
+        }
+    }
+
+    /**
+     * What to say when the form that was just posted is no longer the pending one.
+     *
+     * There are two ways for that to happen and they are opposite things to tell a person, so
+     * they are told apart rather than both reported as an expiry. The common one is a second
+     * press: pressing Allow again, or Enter after it, posts the same request id once more, and
+     * by then the first press has already connected the client. The other is a client that
+     * opens the authorization endpoint twice for one connection — each window carries its own
+     * request id, so the one a person answers is not always the one the client is waiting for;
+     * claude.ai is reported to do this when reconnecting an existing connector.
+     *
+     * Answering all of that with "this request has expired. Nothing has been granted" is wrong
+     * on both counts and sends someone off to debug a connection that is already working.
+     */
+    private suspend fun RoutingContext.respondNoLongerPending(requestId: String, userId: Long) {
+        val answer = oauthService.answerTo(requestId, userId)
+        logger.info { "A consent decision arrived for a request that is no longer pending (answered: $answer)" }
+        when (answer) {
+            OAuthService.Answer.APPROVED -> call.respondText(
+                OAuthPages.answered(
+                    heading = "This connection is already approved",
+                    message = "You answered this request already, and the client it came from was given " +
+                        "the access it asked for. There is nothing left to do here.",
+                ),
+                ContentType.Text.Html,
+            )
+            OAuthService.Answer.DECLINED -> call.respondText(
+                OAuthPages.answered(
+                    heading = "This connection was declined",
+                    message = "You answered this request already, by declining it. Nothing was shared, and " +
+                        "no access was granted. Start the connection again from your client if you meant to allow it.",
+                ),
+                ContentType.Text.Html,
+            )
+            // Either it sat unanswered past its lifetime, or it belongs to another account,
+            // which is deliberately indistinguishable from here.
+            null -> call.respondText(
+                OAuthPages.error(
+                    message = "This connection request can no longer be answered. It may have been left " +
+                        "too long, or replaced by a newer one from the same client.",
+                    note = "If your client already shows itself connected, it is — this page only means " +
+                        "that this particular request is no longer the one it is waiting for. Otherwise, " +
+                        "start the connection again from it.",
+                ),
+                ContentType.Text.Html,
+                HttpStatusCode.BadRequest,
+            )
         }
     }
 

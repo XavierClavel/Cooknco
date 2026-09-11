@@ -2,6 +2,7 @@ package com.xavierclavel.services
 
 import com.xavierclavel.models.OAuthClient
 import com.xavierclavel.models.query.QOAuthClient
+import com.xavierclavel.plugins.AnsweredDecisionData
 import com.xavierclavel.plugins.AuthorizationCodeData
 import com.xavierclavel.plugins.OAuthTokenData
 import com.xavierclavel.plugins.PendingAuthorizationData
@@ -238,6 +239,7 @@ class OAuthService : KoinComponent {
             logger.warn { "Consent for client ${pending.clientId} was posted by a different account; refused" }
             return null
         }
+        redisService.rememberDecision(pendingId, AnsweredDecisionData(pending.userId, approved = true))
         val code = newToken()
         redisService.createAuthorizationCode(
             code,
@@ -253,9 +255,26 @@ class OAuthService : KoinComponent {
         return ApprovedAuthorization(code = code, redirectUri = pending.redirectUri, state = pending.state)
     }
 
-    /** Reads a pending request without consuming it, to know where a Deny should be reported. */
-    suspend fun takeDenied(pendingId: String, sessionUserId: Long): PendingAuthorizationData? =
-        redisService.takePendingAuthorization(pendingId)?.takeIf { it.userId == sessionUserId }
+    /** Consumes a pending request that was declined, to know where the refusal is reported. */
+    suspend fun takeDenied(pendingId: String, sessionUserId: Long): PendingAuthorizationData? {
+        val pending = redisService.takePendingAuthorization(pendingId) ?: return null
+        if (pending.userId != sessionUserId) return null
+        redisService.rememberDecision(pendingId, AnsweredDecisionData(pending.userId, approved = false))
+        return pending
+    }
+
+    /**
+     * What this account already answered a consent form with, when the form is no longer pending.
+     *
+     * A form that is gone was either answered or left too long, and only this tells the two
+     * apart — which matters to the person holding the page, because a client that opens a
+     * second authorization for the same connection leaves the first window behind, and pressing
+     * Allow on it must not read as "nothing was granted".
+     */
+    suspend fun answerTo(pendingId: String, sessionUserId: Long): Answer? =
+        redisService.getDecision(pendingId)
+            ?.takeIf { it.userId == sessionUserId }
+            ?.let { if (it.approved) Answer.APPROVED else Answer.DECLINED }
 
     // ------------------------------------------------------------ the token step
 
@@ -383,6 +402,9 @@ class OAuthService : KoinComponent {
             update()
         }
     }
+
+    /** What a consent form that is no longer pending was answered with. */
+    enum class Answer { APPROVED, DECLINED }
 
     data class PendingAuthorization(
         val id: String,

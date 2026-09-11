@@ -323,7 +323,63 @@ class OAuthControllerTest : ApplicationTest() {
         val requestId = http.authorize(clientId, loopbackRedirect).bodyAsText().consentRequestId()
 
         assertEquals(HttpStatusCode.Found, http.decide(requestId, allow = true).status)
-        assertEquals(HttpStatusCode.BadRequest, http.decide(requestId, allow = true).status)
+
+        // Answered, not obeyed: no second code goes anywhere.
+        val again = http.decide(requestId, allow = true)
+        assertNull(again.headers[HttpHeaders.Location])
+        assertNull(again.redirectParameter("code"))
+    }
+
+    /**
+     * The second press is the one a person sees, and by then the first has usually connected
+     * their client — a web client redirects the code to a server on the other side of the
+     * internet, and the wait is what makes them press again. Telling them the request expired
+     * and nothing was granted sends them off to debug something that is already working.
+     */
+    @Test
+    fun `pressing Allow again says the request was already approved, not that it expired`() = runTest {
+        val http = signedIn()
+        val clientId = noRedirectClient.registerClient(loopbackRedirect)
+        val requestId = http.authorize(clientId, loopbackRedirect).bodyAsText().consentRequestId()
+        http.decide(requestId, allow = true)
+
+        val again = http.decide(requestId, allow = true)
+        assertEquals(HttpStatusCode.OK, again.status)
+        assertContains(again.bodyAsText(), "already approved")
+    }
+
+    @Test
+    fun `pressing Cancel again says the request was declined`() = runTest {
+        val http = signedIn()
+        val clientId = noRedirectClient.registerClient(loopbackRedirect)
+        val requestId = http.authorize(clientId, loopbackRedirect).bodyAsText().consentRequestId()
+        http.decide(requestId, allow = false)
+
+        val again = http.decide(requestId, allow = false)
+        assertEquals(HttpStatusCode.OK, again.status)
+        assertContains(again.bodyAsText(), "declined")
+    }
+
+    /** A form nobody answered is a dead end, and says so without claiming anything else. */
+    @Test
+    fun `a decision on an unknown request is refused`() = runTest {
+        val response = signedIn().decide("no-such-request", allow = true)
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertContains(response.bodyAsText(), "no longer be answered")
+    }
+
+    /** What one account answered is not something another account gets told. */
+    @Test
+    fun `an answered request tells another account nothing`() = runTest {
+        val user1 = signedIn()
+        val clientId = user1.registerClient(loopbackRedirect)
+        val requestId = user1.authorize(clientId, loopbackRedirect).bodyAsText().consentRequestId()
+        user1.decide(requestId, allow = true)
+
+        val user2 = newNoRedirectClient().also { it.login(USER2, password) }
+        val response = user2.decide(requestId, allow = true)
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertFalse(response.bodyAsText().contains("already approved"))
     }
 
     /** A consent form is bound to the account it was rendered for, not merely to a session. */

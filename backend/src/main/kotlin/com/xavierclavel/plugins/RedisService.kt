@@ -81,6 +81,24 @@ data class ImageUploadTicketData(
     val recipeId: Long,
 )
 
+/**
+ * The answer a consent form was given, kept after the pending request it answered is gone.
+ *
+ * Nothing is granted by it: it exists so that a form posted a second time can be told apart
+ * from one that timed out. The two look identical to [takePendingAuthorization] — the record is
+ * consumed either way — and they are opposite things to say to a person: by the time a second
+ * press arrives, the first has usually granted everything the client asked for, and the answer
+ * to that is not "this request has expired, nothing was granted".
+ *
+ * [userId] is checked before the answer is reported, so an id spent by one account says nothing
+ * to another.
+ */
+@Serializable
+data class AnsweredDecisionData(
+    val userId: Long,
+    val approved: Boolean,
+)
+
 class RedisService(redisUrl: String): KoinComponent {
     companion object {
         /** Idle timeout: a session survives this long without activity. */
@@ -96,8 +114,17 @@ class RedisService(redisUrl: String): KoinComponent {
          */
         const val AUTHORIZATION_CODE_TTL = 60L
 
-        /** How long the consent page's decision can sit unanswered. */
-        const val PENDING_AUTHORIZATION_TTL = 10L * 60
+        /**
+         * How long the consent page's decision can sit unanswered — and, once answered, how
+         * long [AnsweredDecisionData] remembers what it was answered with, since that is
+         * exactly how long the same form could still be posted back.
+         *
+         * Half an hour rather than ten minutes because the window a client opens is often not
+         * the window the person is looking at: a popup lands behind the main one, and a client
+         * that re-issues its request leaves the first consent page sitting there. Nothing is
+         * granted by the record, and its id is unguessable and single-use.
+         */
+        const val PENDING_AUTHORIZATION_TTL = 30L * 60
 
         /**
          * Access tokens are short-lived on purpose: a leaked one stops working within the hour,
@@ -215,6 +242,18 @@ class RedisService(redisUrl: String): KoinComponent {
         val json = redis.get(key) ?: return null
         redis.del(key)
         return Json.decodeFromString<PendingAuthorizationData>(json)
+    }
+
+    /** Records what a consent form was answered with, for as long as it could be posted again. */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun rememberDecision(id: String, data: AnsweredDecisionData) {
+        redis.setex("oauth-decided:$id", PENDING_AUTHORIZATION_TTL, Json.encodeToString(data))
+    }
+
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun getDecision(id: String): AnsweredDecisionData? {
+        val json = redis.get("oauth-decided:$id") ?: return null
+        return Json.decodeFromString<AnsweredDecisionData>(json)
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)

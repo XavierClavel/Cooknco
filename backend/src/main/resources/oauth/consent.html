@@ -33,7 +33,7 @@
       client you are setting up.
     </p>
 
-    <form method="post" action="{{decisionUrl}}">
+    <form id="decision" method="post" action="{{decisionUrl}}">
       <input type="hidden" name="request_id" value="{{requestId}}">
       <div class="actions">
         <button class="deny" type="submit" name="decision" value="deny">Cancel</button>
@@ -41,5 +41,34 @@
       </div>
     </form>
   </main>
+
+  <!--
+    The only script on these pages, and the form works exactly as before without it — it is not
+    asked to do anything but swallow a second submission.
+
+    An answer is single-use, so the second one has nothing left to answer: it lands on a page
+    saying so while the first is still on its way, which is alarming for something that has
+    already worked. There is a real gap for it to happen in, because the address a web client
+    sends the code to is a server on the other side of the internet, and a second or two of
+    nothing happening is exactly when a person presses the button again — or presses Enter,
+    which submits the form once more, as Cancel.
+
+    Dimmed rather than disabled: a disabled control is left out of the form data, and it is the
+    pressed button's own value that says which answer this is.
+  -->
+  <script>
+    (function () {
+      var form = document.getElementById('decision')
+      var answered = false
+      form.addEventListener('submit', function (event) {
+        if (answered) {
+          event.preventDefault()
+          return
+        }
+        answered = true
+        form.classList.add('submitting')
+      })
+    })()
+  </script>
 </body>
 </html>
