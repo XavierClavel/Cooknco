@@ -180,6 +180,8 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateToEdit = { id -> navController.navigate("recipe/$id/edit") },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
+                onNavigateToCookMode = { id -> navController.navigate("recipe/$id/cook") },
+                onNavigateToShoppingList = { navController.navigate(Routes.SHOPPING_LIST) },
                 viewModel = recipeViewModel,
             )
         }
