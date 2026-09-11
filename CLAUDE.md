@@ -200,6 +200,51 @@ a save before making it. Three things about those figures:
 
 Only devices registered for push are visible, so reach is a floor on the real number.
 
+## The account's language is the backend's, and a client only ever reports
+
+`users.locale` is what the product writes *to* a user in — the mails `mail-service` sends and
+the notifications they are pushed. It is nullable, and null means "nothing has ever told us".
+That distinction is the whole feature: the column shipped non-null with a default of FR and
+no writer at all, so every account read as French and every mail this product sent went out
+in French whoever received it. Migration `1.44` drops the default and nulls the rows, because
+none of those values was ever a choice.
+
+The rule underneath everything is that **a report never corrects a value already there**:
+
+- **Clients report, they do not decide.** Signing up, signing in and registering a device all
+  carry `?locale=`, and an account with none adopts it (`UserService.adoptLocale`). An
+  account that has one keeps it — a borrowed laptop, a second-hand phone or a
+  holiday-language handset is not a decision the user made.
+- **The user decides, in the settings.** `UserSettingsDTO.locale` is nullable *on the way in*
+  too, and null there means "not saying": a client that predates the field saves the other
+  settings without wiping a language chosen from one that does know about it.
+- **Unknown falls back, it does not guess.** Notifications fall back to the most recent
+  device's language and then to `Locale.FR`; `mail-service` falls back to `Locale.FR`
+  directly. FR because that is what the column held for everybody, so nothing changes
+  language until something actually reports one. A locale that will not parse is treated as
+  absent rather than refused — a signup is worth more than a preference
+  (`AuthController.reportedLocale`).
+
+Two consequences worth keeping:
+
+- **Resolution happens here, not in `mail-service`.** That service reads the column and has
+  no devices or requests to infer anything from, which is why the backend fills the column in
+  eagerly on adoption rather than resolving lazily at read time.
+- **The announcement audience filter resolves the language the same way the wording does**
+  (`NotificationService.recipientsOf`). They have to agree, or an operator selects an audience
+  by one rule and has it written by another — an account reading EN whose last handset
+  reported FR would land in the French send and receive an English notification.
+
+`devices.locale` still describes the handset, and is what the backoffice shows and what an
+audience falls back to. The Google sign-in is the one flow where the language cannot be read
+off the request that needs it: Google builds the callback itself, so `?locale=` is captured
+when the flow leaves (`onStateCreated`) and consumed when the state comes back.
+
+The app reports `deviceLocale` — the real platform language — rather than the constant it
+used to send. `ApiClient.LOCALE` still exists and is still `EN`, because what the app asks
+for *content* in is a different question from what the backend writes to its user in: the
+app's own copy is English-only.
+
 ## The MCP endpoint holds the SDK back on purpose
 
 `POST /mcp` serves Model Context Protocol from the backend (`McpController`, tools in

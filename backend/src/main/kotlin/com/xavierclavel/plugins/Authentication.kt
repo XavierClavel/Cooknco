@@ -34,6 +34,7 @@ import io.ktor.server.auth.bearer
 import io.lettuce.core.ExperimentalLettuceCoroutinesApi
 import org.koin.java.KoinJavaComponent
 import org.koin.ktor.ext.inject
+import shared.enums.Locale
 
 @OptIn(ExperimentalLettuceCoroutinesApi::class)
 fun Application.configureAuthentication() {
@@ -100,6 +101,11 @@ fun Application.configureAuthentication() {
                         call.request.queryParameters["redirect"]?.let {
                             AuthController.redirects[state] = it
                         }
+                        // Google's callback carries nothing of ours, so the client's language
+                        // has to be remembered here or not at all
+                        call.request.queryParameters["locale"]
+                            ?.let { reported -> Locale.entries.find { it.name.equals(reported, ignoreCase = true) } }
+                            ?.let { AuthController.oauthLocales[state] = it }
                     }
                 )
             }

@@ -4,6 +4,7 @@ import com.xavierclavel.cooknco.network.dto.DeviceRegistrationDTO
 import com.xavierclavel.cooknco.network.dto.NotificationInfo
 import com.xavierclavel.cooknco.network.dto.UserNotificationInfo
 import com.xavierclavel.cooknco.platform.appVersion
+import com.xavierclavel.cooknco.platform.deviceLocale
 import com.xavierclavel.cooknco.platform.devicePlatform
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -22,13 +23,14 @@ class NotificationApi(private val client: HttpClient) {
     private val base = "${ApiClient.BASE_URL}/notification"
 
     /**
-     * Tells the backend where to push to.
+     * Tells the backend where to push to, and what language this phone is in.
      *
-     * The locale is the one the app is running in, not the account's: the backend renders
-     * each notification per device, so the language a notification arrives in is the
-     * language of the client it arrives on.
+     * The locale describes the handset. It is recorded against the device, and an account
+     * that has no language of its own adopts it — but it never corrects one, because a
+     * notification is written in the language of the person rather than of the handset they
+     * happen to be holding.
      */
-    suspend fun registerDevice(token: String, pushToken: String, locale: String = ApiClient.LOCALE) {
+    suspend fun registerDevice(token: String, pushToken: String, locale: String = deviceLocale) {
         val response = client.post("$base/devices") {
             bearerAuth(token)
             parameter("locale", locale)

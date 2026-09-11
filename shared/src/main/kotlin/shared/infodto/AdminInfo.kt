@@ -47,7 +47,8 @@ data class AdminUserInfo(
     val suspendedUntil: Long? = null,
     val moderationNote: String = "",
     val bio: String,
-    val locale: Locale,
+    /** Null while nothing has reported one for this account — see `User.locale`. */
+    val locale: Locale? = null,
     val isAccountPublic: Boolean,
     val joinDate: Long,
     val lastActivityDate: Long,

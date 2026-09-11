@@ -71,7 +71,7 @@ class RecipeApi(private val client: HttpClient) {
     suspend fun getRecipe(id: Long, token: String? = null): RecipeInfo {
         val response = client.get("$base/recipe/$id") {
             if (token != null) bearerAuth(token)
-            parameter("locale", "EN")
+            parameter("locale", ApiClient.LOCALE)
         }
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
@@ -177,7 +177,7 @@ class RecipeApi(private val client: HttpClient) {
             parameter("query", query)
             parameter("page", 0)
             parameter("size", 20)
-            parameter("locale", "EN")
+            parameter("locale", ApiClient.LOCALE)
         }
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())

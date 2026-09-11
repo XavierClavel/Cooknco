@@ -225,7 +225,11 @@ function postLoginRedirect(): string | null {
 }
 
 async function login(user) {
-  const result = await apiClient.post(`/auth/login`, {}, {
+  // Reports the language this browser is in, which an account with none of its own adopts.
+  // The one request a web user makes that says something about them rather than about a
+  // page, and the only thing that gives an existing account a language without a visit to
+  // the settings. A locale already chosen is never overwritten - the backend decides that.
+  const result = await apiClient.post(`/auth/login?locale=${getLocale()}`, {}, {
     auth: {
       username: user.mail,
       password: user.password,
@@ -258,7 +262,12 @@ async function loginOauthGoogle() {
   // on the home page and lose the consent request that sent the user to log in.
   const redirect = postLoginRedirect()
   const url = `${import.meta.env.VITE_API_URL}/auth/login-oauth-google`
-  window.location.href = redirect ? `${url}?redirect=${encodeURIComponent(redirect)}` : url
+  // Same report as a password sign-in. It has to go out now rather than on the way back:
+  // Google builds the callback itself and carries nothing of ours, so the backend keeps
+  // this against the OAuth state alongside the redirect
+  const params = new URLSearchParams({locale: getLocale()})
+  if (redirect) params.set("redirect", redirect)
+  window.location.href = `${url}?${params.toString()}`
 }
 
 async function signup(user) {

@@ -88,7 +88,7 @@ import { useRoute } from 'vue-router';
 import {login, toMcp, toMyProfile, toSignup, toUpdatePassword} from '@/scripts/common'
 import {useI18n} from "vue-i18n";
 import {ICON_LOCALIZATION, ICON_SAVE} from "@/scripts/icons";
-import {forceLocale, getLocale} from "@/scripts/localization";
+import {forceLocale, fromApiLocale, getLocale, toApiLocale} from "@/scripts/localization";
 import {getSettings, updateSettings} from "@/scripts/settings";
 
 const errorMessage = ref(null)
@@ -115,11 +115,16 @@ const autoAcceptFollowRequests = computed({
 
 getSettings().then(response => {
   settings.value = response.data
+  // Show what the account holds, not what this browser happens to be in: an account with no
+  // language saved yet keeps the current one, which is then what a save would record
+  locale.value = fromApiLocale(response.data.locale) ?? locale.value
 })
 
 const submit = () => {
   forceLocale(locale.value)
-  updateSettings(settings.value).then(response => {
+  // The language goes to the account, not only to this browser's cookie - it is what mails
+  // and notifications are written in, and what every other browser of theirs will read back
+  updateSettings({...settings.value, locale: toApiLocale(locale.value)}).then(response => {
     toMyProfile()
   })
 }

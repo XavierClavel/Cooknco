@@ -14,6 +14,7 @@ import main.com.xavierclavel.utils.listNotifications
 import main.com.xavierclavel.utils.registerDevice
 import main.com.xavierclavel.utils.sendTestNotification
 import main.com.xavierclavel.utils.sendTestNotificationRaw
+import main.com.xavierclavel.utils.userService
 import org.junit.jupiter.api.Test
 import shared.enums.DevicePlatform
 import shared.enums.Locale
@@ -78,9 +79,9 @@ class AdminNotificationControllerTest : ApplicationTest() {
      * reports — and so a filtered broadcast reaches nobody who has no device at all.
      */
     @Test
-    fun `a broadcast can be narrowed to the users with a device in one language`() = runTest {
+    fun `a broadcast can be narrowed to the accounts reading one language`() = runTest {
         val french = "french@mail.com"
-        runAsAdmin { client.createUser(french) }
+        runAsAdmin { client.createUser(french, locale = Locale.FR) }
 
         runAsUser1 { client.registerDevice("en-phone", locale = Locale.EN) }
         runAs(french, "password") { client.registerDevice("fr-phone", locale = Locale.FR) }
@@ -91,8 +92,47 @@ class AdminNotificationControllerTest : ApplicationTest() {
             assertEquals(2, all.devices)
 
             val inFrench = client.getPushAudience(locale = Locale.FR)
-            assertEquals(1, inFrench.users, "only the account with a French device")
+            assertEquals(1, inFrench.users, "only the account whose language is French")
             assertEquals(1, inFrench.devices)
+        }
+    }
+
+    /**
+     * The audience has to be resolved the way the wording is, or an operator picks an
+     * audience by one rule and has it written by another — see `NotificationService`.
+     */
+    @Test
+    fun `an account is placed by its own language, not by the handset it registered`() = runTest {
+        val reader = "reads-english@mail.com"
+        runAsAdmin { client.createUser(reader, locale = Locale.EN) }
+
+        // The phone is French; the person is not
+        runAs(reader, "password") { client.registerDevice("borrowed-fr-phone", locale = Locale.FR) }
+
+        runAsAdmin {
+            assertEquals(0, client.getPushAudience(locale = Locale.FR).users)
+            assertEquals(1, client.getPushAudience(locale = Locale.EN).users)
+        }
+    }
+
+    /**
+     * The state every account was left in by the migration that made the column nullable:
+     * a device registered long ago, and nothing ever reported for the account itself. Its
+     * handset is all there is to go on, exactly as it was before.
+     */
+    @Test
+    fun `an account that has reported no language is placed by its device`() = runTest {
+        val legacy = "legacy@mail.com"
+        var legacyId = 0L
+        runAsAdmin { legacyId = client.createUser(legacy, locale = null).id }
+        runAs(legacy, "password") { client.registerDevice("legacy-fr-phone", locale = Locale.FR) }
+
+        // Registering adopted it; put the account back to where the migration leaves one
+        userService.getEntityById(legacyId).apply { locale = null }.update()
+
+        runAsAdmin {
+            assertEquals(1, client.getPushAudience(locale = Locale.FR).users)
+            assertEquals(0, client.getPushAudience(locale = Locale.EN).users)
         }
     }
 

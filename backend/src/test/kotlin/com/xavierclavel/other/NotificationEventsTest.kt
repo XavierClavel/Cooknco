@@ -2,6 +2,7 @@ package main.com.xavierclavel.other
 
 import com.xavierclavel.ApplicationTest
 import main.com.xavierclavel.utils.acceptFollowRequest
+import main.com.xavierclavel.utils.chooseLocale
 import main.com.xavierclavel.utils.createRecipe
 import main.com.xavierclavel.utils.createUser
 import main.com.xavierclavel.utils.follow
@@ -49,8 +50,10 @@ class NotificationEventsTest : ApplicationTest() {
         }
 
         runAs(follower, password) {
-            // Registered in French: the device's language is what the wording is written in
-            client.registerDevice("follower-phone", locale = Locale.FR)
+            // The account's language is what the wording is written in, and it disagrees
+            // with the handset on purpose: the phone is in English, the person reads French
+            client.chooseLocale(Locale.FR)
+            client.registerDevice("follower-phone", locale = Locale.EN)
             client.follow(authorId)
         }
 

@@ -99,8 +99,27 @@ class User (
     @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true)
     var dietaryRestrictions: DietaryRestrictions = DietaryRestrictions(),
 
-    @DbDefault("0")
-    var locale: Locale = Locale.FR,
+    /**
+     * The language this account is written to — mails, and the notifications it is pushed.
+     *
+     * Nullable because "nobody has told us" is a real state and a wrong guess is not: the
+     * column was non-null with a default of FR for its whole life while nothing ever wrote
+     * it, which is why every mail this product has sent went out in French regardless of who
+     * read it. Null now means exactly that nothing has reported one, and the readers fall
+     * back rather than believe it ([Locale.FR] stays the last resort, so an account nothing
+     * has ever said anything about is treated as it was before).
+     *
+     * Three things set it, and none of them overwrite a value already there:
+     * - a signup, from the `?locale=` its client already sends;
+     * - registering a device, adopting that client's language for an account with none —
+     *   this is what keeps a single column answerable to `mail-service`, which reads it
+     *   directly and has no devices of its own to consult;
+     * - the account's own settings, which is the user saying it themselves.
+     *
+     * A choice therefore survives every later client report, and `devices.locale` is left to
+     * describe the handset rather than the person.
+     */
+    var locale: Locale? = null,
 
 
     ): Model() {
@@ -164,6 +183,23 @@ class User (
     fun updateSettings(userSettingsDTO: UserSettingsDTO) = this.apply {
         autoAcceptFollowRequests = userSettingsDTO.autoAcceptFollowRequests
         isAccountPublic = userSettingsDTO.isAccountPublic
+        // Null is "not saying", not "forget it": a client that predates the field sends
+        // nothing, and must not wipe a language chosen from another one
+        userSettingsDTO.locale?.let { locale = it }
+    }
+
+    /**
+     * Takes a language reported by a client, for an account that has none.
+     *
+     * Never overwrites: whatever is already there was either chosen in the settings or
+     * adopted earlier, and a second client's OS language is no reason to revisit it.
+     *
+     * @return true when this actually recorded something
+     */
+    fun adoptLocale(reported: Locale): Boolean {
+        if (locale != null) return false
+        locale = reported
+        return true
     }
 
     // Public accounts have nothing to gate, so they never hold follow requests pending
@@ -224,6 +260,7 @@ class User (
     fun getSettings() = UserSettingsDTO(
         autoAcceptFollowRequests = this.autoAcceptFollowRequests,
         isAccountPublic = this.isAccountPublic,
+        locale = this.locale,
     )
 
     fun useToken() {

@@ -10,11 +10,13 @@ object ApiClient {
     const val IMAGE_URL = "https://cooknco.eu/image"
 
     /**
-     * The locale the app asks the API for, and registers its devices under.
+     * The locale the app asks the API for *content* in — ingredient names, recipe exports.
      *
-     * A constant because the app has no language switch yet — the endpoints that take a
-     * locale were already passing this literal, and this is them agreeing on one place to
-     * change when it does.
+     * Still a constant: the app's own copy is English-only, so asking for French ingredient
+     * names inside an English screen would read worse than not. What the phone is actually
+     * set to is [com.xavierclavel.cooknco.platform.deviceLocale], which is a different
+     * question — it is what the backend writes *to* the user in, and it is reported rather
+     * than assumed.
      */
     const val LOCALE = "EN"
 

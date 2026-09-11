@@ -2,6 +2,7 @@ package main.com.xavierclavel.utils
 
 import shared.dto.PasswordDTO
 import shared.dto.UserDTO
+import shared.enums.Locale
 import shared.infodto.UserInfo
 import shared.utils.URL.AUTH_URL
 import shared.utils.URL.USER_URL
@@ -33,8 +34,13 @@ suspend fun HttpClient.signup(mail: String = UUID.randomUUID().toString(), passw
     }
 }
 
-suspend fun HttpClient.login(username: String, password: String) =
-    this.post("$AUTH_URL/login") {
+/**
+ * @param locale what the signing-in client reports, as a real one does. Null sends nothing,
+ *   which is what every client did before this was managed — most tests want that, so that
+ *   signing in does not quietly give an account a language the test did not ask for.
+ */
+suspend fun HttpClient.login(username: String, password: String, locale: Locale? = null) =
+    this.post("$AUTH_URL/login${locale?.let { "?locale=$it" } ?: ""}") {
         basicAuth(username = username, password = password)
     }
 

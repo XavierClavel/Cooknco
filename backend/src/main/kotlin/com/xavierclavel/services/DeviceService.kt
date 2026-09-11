@@ -31,6 +31,9 @@ class DeviceService: KoinComponent {
      */
     fun register(userId: Long, dto: DeviceRegistrationDTO, locale: Locale): Device {
         val user = userService.getEntityById(userId)
+        // A client saying what language it runs in is the app's only way of telling the
+        // backend, and an account with none takes it. Never a correction: see `User.locale`
+        userService.adoptLocale(user, locale)
         val existing = QDevice().token.eq(dto.token).findOne()
 
         if (existing != null) {
@@ -78,9 +81,8 @@ class DeviceService: KoinComponent {
     /**
      * The users who have at least one device registered in a given language.
      *
-     * Device locale rather than account locale because the device's is the only one any
-     * client actually reports: nothing sets `users.locale`, so filtering on it would put
-     * every user in the same bucket.
+     * The handsets, not the people: this describes clients, and [NotificationService] is
+     * what widens it to the accounts whose own language says the same thing.
      */
     fun findUserIdsReadingIn(reading: Locale): Set<Long> =
         QDevice().locale.eq(reading).select(QDevice.Alias.user.id).findList()
@@ -88,9 +90,13 @@ class DeviceService: KoinComponent {
             .toSet()
 
     /**
-     * The language to write a user's notifications in.
+     * The language to write the notifications of an account that has none of its own in.
      *
      * The most recently registered device wins, since that is the client they last used.
+     * Barely reachable now that registering a device gives the account a language — it
+     * catches the rows that predate that, and the window between a device being pointed at
+     * a different account and that account's next launch.
+     *
      * A user with no device has nothing to go on, so the caller supplies the fallback.
      */
     fun readingLocaleOf(userId: Long, fallback: Locale): Locale =

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import apiClient from "@/plugins/axios";
+import {applyAccountLocale} from "@/scripts/localization";
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -34,6 +35,9 @@ export const useAuthStore = defineStore('auth', {
         this.id = response.data.id
         this.iconVersion = response.data.version
         this.isAdmin = response.data.role == 'ADMIN'
+        // Not awaited: the language the account saved is worth applying, but nothing on the
+        // page is waiting for it and the cookie has already given us a usable one
+        applyAccountLocale()
       } catch {
         this.isAuthenticated = false;
       }

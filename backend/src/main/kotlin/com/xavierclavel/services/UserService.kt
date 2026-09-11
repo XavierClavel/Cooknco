@@ -17,6 +17,7 @@ import com.xavierclavel.utils.logger
 import shared.dto.UserDTO
 import shared.dto.UserSettingsDTO
 import shared.infodto.UserInfo
+import shared.enums.Locale
 import shared.enums.UserRole
 import shared.overviewdto.UserOverview
 import io.ebean.Paging
@@ -131,7 +132,13 @@ class UserService: KoinComponent {
     fun existsByMail(mail: String) = QUser().mailHash.eq(encryptionService.hash(mail)).exists()
     fun existsByUsername(username: String) = QUser().username.eq(username).exists()
 
-    fun createUser(userDTO: UserDTO, verified: Boolean): User =
+    /**
+     * @param locale the language the signing-up client is running in, when it said so.
+     *   Worth taking at exactly this moment: the verification mail goes out below, before
+     *   any device of theirs has had a chance to register, so this is the only thing that
+     *   can put the very first mail an account receives in the right language.
+     */
+    fun createUser(userDTO: UserDTO, verified: Boolean, locale: Locale? = null): User =
         User.from(
             userDTO = userDTO,
             passwordHash = encryptionService.encryptPassword(userDTO.password),
@@ -140,6 +147,7 @@ class UserService: KoinComponent {
             token = UUID.randomUUID().toString(),
         )
         .apply {
+            this.locale = locale
             if (verified) {
                 this.verify()
             }
@@ -261,6 +269,18 @@ class UserService: KoinComponent {
 
     fun getSettings(id: Long): UserSettingsDTO =
         getEntityById(id).getSettings()
+
+    /**
+     * Records a language a client reported, for an account that has none.
+     *
+     * Called from wherever a client says what it is running in — today, registering a
+     * device. Silent about an account that already has one: see [User.adoptLocale].
+     */
+    fun adoptLocale(user: User, reported: Locale) {
+        if (!user.adoptLocale(reported)) return
+        user.update()
+        logger.info { "Account ${user.id} adopted locale $reported from a client" }
+    }
 
     fun search(searchString: String?, paging: Paging): Pair<Int, List<UserInfo>> {
         val query = QUser()

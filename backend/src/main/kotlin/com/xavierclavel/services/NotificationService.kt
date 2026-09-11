@@ -239,6 +239,18 @@ class NotificationService : KoinComponent {
     }
 
     /**
+     * The language to write one user's notifications in.
+     *
+     * The account's own when it has one, which is the point of it being managed here: it is
+     * what the user chose or what the first client to say anything reported, and it is the
+     * same language their mails go out in. A device is consulted only for an account that
+     * has none, and [Locale.FR] is the last resort — the value the column used to hold for
+     * everybody, so an account nothing has ever reported for reads exactly as it did before.
+     */
+    private fun readingLocaleOf(user: User): Locale =
+        user.locale ?: deviceService.readingLocaleOf(user.id, Locale.FR)
+
+    /**
      * Who an announcement is for.
      *
      * Naming users takes precedence over everything else, [AnnouncementDTO.locale] included:
@@ -247,9 +259,14 @@ class NotificationService : KoinComponent {
      * not leave the operator believing the notification went out.
      *
      * A broadcast is every account that is not banned. With a locale it is narrowed to the
-     * accounts that have a device registered in that language, which also means such a
-     * broadcast never reaches an account with no device at all — reaching a language
-     * audience is a claim about clients, and only a device says anything about those.
+     * accounts that will *read* it in that language — which has to be resolved the same way
+     * [readingLocaleOf] does, or an operator would select an audience by one rule and have
+     * it worded by another: an account whose language is EN and whose last handset reported
+     * FR would land in the French send and receive an English notification.
+     *
+     * So: the account's own language when it has one, and failing that a device registered
+     * in it. An account with neither is in no language audience at all, the same way it
+     * never was.
      */
     private fun recipientsOf(dto: AnnouncementDTO): List<User> {
         if (dto.userIds.isNotEmpty()) {
@@ -258,10 +275,22 @@ class NotificationService : KoinComponent {
             if (users.size != wanted.size) throw NotFoundException(NotFoundCause.USER_NOT_FOUND)
             return users
         }
-        val reading = dto.locale?.let { deviceService.findUserIdsReadingIn(it) }
+        val dtoLocale = dto.locale
+            ?: return QUser().isBanned.eq(false).findList()
+
+        // Accounts with a language of their own are answered by it alone; the device lookup
+        // is only for the ones that have none, so a stale handset cannot pull an account
+        // into an audience its own language excludes it from
+        val byDevice = deviceService.findUserIdsReadingIn(dtoLocale)
         return QUser()
             .isBanned.eq(false)
-            .apply { reading?.let { id.`in`(it.ifEmpty { setOf(-1L) }) } }
+            .or()
+                .locale.eq(dtoLocale)
+                .and()
+                    .locale.isNull()
+                    .id.`in`(byDevice.ifEmpty { setOf(-1L) })
+                .endAnd()
+            .endOr()
             .findList()
     }
 
@@ -308,9 +337,7 @@ class NotificationService : KoinComponent {
                 val users = QUser().id.`in`(ids).findList()
                 val actorEntity = actorId?.let { QUser().id.eq(it).findOne() }
                 val stored = users.map { user ->
-                    // The language of the client they last registered, not the account's:
-                    // nothing sets `users.locale`, so it would put everyone in French
-                    val reading = deviceService.readingLocaleOf(user.id, user.locale)
+                    val reading = readingLocaleOf(user)
                     val (title, body) = NotificationWordings.render(kind, reading, values)
                     Notification(
                         user = user,
