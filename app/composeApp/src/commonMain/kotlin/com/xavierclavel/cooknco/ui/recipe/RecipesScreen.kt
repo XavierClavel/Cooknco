@@ -22,7 +22,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -306,18 +305,6 @@ private fun RecipeResultRow(recipe: RecipeOverview, onClick: () -> Unit) {
             )
             Text(text = "by ${recipe.owner.username}", fontSize = 12.5.sp, color = CookncoNavy.copy(alpha = 0.62f))
             Text(text = "♥ ${recipe.likesCount}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CookncoOrangeDark)
-        }
-        // Tapping "+" opens the recipe just like the rest of the row — there is no
-        // distinct quick-add action wired up yet (see the PR description).
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(2.5.dp, CookncoNavy, RoundedCornerShape(12.dp))
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Outlined.Add, contentDescription = null, tint = CookncoNavy)
         }
     }
 }

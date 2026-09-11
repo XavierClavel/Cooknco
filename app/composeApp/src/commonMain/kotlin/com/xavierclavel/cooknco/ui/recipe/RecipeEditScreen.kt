@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -664,6 +666,10 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
     }
 }
 
+// Turn 7 / option 7b: the step number lives in a gold column inside the card's own
+// outline, rather than a circle badge overlapping its edge (the old treatment — see
+// StepEditCard's previous version — hung the badge off the left edge, where it fought
+// the drag handle for the same corner).
 @Composable
 private fun StepEditCard(
     index: Int,
@@ -673,46 +679,52 @@ private fun StepEditCard(
     onStepChange: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        StickerCard(
-            modifier = Modifier.fillMaxWidth().padding(start = 24.dp).shadow(elevation, RoundedCornerShape(14.dp)),
-            shape = RoundedCornerShape(14.dp),
-            shadowOffset = 4.dp,
-        ) {
-            Row(modifier = Modifier.padding(start = 28.dp, top = 8.dp, end = 4.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = step.text,
-                    onValueChange = onStepChange,
-                    label = { Text("Step ${index + 1}") },
-                    modifier = Modifier.weight(1f),
-                    minLines = 2,
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
-                Icon(
-                    imageVector = Icons.Outlined.DragIndicator,
-                    contentDescription = "Drag to reorder",
-                    tint = CookncoNavy.copy(alpha = 0.4f),
-                    modifier = Modifier.padding(horizontal = 4.dp).size(24.dp).then(dragHandleModifier),
-                )
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = "Remove step",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.clickable(onClick = onRemove),
-                )
+    StickerCard(
+        modifier = Modifier.fillMaxWidth().shadow(elevation, RoundedCornerShape(18.dp)),
+        shape = RoundedCornerShape(18.dp),
+        shadowOffset = 5.dp,
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier.fillMaxHeight().width(46.dp).background(CookncoGold),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(text = (index + 1).toString(), color = CookncoNavy, fontWeight = FontWeight.Bold, fontSize = 19.sp)
             }
-        }
-        Box(
-            modifier = Modifier
-                .size(46.dp)
-                .clip(CircleShape)
-                .background(CookncoGreen)
-                .border(2.dp, CookncoNavy, CircleShape)
-                .align(Alignment.CenterStart),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = (index + 1).toString(), color = CookncoWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Box(modifier = Modifier.fillMaxHeight().width(3.dp).background(CookncoNavy))
+            OutlinedTextField(
+                value = step.text,
+                onValueChange = onStepChange,
+                modifier = Modifier.weight(1f).align(Alignment.CenterVertically).padding(8.dp),
+                minLines = 2,
+                colors = editFieldColors(),
+                shape = fieldShape,
+            )
+            Column(
+                modifier = Modifier.padding(horizontal = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier.size(44.dp).then(dragHandleModifier),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DragIndicator,
+                        contentDescription = "Drag to reorder",
+                        tint = CookncoNavy.copy(alpha = 0.4f),
+                    )
+                }
+                Box(
+                    modifier = Modifier.size(44.dp).clickable(onClick = onRemove),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        contentDescription = "Remove step",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
         }
     }
 }

@@ -25,8 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,8 +53,8 @@ import com.xavierclavel.cooknco.ui.theme.StickerIconButton
  * than the app's usual `#629677`, so this reads as a distinct mode rather than more
  * ordinary navigation.
  *
- * "Screen on" is cosmetic only in this pass — nothing in `platform/` offers a wake-lock
- * hook yet, so wiring one for real is out of scope here (see the PR description).
+ * The mockup's "Screen on" toggle is left out: nothing in `platform/` offers a wake-lock
+ * hook, and a toggle that doesn't actually keep the screen on is worse than none.
  */
 @Composable
 fun CookModeScreen(
@@ -109,13 +107,14 @@ private fun CookModeContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var screenOn by rememberSaveable { mutableStateOf(true) }
     val stepCount = recipe.steps.size
     val stepText = recipe.steps.getOrNull(currentStep) ?: ""
     val isLastStep = currentStep >= stepCount - 1
 
     Column(modifier = modifier.fillMaxSize()) {
-        // ── Top bar: close, title, screen-on toggle ───────────────────────────
+        // ── Top bar: close, title ──────────────────────────────────────────────
+        // The mockup also shows a "Screen on" toggle here — dropped for now, since
+        // nothing in platform/ offers a wake-lock hook to back it with real behavior.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -136,23 +135,6 @@ private fun CookModeContent(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Row(
-                modifier = Modifier
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(CookncoBackground)
-                    .border(3.dp, CookncoNavy, RoundedCornerShape(percent = 50))
-                    .clickable { screenOn = !screenOn }
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = if (screenOn) "Screen on" else "Screen off",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CookncoNavy,
-                )
-            }
         }
 
         // ── Progress segments ─────────────────────────────────────────────────

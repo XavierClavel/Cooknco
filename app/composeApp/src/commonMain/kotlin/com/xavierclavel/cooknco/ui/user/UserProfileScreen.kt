@@ -55,7 +55,6 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
-import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
@@ -63,8 +62,6 @@ import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
-
-private enum class ProfileFilter { RECIPES, LIKED, BOOKS }
 
 /**
  * Reachable both as the bottom nav's own-profile tab and, via `Routes.USER`, to view
@@ -128,7 +125,6 @@ private fun ProfileContent(
     onRecipeClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var filter by rememberSaveable { mutableStateOf(ProfileFilter.RECIPES) }
     val gridState = rememberLazyGridState()
     val reachedEnd by remember {
         derivedStateOf {
@@ -244,26 +240,8 @@ private fun ProfileContent(
             }
         }
 
-        // ── Filter pills — only Recipes is backed by real data in this pass ───
-        item(span = { GridItemSpan(2) }) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ProfileFilterPill(label = "Recipes", selected = filter == ProfileFilter.RECIPES, onClick = { filter = ProfileFilter.RECIPES })
-                ProfileFilterPill(label = "Liked", selected = filter == ProfileFilter.LIKED, onClick = { filter = ProfileFilter.LIKED })
-                ProfileFilterPill(label = "Books", selected = filter == ProfileFilter.BOOKS, onClick = { filter = ProfileFilter.BOOKS })
-            }
-        }
-
         // ── Recipe grid ────────────────────────────────────────────────────────
-        if (filter != ProfileFilter.RECIPES) {
-            item(span = { GridItemSpan(2) }) {
-                Text(
-                    text = "Coming soon",
-                    color = CookncoNavy.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                    textAlign = TextAlign.Center,
-                )
-            }
-        } else if (recipes.isEmpty()) {
+        if (recipes.isEmpty()) {
             item(span = { GridItemSpan(2) }) {
                 Text(
                     text = "No recipes yet",
@@ -285,22 +263,6 @@ private fun ProfileStat(value: Int, label: String) {
     Column {
         Text(value.toString(), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
         Text(label, fontSize = 12.sp, color = CookncoNavy.copy(alpha = 0.6f))
-    }
-}
-
-@Composable
-private fun ProfileFilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(if (selected) CookncoOrange else CookncoBackground)
-            .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold, color = if (selected) CookncoWhite else CookncoNavy)
     }
 }
 
