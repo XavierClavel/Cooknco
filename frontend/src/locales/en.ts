@@ -237,6 +237,11 @@ export default {
   auto_accept_follow_requests_public_hint: "Public accounts always accept follow requests automatically.",
   mail_notifications: "Email me about new recipes",
   mail_notifications_hint: "From the people you follow. Account emails, such as password resets, are sent either way.",
+
+  unsubscribe_title: "Email notifications",
+  unsubscribe_done: "You will no longer be emailed about new recipes from the people you follow.",
+  unsubscribe_done_hint: "Account emails, such as password resets, are still sent. You can turn recipe emails back on in your settings.",
+  unsubscribe_failed: "This unsubscribe link is not valid. You can still turn these emails off in your account settings.",
   no_data: "No data",
 
   unit_teaspoon: "teaspoons",
