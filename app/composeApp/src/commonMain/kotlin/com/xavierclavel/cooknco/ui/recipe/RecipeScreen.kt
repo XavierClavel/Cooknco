@@ -234,7 +234,7 @@ private fun RecipeContent(
                             Icon(
                                 imageVector = if (uiState.isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                                 contentDescription = "Like",
-                                tint = if (uiState.isLiked) CookncoOrange else CookncoNavy,
+                                tint = CookncoWhite,
                             )
                         }
                         Box {
