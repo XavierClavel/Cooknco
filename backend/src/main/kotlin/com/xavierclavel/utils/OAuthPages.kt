@@ -5,8 +5,8 @@ import com.samskivert.mustache.Template
 import java.io.StringReader
 
 /**
- * The two pages the OAuth flow shows a person: the consent screen, and the dead end when a
- * request cannot be honoured.
+ * The three pages the OAuth flow shows a person: the consent screen, the dead end when a
+ * request cannot be honoured, and the note that a request was answered already.
  *
  * Rendered here rather than in the Vue app because they are part of the authorization server,
  * not part of the product: they must work with no app state, no API call and no JavaScript, and
@@ -35,6 +35,7 @@ object OAuthPages {
     // variable-fetcher cache, which is a ConcurrentHashMap.
     private val consentTemplate: Template by lazy { compile("/oauth/consent.html") }
     private val errorTemplate: Template by lazy { compile("/oauth/error.html") }
+    private val answeredTemplate: Template by lazy { compile("/oauth/answered.html") }
 
     private fun compile(resource: String): Template = compiler.compile(load(resource))
 
@@ -58,5 +59,17 @@ object OAuthPages {
         ),
     )
 
-    fun error(message: String): String = errorTemplate.execute(mapOf("message" to message))
+    /**
+     * [note] is what the page says under the reason, and it is not always the same reassurance:
+     * a request that was refused granted nothing, while one that is merely no longer the
+     * pending one may well have granted everything already.
+     */
+    fun error(
+        message: String,
+        note: String = "Nothing has been shared, and no access has been granted. You can close this page.",
+    ): String = errorTemplate.execute(mapOf("message" to message, "note" to note))
+
+    /** Not an error: the request was answered, and this says which way. */
+    fun answered(heading: String, message: String): String =
+        answeredTemplate.execute(mapOf("heading" to heading, "message" to message))
 }

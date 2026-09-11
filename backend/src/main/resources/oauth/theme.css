@@ -203,6 +203,16 @@ button:hover {
   filter: brightness(.95);
 }
 
+/*
+ * Set on the form once it has been answered, while the browser is still on its way to the
+ * client's address. Both buttons go quiet: the answer is single-use, so a second press has
+ * nothing left to answer. See the note in `consent.html` for why they are not disabled.
+ */
+.submitting .actions {
+  pointer-events: none;
+  opacity: .55;
+}
+
 button:focus-visible {
   outline: 3px solid var(--ink);
   outline-offset: 3px;
