@@ -7,6 +7,7 @@ import com.xavierclavel.cooknco.data.AuthRepository
 import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.PushRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
+import com.xavierclavel.cooknco.data.ShoppingListRepository
 import com.xavierclavel.cooknco.data.TokenDataStore
 import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.data.UserRepository
@@ -62,6 +63,12 @@ object AppGraph {
     val recipeRepository by lazy { RecipeRepository(recipeApi, tokenDataStore) }
     val cookbookRepository by lazy { CookbookRepository(cookbookApi, tokenDataStore) }
     val unitRepository by lazy { UnitRepository(recipeApi) }
+
+    /**
+     * In-memory only — no backend endpoint persists a shopping list. See
+     * [ShoppingListRepository]'s own doc for what that means for its lifetime.
+     */
+    val shoppingListRepository by lazy { ShoppingListRepository() }
 
     /**
      * Whether this build may still run. Needs no session and no data store, so it is
