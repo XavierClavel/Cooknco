@@ -13,8 +13,9 @@ import main.com.xavierclavel.utils.updatePassword
 import main.com.xavierclavel.utils.verifyUser
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
-import shared.events.AccountVerificationRequestedEvent
+import shared.enums.EmailTemplateKind
 import shared.events.UserCreatedEvent
+import shared.events.UserMailRequestedEvent
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -127,11 +128,14 @@ class AuthControllerTest : ApplicationTest() {
         val user = client.signup(mail = mail, password = password)
         assertEquals(2, mockEventProducer.eventsProduced.size)
         assertTrue { mockEventProducer.eventsProduced.first() is UserCreatedEvent }
-        assertTrue { mockEventProducer.eventsProduced[1] is AccountVerificationRequestedEvent }
+        assertTrue { mockEventProducer.eventsProduced[1] is UserMailRequestedEvent }
         val actualFirst = mockEventProducer.eventsProduced.first() as UserCreatedEvent
-        val actualSecond = mockEventProducer.eventsProduced[1] as AccountVerificationRequestedEvent
+        val actualSecond = mockEventProducer.eventsProduced[1] as UserMailRequestedEvent
         assertEquals(actualFirst.id, user.id)
-        assertEquals(actualSecond.userId, user.id)
+        assertEquals(actualSecond.recipientId, user.id)
+        assertEquals(EmailTemplateKind.ACCOUNT_VERIFICATION.key, actualSecond.templateKey)
+        // The address travels with the request: this is what lets mail-service keep no users
+        assertEquals(mail, encryptionService.decrypt(actualSecond.encryptedRecipient))
     }
 
 

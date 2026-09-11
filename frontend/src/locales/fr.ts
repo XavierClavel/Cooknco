@@ -235,6 +235,8 @@ export default {
   public_account: "Compte public",
   auto_accept_follow_requests: "Accepter automatiques requêtes d'abonnement",
   auto_accept_follow_requests_public_hint: "Les comptes publics acceptent automatiquement les demandes d'abonnement.",
+  mail_notifications: "Me prévenir des nouvelles recettes par mail",
+  mail_notifications_hint: "De la part des personnes que tu suis. Les mails liés au compte, comme la réinitialisation du mot de passe, sont envoyés dans tous les cas.",
   no_data: "Aucune donnée",
 
   unit_teaspoon: "cuillères à café",

@@ -50,6 +50,20 @@
           </v-card-text>
         </v-card>
 
+        <v-card color="background" class="mb-2">
+          <v-checkbox
+            v-model="settings.mailNotificationsEnabled"
+            :label="`${$t('mail_notifications')}`"
+            color="black"
+            base-color="black"
+            variant="elevated"
+            class="mx-2 my-0"
+          ></v-checkbox>
+          <v-card-text class="pt-0 pb-2 text-caption">
+            {{ $t('mail_notifications_hint') }}
+          </v-card-text>
+        </v-card>
+
         <v-container>
           <v-row
             class="d-flex align-center justify-center mb-2 ga-4"
@@ -104,6 +118,7 @@ const locales = [
 const settings = ref({
   autoAcceptFollowRequests: false,
   isAccountPublic: false,
+  mailNotificationsEnabled: false,
 })
 
 // Public accounts always auto accept: show the toggle locked on, but keep the

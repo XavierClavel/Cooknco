@@ -24,7 +24,9 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import shared.dto.AnnouncementDTO
 import shared.dto.NotificationTestDTO
+import shared.enums.EmailTemplateKind
 import shared.enums.Locale
+import shared.enums.MailPlaceholder
 import shared.enums.NotificationKind
 import shared.enums.NotificationPlaceholder
 import shared.infodto.AdminNotificationSendInfo
@@ -48,6 +50,8 @@ import shared.utils.NotificationWordings
  */
 class NotificationService : KoinComponent {
     private val deviceService: DeviceService by inject()
+    private val mailService: MailService by inject()
+    private val userService: UserService by inject()
     private val pushSender: PushSender by inject()
 
     /**
@@ -141,6 +145,57 @@ class NotificationService : KoinComponent {
             ),
             link = "/recipe/view?id=${recipe.id}",
         )
+
+        mailFollowers(followers.map { it.id }, author, recipe)
+    }
+
+    /**
+     * Mails the followers who asked to be mailed.
+     *
+     * The same audience as the push above, narrowed by the one setting that governs mail: a
+     * push is a buzz on a device the reader chose to install, whereas a mail arrives
+     * somewhere harder to ignore, so it waits to be asked for.
+     *
+     * Resolving the recipients here rather than letting mail-service work them out is what
+     * keeps the follow graph in the one service that owns it — the rule above that a pending
+     * follower is no audience included. mail-service is handed finished addresses.
+     *
+     * On the same scope as [dispatch], and for the same reasons: publishing a recipe should
+     * not wait on a mail to every follower, and `producer.send` can block for as long as
+     * `max.block.ms` when the broker is unreachable. Only ids cross into the coroutine.
+     */
+    private fun mailFollowers(followerIds: List<Long>, author: User, recipe: Recipe) {
+        if (followerIds.isEmpty()) return
+        val authorId = author.id
+        val authorName = author.username
+        val recipeId = recipe.id
+        val recipeTitle = recipe.title
+
+        scope.launch {
+            try {
+                val readers = QUser()
+                    .id.`in`(followerIds)
+                    .id.ne(authorId)
+                    .mailNotificationsEnabled.isTrue
+                    .isVerified.isTrue
+                    .findList()
+                if (readers.isEmpty()) return@launch
+
+                logger.info { "Recipe $recipeId: mailing ${readers.size} of ${followerIds.size} follower(s)" }
+                mailService.sendAll(
+                    kind = EmailTemplateKind.NEW_RECIPE,
+                    recipients = readers,
+                    target = recipeId.toString(),
+                    values = mapOf(
+                        MailPlaceholder.USERNAME to authorName,
+                        MailPlaceholder.TITLE to recipeTitle,
+                    ),
+                )
+            } catch (e: Exception) {
+                // Whatever caused this has already been committed and answered
+                logger.error(e) { "Could not mail followers about recipe $recipeId" }
+            }
+        }
     }
 
     /**
@@ -239,18 +294,6 @@ class NotificationService : KoinComponent {
     }
 
     /**
-     * The language to write one user's notifications in.
-     *
-     * The account's own when it has one, which is the point of it being managed here: it is
-     * what the user chose or what the first client to say anything reported, and it is the
-     * same language their mails go out in. A device is consulted only for an account that
-     * has none, and [Locale.FR] is the last resort — the value the column used to hold for
-     * everybody, so an account nothing has ever reported for reads exactly as it did before.
-     */
-    private fun readingLocaleOf(user: User): Locale =
-        user.locale ?: deviceService.readingLocaleOf(user.id, Locale.FR)
-
-    /**
      * Who an announcement is for.
      *
      * Naming users takes precedence over everything else, [AnnouncementDTO.locale] included:
@@ -260,9 +303,9 @@ class NotificationService : KoinComponent {
      *
      * A broadcast is every account that is not banned. With a locale it is narrowed to the
      * accounts that will *read* it in that language — which has to be resolved the same way
-     * [readingLocaleOf] does, or an operator would select an audience by one rule and have
-     * it worded by another: an account whose language is EN and whose last handset reported
-     * FR would land in the French send and receive an English notification.
+     * [UserService.readingLocaleOf] does, or an operator would select an audience by one
+     * rule and have it worded by another: an account whose language is EN and whose last
+     * handset reported FR would land in the French send and receive an English notification.
      *
      * So: the account's own language when it has one, and failing that a device registered
      * in it. An account with neither is in no language audience at all, the same way it
@@ -336,8 +379,11 @@ class NotificationService : KoinComponent {
             try {
                 val users = QUser().id.`in`(ids).findList()
                 val actorEntity = actorId?.let { QUser().id.eq(it).findOne() }
+                // Resolved for the whole audience at once: asking per recipient is a query
+                // per notification, which a broadcast turns into thousands
+                val readingLocales = userService.readingLocalesOf(users)
                 val stored = users.map { user ->
-                    val reading = readingLocaleOf(user)
+                    val reading = readingLocales[user.id] ?: Locale.FR
                     val (title, body) = NotificationWordings.render(kind, reading, values)
                     Notification(
                         user = user,

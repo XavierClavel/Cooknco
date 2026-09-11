@@ -6,23 +6,15 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import jakarta.mail.internet.AddressException
+import jakarta.mail.SendFailedException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import eu.cooknco.models.Follower
-import eu.cooknco.models.User
-import eu.cooknco.models.query.QFollower
-import eu.cooknco.models.query.QUser
 import shared.enums.EmailTemplateKind
-import shared.enums.Locale
-import shared.enums.MailPlaceholder
-import shared.events.AccountVerificationRequestedEvent
-import shared.events.FollowedUserEvent
 import shared.events.KafkaEventConsumer
-import shared.events.NewRecipeEvent
-import shared.events.NotificationsToggledEvent
-import shared.events.PasswordResetRequestedEvent
+import shared.events.MailEvent
 import shared.events.TestMailRequestedEvent
-import shared.events.UnfollowedUserEvent
-import shared.events.UserCreatedEvent
+import shared.events.UserMailRequestedEvent
 import shared.utils.EmailTemplates
 import shared.utils.logger
 import java.util.Base64
@@ -45,21 +37,17 @@ private val frontendUrl = System.getenv("FRONTEND_URL")
 
 fun Application.module() {
 
-    val kafkaConsumer = KafkaEventConsumer("mail-service", listOf("cooknco-users", "cooknco-auth", "cooknco-mails")) { event ->
-        logger.info { "Received event: $event" }
+    val kafkaConsumer = KafkaEventConsumer("mail-service", listOf(MailEvent.MAILS_TOPIC)) { event ->
         when (event) {
-            is FollowedUserEvent -> handleFollow(event)
-            is UnfollowedUserEvent -> handleUnfollow(event)
-            is NotificationsToggledEvent -> handleNotifications(event)
-            is UserCreatedEvent -> handleUserCreation(event)
-            is PasswordResetRequestedEvent -> handlePasswordResetRequest(event)
-            is AccountVerificationRequestedEvent -> handleAccountVerificationRequested(event)
-            is TestMailRequestedEvent -> handleTestMailRequested(event)
-            else -> {}
+            is UserMailRequestedEvent -> deliverable { handleUserMailRequested(event) }
+            is TestMailRequestedEvent -> deliverable { handleTestMailRequested(event) }
+            else -> logger.debug { "Ignoring event of unhandled type: $event" }
         }
     }
 
-    launch {
+    // A dedicated IO thread: start() blocks on poll() and again on every SMTP round trip,
+    // and must not sit on a dispatcher thread the health endpoint shares.
+    launch(Dispatchers.IO) {
         kafkaConsumer.start()
     }
 
@@ -68,92 +56,42 @@ fun Application.module() {
     }
 }
 
-private fun handleUserCreation(event: UserCreatedEvent) {
-    User(
-        id = event.id,
-        username = event.username,
-        encryptedMail = event.mail,
-    ).save()
-}
-
-private fun handleFollow(e: FollowedUserEvent) {
-    val follower = QUser().id.eq(e.followerId).findOne()!!
-    val followed = QUser().id.eq(e.followedId).findOne()!!
-    Follower(follower = follower, followed = followed).save()
-}
-
-private fun handleUnfollow(e: UnfollowedUserEvent) {
-    QFollower()
-        .follower.id.eq(e.followerId)
-        .followed.id.eq(e.followedId)
-        .delete()
-}
-
-private fun handleNotifications(e: NotificationsToggledEvent) {
-    /*
-    val user = QUser().id.eq(e.userId).findOne() ?: return
-    user.notificationsEnabled = e.enabled
-    user.save()
-     */
-}
-
-private fun handleNewRecipe(e: NewRecipeEvent) {
-    /*
-    val authorId = e.authorId
-    val followers = QFollower().followed.id.eq(authorId).findList()
-
-    for (f in followers) {
-        val user = QUser().id.eq(f.follower?.id).findOne() ?: continue
-        if (user.notificationsEnabled) {
-            eu.cooknco.Mail(user.email, PASSWORD_RESET_TITLE[user.locale], PASSWORD_RESET).send()
-        }
+/**
+ * Runs a send, telling a mail that will never go out apart from one that might.
+ *
+ * A refused or malformed address is the recipient's problem and no amount of retrying
+ * changes it, so it is dropped here; anything else — a refused login, a timeout, SMTP
+ * down — is thrown on, which is how the consumer knows to keep the offset and try again.
+ */
+private fun deliverable(send: () -> Unit) =
+    try {
+        send()
+    } catch (e: SendFailedException) {
+        logger.error(e) { "Address refused by SMTP: mail dropped" }
+    } catch (e: AddressException) {
+        logger.error(e) { "Malformed recipient address: mail dropped" }
     }
 
-     */
-}
-
 /**
- * Who to write to, and in what language.
+ * Sends one of the mails the app knows about, in the locale it was addressed in.
  *
- * The account's own language, which the backend keeps filled in from whatever its clients
- * report — this service has no devices or requests of its own to infer one from, and reading
- * a single column is the whole reason that resolution happens over there.
- *
- * [Locale.FR] when the account has none, which is what every mail this service has ever sent
- * used, so an account nothing has reported for keeps receiving what it already received.
+ * The event carries the address and every value the wording fills in, so this looks nothing
+ * up: it reads the wording in service for that kind — what an operator saved in the
+ * backoffice, or the copy packaged in the jar — and puts it on the wire.
  */
-private fun getMailAndLocale(id: Long): Pair<String, Locale> {
-    val user = QUser().id.eq(id).findOne()!!
-    return decrypt(user.encryptedMail) to (user.locale ?: Locale.FR)
-}
-
-
-private fun getFollowersMail(id: Long): List<String> =
-    QFollower().followed.id.eq(id).findList().map { decrypt(it.follower!!.encryptedMail) }
-
-
-private fun handlePasswordResetRequest(e: PasswordResetRequestedEvent) =
-    sendToUser(EmailTemplateKind.PASSWORD_RESET, e.userId, e.token)
-
-private fun handleAccountVerificationRequested(e: AccountVerificationRequestedEvent) =
-    sendToUser(EmailTemplateKind.ACCOUNT_VERIFICATION, e.userId, e.token)
-
-/**
- * Sends one of the mails the app knows about, in the recipient's own locale.
- *
- * The wording is whatever is in service for that mail — what an operator saved in the
- * backoffice, or the copy packaged in the jar — and the link is built from the kind, so the
- * address in the mail and the one the backoffice previews are the same expression.
- */
-private fun sendToUser(kind: EmailTemplateKind, userId: Long, token: String) {
-    val (emailAddress, locale) = getMailAndLocale(userId)
-    val (subject, body) = MailTemplateStore.get(kind, locale)
-    val values = mapOf(MailPlaceholder.LINK to kind.link(frontendUrl, token))
+private fun handleUserMailRequested(e: UserMailRequestedEvent) {
+    val wording = MailTemplateStore.get(e.templateKey, e.locale)
+    if (wording == null) {
+        logger.error { "No wording in service for ${e.templateKey}/${e.locale}: mail dropped [${e.dedupeKey}]" }
+        return
+    }
+    val (subject, body) = wording
     Mail(
-        recipient = emailAddress,
-        subject = EmailTemplates.render(subject, values),
-        body = EmailTemplates.render(body, values),
+        recipient = decrypt(e.encryptedRecipient),
+        subject = EmailTemplates.render(subject, e.values),
+        body = EmailTemplates.render(body, e.values),
     ).send()
+    logger.info { "Sent ${e.templateKey} to user ${e.recipientId} [${e.dedupeKey}]" }
 }
 
 /**

@@ -10,17 +10,15 @@ import io.ebean.migration.MigrationRunner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import eu.cooknco.models.query.QEmailTemplate
-import eu.cooknco.models.query.QFollower
-import eu.cooknco.models.query.QUser
 import shared.utils.logger
 
 object DatabaseManager {
     var mainDB : Database? = null
     private val dataSource: HikariDataSource by lazy { hikari() }
 
+    // Only the wording mirror. Users and followers used to be copied here too, until the
+    // senders started putting the address on the event instead.
     fun getTables() = listOf(
-        QUser(),
-        QFollower(),
         QEmailTemplate(),
     )
 

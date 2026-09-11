@@ -12,8 +12,10 @@ Cooknco runs on a Kubernetes cluster. Here are the pods used:
 - cooknco-backend: most of the application as a monolith for now
   - cooknco-database: the main database
   - cooknco-redis: used for sessions
-- cooknco-mail-service: microservice used for sending mails
-  - cooknco-mail-database: its database
+- cooknco-mail-service: microservice used for sending mails. Who a mail goes to is decided
+  by the backend, which owns the follow graph, and travels on the event — this service
+  keeps no copy of the users
+  - cooknco-mail-database: its database, holding only the operator-edited mail wordings
 - cooknco-frontend: the frontend, powered by nginx
 
 Kafka carries the events between the backend and the mail service; in the cluster it is a

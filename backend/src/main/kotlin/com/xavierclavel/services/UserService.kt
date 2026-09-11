@@ -23,9 +23,8 @@ import shared.overviewdto.UserOverview
 import io.ebean.Paging
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import shared.events.AccountVerificationRequestedEvent
+import shared.enums.EmailTemplateKind
 import shared.events.EventProducer
-import shared.events.PasswordResetRequestedEvent
 import shared.events.UserCreatedEvent
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -33,7 +32,9 @@ import java.util.UUID
 
 class UserService: KoinComponent {
     val encryptionService: EncryptionService by inject()
+    val deviceService: DeviceService by inject()
     val followService: FollowService by inject()
+    val mailService: MailService by inject()
     val eventProducerService: EventProducer by inject()
 
 
@@ -109,7 +110,7 @@ class UserService: KoinComponent {
         if (user.passwordHash == null) throw BadRequestException(BadRequestCause.OAUTH_ONLY)
         val token = generateToken()
         user.updateToken(token)
-        eventProducerService.produceEvent { PasswordResetRequestedEvent(user.id, token) }
+        mailService.send(EmailTemplateKind.PASSWORD_RESET, user, token)
         return token
     }
 
@@ -156,7 +157,7 @@ class UserService: KoinComponent {
         .apply {
             eventProducerService.produceEvent { UserCreatedEvent(this.id, this.username, this.mailEncrypted) }
             if (!verified) {
-                eventProducerService.produceEvent { AccountVerificationRequestedEvent(this.id, token) }
+                mailService.send(EmailTemplateKind.ACCOUNT_VERIFICATION, this, token)
             }
         }
 
@@ -280,6 +281,34 @@ class UserService: KoinComponent {
         if (!user.adoptLocale(reported)) return
         user.update()
         logger.info { "Account ${user.id} adopted locale $reported from a client" }
+    }
+
+    /**
+     * The language to write to an account in.
+     *
+     * The account's own when it has one — what the user chose, or what the first client to
+     * say anything reported. A device is consulted only for an account that has none, and
+     * [Locale.FR] is the last resort: the value the column held for everybody, so an account
+     * nothing has ever reported for reads exactly as it did before.
+     *
+     * Here rather than in either caller because notifications and mail both resolve it, and
+     * they have to agree — a push and the mail announcing the same recipe arriving in two
+     * different languages would be nobody's idea of a preference.
+     */
+    fun readingLocaleOf(user: User): Locale =
+        user.locale ?: deviceService.readingLocaleOf(user.id, Locale.FR)
+
+    /**
+     * [readingLocaleOf] for a whole audience, in one query rather than one per member.
+     *
+     * The query is for the accounts with no language of their own, and only those: once a
+     * client has reported one, answering is a field read. An audience that has all reported
+     * touches `devices` not at all.
+     */
+    fun readingLocalesOf(users: Collection<User>): Map<Long, Locale> {
+        val undeclared = users.filter { it.locale == null }.map { it.id }
+        val byDevice = deviceService.readingLocalesOf(undeclared)
+        return users.associate { it.id to (it.locale ?: byDevice[it.id] ?: Locale.FR) }
     }
 
     fun search(searchString: String?, paging: Paging): Pair<Int, List<UserInfo>> {

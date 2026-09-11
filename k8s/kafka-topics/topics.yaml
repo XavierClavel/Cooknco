@@ -28,7 +28,9 @@ spec:
   partitions: 3
   replicas: 1
 ---
-# Mails the backoffice asks for by hand, which is currently only its test sends.
+# Every mail the application sends, one record per recipient, keyed by recipient id so
+# that two mails to the same person keep their order. The partition count is also the
+# ceiling on how many mail-service replicas can usefully share the work.
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaTopic
 metadata:
