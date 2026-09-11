@@ -22,6 +22,7 @@ import com.xavierclavel.services.ImageUploadTicketService
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
 import com.xavierclavel.services.MailService
+import com.xavierclavel.services.UnsubscribeService
 import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.NoopPushSender
 import com.xavierclavel.services.NotificationService
@@ -53,6 +54,7 @@ val appModules = module {
     single { ExportService() }
     single { LikeService() }
     single { MailService() }
+    single { UnsubscribeService() }
     single { CookbookService() }
     single { DashboardService() }
     single { RecipeIngredientService() }

@@ -121,6 +121,14 @@ suspend fun HttpClient.updateSettingsRaw(settings: UserSettingsDTO) =
 suspend fun HttpClient.updateSettings(settings: UserSettingsDTO) =
     this.updateSettingsRaw(settings).apply { assertEquals(HttpStatusCode.OK, status) }
 
+/**
+ * Presses the unsubscribe link in a notification mail.
+ *
+ * Anonymous on purpose, as the real thing is: this is somebody in their inbox, and the page
+ * behind the link is reached with no session at all.
+ */
+suspend fun HttpClient.unsubscribeRaw(token: String) = this.post("$USER_URL/unsubscribe?token=$token")
+
 /** Saves a language the way the settings screen does, leaving the other settings as they are. */
 suspend fun HttpClient.chooseLocale(locale: Locale) =
     this.updateSettings(this.getSettings().copy(locale = locale))

@@ -43,6 +43,7 @@ declare module 'vue-router/auto-routes' {
     '/user/list': RouteRecordInfo<'/user/list', '/user/list', Record<never, never>, Record<never, never>>,
     '/user/mcp': RouteRecordInfo<'/user/mcp', '/user/mcp', Record<never, never>, Record<never, never>>,
     '/user/settings': RouteRecordInfo<'/user/settings', '/user/settings', Record<never, never>, Record<never, never>>,
+    '/user/unsubscribe': RouteRecordInfo<'/user/unsubscribe', '/user/unsubscribe', Record<never, never>, Record<never, never>>,
     '/user/verify': RouteRecordInfo<'/user/verify', '/user/verify', Record<never, never>, Record<never, never>>,
     '/user/view': RouteRecordInfo<'/user/view', '/user/view', Record<never, never>, Record<never, never>>,
     '/verification-email-sent': RouteRecordInfo<'/verification-email-sent', '/verification-email-sent', Record<never, never>, Record<never, never>>,

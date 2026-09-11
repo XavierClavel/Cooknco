@@ -15,6 +15,7 @@ import shared.enums.Locale
 import shared.enums.MailPlaceholder
 import shared.events.UserMailRequestedEvent
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -70,6 +71,12 @@ class NewRecipeMailTest : ApplicationTest() {
         assertEquals(authorName, mail.values[MailPlaceholder.USERNAME])
         assertEquals("Tarte aux pommes", mail.values[MailPlaceholder.TITLE])
         assertTrue { mail.values[MailPlaceholder.LINK]!!.endsWith("/recipe/view?id=$recipeId") }
+        // A mail somebody else's doing put in an inbox carries its own way out, addressed
+        // to the reader rather than to the send
+        assertEquals(
+            unsubscribeService.linkFor(followerId),
+            mail.values[MailPlaceholder.UNSUBSCRIBE],
+        )
     }
 
     @Test
@@ -145,6 +152,9 @@ class NewRecipeMailTest : ApplicationTest() {
         val mail = mailsOfKind(EmailTemplateKind.PASSWORD_RESET).single()
         assertEquals(userId, mail.recipientId)
         assertEquals(follower, encryptionService.decrypt(mail.encryptedRecipient))
+        // And no way out is offered on one, because there is none to offer: the mail would
+        // have gone out whatever the setting said
+        assertNull(mail.values[MailPlaceholder.UNSUBSCRIBE])
     }
 
     @Test
