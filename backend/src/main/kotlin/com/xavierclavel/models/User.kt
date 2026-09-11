@@ -61,6 +61,16 @@ class User (
     var isAccountPublic: Boolean = true,
     var autoAcceptFollowRequests : Boolean = false,
 
+    /**
+     * Whether to mail this account about what the people it follows are up to.
+     *
+     * Opt-out by default: an address that never asked for these is not one to mail. Read by
+     * the fan-out in `NotificationService.onRecipeCreated`, and never by the account mails —
+     * a verification link is not a notification and does not stop for this.
+     */
+    @DbDefault("false")
+    var mailNotificationsEnabled: Boolean = false,
+
     //Moderation
     @DbDefault("false")
     var isBanned: Boolean = false,
@@ -186,6 +196,8 @@ class User (
         // Null is "not saying", not "forget it": a client that predates the field sends
         // nothing, and must not wipe a language chosen from another one
         userSettingsDTO.locale?.let { locale = it }
+        // Absent means "leave as it is", for the same reason
+        userSettingsDTO.mailNotificationsEnabled?.let { mailNotificationsEnabled = it }
     }
 
     /**
@@ -261,6 +273,7 @@ class User (
         autoAcceptFollowRequests = this.autoAcceptFollowRequests,
         isAccountPublic = this.isAccountPublic,
         locale = this.locale,
+        mailNotificationsEnabled = this.mailNotificationsEnabled,
     )
 
     fun useToken() {

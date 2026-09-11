@@ -60,8 +60,18 @@ object EmailTemplates {
      * knows what they mean. The token is deliberately not a real one — a preview link has
      * to be inert, and a test mail goes to whoever asked for it, not to an account.
      */
-    fun sampleValues(kind: EmailTemplateKind?, frontendUrl: String): Map<String, String> =
-        kind?.let { mapOf(MailPlaceholder.LINK to it.link(frontendUrl, SAMPLE_TOKEN)) } ?: emptyMap()
+    fun sampleValues(kind: EmailTemplateKind?, frontendUrl: String): Map<String, String> = when (kind) {
+        null -> emptyMap()
+        EmailTemplateKind.NEW_RECIPE -> mapOf(
+            MailPlaceholder.LINK to kind.link(frontendUrl, SAMPLE_RECIPE_ID),
+            MailPlaceholder.USERNAME to SAMPLE_USERNAME,
+            MailPlaceholder.TITLE to SAMPLE_TITLE,
+        )
+        else -> mapOf(MailPlaceholder.LINK to kind.link(frontendUrl, SAMPLE_TOKEN))
+    }
 
     private const val SAMPLE_TOKEN = "sample-token"
+    private const val SAMPLE_RECIPE_ID = "0"
+    private const val SAMPLE_USERNAME = "a-cook"
+    private const val SAMPLE_TITLE = "Tarte aux pommes"
 }

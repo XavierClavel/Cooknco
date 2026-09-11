@@ -84,7 +84,9 @@ class AdminMailTemplateControllerTest : ApplicationTest() {
         assertEquals(EmailTemplateKind.entries.map { it.key }, templates.map { it.key })
         templates.forEach { template ->
             assertTrue(template.builtIn, "${template.key} is emitted by the app")
-            assertEquals(listOf(MailPlaceholder.LINK), template.placeholders)
+            // What the backoffice offers an operator is what the kind says it fills in
+            val kind = EmailTemplateKind.of(template.key)!!
+            assertEquals(kind.placeholders, template.placeholders)
             assertEquals(Locale.entries, template.locales.map { it.locale })
             template.locales.forEach {
                 assertFalse(it.custom, "${template.key}/${it.locale} has nothing saved over it")

@@ -54,3 +54,6 @@ out/
 /k8s/migration/backup-*/
 /k8s/migration/.last-backup
 /k8s/migration/.migration-plan
+
+# Kotlin compiler scratch (session locks, error logs) - regenerated every build
+.kotlin/

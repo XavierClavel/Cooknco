@@ -108,6 +108,24 @@ class DeviceService: KoinComponent {
             ?: fallback
 
     /**
+     * [readingLocaleOf] for many users at once, in one query.
+     *
+     * Its reason for existing is fan-out: mailing a popular author's followers one at a
+     * time would ask this question once per recipient, which is a query per mail before a
+     * single one is sent. Users with no device are simply absent from the result — the
+     * caller holds the fallback, which is per-user.
+     */
+    fun readingLocalesOf(userIds: Collection<Long>): Map<Long, Locale> {
+        if (userIds.isEmpty()) return emptyMap()
+        return QDevice().user.id.`in`(userIds)
+            .orderBy().lastSeenAt.desc()
+            .findList()
+            .groupBy { it.user?.id }
+            .mapNotNull { (userId, devices) -> userId?.let { it to devices.first().locale } }
+            .toMap()
+    }
+
+    /**
      * Drops tokens the transport reported as dead.
      *
      * The only thing that prunes the table, and deliberately the only thing: see
