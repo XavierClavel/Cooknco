@@ -64,7 +64,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
@@ -76,7 +75,6 @@ import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
-import com.xavierclavel.cooknco.ui.theme.CookncoOrangeDark
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
@@ -118,7 +116,6 @@ fun RecipeScreen(
     onNavigateBack: () -> Unit,
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateToCookMode: (Long) -> Unit = {},
-    onNavigateToShoppingList: () -> Unit = {},
     viewModel: RecipeViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -158,10 +155,6 @@ fun RecipeScreen(
                 onNavigateToUser = onNavigateToUser,
                 onNavigateBack = onNavigateBack,
                 onStartCooking = { onNavigateToCookMode(recipe.id) },
-                onAddToShoppingList = {
-                    AppGraph.shoppingListRepository.addFromRecipe(recipe.title, recipe.ingredients)
-                    onNavigateToShoppingList()
-                },
             )
         }
     }
@@ -204,7 +197,6 @@ private fun RecipeContent(
     onSaveNotes: () -> Unit,
     onCancelNoteEdit: () -> Unit,
     onStartCooking: () -> Unit,
-    onAddToShoppingList: () -> Unit,
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateBack: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -375,7 +367,6 @@ private fun RecipeContent(
                 recipeYield = recipeYield,
                 onYieldMinus = onYieldMinus,
                 onYieldPlus = onYieldPlus,
-                onAddToShoppingList = onAddToShoppingList,
             )
             RecipeTab.STEPS -> stepsTab(recipe = recipe)
             RecipeTab.NOTES -> item {
@@ -455,7 +446,6 @@ private fun LazyListScope.ingredientsTab(
     recipeYield: Int,
     onYieldMinus: () -> Unit,
     onYieldPlus: () -> Unit,
-    onAddToShoppingList: () -> Unit,
 ) {
     if (recipe.yield != null) {
         item {
@@ -507,16 +497,6 @@ private fun LazyListScope.ingredientsTab(
                     recipe.ingredients.forEach { ingredient ->
                         IngredientRow(ingredient = ingredient, selectedYield = uiState.selectedYield, recipeYield = recipeYield)
                     }
-                    Text(
-                        text = "Add all ${recipe.ingredients.size} to shopping list",
-                        color = CookncoOrangeDark,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onAddToShoppingList)
-                            .padding(horizontal = 14.dp, vertical = 13.dp),
-                    )
                 }
             }
         }
@@ -787,7 +767,6 @@ fun RecipeScreenPreview() {
                 onSaveNotes = {},
                 onCancelNoteEdit = {},
                 onStartCooking = {},
-                onAddToShoppingList = {},
             )
         }
     }

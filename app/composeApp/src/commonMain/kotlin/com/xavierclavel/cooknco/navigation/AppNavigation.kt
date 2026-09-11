@@ -33,7 +33,6 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbookViewModel
 import com.xavierclavel.cooknco.ui.main.MainScreen
 import com.xavierclavel.cooknco.ui.recipe.CookModeScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditScreen
-import com.xavierclavel.cooknco.ui.shopping.ShoppingListScreen
 import com.xavierclavel.cooknco.ui.user.UserEditScreen
 import com.xavierclavel.cooknco.ui.user.UserEditViewModel
 import com.xavierclavel.cooknco.ui.user.UserProfileScreen
@@ -60,7 +59,6 @@ private object Routes {
     const val USER = "user/{userId}"
     const val USER_EDIT = "user/{userId}/edit"
     const val RECIPES = "recipes"
-    const val SHOPPING_LIST = "shopping_list"
 }
 
 @Composable
@@ -181,7 +179,6 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 onNavigateToCookMode = { id -> navController.navigate("recipe/$id/cook") },
-                onNavigateToShoppingList = { navController.navigate(Routes.SHOPPING_LIST) },
                 viewModel = recipeViewModel,
             )
         }
@@ -317,13 +314,6 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateBack = { navController.popBackStack() },
                 onRecipeClick = { recipeId -> navController.navigate("recipe/$recipeId") },
                 onUserClick = { userId -> navController.navigate("user/$userId") },
-            )
-        }
-
-        // ── Shopping list ─────────────────────────────────────────────────────
-        composable(Routes.SHOPPING_LIST) {
-            ShoppingListScreen(
-                onNavigateBack = { navController.popBackStack() },
             )
         }
 
