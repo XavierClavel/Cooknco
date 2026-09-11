@@ -24,6 +24,7 @@ import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.route
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import java.awt.image.BufferedImage
+import java.io.InputStream
 import javax.imageio.ImageIO
 
 abstract class Controller(val base: String = "") {
@@ -106,14 +107,21 @@ suspend fun RoutingContext.handleDeletion(deleted: Boolean?) {
     else call.respond(HttpStatusCode.OK)
 }
 
-suspend fun RoutingContext.receiveImage(): Pair<BufferedImage, Metadata> {
+/**
+ * The picture out of a multipart body.
+ *
+ * [maxBytes] bounds what is read into memory. It is left off where a session is what got the
+ * caller here — nginx's `client_max_body_size` is the bound there, as it always was — and set
+ * on the ticket endpoint, which anyone holding a URL can reach.
+ */
+suspend fun RoutingContext.receiveImage(maxBytes: Long? = null): Pair<BufferedImage, Metadata> {
     val multipart = call.receiveMultipart()
     var image: BufferedImage? = null
     var metadata: Metadata? = null
     multipart.forEachPart { part ->
         when (part) {
             is PartData.FileItem -> {
-                val bytes = part.provider().toInputStream().readBytes()
+                val bytes = part.provider().toInputStream().readBounded(maxBytes)
                 metadata = ImageMetadataReader.readMetadata(bytes.inputStream())
                 image = ImageIO.read(bytes.inputStream())
             }
@@ -133,6 +141,20 @@ suspend fun RoutingContext.receiveImage(): Pair<BufferedImage, Metadata> {
         throw BadRequestException(BadRequestCause.INVALID_IMAGE)
     }
     return Pair(image, metadata)
+}
+
+/**
+ * Everything on the stream, or a refusal if that is more than [limit].
+ *
+ * Stops one byte past the limit rather than trusting the declared `Content-Length`, so what is
+ * held in memory is bounded whatever the caller said it was sending — or said nothing at all,
+ * as a chunked body does.
+ */
+private fun InputStream.readBounded(limit: Long?): ByteArray {
+    if (limit == null) return readBytes()
+    val bytes = readNBytes((limit + 1).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+    if (bytes.size > limit) throw BadRequestException(BadRequestCause.IMAGE_TOO_LARGE)
+    return bytes
 }
 
 suspend fun RoutingCall.respondPDF(filename: String, content: ByteArray) {

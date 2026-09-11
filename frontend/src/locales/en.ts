@@ -729,7 +729,7 @@ export default {
   mcp_client_other_hint: "A client that can only launch local commands reaches the server through this bridge.",
   mcp_permissions: "What an assistant can do",
   mcp_grant_read: "read your recipes, cookbooks and feed",
-  mcp_grant_write: "write, edit and delete your recipes",
+  mcp_grant_write: "write, edit and delete your recipes, pictures included",
   mcp_grant_collect: "like recipes and add them to your cookbooks",
   mcp_permissions_note: "It cannot change your password, your email address or your account settings.",
   mcp_expiry_note: "A connection you stop using expires after 30 days, and the assistant has to ask again.",

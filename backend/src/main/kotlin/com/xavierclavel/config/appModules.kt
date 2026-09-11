@@ -18,6 +18,7 @@ import com.xavierclavel.services.FcmPushSender
 import com.xavierclavel.services.GotenbergPdfRenderer
 import com.xavierclavel.services.FollowService
 import com.xavierclavel.services.ImageService
+import com.xavierclavel.services.ImageUploadTicketService
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.services.LikeService
 import com.xavierclavel.services.ModerationService
@@ -46,6 +47,7 @@ val appModules = module {
     single { UserService() }
     single { IngredientService() }
     single { ImageService() }
+    single { ImageUploadTicketService() }
     single { DefaultImageService() }
     single { ExportService() }
     single { LikeService() }
