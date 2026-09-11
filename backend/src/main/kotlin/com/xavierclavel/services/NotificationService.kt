@@ -110,6 +110,42 @@ class NotificationService : KoinComponent {
             .onEach { it.markRead().update() }
             .size
 
+    // ------------------------------------------------------------------ clearing
+
+    /**
+     * Takes one notification out of its recipient's list, for good.
+     *
+     * A delete rather than a flag, because the row *is* the notification: keeping a cleared
+     * one would make the table and the list disagree about what a user has, and put a filter
+     * on every read from then on to hold them apart. It is also what keeps [unreadCount]
+     * honest with nothing said to it — clearing an unread notification stops it being
+     * counted because it stops existing.
+     *
+     * The push already on the recipient's phone is not recalled, and cannot be: clearing is
+     * about the list, and a notification that has already buzzed is not news this can take
+     * back.
+     *
+     * @return false when the notification is not this user's, or is already gone
+     */
+    fun clear(userId: Long, notificationId: Long): Boolean =
+        QNotification().id.eq(notificationId).user.id.eq(userId).delete() > 0
+
+    /**
+     * Clears everything addressed to this user, not just the page they were shown.
+     *
+     * The bell asks for [DEFAULT_PAGE_SIZE] at a time, so a clear bounded by what came back
+     * would empty a list that fills itself again on the next poll — and the user would have
+     * no way of telling how many presses "clear all" takes.
+     *
+     * Follow requests survive it, and that is the point of their being a list of their own:
+     * they are a queue to answer rather than news, so clearing the notification that
+     * announced one leaves the request itself waiting to be answered.
+     *
+     * @return how many were cleared
+     */
+    fun clearAll(userId: Long): Int =
+        QNotification().user.id.eq(userId).delete()
+
     // -------------------------------------------------------- what the app emits
 
     /**

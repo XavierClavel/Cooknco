@@ -2,8 +2,12 @@ package main.com.xavierclavel.controllertests
 
 import com.xavierclavel.ApplicationTest
 import com.xavierclavel.models.query.QDevice
+import com.xavierclavel.models.query.QNotification
 import io.ktor.http.HttpStatusCode
+import main.com.xavierclavel.utils.clearAllNotificationsRaw
+import main.com.xavierclavel.utils.clearNotificationRaw
 import main.com.xavierclavel.utils.createUser
+import main.com.xavierclavel.utils.follow
 import main.com.xavierclavel.utils.getNotifications
 import main.com.xavierclavel.utils.getNotificationsRaw
 import main.com.xavierclavel.utils.listNotifications
@@ -14,6 +18,7 @@ import main.com.xavierclavel.utils.registerDeviceRaw
 import main.com.xavierclavel.utils.sendTestNotification
 import main.com.xavierclavel.utils.unregisterDeviceRaw
 import org.junit.jupiter.api.Test
+import shared.dto.UserSettingsDTO
 import shared.enums.DevicePlatform
 import shared.enums.Locale
 import shared.enums.NotificationKind
@@ -40,6 +45,7 @@ class NotificationControllerTest : ApplicationTest() {
         client.getNotificationsRaw().apply { assertEquals(HttpStatusCode.Unauthorized, status) }
         client.registerDeviceRaw("some-token").apply { assertEquals(HttpStatusCode.Unauthorized, status) }
         client.markAllNotificationsReadRaw().apply { assertEquals(HttpStatusCode.Unauthorized, status) }
+        client.clearAllNotificationsRaw().apply { assertEquals(HttpStatusCode.Unauthorized, status) }
     }
 
     // ----------------------------------------------------------------- devices
@@ -185,5 +191,103 @@ class NotificationControllerTest : ApplicationTest() {
             assertEquals(HttpStatusCode.NotFound, client.markNotificationReadRaw(notificationId).status)
             assertEquals(emptyList(), client.listNotifications())
         }
+    }
+
+    // ---------------------------------------------------------------- clearing
+
+    /**
+     * Clearing is a delete, not a flag: what is asserted is that the row is gone, because
+     * that is what keeps the unread count right without anything being told about it.
+     */
+    @Test
+    fun `clearing one takes it out of the list and out of the unread count`() = runTestAsAdmin {
+        client.registerDevice("token-h")
+        client.sendTestNotification(title = "One", body = "Body")
+        client.sendTestNotification(title = "Two", body = "Body")
+
+        val first = client.listNotifications().first()
+        assertEquals(HttpStatusCode.OK, client.clearNotificationRaw(first.id).status)
+
+        val after = client.getNotifications()
+        assertEquals(1, after.notifications.size)
+        assertTrue(after.notifications.none { it.id == first.id })
+        assertEquals(1, after.unreadCount, "an unread notification cleared is one fewer unread")
+        assertFalse(QNotification().id.eq(first.id).exists(), "the row is gone, not hidden")
+    }
+
+    /** Clearing the same notification twice is the client's own retry, and says so. */
+    @Test
+    fun `clearing one that is already gone is a 404`() = runTestAsAdmin {
+        client.registerDevice("token-i")
+        client.sendTestNotification(title = "Once", body = "Body")
+        val id = client.listNotifications().single().id
+
+        assertEquals(HttpStatusCode.OK, client.clearNotificationRaw(id).status)
+        assertEquals(HttpStatusCode.NotFound, client.clearNotificationRaw(id).status)
+    }
+
+    /** Read or not: clearing says the user is done with the list, not that they read it. */
+    @Test
+    fun `clearing all empties the list whether or not it was read`() = runTestAsAdmin {
+        client.registerDevice("token-j")
+        client.sendTestNotification(title = "Read", body = "Body")
+        client.sendTestNotification(title = "Unread", body = "Body")
+        client.markNotificationReadRaw(client.listNotifications().first().id)
+
+        assertEquals(HttpStatusCode.OK, client.clearAllNotificationsRaw().status)
+
+        val after = client.getNotifications()
+        assertEquals(emptyList(), after.notifications)
+        assertEquals(0, after.unreadCount)
+    }
+
+    /**
+     * The half of the bell clearing must not touch.
+     *
+     * A follow request is a queue the user has to answer, not news, so clearing the
+     * notification that announced one leaves the request itself waiting — otherwise "clear
+     * all" would quietly decline everybody.
+     */
+    @Test
+    fun `clearing all leaves follow requests waiting`() = runTest {
+        val privateAccount = "private@mail.com"
+        val requester = "requester@mail.com"
+        var privateId = 0L
+        runAsAdmin {
+            privateId = client.createUser(privateAccount).id
+            client.createUser(requester)
+            userService.updateSettings(
+                privateId,
+                UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false),
+            )
+        }
+
+        runAs(requester, "password") { client.follow(privateId) }
+        notificationService.awaitDispatches()
+
+        runAs(privateAccount, "password") {
+            assertEquals(1, client.getNotifications().notifications.size)
+            assertEquals(HttpStatusCode.OK, client.clearAllNotificationsRaw().status)
+
+            val after = client.getNotifications()
+            assertEquals(emptyList(), after.notifications)
+            assertEquals(1, after.followersPending.size, "the request is still there to answer")
+        }
+    }
+
+    /** Someone else's notification is not the caller's to clear, and stays where it is. */
+    @Test
+    fun `a notification cannot be cleared by another user`() = runTest {
+        var notificationId = 0L
+        runAsAdmin {
+            client.registerDevice("token-k")
+            client.sendTestNotification(title = "Private", body = "Body")
+            notificationId = client.listNotifications().single().id
+        }
+
+        runAsUser1 {
+            assertEquals(HttpStatusCode.NotFound, client.clearNotificationRaw(notificationId).status)
+        }
+        assertTrue(QNotification().id.eq(notificationId).exists(), "it is still its owner's")
     }
 }

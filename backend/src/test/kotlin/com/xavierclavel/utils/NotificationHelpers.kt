@@ -1,6 +1,7 @@
 package main.com.xavierclavel.utils
 
 import io.ktor.client.HttpClient
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -93,6 +94,10 @@ suspend fun HttpClient.listNotifications(): List<UserNotificationInfo> =
 suspend fun HttpClient.markNotificationReadRaw(id: Long) = this.post("$NOTIFICATION_URL/$id/read")
 
 suspend fun HttpClient.markAllNotificationsReadRaw() = this.post("$NOTIFICATION_URL/read")
+
+suspend fun HttpClient.clearNotificationRaw(id: Long) = this.delete("$NOTIFICATION_URL/$id")
+
+suspend fun HttpClient.clearAllNotificationsRaw() = this.delete(NOTIFICATION_URL)
 
 // ------------------------------------------------------------------ admin
 

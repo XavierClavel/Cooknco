@@ -118,6 +118,24 @@
                   </v-avatar>
                   <v-icon v-else class="mr-2">mdi-bullhorn-outline</v-icon>
                 </template>
+
+                <!--
+                  .stop does two jobs: it keeps the click off the row, which would open the
+                  notification on the way to clearing it, and it keeps the menu open so the
+                  next one can be cleared without reopening the bell.
+                -->
+                <template v-slot:append>
+                  <v-btn
+                    class="notification-clear"
+                    icon="mdi-close"
+                    variant="text"
+                    size="x-small"
+                    density="comfortable"
+                    :title="$t('clear_notification')"
+                    :aria-label="$t('clear_notification')"
+                    @click.stop="clearNotification(notification)"
+                  ></v-btn>
+                </template>
               </v-list-item>
 
               <v-divider class="my-1" />
@@ -127,6 +145,12 @@
                 prepend-icon="mdi-check-all"
                 link
                 @click="markAllNotificationsRead"
+              ></v-list-item>
+              <v-list-item
+                :title="$t('clear_all_notifications')"
+                prepend-icon="mdi-notification-clear-all"
+                link
+                @click="clearAllNotifications"
               ></v-list-item>
             </template>
           </v-list>
@@ -216,7 +240,12 @@ import {ICON_ADMIN, ICON_COOKBOOK, ICON_HOME, ICON_INGREDIENT, ICON_NOTIFICATION
 import {overrideLocaleFromCookie} from "@/scripts/localization";
 import {useDisplay} from "vuetify";
 import {usePollingStore} from "@/stores/pollingStore";
-import {markAllNotificationsRead as markAllRead, markNotificationRead} from "@/scripts/notifications";
+import {
+  clearAllNotifications as clearAllOnServer,
+  clearNotification as clearOnServer,
+  markAllNotificationsRead as markAllRead,
+  markNotificationRead,
+} from "@/scripts/notifications";
 
 const route = useRoute();
 const router = useRouter()
@@ -296,6 +325,41 @@ async function markAllNotificationsRead() {
   pollingStore.data.unreadCount = 0
 }
 
+/**
+ * Takes one notification out of the list, for good.
+ *
+ * Removed here as well as server-side so the menu answers the click rather than the next
+ * poll five minutes later — but only once the backend has agreed, because a clear that
+ * silently failed would otherwise reappear on that poll. A 404 is agreement: it means the
+ * notification was already gone.
+ */
+async function clearNotification(notification) {
+  const cleared = await clearOnServer(notification.id)
+    .then(() => true)
+    .catch((error) => error.response?.status === 404)
+  if (!cleared) return
+
+  pollingStore.data.notifications =
+    (pollingStore.data.notifications ?? []).filter((it) => it.id !== notification.id)
+  if (!notification.read) {
+    pollingStore.data.unreadCount = Math.max(0, (pollingStore.data.unreadCount ?? 1) - 1)
+  }
+}
+
+/**
+ * Clears everything, including whatever the menu had no room to show.
+ *
+ * Follow requests are left where they are: they are a queue the user has to answer, and
+ * clearing one from here would be answering it on their behalf.
+ */
+async function clearAllNotifications() {
+  const cleared = await clearAllOnServer().then(() => true).catch(() => false)
+  if (!cleared) return
+
+  pollingStore.data.notifications = []
+  pollingStore.data.unreadCount = 0
+}
+
 const removeAfterEach = router.afterEach((to, from) => {
   if (to.name != "/search") {
     search.value = null
@@ -345,6 +409,23 @@ watch(
 /* An unread row, marked with the same accent as the dot on the bell */
 .notification-unread {
   border-left: 3px solid #ff6f59;
+}
+
+/*
+  The app frames every button in 3px of black (global.scss). That is the house style for a
+  button you press on its own, and far too much for an x sitting inside a list row, which
+  should read as part of the row rather than as a control stacked on top of it. Both the
+  rule being undone and this one are !important, so the class is named alongside .v-btn to
+  win on specificity rather than on load order.
+*/
+.notification-clear.v-btn {
+  border: 0 !important;
+  opacity: 0.6;
+}
+
+.notification-clear.v-btn:hover,
+.notification-clear.v-btn:focus-visible {
+  opacity: 1;
 }
 
 .notification-dot {

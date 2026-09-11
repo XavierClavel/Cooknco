@@ -604,6 +604,8 @@ export default {
   // ---------------------------------------------------------- notifications
   notifications: "Notifications",
   mark_all_read: "Tout marquer comme lu",
+  clear_notification: "Effacer cette notification",
+  clear_all_notifications: "Tout effacer",
 
   admin_notifications: "Notifications",
   admin_notifications_compose: "Annonce",
