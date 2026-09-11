@@ -1,56 +1,41 @@
 package com.xavierclavel.cooknco.ui.main
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -62,17 +47,40 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbooksScreen
 import com.xavierclavel.cooknco.ui.cookbook.CookbooksViewModel
 import com.xavierclavel.cooknco.ui.home.HomeScreen
 import com.xavierclavel.cooknco.ui.home.HomeViewModel
+import com.xavierclavel.cooknco.ui.recipe.RecipesScreen
+import com.xavierclavel.cooknco.ui.recipe.RecipesViewModel
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
+import com.xavierclavel.cooknco.ui.theme.StickerIconButton
+import com.xavierclavel.cooknco.ui.theme.stickerShadow
 import com.xavierclavel.cooknco.ui.user.UserProfileScreen
 import com.xavierclavel.cooknco.ui.user.UserProfileViewModel
 
-private val tabs = listOf("Home", "Cookbooks", "Profile")
+private enum class MainTab { FEED, SEARCH, COOKBOOKS, PROFILE }
 
+/**
+ * The four tabs behind the sticker-pill bottom bar, in the order the mockup lays them
+ * out left to right — see `Cooknco Mobile.dc.html`, turn 5 / option `5a`, the Feed /
+ * Search / Cookbooks / Profile screenshots (their nav bar is otherwise identical, only
+ * the active segment differs).
+ *
+ * PHASE 2 SEAM: this screen used to draw a shared `MainTopBar` (hamburger + search pill
+ * + avatar) above whichever tab was showing. The redesign drops it — none of the mockup's
+ * four tab screens have one, each has its own header content instead (Feed's "Friday, 11
+ * September / What's cooking?" greeting, Profile's avatar card, ...). That per-screen
+ * header is phase 2's job. Two things fell out with the old bar and need a new home:
+ *   - Logging out: was the account-menu's only exit. `onLogout`/`isLoggingOut` and the
+ *     confirmation dialog below are all still here and work — only the button that used
+ *     to open it is gone. UserProfileScreen (or a settings screen phase 2 adds) is the
+ *     obvious place for it.
+ *   - Jumping to another user's profile by tapping the avatar: no longer needed as a
+ *     shortcut now that Profile is a first-class tab.
+ */
 @Composable
 fun MainScreen(
     user: UserInfo,
@@ -81,110 +89,62 @@ fun MainScreen(
     onNavigateToRecipe: (Long) -> Unit = {},
     onNavigateToEditRecipe: (Long?) -> Unit = {},
     onNavigateToCookbook: (Long) -> Unit = {},
+    // Unused here for now: the old FAB called this for "new cookbook" while the
+    // Cookbooks tab was showing. The mockup replaces that with an inline "+ New
+    // cookbook" row inside the cookbooks list itself, which is CookbooksScreen's own
+    // restyle to add (phase 2) — kept as a parameter so it's ready to wire in then.
     onNavigateToEditCookbook: (Long?) -> Unit = {},
-    onNavigateToSearch: () -> Unit = {},
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(user.id))
+    val recipesViewModel: RecipesViewModel = viewModel(factory = RecipesViewModel.factory())
     val cookbooksViewModel: CookbooksViewModel = viewModel(factory = CookbooksViewModel.factory(user.id))
     val profileViewModel: UserProfileViewModel = viewModel(factory = UserProfileViewModel.factory(user.id, user.id))
 
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableStateOf(MainTab.FEED) }
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
-        topBar = {
-            MainTopBar(
+        bottomBar = {
+            MainBottomBar(
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it },
+                onCreateClick = { onNavigateToEditRecipe(null) },
                 user = user,
-                onMenuClick = { /* TODO: side drawer */ },
-                onSearchClick = onNavigateToSearch,
-                onProfileClick = { selectedTab = 2 },
-                onLogoutClick = { showLogoutConfirm = true },
             )
         },
-        bottomBar = {
-            NavigationBar(
-                containerColor = CookncoBackground,
-                tonalElevation = 0.dp,
-            ) {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
-                    label = { Text(tabs[0], fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = CookncoOrange,
-                        selectedTextColor = CookncoOrange,
-                        indicatorColor = CookncoBackground,
-                        unselectedIconColor = CookncoNavy.copy(alpha = 0.5f),
-                        unselectedTextColor = CookncoNavy.copy(alpha = 0.5f),
-                    ),
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Outlined.MenuBook, contentDescription = null) },
-                    label = { Text(tabs[1], fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = CookncoOrange,
-                        selectedTextColor = CookncoOrange,
-                        indicatorColor = CookncoBackground,
-                        unselectedIconColor = CookncoNavy.copy(alpha = 0.5f),
-                        unselectedTextColor = CookncoNavy.copy(alpha = 0.5f),
-                    ),
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
-                    label = { Text(tabs[2], fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = CookncoOrange,
-                        selectedTextColor = CookncoOrange,
-                        indicatorColor = CookncoBackground,
-                        unselectedIconColor = CookncoNavy.copy(alpha = 0.5f),
-                        unselectedTextColor = CookncoNavy.copy(alpha = 0.5f),
-                    ),
-                )
-            }
-        },
-        floatingActionButton = {
-            when (selectedTab) {
-                0 -> FloatingActionButton(
-                    onClick = { onNavigateToEditRecipe(null) },
-                    containerColor = CookncoOrange,
-                    contentColor = CookncoWhite,
-                ) {
-                    Icon(Icons.Outlined.Add, contentDescription = "New recipe")
-                }
-                1 -> FloatingActionButton(
-                    onClick = { onNavigateToEditCookbook(null) },
-                    containerColor = CookncoOrange,
-                    contentColor = CookncoWhite,
-                ) {
-                    Icon(Icons.Outlined.Add, contentDescription = "New cookbook")
-                }
-            }
-        },
-        containerColor = CookncoBackground,
+        // Green everywhere behind content, cream only inside cards — the one background
+        // every tab shares, so it lives here rather than being repeated per screen.
+        containerColor = CookncoGreen,
     ) { innerPadding ->
         when (selectedTab) {
-            0 -> HomeScreen(
+            MainTab.FEED -> HomeScreen(
                 user = user,
                 viewModel = homeViewModel,
                 onRecipeClick = onNavigateToRecipe,
                 onUserClick = onNavigateToUser,
                 modifier = Modifier.padding(innerPadding),
             )
-            1 -> CookbooksScreen(
+            MainTab.SEARCH -> RecipesScreen(
+                viewModel = recipesViewModel,
+                // RecipesScreen's back arrow doesn't belong on a tab — it still requires
+                // the callback (non-nullable), so this is a no-op rather than a pop.
+                // Phase 2, restyling this screen's header anyway, should make it
+                // optional the way UserProfileScreen.onNavigateBack already is.
+                onNavigateBack = {},
+                onRecipeClick = onNavigateToRecipe,
+                onUserClick = onNavigateToUser,
+                modifier = Modifier.padding(innerPadding),
+            )
+            MainTab.COOKBOOKS -> CookbooksScreen(
                 viewModel = cookbooksViewModel,
                 onCookbookClick = onNavigateToCookbook,
                 modifier = Modifier.padding(innerPadding),
             )
-            2 -> UserProfileScreen(
+            MainTab.PROFILE -> UserProfileScreen(
                 viewModel = profileViewModel,
                 onNavigateToEdit = onNavigateToEditProfile,
                 onNavigateToRecipe = onNavigateToRecipe,
@@ -230,109 +190,123 @@ fun MainScreen(
     }
 }
 
+/**
+ * The sticker-pill bottom nav: a cream, navy-bordered, fully-rounded pill holding the
+ * four tabs, plus a separate raised gold Create square that always starts a new recipe.
+ * Inactive tabs show only a navy icon; the active one becomes an orange segment with a
+ * white icon and label, sized to its content rather than sharing the pill equally — the
+ * three inactive icon-only slots split whatever width that leaves.
+ */
 @Composable
-private fun MainTopBar(
+private fun MainBottomBar(
+    selectedTab: MainTab,
+    onTabSelected: (MainTab) -> Unit,
+    onCreateClick: () -> Unit,
     user: UserInfo,
-    onMenuClick: () -> Unit,
-    onSearchClick: () -> Unit,
-    onProfileClick: () -> Unit,
-    onLogoutClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var accountMenuOpen by remember { mutableStateOf(false) }
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = CookncoBackground,
-        shadowElevation = 2.dp,
+    val pillShape = RoundedCornerShape(percent = 50)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
             modifier = Modifier
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .fillMaxWidth()
-                .height(60.dp)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .weight(1f)
+                .stickerShadow(pillShape, CookncoNavy, offsetX = 5.dp, offsetY = 5.dp)
+                .clip(pillShape)
+                .background(CookncoBackground)
+                .border(3.dp, CookncoNavy, pillShape)
+                .padding(5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Hamburger menu button
-            IconButton(
-                onClick = onMenuClick,
-                modifier = Modifier
-                    .size(44.dp)
-                    .border(1.5.dp, CookncoNavy, RoundedCornerShape(10.dp))
-                    .background(CookncoWhite, RoundedCornerShape(10.dp)),
-            ) {
-                Icon(Icons.Outlined.Menu, contentDescription = "Menu", tint = CookncoNavy)
-            }
+            NavTabItem(
+                selected = selectedTab == MainTab.FEED,
+                label = "Feed",
+                onClick = { onTabSelected(MainTab.FEED) },
+            ) { tint -> Icon(Icons.Outlined.Home, contentDescription = "Feed", tint = tint, modifier = Modifier.size(20.dp)) }
 
-            // Search bar — clickable, navigates to search screen
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(50.dp))
-                    .background(CookncoOrange)
-                    .border(1.5.dp, CookncoNavy, RoundedCornerShape(50.dp))
-                    .clickable(onClick = onSearchClick),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(horizontal = 14.dp),
-                ) {
-                    Icon(
-                        Icons.Outlined.Search,
-                        contentDescription = null,
-                        tint = CookncoWhite,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        text = "Search a recipe...",
-                        color = CookncoWhite.copy(alpha = 0.85f),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-            }
+            NavTabItem(
+                selected = selectedTab == MainTab.SEARCH,
+                label = "Search",
+                onClick = { onTabSelected(MainTab.SEARCH) },
+            ) { tint -> Icon(Icons.Outlined.Search, contentDescription = "Search", tint = tint, modifier = Modifier.size(20.dp)) }
 
-            // User avatar — tapping opens the account menu, which is where the web app
-            // keeps the way out of a session too. The profile is still one tap away on
-            // the bottom bar, so nothing is buried by hanging the menu here.
-            Box {
+            NavTabItem(
+                selected = selectedTab == MainTab.COOKBOOKS,
+                label = "Books",
+                onClick = { onTabSelected(MainTab.COOKBOOKS) },
+            ) { tint -> Icon(Icons.Outlined.MenuBook, contentDescription = "Cookbooks", tint = tint, modifier = Modifier.size(20.dp)) }
+
+            NavTabItem(
+                selected = selectedTab == MainTab.PROFILE,
+                label = "Me",
+                onClick = { onTabSelected(MainTab.PROFILE) },
+            ) { tint ->
                 UserAvatar(
                     userId = user.id,
                     version = user.version,
-                    contentDescription = "Account menu",
+                    contentDescription = "Profile",
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(22.dp)
                         .clip(CircleShape)
-                        .border(1.5.dp, CookncoNavy, CircleShape)
-                        .clickable { accountMenuOpen = true },
+                        .border(2.dp, tint, CircleShape),
                 )
-                DropdownMenu(
-                    expanded = accountMenuOpen,
-                    onDismissRequest = { accountMenuOpen = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("My profile") },
-                        leadingIcon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
-                        onClick = {
-                            accountMenuOpen = false
-                            onProfileClick()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Log out") },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null) },
-                        onClick = {
-                            accountMenuOpen = false
-                            onLogoutClick()
-                        },
-                    )
-                }
             }
+        }
+
+        StickerIconButton(
+            onClick = onCreateClick,
+            size = 58.dp,
+            shape = RoundedCornerShape(20.dp),
+            fillColor = CookncoGold,
+            shadowOffset = 5.dp,
+        ) {
+            Icon(Icons.Outlined.Add, contentDescription = "New recipe", tint = CookncoNavy, modifier = Modifier.size(26.dp))
+        }
+    }
+}
+
+/**
+ * One nav-bar slot. Selected: an orange pill sized to its icon+label, opaque white
+ * content. Unselected: icon only, navy tint, sharing the remaining width equally with
+ * the other unselected slots (`Modifier.weight(1f)`, hence the [RowScope] receiver).
+ */
+@Composable
+private fun RowScope.NavTabItem(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    icon: @Composable (tint: Color) -> Unit,
+) {
+    if (selected) {
+        Row(
+            modifier = Modifier
+                .height(44.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(CookncoOrange)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            icon(CookncoWhite)
+            Text(label, color = CookncoWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(44.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            icon(CookncoNavy)
         }
     }
 }
@@ -346,15 +320,14 @@ private val previewUser = UserInfo(
 
 @Preview(showBackground = true)
 @Composable
-fun MainTopBarPreview() {
+fun MainBottomBarPreview() {
     CookncoTheme {
-        Surface(color = CookncoBackground) {
-            MainTopBar(
+        Box(modifier = Modifier.background(CookncoGreen)) {
+            MainBottomBar(
+                selectedTab = MainTab.FEED,
+                onTabSelected = {},
+                onCreateClick = {},
                 user = previewUser,
-                onMenuClick = {},
-                onSearchClick = {},
-                onProfileClick = {},
-                onLogoutClick = {},
             )
         }
     }

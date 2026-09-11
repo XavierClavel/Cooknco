@@ -31,7 +31,9 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbookEditViewModel
 import com.xavierclavel.cooknco.ui.cookbook.CookbookScreen
 import com.xavierclavel.cooknco.ui.cookbook.CookbookViewModel
 import com.xavierclavel.cooknco.ui.main.MainScreen
+import com.xavierclavel.cooknco.ui.recipe.CookModeScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditScreen
+import com.xavierclavel.cooknco.ui.shopping.ShoppingListScreen
 import com.xavierclavel.cooknco.ui.user.UserEditScreen
 import com.xavierclavel.cooknco.ui.user.UserEditViewModel
 import com.xavierclavel.cooknco.ui.user.UserProfileScreen
@@ -51,12 +53,14 @@ private object Routes {
     const val RECIPE = "recipe/{recipeId}"
     const val RECIPE_EDIT = "recipe/{recipeId}/edit"
     const val RECIPE_CREATE = "recipe/create"
+    const val RECIPE_COOK_MODE = "recipe/{recipeId}/cook"
     const val COOKBOOK = "cookbook/{cookbookId}"
     const val COOKBOOK_EDIT = "cookbook/{cookbookId}/edit"
     const val COOKBOOK_CREATE = "cookbook/create"
     const val USER = "user/{userId}"
     const val USER_EDIT = "user/{userId}/edit"
     const val RECIPES = "recipes"
+    const val SHOPPING_LIST = "shopping_list"
 }
 
 @Composable
@@ -135,7 +139,6 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 user = user,
                 onLogout = viewModel::logout,
                 isLoggingOut = isLoggingOut,
-                onNavigateToSearch = { navController.navigate(Routes.RECIPES) },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 onNavigateToEditProfile = { navController.navigate("user/${user.id}/edit") },
                 onNavigateToRecipe = { recipeId ->
@@ -223,6 +226,17 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             )
         }
 
+        composable(
+            route = Routes.RECIPE_COOK_MODE,
+            arguments = listOf(navArgument("recipeId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val recipeId = backStackEntry.arguments?.read { getLongOrNull("recipeId") } ?: return@composable
+            CookModeScreen(
+                recipeId = recipeId,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
         // Cookbook create — must be declared BEFORE cookbook/{cookbookId}
         composable(route = Routes.COOKBOOK_CREATE) {
             val currentUserId = (authState as? AuthState.Authenticated)?.user?.id ?: 0L
@@ -301,6 +315,13 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateBack = { navController.popBackStack() },
                 onRecipeClick = { recipeId -> navController.navigate("recipe/$recipeId") },
                 onUserClick = { userId -> navController.navigate("user/$userId") },
+            )
+        }
+
+        // ── Shopping list ─────────────────────────────────────────────────────
+        composable(Routes.SHOPPING_LIST) {
+            ShoppingListScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

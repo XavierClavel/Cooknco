@@ -8,6 +8,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Compose Multiplatform's resource accessors (Res.drawable.*, Res.font.*) are generated
+// under this package rather than one derived from the (unset) Gradle project group.
+compose.resources {
+    packageOfResClass = "com.xavierclavel.cooknco.resources"
+}
+
 kotlin {
     android {
         namespace = "com.xavierclavel.cooknco.shared"
@@ -42,6 +48,7 @@ kotlin {
             implementation(libs.compose.ui)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.compose.material.icons.extended)
+            implementation(libs.compose.components.resources)
 
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.viewmodel.compose)
