@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -112,6 +113,13 @@ fun MainScreen(
         // Green everywhere behind content, cream only inside cards — the one background
         // every tab shares, so it lives here rather than being repeated per screen.
         containerColor = CookncoGreen,
+        // Each tab already applies its own statusBarsPadding()/navigationBarsPadding()
+        // (they have to — the same composables render standalone, without this Scaffold,
+        // via other routes, e.g. RecipesScreen via Routes.RECIPES). Scaffold's default
+        // contentWindowInsets would reserve that same top inset a second time here, since
+        // there's no topBar to consume it — hence the large empty gap under the status bar.
+        // Zero it out and let each screen keep owning its own insets.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { innerPadding ->
         when (selectedTab) {
             MainTab.FEED -> HomeScreen(
