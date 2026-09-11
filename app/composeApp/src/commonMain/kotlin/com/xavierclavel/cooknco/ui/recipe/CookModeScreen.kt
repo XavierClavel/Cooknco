@@ -43,7 +43,6 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
-import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
@@ -245,26 +244,6 @@ private fun CookModeContent(
                 }
             }
 
-            if (recipe.ingredients.isNotEmpty()) {
-                item {
-                    Column {
-                        Text(
-                            text = "INGREDIENTS",
-                            color = CookncoWhite,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            modifier = Modifier.padding(top = 24.dp, bottom = 10.dp),
-                        )
-                        StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowOffset = 5.dp) {
-                            Column {
-                                recipe.ingredients.forEach { ingredient -> CookModeIngredientRow(ingredient) }
-                            }
-                        }
-                    }
-                }
-            }
-
             if (!isLastStep) {
                 item {
                     Text(
@@ -312,33 +291,6 @@ private fun CookModeContent(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CookModeIngredientRow(ingredient: RecipeIngredientInfo, modifier: Modifier = Modifier) {
-    val amount = ingredient.amount
-    val amountLabel = when {
-        amount == null -> ""
-        amount == amount.toInt().toFloat() -> "${amount.toInt()} ${ingredient.unit.lowercase()}"
-        else -> "$amount ${ingredient.unit.lowercase()}"
-    }
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(9.dp))
-                .background(CookncoGreenLight)
-                .border(2.dp, CookncoNavy, RoundedCornerShape(9.dp)),
-        )
-        Text(ingredient.name, color = CookncoNavy, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        if (amountLabel.isNotBlank()) {
-            Text(amountLabel, color = CookncoNavy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
     }
 }
