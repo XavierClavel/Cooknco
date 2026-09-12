@@ -197,15 +197,48 @@ class RecipeService: KoinComponent {
         getEntityById(id).tagForDeletion().update()
     }
 
+    /**
+     * Takes a recipe out of the product without destroying it.
+     *
+     * A recipe that something still points at — a like, a cookbook — is kept whole instead,
+     * because it is not only its owner's any more. Callers must check `taggedForDeletion`
+     * themselves before calling this: it is the tag that says the owner asked, and nothing
+     * here reads it (see `LikeController.deleteLike`, which learned that the hard way).
+     *
+     * `delete()` is a *soft* delete here, and it leaves the children alone: Ebean only
+     * cascades a soft delete to a child that is soft-deletable itself
+     * (`DefaultPersister.deleteManyDetails`: `if (deleteMode.isHard() || targetDesc.isSoftDelete())`,
+     * commented "only cascade soft deletes when supported by target"). None of steps,
+     * ingredients, likes or cookbook links carry the annotation, so all of them survive —
+     * which is what makes the restore below give back a whole recipe rather than an empty one.
+     *
+     * The pictures survive for a different reason: nothing deletes them any more.
+     * `StorageService` reads owning rows over raw SQL, which does not apply the flag, so a
+     * deleted recipe still counts as their owner and they are never offered up as orphans.
+     */
     fun tryDelete(id: Long) {
         val recipe = getEntityById(id)
         val recipeInfo = recipe.toInfo(Locale.EN)
-        logger.info {recipe}
-        logger.info {"Has references: ${recipeInfo.likesCount > 0 || QCookbookRecipe().recipe.id.eq(recipe.id).exists()}"}
-        if (recipeInfo.likesCount > 0 || QCookbookRecipe().recipe.id.eq(recipe.id).exists()) return
+        val referenced = recipeInfo.likesCount > 0 || QCookbookRecipe().recipe.id.eq(recipe.id).exists()
+        logger.info { "Deleting recipe ${recipe.id} (${recipe.title}); has references: $referenced" }
+        if (referenced) return
         recipe.delete()
-        imageService.deleteImage(RECIPES_IMG_PATH, id, recipe.imageVersion)
-        imageService.deleteImage(RECIPES_THUMBNAIL_PATH, id, recipe.imageVersion)
+    }
+
+    /**
+     * Puts a soft-deleted recipe back, with everything that was still attached to it.
+     *
+     * Not reachable from the API — there is no screen for it — but this is the whole point
+     * of the flag, and the operator running it from a console should be running tested code
+     * rather than inventing the `update` on the spot.
+     */
+    fun restore(id: Long): Boolean {
+        val recipe = QRecipe().setIncludeSoftDeletes().id.eq(id).findOne() ?: return false
+        if (!recipe.deleted) return false
+        recipe.deleted = false
+        recipe.update()
+        logger.info { "Restored recipe ${recipe.id} (${recipe.title})" }
+        return true
     }
 
     private fun queryByOwner(username: String) =

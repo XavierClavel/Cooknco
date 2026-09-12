@@ -21,6 +21,7 @@ import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import io.ebean.Model
 import io.ebean.annotation.DbDefault
+import io.ebean.annotation.SoftDelete
 import jakarta.persistence.Column
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -73,6 +74,23 @@ class Recipe (
     var likes: MutableList<Like> = mutableListOf(),
 
     var taggedForDeletion: Boolean = false,
+
+    /**
+     * Set instead of removing the row — see [com.xavierclavel.services.RecipeService.tryDelete].
+     *
+     * Ebean hides a soft-deleted row from every query bean automatically, so a deleted
+     * recipe disappears from feeds, searches, profiles and exports without a single query
+     * gaining a predicate. What it does *not* do is destroy the recipe: the row, its steps,
+     * its ingredients and everything pointing at it stay exactly where they were, so a
+     * deletion made by mistake is one `update` away from being undone rather than gone.
+     *
+     * Raw SQL does not see this flag — Ebean can only apply it to its own queries — which is
+     * why `StorageService` still counts a deleted recipe as the owner of its pictures and
+     * leaves them alone.
+     */
+    @SoftDelete
+    @DbDefault("false")
+    var deleted: Boolean = false,
 
     //Moderation
     /** Hidden recipes stay in database but are only served to their owner and to admins. */
