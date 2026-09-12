@@ -38,10 +38,10 @@ enum class IngredientSort(val value: String) {
     NAME("NAME_ASCENDING"),
 }
 
-enum class RecipeSort(val value: String, val label: String) {
-    RECENT("DATE_DESCENDING", "Recent"),
-    BEST_MATCH("BEST_MATCH", "Best match"),
-    MOST_LIKED("LIKES_DESCENDING", "Most liked"),
+enum class RecipeSort(val value: String) {
+    RECENT("DATE_DESCENDING"),
+    BEST_MATCH("BEST_MATCH"),
+    MOST_LIKED("LIKES_DESCENDING"),
 }
 
 class RecipeApi(private val client: HttpClient) {

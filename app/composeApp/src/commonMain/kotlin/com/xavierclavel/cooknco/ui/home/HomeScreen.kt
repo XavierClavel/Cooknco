@@ -55,19 +55,8 @@ import com.xavierclavel.cooknco.ui.theme.StickerCard
 import kotlin.time.Clock
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.format.DayOfWeekNames
-import kotlinx.datetime.format.MonthNames
-import kotlinx.datetime.format.char
 import kotlinx.datetime.toLocalDateTime
 
-private val headerDateFormat = LocalDateTime.Format {
-    dayOfWeek(DayOfWeekNames.ENGLISH_FULL)
-    char(',')
-    char(' ')
-    day()
-    char(' ')
-    monthName(MonthNames.ENGLISH_FULL)
-}
 
 @Composable
 fun HomeScreen(
@@ -154,7 +143,7 @@ private fun HomeHeader(user: UserInfo, onAvatarClick: () -> Unit, modifier: Modi
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = headerDateFormat.format(today).uppercase(),
+                text = s.fullDate(today.date).uppercase(),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,

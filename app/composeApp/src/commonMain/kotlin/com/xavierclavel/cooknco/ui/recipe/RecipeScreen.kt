@@ -122,17 +122,16 @@ private fun scaleAmount(amount: Float?, selectedYield: Int, recipeYield: Int): S
     else ((scaled * 100).roundToInt() / 100f).toString().trimEnd('0').trimEnd('.')
 }
 
-// Matches the day-of-month + full month name convention HomeViewModel already uses for
-// recipe dates, just without the year (the owner-actions sheet's "published 22 March").
-private val publishedDateFormat = LocalDate.Format {
-    day()
-    char(' ')
-    monthName(MonthNames.ENGLISH_FULL)
-}
-
-private fun publishedLabel(creationDate: Long): String {
+/**
+ * "published 22 March", for the owner-actions sheet.
+ *
+ * The date is built by the catalogue rather than by a `LocalDate.Format` here: the format
+ * carried `MonthNames.ENGLISH_FULL`, which is a month table in one language sitting outside
+ * the one place month names are supposed to live.
+ */
+private fun publishedLabel(creationDate: Long, s: Strings): String {
     val date = Instant.fromEpochSeconds(creationDate).toLocalDateTime(TimeZone.currentSystemDefault()).date
-    return "published ${publishedDateFormat.format(date)}"
+    return s.publishedOn(s.dayAndMonth(date))
 }
 
 private enum class RecipeTab { INGREDIENTS, STEPS, NOTES }
@@ -384,9 +383,9 @@ private fun RecipeContent(
                                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    recipe.preparationTime?.let { MetaStat(label = "PREP", value = "$it min", modifier = Modifier.weight(1f)) }
-                                    recipe.cookingTime?.let { MetaStat(label = "COOK", value = "$it min", modifier = Modifier.weight(1f)) }
-                                    recipe.cookingTemperature?.let { MetaStat(label = "OVEN", value = "$it °C", modifier = Modifier.weight(1f)) }
+                                    recipe.preparationTime?.let { MetaStat(label = s.prepCaps, value = s.minutes(it), modifier = Modifier.weight(1f)) }
+                                    recipe.cookingTime?.let { MetaStat(label = s.cookCaps, value = s.minutes(it), modifier = Modifier.weight(1f)) }
+                                    recipe.cookingTemperature?.let { MetaStat(label = s.ovenCaps, value = s.degrees(it), modifier = Modifier.weight(1f)) }
                                 }
                             }
                         }
@@ -533,7 +532,7 @@ private fun LazyListScope.ingredientsTab(
                         contentAlignment = Alignment.Center,
                     ) { Icon(Icons.Outlined.Remove, contentDescription = s.decrease, tint = CookncoNavy) }
                     Text(
-                        "${uiState.selectedYield} pcs",
+                        s.portions(uiState.selectedYield),
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = CookncoNavy,
@@ -910,7 +909,11 @@ private fun RecipeActionSheet(
                         Column(modifier = Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 12.dp)) {
                             Text(recipe.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
                             Text(
-                                text = if (isOwner) "Your recipe · ${publishedLabel(recipe.creationDate)}" else publishedLabel(recipe.creationDate).replaceFirstChar(Char::uppercase),
+                                text = if (isOwner) {
+                                    s.yourRecipe + " · " + publishedLabel(recipe.creationDate, s)
+                                } else {
+                                    publishedLabel(recipe.creationDate, s).replaceFirstChar(Char::uppercase)
+                                },
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = CookncoGreenDark,

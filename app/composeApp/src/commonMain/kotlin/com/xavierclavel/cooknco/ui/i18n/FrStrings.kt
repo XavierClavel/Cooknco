@@ -2,6 +2,8 @@ package com.xavierclavel.cooknco.ui.i18n
 
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
 import com.xavierclavel.cooknco.network.IngredientSort
+import com.xavierclavel.cooknco.ui.recipe.SearchScope
+import com.xavierclavel.cooknco.network.RecipeSort
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
@@ -78,8 +80,21 @@ object FrStrings : Strings {
     override fun stepsCount(count: Int) = if (count == 1) "1 étape" else "$count étapes"
     override fun aboutMinutesInTotal(minutes: Int) = "environ $minutes min au total"
     override fun ovenAt(temperature: Int) = "four à $temperature °C"
+    override val portionsUnit = "parts"
+    override val minutesUnit = "min"
+    override val degreesUnit = "°C"
+    override fun portions(count: Int) = if (count == 1) "1 part" else "$count parts"
+    override fun publishedOn(date: String) = "publiée le $date"
+    override fun dayAndMonth(date: LocalDate) = "${date.day} ${monthName(date.month)}"
+    override val yourRecipe = "Votre recette"
+    override val prepCaps = "PRÉPA"
+    override val cookCaps = "CUISSON"
+    override val ovenCaps = "FOUR"
+    override fun minutes(value: Int) = "$value min"
+    override fun degrees(value: Int) = "$value °C"
     override val serves = "Pour"
 
+    override fun fullDate(date: LocalDate) = "${weekday(date.dayOfWeek)} ${date.day} ${monthName(date.month)}"
     override val whatsCooking = "On cuisine quoi ?"
     override val yourProfile = "Votre profil"
     override fun newRecipesCount(count: Int) = if (count == 1) "1 nouvelle recette" else "$count nouvelles recettes"
@@ -166,20 +181,39 @@ object FrStrings : Strings {
     override fun revokeQuestion(client: String) = "Révoquer $client ?"
     override val revokeMessage = "Elle perd l'accès à vos recettes immédiatement, même si elle est connectée en ce moment. Vous pourrez la reconnecter depuis l'application elle-même."
     override val revoke = "Révoquer"
-    override val connected = "Connecté"
-    override val used = "utilisé"
 
     override fun followersTab(count: Int) = "Abonnés $count"
     override fun followingTab(count: Int) = "Abonnements $count"
+    override fun followingSince(days: Long) = "Vous suit depuis ${duration(days)}"
+    override fun requestedSince(days: Long) = "Demandé ${ago(days)}"
+    override fun followedSince(days: Long) = "Depuis ${duration(days)}"
+    override fun connectedSince(days: Long) = "Connecté ${ago(days)}"
+    override fun usedSince(days: Long) = "utilisé ${ago(days)}"
+
+    /** "il y a 3 jours" — what hangs off "Demandé", where English says "3 days ago". */
+    private fun ago(days: Long) = when {
+        days <= 0L -> "aujourd'hui"
+        days == 1L -> "hier"
+        else -> "il y a ${duration(days)}"
+    }
+
+    /** The span itself, for the phrasings that already carry their own "depuis". */
+    private fun duration(days: Long) = when {
+        days <= 0L -> "aujourd'hui"
+        days == 1L -> "hier"
+        days < 30L -> "$days jours"
+        days < 60L -> "1 mois"
+        days < 365L -> "${days / 30} mois"
+        days < 730L -> "1 an"
+        else -> "${days / 365} ans"
+    }
+
     override val pendingRequests = "DEMANDES EN ATTENTE"
     override fun acceptedCount(count: Int) = "ACCEPTÉS · $count"
     override val noFollowersYet = "Aucun abonné pour l'instant"
-    override val followingSince = "Vous suit depuis"
     override val requestedWaiting = "DEMANDÉ — EN ATTENTE DE LEUR RÉPONSE"
-    override val requested = "Demandé"
     override fun followingCount(count: Int) = "ABONNEMENTS · $count"
     override val notFollowingAnyone = "Vous ne suivez personne pour l'instant"
-    override val since = "Depuis"
     override val unfollow = "Se désabonner"
     override fun unfollowQuestion(name: String) = "Ne plus suivre $name ?"
     override fun unfollowMessage(name: String) =
@@ -192,6 +226,7 @@ object FrStrings : Strings {
     override val shared = "Partagé"
     override val recipes = "Recettes"
     override val members = "Membres"
+    override fun memberCount(count: Int) = if (count == 1) "1 membre" else "$count membres"
     override val leaveCookbook = "Quitter le carnet"
     override val leaveCookbookQuestion = "Voulez-vous vraiment quitter ce carnet ?"
     override val leave = "Quitter"
@@ -237,6 +272,20 @@ object FrStrings : Strings {
     override val noUsersYet = "Aucun utilisateur"
     override fun recipeCount(count: Int) = if (count == 1) "1 recette" else "$count recettes"
     override fun userCount(count: Int) = if (count == 1) "1 utilisateur" else "$count utilisateurs"
+
+    override fun searchScopeName(scope: SearchScope) = when (scope) {
+        SearchScope.ALL -> "Tout"
+        SearchScope.RECIPES -> "Recettes"
+        SearchScope.USERS -> "Personnes"
+        SearchScope.COOKBOOKS -> "Carnets"
+        SearchScope.INGREDIENTS -> "Aliments"
+    }
+
+    override fun recipeSortName(sort: RecipeSort) = when (sort) {
+        RecipeSort.RECENT -> "Récentes"
+        RecipeSort.BEST_MATCH -> "Pertinence"
+        RecipeSort.MOST_LIKED -> "Les plus aimées"
+    }
 
     override fun ingredientCount(count: Int) = if (count == 1) "1 ingrédient" else "$count ingrédients"
     override fun ingredientSortName(sort: IngredientSort) = when (sort) {
@@ -335,6 +384,8 @@ object FrStrings : Strings {
         "TEASPOON" -> "c. à c."
         "TABLESPOON" -> "c. à s."
         "CUP" -> "tasse"
+        "PIECE" -> "pièce"
+        "PINCH" -> "pincée"
         else -> value
     }
 

@@ -38,12 +38,12 @@ import kotlinx.coroutines.launch
  * "Search — recipes scope". [RECIPES] is the default so opening the screen with a blank
  * query behaves exactly as it always has; the rest are opt-in via the scope pills.
  */
-enum class SearchScope(val label: String) {
-    ALL("All"),
-    RECIPES("Recipes"),
-    USERS("Users"),
-    COOKBOOKS("Books"),
-    INGREDIENTS("Food"),
+enum class SearchScope {
+    ALL,
+    RECIPES,
+    USERS,
+    COOKBOOKS,
+    INGREDIENTS,
 }
 
 data class RecipesUiState(

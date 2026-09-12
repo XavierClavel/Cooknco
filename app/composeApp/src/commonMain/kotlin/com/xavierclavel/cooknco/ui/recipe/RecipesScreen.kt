@@ -310,9 +310,10 @@ private fun ScopePillsRow(
         modifier = modifier.fillMaxWidth().horizontalScroll(scrollState),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        SearchScope.entries.forEach { s ->
-            val selected = s == scope
-            val count = counts[s]
+        val copy = strings()
+        SearchScope.entries.forEach { pill ->
+            val selected = pill == scope
+            val count = counts[pill]
             val fill by animateColorAsState(
                 targetValue = if (selected) CookncoNavy else CookncoBackground,
                 animationSpec = stickerSwitchSpec(),
@@ -330,9 +331,10 @@ private fun ScopePillsRow(
                 fillColor = fill,
                 contentColor = content,
                 contentPadding = PaddingValues(horizontal = 13.dp),
-                onClick = { onScopeSelected(s) },
+                onClick = { onScopeSelected(pill) },
             ) {
-                val label = if (count != null) "${s.label} ${count.value}${if (count.approximate) "+" else ""}" else s.label
+                val name = copy.searchScopeName(pill)
+                val label = if (count != null) "$name ${count.value}${if (count.approximate) "+" else ""}" else name
                 Text(text = label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
             }
         }
@@ -524,7 +526,7 @@ private fun RecipesScopeContent(
                     expanded = sortExpanded,
                     onDismissRequest = { sortExpanded = false },
                     items = RecipeSort.entries.filter { it != RecipeSort.BEST_MATCH || query.isNotBlank() },
-                    label = { it.label },
+                    label = { s.recipeSortName(it) },
                     selected = { it == activeSort },
                     onSelect = { onSortChange(it); sortExpanded = false },
                     alignEnd = true,
@@ -538,7 +540,7 @@ private fun RecipesScopeContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Text(activeSort.label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                        Text(s.recipeSortName(activeSort), fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
                         Text(
                             text = if (sortExpanded) "\u25b4" else "\u25be",
                             fontSize = 10.sp,
@@ -741,6 +743,7 @@ private fun CookbooksScopeContent(
 
 @Composable
 private fun CookbookResultCard(cookbook: CookbookInfo, onClick: () -> Unit) {
+    val s = strings()
     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), onClick = onClick) {
         Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CookbookImage(
@@ -759,7 +762,7 @@ private fun CookbookResultCard(cookbook: CookbookInfo, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${cookbook.recipesCount} recipes · ${cookbook.usersCount} members",
+                    text = s.recipeCount(cookbook.recipesCount) + " · " + s.memberCount(cookbook.usersCount),
                     fontSize = 12.5.sp,
                     color = CookncoNavy.copy(alpha = 0.62f),
                 )

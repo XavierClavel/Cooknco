@@ -103,7 +103,7 @@ fun IngredientScreen(
             ) {
                 IngredientCard(ingredient = ingredient, s = s)
 
-                if (ingredient.allowedTypes.isNotEmpty() || ingredient.defaultUnit != null) {
+                if (uiState.units.isNotEmpty()) {
                     SectionHeading(s.measuredIn)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -111,12 +111,13 @@ fun IngredientScreen(
                     ) {
                         // The default first and gold, the rest cream: the picker in the
                         // editor opens on that one, so the page says which it is.
-                        ingredient.defaultUnit?.let { unit ->
-                            UnitChip(label = s.unitDefault(s.unitName(unit)), isDefault = true)
+                        val defaultUnit = uiState.units.firstOrNull { it.name == ingredient.defaultUnit }
+                        defaultUnit?.let { unit ->
+                            UnitChip(label = s.unitDefault(s.unitName(unit.name)), isDefault = true)
                         }
-                        ingredient.allowedTypes
-                            .filterNot { it == ingredient.defaultUnit }
-                            .forEach { UnitChip(label = s.unitName(it), isDefault = false) }
+                        uiState.units
+                            .filterNot { it.name == defaultUnit?.name || it.name == "NONE" }
+                            .forEach { UnitChip(label = s.unitName(it.name), isDefault = false) }
                     }
                 }
 

@@ -7,6 +7,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.xavierclavel.cooknco.data.AppLocale
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
 import com.xavierclavel.cooknco.network.IngredientSort
+import com.xavierclavel.cooknco.ui.recipe.SearchScope
+import com.xavierclavel.cooknco.network.RecipeSort
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
@@ -104,9 +106,22 @@ interface Strings {
     fun stepsCount(count: Int): String
     fun aboutMinutesInTotal(minutes: Int): String
     fun ovenAt(temperature: Int): String
+    val portionsUnit: String
+    val minutesUnit: String
+    val degreesUnit: String
+    fun portions(count: Int): String
+    fun publishedOn(date: String): String
+    fun dayAndMonth(date: LocalDate): String
+    val yourRecipe: String
+    val prepCaps: String
+    val cookCaps: String
+    val ovenCaps: String
+    fun minutes(value: Int): String
+    fun degrees(value: Int): String
     val serves: String
 
     // ── Feed, continued ───────────────────────────────────────────────────────
+    fun fullDate(date: LocalDate): String
     val whatsCooking: String
     val yourProfile: String
     fun newRecipesCount(count: Int): String
@@ -169,21 +184,21 @@ interface Strings {
     fun revokeQuestion(client: String): String
     val revokeMessage: String
     val revoke: String
-    val connected: String
-    val used: String
 
     // ── Followers and following ───────────────────────────────────────────────
     fun followersTab(count: Int): String
     fun followingTab(count: Int): String
+    fun followingSince(days: Long): String
+    fun requestedSince(days: Long): String
+    fun followedSince(days: Long): String
+    fun connectedSince(days: Long): String
+    fun usedSince(days: Long): String
     val pendingRequests: String
     fun acceptedCount(count: Int): String
     val noFollowersYet: String
-    val followingSince: String
     val requestedWaiting: String
-    val requested: String
     fun followingCount(count: Int): String
     val notFollowingAnyone: String
-    val since: String
     val unfollow: String
     fun unfollowQuestion(name: String): String
     fun unfollowMessage(name: String): String
@@ -196,6 +211,7 @@ interface Strings {
     val shared: String
     val recipes: String
     val members: String
+    fun memberCount(count: Int): String
     val leaveCookbook: String
     val leaveCookbookQuestion: String
     val leave: String
@@ -238,6 +254,8 @@ interface Strings {
     fun recipeCount(count: Int): String
     fun userCount(count: Int): String
 
+    fun searchScopeName(scope: SearchScope): String
+    fun recipeSortName(sort: RecipeSort): String
     fun ingredientCount(count: Int): String
     fun ingredientSortName(sort: IngredientSort): String
     // ── Profile ───────────────────────────────────────────────────────────────

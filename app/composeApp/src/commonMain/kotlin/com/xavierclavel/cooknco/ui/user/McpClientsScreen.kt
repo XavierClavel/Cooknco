@@ -192,8 +192,8 @@ private fun McpClientRow(client: McpClientInfo, isRevoking: Boolean, onRevoke: (
                 )
             }
             Text(
-                text = followedSinceLabel(s.connected, client.grantedAt) +
-                    " · " + followedSinceLabel(s.used, client.lastUsedAt).lowercase(),
+                text = s.connectedSince(daysSince(client.grantedAt)) +
+                    " · " + s.usedSince(daysSince(client.lastUsedAt)),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
                 color = CookncoNavy.copy(alpha = 0.55f),

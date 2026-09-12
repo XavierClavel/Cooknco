@@ -178,7 +178,7 @@ private fun FollowersList(
                 accepted.forEachIndexed { index, entry ->
                     FollowUserRow(
                         user = entry.user,
-                        meta = followedSinceLabel(s.followingSince, entry.followedSince),
+                        meta = s.followingSince(daysSince(entry.followedSince)),
                         onClick = { onUserClick(entry.user.id) },
                     )
                     if (index != accepted.lastIndex) FollowRowDivider()
@@ -213,7 +213,7 @@ private fun FollowingList(
                 requested.forEachIndexed { index, entry ->
                     FollowUserRow(
                         user = entry.user,
-                        meta = followedSinceLabel(s.requested, entry.followedSince),
+                        meta = s.requestedSince(daysSince(entry.followedSince)),
                         onClick = { onUserClick(entry.user.id) },
                     ) {
                         if (actioningUserId == entry.user.id) {
@@ -235,7 +235,7 @@ private fun FollowingList(
                 following.forEachIndexed { index, entry ->
                     FollowUserRow(
                         user = entry.user,
-                        meta = followedSinceLabel(s.since, entry.followedSince),
+                        meta = s.followedSince(daysSince(entry.followedSince)),
                         onClick = { onUserClick(entry.user.id) },
                     ) {
                         if (actioningUserId == entry.user.id) {
@@ -355,7 +355,7 @@ private fun PendingFollowerRow(
     val s = strings()
     FollowUserRow(
         user = entry.user,
-        meta = followedSinceLabel(s.requested, entry.followedSince),
+        meta = s.requestedSince(daysSince(entry.followedSince)),
         onClick = onClick,
     ) {
         if (isActioning) {

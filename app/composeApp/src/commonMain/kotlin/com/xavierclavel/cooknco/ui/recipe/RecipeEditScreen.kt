@@ -527,15 +527,24 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
  * because "5 minutes" is a sensible nudge for a time and a useless one for an oven.
  */
 private enum class RecipeNumber(
-    val unit: String,
     val step: Int,
     val max: Int,
     val presets: List<Int>,
 ) {
-    YIELD("pcs", 1, 999, listOf(1, 2, 4, 6, 8, 12)),
-    PREP("min", 5, 1440, listOf(5, 10, 15, 30, 60)),
-    COOK("min", 5, 1440, listOf(10, 20, 35, 60, 90)),
-    TEMP("°C", 10, 300, listOf(150, 180, 200, 220, 240));
+    YIELD(1, 999, listOf(1, 2, 4, 6, 8, 12)),
+    PREP(5, 1440, listOf(5, 10, 15, 30, 60)),
+    COOK(5, 1440, listOf(10, 20, 35, 60, 90)),
+    TEMP(10, 300, listOf(150, 180, 200, 220, 240));
+
+    /**
+     * Minutes and degrees are symbols; portions are a word, and words differ per language —
+     * which is why this comes from the catalogue rather than from a constructor argument.
+     */
+    fun unit(s: Strings) = when (this) {
+        YIELD -> s.portionsUnit
+        PREP, COOK -> s.minutesUnit
+        TEMP -> s.degreesUnit
+    }
 
     fun title(s: Strings) = when (this) {
         YIELD -> s.yieldLabel
@@ -571,8 +580,8 @@ private enum class RecipeNumber(
     }
 
     /** "1 h 30" reads better than "90 min" on a preset chip; the row itself stays in minutes. */
-    fun labelFor(value: Int): String = when {
-        unit != "min" -> "$value $unit"
+    fun labelFor(value: Int, s: Strings): String = when {
+        this != PREP && this != COOK -> "$value ${unit(s)}"
         value >= 60 && value % 60 == 0 -> "${value / 60} h"
         value >= 60 -> "${value / 60} h ${value % 60}"
         else -> "$value min"
@@ -620,7 +629,7 @@ private fun NumberStepperRow(
                 onClick = { onValueChange((value - number.step).coerceAtLeast(0)) },
             )
             Text(
-                text = if (value > 0) "$value ${number.unit}" else "—",
+                text = if (value > 0) "$value ${number.unit(s)}" else "—",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (value > 0) CookncoNavy else CookncoNavy.copy(alpha = 0.4f),
@@ -760,7 +769,7 @@ private fun NumberPickerSheet(
                                         color = CookncoNavy,
                                     )
                                 }
-                                Text(number.unit, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+                                Text(number.unit(s), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
                             }
                             StickerCard(
                                 modifier = Modifier.size(56.dp),
@@ -786,7 +795,7 @@ private fun NumberPickerSheet(
                         ) {
                             number.presets.forEach { preset ->
                                 PresetChip(
-                                    label = number.labelFor(preset),
+                                    label = number.labelFor(preset, s),
                                     selected = draft == preset,
                                     onClick = { draft = preset; typing = false },
                                 )
@@ -830,7 +839,7 @@ private fun NumberPickerSheet(
                         onClick = { onConfirm(draft) },
                     ) {
                         Text(
-                            text = if (draft > 0) s.setValue(number.labelFor(draft)) else s.clearValue,
+                            text = if (draft > 0) s.setValue(number.labelFor(draft, s)) else s.clearValue,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = CookncoWhite,

@@ -139,20 +139,17 @@ fun FollowTabs(
 }
 
 /**
- * A short "since"/"ago" label for a `FollowInfo.followedSince` epoch-seconds timestamp —
- * there is no relative-time formatter elsewhere in the client to share, so this mirrors
- * `HomeViewModel.groupByDate`'s day-diff approach rather than inventing a new one.
+ * How many days ago something happened, for the catalogue to put into words.
+ *
+ * It used to return the words itself — `"$prefix $diffDays days ago"` — with the prefix
+ * translated and the rest not, which is how "Vous suit depuis 1y ago" got on screen. The
+ * duration cannot be assembled from parts across languages anyway: English hangs it off the
+ * end ("Requested 3 days ago"), French puts it inside ("Demandé il y a 3 jours"), and
+ * "depuis" wants no "il y a" at all.
  */
-fun followedSinceLabel(prefix: String, epochSeconds: Long): String {
+fun daysSince(epochSeconds: Long): Long {
     val timeZone = TimeZone.currentSystemDefault()
     val today = Clock.System.now().toLocalDateTime(timeZone).date
     val day = Instant.fromEpochSeconds(epochSeconds).toLocalDateTime(timeZone).date
-    val diffDays = today.toEpochDays() - day.toEpochDays()
-    return when {
-        diffDays <= 0L -> "$prefix today"
-        diffDays == 1L -> "$prefix yesterday"
-        diffDays < 30L -> "$prefix $diffDays days ago"
-        diffDays < 365L -> "$prefix ${diffDays / 30} mo ago"
-        else -> "$prefix ${diffDays / 365}y ago"
-    }
+    return (today.toEpochDays() - day.toEpochDays()).coerceAtLeast(0L)
 }

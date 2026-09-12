@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.RecipeRepository
+import com.xavierclavel.cooknco.data.UnitRepository
+import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.RecipeSort
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
@@ -19,6 +21,14 @@ import kotlinx.coroutines.launch
 
 data class IngredientUiState(
     val ingredient: IngredientSummary? = null,
+    /**
+     * The units it can actually be measured in.
+     *
+     * `IngredientSummary.allowedTypes` holds measurement *types* — WEIGHT, VOLUME — not
+     * units, so showing it directly printed the enum names on screen. The unit catalogue is
+     * what turns a type into "g", "kg", "tablespoon", exactly as the editor's picker does.
+     */
+    val units: List<UnitInfo> = emptyList(),
     /** This cook's own recipes built on it, newest first. */
     val mine: List<RecipeOverview> = emptyList(),
     /** Everyone's, most liked first — the same query without the owner. */
@@ -41,6 +51,7 @@ data class IngredientUiState(
  */
 class IngredientViewModel(
     private val repo: RecipeRepository,
+    private val unitRepo: UnitRepository,
     private val ingredientId: Long,
     private val currentUserId: Long,
 ) : ViewModel() {
@@ -51,10 +62,12 @@ class IngredientViewModel(
     init {
         viewModelScope.launch {
             val ingredient = async { repo.getIngredient(ingredientId) }
+            val units = async { unitRepo.getUnits() }
             val mine = async { repo.recipesWithIngredient(ingredientId, ownerId = currentUserId) }
             val popular = async { repo.recipesWithIngredient(ingredientId, sort = RecipeSort.MOST_LIKED) }
 
             val ingredientResult = ingredient.await()
+            val unitCatalogue = units.await()
             val mineList = mine.await().getOrDefault(emptyList())
             val popularList = popular.await().getOrDefault(emptyList())
             val mineIds = mineList.mapTo(HashSet()) { it.id }
@@ -64,6 +77,9 @@ class IngredientViewModel(
                     _uiState.update {
                         it.copy(
                             ingredient = found,
+                            units = unitCatalogue.filter { unit ->
+                                found.allowedTypes.isEmpty() || unit.type in found.allowedTypes
+                            },
                             mine = mineList,
                             popular = popularList.filterNot { recipe -> recipe.id in mineIds },
                             isLoading = false,
@@ -76,7 +92,9 @@ class IngredientViewModel(
 
     companion object {
         fun factory(ingredientId: Long, currentUserId: Long): ViewModelProvider.Factory = viewModelFactory {
-            initializer { IngredientViewModel(AppGraph.recipeRepository, ingredientId, currentUserId) }
+            initializer {
+                IngredientViewModel(AppGraph.recipeRepository, AppGraph.unitRepository, ingredientId, currentUserId)
+            }
         }
     }
 }

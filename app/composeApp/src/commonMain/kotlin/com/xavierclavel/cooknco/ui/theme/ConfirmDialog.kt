@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xavierclavel.cooknco.ui.i18n.strings
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
@@ -49,7 +50,12 @@ fun StickerConfirmDialog(
     onConfirm: () -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
-    dismissText: String = "Cancel",
+    /**
+     * Null takes the catalogue's word for it. A literal default here would be one English
+     * string every caller inherits without ever naming it — which is exactly how "Cancel"
+     * survived the translation of every screen that shows this dialog.
+     */
+    dismissText: String? = null,
     isConfirming: Boolean = false,
     iconColor: Color = MaterialTheme.colorScheme.error,
     confirmColor: Color = MaterialTheme.colorScheme.error,
@@ -132,7 +138,7 @@ fun StickerConfirmDialog(
                             onClick = if (!isConfirming) onDismissRequest else null,
                         ) {
                             Text(
-                                text = dismissText,
+                                text = dismissText ?: strings().cancel,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = CookncoNavy,

@@ -347,7 +347,7 @@ private fun ProfileContent(
         StickerConfirmDialog(
             icon = Icons.Outlined.PersonRemove,
             title = s.unfollowQuestion(user.username),
-            message = "You'll stop seeing ${user.username}'s recipes in your feed. You can follow them again anytime.",
+            message = s.unfollowMessage(user.username),
             confirmText = s.unfollow,
             isConfirming = isFollowLoading,
             onConfirm = onToggleFollow,
