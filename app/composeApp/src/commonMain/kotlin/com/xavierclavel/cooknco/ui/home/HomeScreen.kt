@@ -15,9 +15,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,11 +77,11 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val s = strings()
-    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
 
     val reachedEnd by remember {
         derivedStateOf {
-            val info = listState.layoutInfo
+            val info = gridState.layoutInfo
             val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
             last >= info.totalItemsCount - 3
         }
@@ -90,13 +93,17 @@ fun HomeScreen(
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         HomeHeader(user = user, onAvatarClick = onProfileClick)
 
-        LazyColumn(
-            state = listState,
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            state = gridState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             uiState.dateGroups.forEach { group ->
-                item(key = "header_${group.key}") {
+                // A date is a heading over the rows beneath it, not a cell beside one.
+                item(key = "header_${group.key}", span = { GridItemSpan(2) }) {
                     DateGroupHeader(label = s.dateGroup(group.key), count = group.recipes.size)
                 }
                 items(group.recipes, key = { it.id }) { recipe ->
@@ -104,13 +111,12 @@ fun HomeScreen(
                         recipe = recipe,
                         onClick = { onRecipeClick(recipe.id) },
                         onUserClick = onUserClick,
-                        modifier = Modifier.padding(bottom = 16.dp),
                     )
                 }
             }
 
             if (uiState.isLoading) {
-                item {
+                item(span = { GridItemSpan(2) }) {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                         contentAlignment = Alignment.Center,
@@ -121,7 +127,7 @@ fun HomeScreen(
             }
 
             if (uiState.error != null) {
-                item {
+                item(span = { GridItemSpan(2) }) {
                     Text(
                         text = uiState.error!!,
                         color = MaterialTheme.colorScheme.error,
@@ -130,7 +136,7 @@ fun HomeScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(24.dp)) }
+            item(span = { GridItemSpan(2) }) { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
@@ -216,7 +222,8 @@ private fun RecipeCard(
 ) {
     StickerCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
+        shadowOffset = 5.dp,
         onClick = onClick,
     ) {
         Column {
@@ -224,35 +231,49 @@ private fun RecipeCard(
                 recipeId = recipe.id,
                 version = recipe.version,
                 contentDescription = recipe.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(176.dp),
+                // An aspect rather than a fixed height, so the picture is the same shape in
+                // both columns however wide the handset is.
+                modifier = Modifier.fillMaxWidth().aspectRatio(1.15f),
             )
             Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(CookncoNavy))
 
             Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = recipe.title,
-                    fontSize = 22.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
+                    // Two lines of room whether the title needs them or not: side by side, a
+                    // one-line title next to a two-line one leaves the row ragged and the
+                    // shorter card stubby.
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    lineHeight = 19.sp,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AuthorChip(owner = recipe.owner, onClick = { onUserClick(recipe.owner.id) })
-                    Spacer(Modifier.weight(1f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    // The author is what makes this a feed rather than a list of recipes, so
+                    // it stays. It yields its width rather than taking it: a long username
+                    // ellipsises instead of pushing the likes off the card.
+                    AuthorChip(
+                        owner = recipe.owner,
+                        onClick = { onUserClick(recipe.owner.id) },
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(percent = 50))
                             .background(CookncoOrange)
                             .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .padding(horizontal = 7.dp, vertical = 3.dp),
                     ) {
-                        LikeCount(count = recipe.likesCount, color = CookncoWhite)
+                        LikeCount(count = recipe.likesCount, color = CookncoWhite, fontSize = 11.5.sp, iconSize = 12.dp)
                     }
                 }
             }
@@ -268,21 +289,21 @@ private fun AuthorChip(owner: RecipeOwner, onClick: () -> Unit = {}, modifier: M
             .background(CookncoWhite)
             .border(2.dp, CookncoNavy, RoundedCornerShape(50.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 3.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         UserAvatar(
             userId = owner.id,
             version = owner.version,
             contentDescription = null,
             modifier = Modifier
-                .size(22.dp)
+                .size(18.dp)
                 .clip(CircleShape),
         )
         Text(
             text = owner.username,
-            fontSize = 12.5.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = CookncoNavy,
             maxLines = 1,
@@ -318,11 +339,18 @@ fun HomeScreenPreview() {
     CookncoTheme {
         Column(modifier = Modifier.fillMaxSize().background(CookncoGreen)) {
             HomeHeader(user = previewUser, onAvatarClick = {})
-            LazyColumn(contentPadding = PaddingValues(horizontal = 18.dp)) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
                 previewGroups.forEach { group ->
-                    item { DateGroupHeader(label = EnStrings.dateGroup(group.key), count = group.recipes.size) }
+                    item(span = { GridItemSpan(2) }) {
+                        DateGroupHeader(label = EnStrings.dateGroup(group.key), count = group.recipes.size)
+                    }
                     items(group.recipes, key = { it.id }) { recipe ->
-                        RecipeCard(recipe = recipe, onClick = {}, modifier = Modifier.padding(bottom = 16.dp))
+                        RecipeCard(recipe = recipe, onClick = {})
                     }
                 }
             }
