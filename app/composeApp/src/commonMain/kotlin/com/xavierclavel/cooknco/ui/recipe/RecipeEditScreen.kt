@@ -18,19 +18,23 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material3.CircularProgressIndicator
@@ -57,11 +61,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.decodeToImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawOutline
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -78,6 +90,7 @@ import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
@@ -129,6 +142,9 @@ private enum class EditorStep(val label: String) {
 
 private val fieldShape = RoundedCornerShape(12.dp)
 
+// The compact, label-less amount/unit "pill" fields on an added ingredient row.
+private val pillFieldShape = RoundedCornerShape(10.dp)
+
 @Composable
 private fun editFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedContainerColor = CookncoWhite,
@@ -137,8 +153,8 @@ private fun editFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedBorderColor = CookncoNavy,
     focusedTextColor = CookncoNavy,
     unfocusedTextColor = CookncoNavy,
-    focusedLabelColor = CookncoOrange,
-    unfocusedLabelColor = CookncoNavy.copy(alpha = 0.6f),
+    focusedLabelColor = CookncoGreenDark,
+    unfocusedLabelColor = CookncoGreenDark,
     cursorColor = CookncoOrange,
 )
 
@@ -148,6 +164,38 @@ private fun StepHeading(title: String, subtitle: String, modifier: Modifier = Mo
         Text(title, fontSize = 25.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 31.sp)
         Text(subtitle, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = CookncoNavy, modifier = Modifier.padding(top = 4.dp))
     }
+}
+
+// A small uppercase caption over a group of fields — "DISH CLASS", "TIMES & YIELD" —
+// matching the mockup's section labels (navy, not the muted green used for field captions).
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text.uppercase(),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        color = CookncoNavy,
+        letterSpacing = 0.7.sp,
+        modifier = modifier.padding(top = 20.dp, bottom = 10.dp),
+    )
+}
+
+// A dashed sticker-navy outline, used for the "+ Add step" affordance — Modifier.border()
+// has no dashed variant, so this paints the stroke itself with a dash path effect.
+private fun Modifier.dashedBorder(
+    color: Color,
+    shape: Shape,
+    strokeWidth: Dp = 3.dp,
+    dashLength: Dp = 8.dp,
+    gapLength: Dp = 6.dp,
+): Modifier = drawWithContent {
+    drawContent()
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val stroke = Stroke(
+        width = strokeWidth.toPx(),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLength.toPx(), gapLength.toPx()), 0f),
+    )
+    drawOutline(outline = outline, color = color, style = stroke)
 }
 
 // ── Screen ───────────────────────────────────────────────────────────────────
@@ -187,7 +235,13 @@ fun RecipeEditScreen(
                 onClick = { if (currentStep > 0) currentStep-- else onNavigateBack() },
                 shadowOffset = 3.dp,
             ) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                // Step 0 has nowhere to go "back" to inside the wizard, so the icon reads
+                // as a close (cancel) rather than a back arrow — steps 1-3 step back instead.
+                if (currentStep == 0) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Cancel")
+                } else {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                }
             }
             Text(
                 text = if (recipeId == null) "New recipe" else "Edit recipe",
@@ -224,7 +278,7 @@ fun RecipeEditScreen(
                         text = step.label.uppercase(),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (index <= currentStep) CookncoNavy else CookncoNavy.copy(alpha = 0.6f),
+                        color = if (index <= currentStep) CookncoNavy else CookncoGreenDark,
                         modifier = Modifier.padding(top = 6.dp),
                     )
                 }
@@ -253,23 +307,27 @@ fun RecipeEditScreen(
         }
 
         // ── Bottom navigation ─────────────────────────────────────────────────
+        // Step 0 has no "Cancel" box beside the primary button — the close icon in the
+        // top bar already covers that, so only the full-width primary action shows.
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            StickerCard(
-                modifier = Modifier.size(width = 100.dp, height = 56.dp),
-                shape = RoundedCornerShape(16.dp),
-                shadowOffset = 4.dp,
-                onClick = { if (currentStep > 0) currentStep-- else onNavigateBack() },
-            ) {
-                Text(
-                    text = if (currentStep == 0) "Cancel" else "Back",
-                    color = CookncoNavy,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    modifier = Modifier.align(Alignment.Center),
-                )
+            if (currentStep > 0) {
+                StickerCard(
+                    modifier = Modifier.size(width = 100.dp, height = 56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    shadowOffset = 4.dp,
+                    onClick = { currentStep-- },
+                ) {
+                    Text(
+                        text = "Back",
+                        color = CookncoNavy,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
             }
             StickerCard(
                 modifier = Modifier.weight(1f).height(56.dp),
@@ -288,10 +346,11 @@ fun RecipeEditScreen(
                     )
                 } else {
                     Text(
-                        text = if (currentStep < steps.lastIndex) "Next: ${steps[currentStep + 1].label}" else "Save recipe",
+                        text = if (currentStep < steps.lastIndex) "Next: ${steps[currentStep + 1].label.lowercase()}" else "PUBLISH",
                         color = CookncoWhite,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
+                        letterSpacing = if (currentStep == steps.lastIndex) 0.6.sp else 0.sp,
                         modifier = Modifier.align(Alignment.Center),
                     )
                 }
@@ -319,34 +378,36 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StepHeading(title = "Basics", subtitle = "What is this recipe, at a glance?")
+            StepHeading(title = "The basics", subtitle = "Only the title is required — the rest can wait.")
         }
         item {
-            OutlinedTextField(
-                value = uiState.title,
-                onValueChange = viewModel::updateTitle,
-                label = { Text("Title *") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                isError = uiState.error?.contains("Title") == true,
-                colors = editFieldColors(),
-                shape = fieldShape,
-            )
+            StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    OutlinedTextField(
+                        value = uiState.title,
+                        onValueChange = viewModel::updateTitle,
+                        label = { Text("Title *") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = uiState.error?.contains("Title") == true,
+                        colors = editFieldColors(),
+                        shape = fieldShape,
+                    )
+                    OutlinedTextField(
+                        value = uiState.description,
+                        onValueChange = viewModel::updateDescription,
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        colors = editFieldColors(),
+                        shape = fieldShape,
+                    )
+                }
+            }
         }
         item {
-            OutlinedTextField(
-                value = uiState.description,
-                onValueChange = viewModel::updateDescription,
-                label = { Text("Description") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                colors = editFieldColors(),
-                shape = fieldShape,
-            )
-        }
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Dish class", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoNavy.copy(alpha = 0.75f))
+            Column {
+                SectionLabel("Dish class")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     dishClasses.forEach { (value, label) ->
                         DishClassChip(label = label, selected = uiState.dishClass == value, onClick = { viewModel.updateDishClass(value) })
@@ -355,51 +416,42 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = uiState.yield,
-                    onValueChange = viewModel::updateYield,
-                    label = { Text("Yield") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
-                OutlinedTextField(
-                    value = uiState.prepTime,
-                    onValueChange = viewModel::updatePrepTime,
-                    label = { Text("Prep (min)") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = uiState.cookTime,
-                    onValueChange = viewModel::updateCookTime,
-                    label = { Text("Cook (min)") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
-                OutlinedTextField(
-                    value = uiState.cookTemp,
-                    onValueChange = viewModel::updateCookTemp,
-                    label = { Text("Temp (°C)") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
+            Column {
+                SectionLabel("Times & yield")
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StatInputField(
+                            label = "Yield",
+                            value = uiState.yield,
+                            unit = "pcs",
+                            onValueChange = viewModel::updateYield,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatInputField(
+                            label = "Prep",
+                            value = uiState.prepTime,
+                            unit = "min",
+                            onValueChange = viewModel::updatePrepTime,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StatInputField(
+                            label = "Cook",
+                            value = uiState.cookTime,
+                            unit = "min",
+                            onValueChange = viewModel::updateCookTime,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatInputField(
+                            label = "Temp",
+                            value = uiState.cookTemp,
+                            unit = "°C",
+                            onValueChange = viewModel::updateCookTemp,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
         item { Spacer(Modifier.height(8.dp)) }
@@ -410,14 +462,60 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
 private fun DishClassChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
+            .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(50.dp))
-            .background(if (selected) CookncoOrange else CookncoWhite)
-            .border(1.5.dp, if (selected) CookncoNavy else CookncoNavy.copy(alpha = 0.35f), RoundedCornerShape(50.dp))
+            .background(if (selected) CookncoNavy else CookncoBackground)
+            .border(2.dp, CookncoNavy, RoundedCornerShape(50.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 15.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = if (selected) CookncoWhite else CookncoNavy, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontSize = 14.sp)
+        Text(
+            label,
+            color = if (selected) CookncoWhite else CookncoNavy,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+            fontSize = 13.sp,
+            modifier = Modifier.align(Alignment.Center),
+        )
+    }
+}
+
+// One "stat" tile in the Times & Yield grid: a small caption over a big editable number
+// with a unit suffix, styled like the mockup's read-outs rather than a floating-label field.
+@Composable
+private fun StatInputField(
+    label: String,
+    value: String,
+    unit: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    StickerCard(modifier = modifier, shape = RoundedCornerShape(16.dp), shadowOffset = 4.dp) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(
+                text = label.uppercase(),
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoGreenDark,
+                letterSpacing = 0.5.sp,
+            )
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(top = 3.dp),
+            ) {
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CookncoNavy),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    cursorBrush = SolidColor(CookncoNavy),
+                    modifier = Modifier.widthIn(min = 20.dp),
+                )
+                Text(unit, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
+            }
+        }
     }
 }
 
@@ -438,8 +536,11 @@ private fun IngredientsStep(uiState: RecipeEditUiState, viewModel: RecipeEditVie
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Counts only rows that have actually resolved to a catalogue or custom
+                // ingredient — the still-being-searched row at the bottom isn't "added" yet.
+                val addedCount = uiState.ingredients.count { it.ingredientId != null || it.customName != null }
                 Text(
-                    text = "ADDED · ${uiState.ingredients.size}",
+                    text = "ADDED · $addedCount",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
@@ -495,28 +596,40 @@ private fun IngredientEditCard(
 ) {
     val availableUnits = unitsForIngredient(ingredient.allowedTypes, units)
     val showAmount = ingredient.unit != "NONE"
+    // A row is "resolved" once it points at a catalogue ingredient or has been confirmed as
+    // a custom one. Until then it is just the search box the mockup shows — unit, amount
+    // and note have nothing to scale or annotate yet, so that row stays hidden.
+    val isResolved = ingredient.ingredientId != null || ingredient.customName != null
 
     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowOffset = 5.dp) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(CookncoGreenLight)
-                        .border(2.dp, CookncoNavy, RoundedCornerShape(8.dp)),
+                    modifier = Modifier.padding(end = 8.dp).size(40.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (ingredient.type.isNotEmpty()) {
-                        AsyncImage(
+                    when {
+                        !isResolved -> Box(modifier = Modifier.size(17.dp).border(2.5.dp, CookncoNavy, CircleShape))
+                        ingredient.type.isNotEmpty() -> AsyncImage(
                             model = "${ApiClient.IMAGE_URL}/ingredients/${ingredient.type}.webp",
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(CookncoGreenLight)
+                                .border(2.dp, CookncoNavy, RoundedCornerShape(8.dp)),
                         )
-                    } else {
-                        Icon(Icons.Outlined.Add, contentDescription = null, tint = CookncoNavy.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+                        else -> Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(CookncoGreenLight)
+                                .border(2.dp, CookncoNavy, RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Outlined.Add, contentDescription = null, tint = CookncoNavy.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
                 ExposedDropdownMenuBox(
@@ -537,11 +650,28 @@ private fun IngredientEditCard(
                     DropdownMenu(expanded = ingredient.showDropdown, onDismissRequest = onDismiss) {
                         ingredient.searchResults.forEach { result ->
                             val name = result.name["EN"] ?: result.name.values.firstOrNull() ?: ""
-                            DropdownMenuItem(text = { Text(name) }, onClick = { onSelect(result) })
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(name, modifier = Modifier.weight(1f))
+                                        Text("catalogue", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
+                                    }
+                                },
+                                onClick = { onSelect(result) },
+                            )
                         }
                         if (ingredient.searchResults.isEmpty() && ingredient.query.isNotBlank()) {
                             DropdownMenuItem(
-                                text = { Text("Add \"${ingredient.query.trim()}\" as custom") },
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Box(modifier = Modifier.size(22.dp).dashedBorder(CookncoNavy, RoundedCornerShape(6.dp), strokeWidth = 2.dp))
+                                        Text("Add \"${ingredient.query.trim()}\" as custom")
+                                    }
+                                },
                                 onClick = onSelectCustom,
                             )
                         }
@@ -555,52 +685,54 @@ private fun IngredientEditCard(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                var unitExpanded by rememberSaveable { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = unitExpanded,
-                    onExpandedChange = { unitExpanded = it },
-                    modifier = Modifier.width(110.dp),
-                ) {
-                    OutlinedTextField(
-                        value = unitFieldLabel(ingredient.unit),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Unit") },
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
-                        colors = editFieldColors(),
-                        shape = fieldShape,
-                    )
-                    DropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
-                        availableUnits.forEach { unit ->
-                            DropdownMenuItem(text = { Text(unitFieldLabel(unit.name)) }, onClick = { onUnitChange(unit.name); unitExpanded = false })
+            if (isResolved) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    var unitExpanded by rememberSaveable { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = unitExpanded,
+                        onExpandedChange = { unitExpanded = it },
+                        modifier = Modifier.width(96.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = unitFieldLabel(ingredient.unit),
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
+                            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                            colors = editFieldColors(),
+                            shape = pillFieldShape,
+                        )
+                        DropdownMenu(expanded = unitExpanded, onDismissRequest = { unitExpanded = false }) {
+                            availableUnits.forEach { unit ->
+                                DropdownMenuItem(text = { Text(unitFieldLabel(unit.name)) }, onClick = { onUnitChange(unit.name); unitExpanded = false })
+                            }
                         }
                     }
-                }
 
-                if (showAmount) {
+                    if (showAmount) {
+                        OutlinedTextField(
+                            value = ingredient.amount?.toString() ?: "",
+                            onValueChange = onAmountChange,
+                            modifier = Modifier.width(76.dp),
+                            singleLine = true,
+                            textStyle = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            colors = editFieldColors(),
+                            shape = pillFieldShape,
+                        )
+                    }
+
                     OutlinedTextField(
-                        value = ingredient.amount?.toString() ?: "",
-                        onValueChange = onAmountChange,
-                        label = { Text("Amount") },
-                        modifier = Modifier.width(90.dp),
+                        value = ingredient.complement,
+                        onValueChange = onComplementChange,
+                        label = { Text("Note") },
+                        modifier = Modifier.weight(1f),
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         colors = editFieldColors(),
                         shape = fieldShape,
                     )
                 }
-
-                OutlinedTextField(
-                    value = ingredient.complement,
-                    onValueChange = onComplementChange,
-                    label = { Text("Note") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
             }
         }
     }
@@ -624,20 +756,7 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StepHeading(title = "Steps", subtitle = "Drag to reorder.", modifier = Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(CookncoGreen)
-                        .border(1.5.dp, CookncoNavy, CircleShape)
-                        .clickable(onClick = viewModel::addStep),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Outlined.Add, contentDescription = "Add step", tint = CookncoNavy, modifier = Modifier.size(20.dp))
-                }
-            }
+            StepHeading(title = "Steps", subtitle = "Drag to reorder. Each step becomes one card in cook mode.")
         }
 
         uiState.steps.forEachIndexed { index, step ->
@@ -658,6 +777,37 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
                     )
                 }
             }
+        }
+        item {
+            // The dashed "+ Add step" affordance replaces the old top-right circle button —
+            // the mockup only ever shows this one way to add a step.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .dashedBorder(CookncoNavy, RoundedCornerShape(18.dp))
+                    .clickable(onClick = viewModel::addStep),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                Text("Add step", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            }
+        }
+        item {
+            SectionLabel("Tips (optional)")
+        }
+        item {
+            OutlinedTextField(
+                value = uiState.tips,
+                onValueChange = viewModel::updateTips,
+                label = { Text("Tips") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                colors = editFieldColors(),
+                shape = fieldShape,
+            )
         }
         item { Spacer(Modifier.height(8.dp)) }
     }
@@ -749,36 +899,49 @@ private fun PhotoStep(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StepHeading(title = "Photo", subtitle = "A picture makes this recipe worth clicking on.")
+            StepHeading(title = "Photo & publish", subtitle = "One photo of the finished dish. You can change it later.")
         }
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 10f)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(CookncoGreenLight)
-                    .border(3.dp, CookncoNavy, RoundedCornerShape(18.dp))
-                    .clickable { imagePicker.launch() },
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    pickedBitmap != null -> Image(
-                        bitmap = pickedBitmap,
-                        contentDescription = "Recipe photo",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    hasExistingPhoto -> RecipeImage(
-                        recipeId = uiState.recipeId!!,
-                        version = uiState.recipeVersion!!,
-                        contentDescription = "Recipe photo",
-                        thumbnail = false,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Outlined.CameraAlt, contentDescription = null, tint = CookncoNavy.copy(alpha = 0.5f), modifier = Modifier.size(36.dp))
-                        Text("Tap to add a photo", color = CookncoNavy.copy(alpha = 0.6f), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+            StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .background(CookncoGreenLight)
+                            .clickable { imagePicker.launch() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        when {
+                            pickedBitmap != null -> Image(
+                                bitmap = pickedBitmap,
+                                contentDescription = "Recipe photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            hasExistingPhoto -> RecipeImage(
+                                recipeId = uiState.recipeId!!,
+                                version = uiState.recipeVersion!!,
+                                contentDescription = "Recipe photo",
+                                thumbnail = false,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Outlined.CameraAlt, contentDescription = null, tint = CookncoNavy.copy(alpha = 0.5f), modifier = Modifier.size(36.dp))
+                                Text("Tap to add a photo", color = CookncoNavy.copy(alpha = 0.6f), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(CookncoNavy))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(CookncoBackground)
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        PhotoActionButton(text = "Take a photo", onClick = { imagePicker.launch() }, modifier = Modifier.weight(1f))
+                        PhotoActionButton(text = "Choose another", onClick = { imagePicker.launch() }, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -793,16 +956,76 @@ private fun PhotoStep(
             }
         }
         item {
-            OutlinedTextField(
-                value = uiState.tips,
-                onValueChange = viewModel::updateTips,
-                label = { Text("Tips") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                colors = editFieldColors(),
-                shape = fieldShape,
-            )
+            Column {
+                SectionLabel("Ready to publish")
+                PublishChecklist(uiState = uiState)
+            }
         }
         item { Spacer(Modifier.height(8.dp)) }
+    }
+}
+
+@Composable
+private fun PhotoActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(CookncoWhite)
+            .border(2.dp, CookncoNavy, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+    }
+}
+
+// A read-only recap of what's been filled in so far, matching the mockup's "ready to
+// publish" summary — it reads the same state the other three steps already collected,
+// nothing new is computed or validated here.
+@Composable
+private fun PublishChecklist(uiState: RecipeEditUiState, modifier: Modifier = Modifier) {
+    val dishClassLabel = dishClasses.firstOrNull { it.first == uiState.dishClass }?.second ?: uiState.dishClass
+    val ingredientCount = uiState.ingredients.count { it.ingredientId != null || it.customName != null }
+    val catalogCount = uiState.ingredients.count { it.ingredientId != null }
+    val ingredientsLine = when {
+        ingredientCount == 0 -> "No ingredients yet"
+        catalogCount == ingredientCount -> "$ingredientCount ingredient${if (ingredientCount == 1) "" else "s"}, all from the catalogue"
+        else -> "$ingredientCount ingredient${if (ingredientCount == 1) "" else "s"} added"
+    }
+    val stepCount = uiState.steps.count { it.text.isNotBlank() }
+    val stepsLine = if (uiState.cookTime.isNotBlank()) {
+        "$stepCount step${if (stepCount == 1) "" else "s"} · ${uiState.cookTime} min cook"
+    } else {
+        "$stepCount step${if (stepCount == 1) "" else "s"}"
+    }
+
+    StickerCard(modifier = modifier.fillMaxWidth(), shadowOffset = 6.dp) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ChecklistRow(
+                title = if (uiState.title.isNotBlank()) "${uiState.title} · ${dishClassLabel.lowercase()}" else "Untitled recipe",
+                trailing = "Basics ✓",
+                showDivider = true,
+            )
+            ChecklistRow(title = ingredientsLine, trailing = "✓", showDivider = true)
+            ChecklistRow(title = stepsLine, trailing = "✓", showDivider = false)
+        }
+    }
+}
+
+@Composable
+private fun ChecklistRow(title: String, trailing: String, showDivider: Boolean, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy, modifier = Modifier.weight(1f))
+            Text(trailing, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+        }
+        if (showDivider) {
+            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(CookncoNavy.copy(alpha = 0.1f)))
+        }
     }
 }
