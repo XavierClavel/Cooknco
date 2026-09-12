@@ -3,6 +3,7 @@ package com.xavierclavel.cooknco.ui.recipe
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
@@ -94,6 +97,9 @@ fun CookModeScreen(
     }
 }
 
+/** How much of each side moves a step when tapped; the middle 40% is left alone. */
+private const val EDGE_TAP_FRACTION = 0.3f
+
 @Composable
 private fun CookModeContent(
     recipe: RecipeInfo,
@@ -107,6 +113,7 @@ private fun CookModeContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val stepCount = recipe.steps.size
     val stepText = recipe.steps.getOrNull(currentStep) ?: ""
     val isLastStep = currentStep >= stepCount - 1
@@ -124,7 +131,7 @@ private fun CookModeContent(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StickerIconButton(onClick = onClose, shadowOffset = 0.dp) {
-                Icon(Icons.Outlined.Close, contentDescription = "Close")
+                Icon(Icons.Outlined.Close, contentDescription = s.close)
             }
             Text(
                 text = recipe.title,
@@ -155,13 +162,34 @@ private fun CookModeContent(
         }
 
         LazyColumn(
-            modifier = Modifier.weight(1f).padding(horizontal = 18.dp),
+            modifier = Modifier
+                .weight(1f)
+                // Tap the left or right edge of the step to move through the recipe — the
+                // point of cook mode is that a hand covered in flour can reach the next step
+                // without aiming at a button. Before the padding, so the 18dp gutters count
+                // as edge rather than as a dead strip down each side.
+                //
+                // detectTapGestures does not consume drags, so the list still scrolls, and a
+                // child that handles its own taps (the timer) is hit first and swallows them.
+                .pointerInput(currentStep, stepCount) {
+                    detectTapGestures { offset ->
+                        val edge = size.width * EDGE_TAP_FRACTION
+                        when {
+                            offset.x < edge -> onPreviousStep()
+                            // The middle is deliberately inert, and so is the right edge on
+                            // the last step: "Finish" closes the screen, which is not
+                            // something to do to somebody who tapped to read on.
+                            offset.x > size.width - edge && !isLastStep -> onNextStep()
+                        }
+                    }
+                }
+                .padding(horizontal = 18.dp),
             contentPadding = PaddingValues(bottom = 16.dp),
         ) {
             item {
                 Column {
                     Text(
-                        text = "STEP ${currentStep + 1} OF $stepCount",
+                        text = s.stepOf(currentStep + 1, stepCount),
                         color = CookncoWhite,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -199,7 +227,7 @@ private fun CookModeContent(
                                 fontSize = 26.sp,
                             )
                             Text(
-                                text = "Timer from this step",
+                                text = s.timerFromThisStep,
                                 color = CookncoNavy,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
@@ -215,7 +243,7 @@ private fun CookModeContent(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    text = if (timerRunning) "Pause" else "Start",
+                                    text = if (timerRunning) s.pause else s.start,
                                     color = CookncoWhite,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
@@ -229,7 +257,7 @@ private fun CookModeContent(
             if (!isLastStep) {
                 item {
                     Text(
-                        text = "Next: ${recipe.steps[currentStep + 1]}",
+                        text = s.nextIs(recipe.steps[currentStep + 1]),
                         color = CookncoWhite,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 16.dp),
@@ -253,7 +281,7 @@ private fun CookModeContent(
             ) {
                 Icon(
                     Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "Previous step",
+                    contentDescription = s.back,
                     tint = CookncoNavy,
                     modifier = Modifier.align(Alignment.Center),
                 )
@@ -266,7 +294,7 @@ private fun CookModeContent(
                 onClick = if (isLastStep) onClose else onNextStep,
             ) {
                 Text(
-                    text = if (isLastStep) "Finish" else "Next step",
+                    text = if (isLastStep) s.finish else s.nextStep,
                     color = CookncoWhite,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,

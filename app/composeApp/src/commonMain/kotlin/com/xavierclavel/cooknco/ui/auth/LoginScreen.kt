@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.resources.Res
 import com.xavierclavel.cooknco.resources.logo
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import org.jetbrains.compose.resources.painterResource
@@ -49,6 +50,7 @@ fun LoginScreen(
     onLoginWithGoogle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     Surface(
         modifier = modifier.fillMaxSize(),
         color = CookncoGreen,
@@ -73,20 +75,20 @@ fun LoginScreen(
 
             AuthCard {
                 Text(
-                    text = "Log in",
+                    text = s.logIn,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
                 )
 
-                GoogleButton(text = "Continue with Google", onClick = onLoginWithGoogle)
+                GoogleButton(text = s.continueWithGoogle, onClick = onLoginWithGoogle)
 
                 OrDivider()
 
                 AuthTextField(
                     value = state.email,
                     onValueChange = onEmailChange,
-                    placeholder = "Email address",
+                    placeholder = s.emailAddress,
                     leadingIcon = Icons.Outlined.Email,
                     isError = state.error != null,
                 )
@@ -94,7 +96,7 @@ fun LoginScreen(
                 AuthTextField(
                     value = state.password,
                     onValueChange = onPasswordChange,
-                    placeholder = "Password",
+                    placeholder = s.password,
                     leadingIcon = Icons.Outlined.Lock,
                     isPassword = true,
                     isPasswordVisible = state.isPasswordVisible,
@@ -113,10 +115,10 @@ fun LoginScreen(
                     )
                 }
 
-                AuthButton(text = "Log in", onClick = onLogin, isLoading = state.isLoading)
+                AuthButton(text = s.logIn, onClick = onLogin, isLoading = state.isLoading)
 
                 Text(
-                    text = "Forgotten password?",
+                    text = s.forgottenPassword,
                     color = CookncoNavy.copy(alpha = 0.65f),
                     fontSize = 13.sp,
                     textDecoration = TextDecoration.Underline,
@@ -131,9 +133,9 @@ fun LoginScreen(
                 modifier = Modifier.padding(top = 20.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                Text(text = "New here? ", color = CookncoNavy, fontSize = 14.sp)
+                Text(text = s.newHere + " ", color = CookncoNavy, fontSize = 14.sp)
                 Text(
-                    text = "Create an account",
+                    text = s.createAnAccount,
                     color = CookncoNavy,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,

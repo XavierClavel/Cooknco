@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.resources.Res
 import com.xavierclavel.cooknco.resources.google_logo
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
@@ -162,7 +163,7 @@ fun OrDivider(modifier: Modifier = Modifier) {
             color = CookncoNavy.copy(alpha = 0.4f),
         )
         Text(
-            text = "  or  ",
+            text = "  ${strings().or}  ",
             color = CookncoNavy.copy(alpha = 0.7f),
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,

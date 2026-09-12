@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.resources.Res
 import com.xavierclavel.cooknco.resources.logo
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import org.jetbrains.compose.resources.painterResource
@@ -53,6 +54,7 @@ fun SignupScreen(
     onSignupWithGoogle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     Surface(
         modifier = modifier.fillMaxSize(),
         color = CookncoGreen,
@@ -77,20 +79,20 @@ fun SignupScreen(
 
             AuthCard {
                 Text(
-                    text = "Sign up",
+                    text = s.signUp,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
                 )
 
-                GoogleButton(text = "Continue with Google", onClick = onSignupWithGoogle)
+                GoogleButton(text = s.continueWithGoogle, onClick = onSignupWithGoogle)
 
                 OrDivider()
 
                 AuthTextField(
                     value = state.username,
                     onValueChange = onUsernameChange,
-                    placeholder = "Username",
+                    placeholder = s.username,
                     leadingIcon = Icons.Outlined.AccountCircle,
                     isError = state.error != null,
                 )
@@ -98,7 +100,7 @@ fun SignupScreen(
                 AuthTextField(
                     value = state.email,
                     onValueChange = onEmailChange,
-                    placeholder = "Email address",
+                    placeholder = s.emailAddress,
                     leadingIcon = Icons.Outlined.Email,
                     isError = state.error != null,
                 )
@@ -106,7 +108,7 @@ fun SignupScreen(
                 AuthTextField(
                     value = state.password,
                     onValueChange = onPasswordChange,
-                    placeholder = "Password (min. 8 characters)",
+                    placeholder = s.passwordMinEightPlaceholder,
                     leadingIcon = Icons.Outlined.Lock,
                     isPassword = true,
                     isPasswordVisible = state.isPasswordVisible,
@@ -117,7 +119,7 @@ fun SignupScreen(
                 AuthTextField(
                     value = state.confirmPassword,
                     onValueChange = onConfirmPasswordChange,
-                    placeholder = "Confirm password",
+                    placeholder = s.confirmPassword,
                     leadingIcon = Icons.Outlined.LockOpen,
                     isPassword = true,
                     isPasswordVisible = state.isConfirmPasswordVisible,
@@ -136,16 +138,16 @@ fun SignupScreen(
                     )
                 }
 
-                AuthButton(text = "Sign up", onClick = onSignup, isLoading = state.isLoading)
+                AuthButton(text = s.signUp, onClick = onSignup, isLoading = state.isLoading)
             }
 
             Row(
                 modifier = Modifier.padding(top = 20.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                Text(text = "Already have an account? ", color = CookncoNavy, fontSize = 14.sp)
+                Text(text = s.alreadyHaveAnAccount + " ", color = CookncoNavy, fontSize = 14.sp)
                 Text(
-                    text = "Log in",
+                    text = s.logIn,
                     color = CookncoNavy,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,

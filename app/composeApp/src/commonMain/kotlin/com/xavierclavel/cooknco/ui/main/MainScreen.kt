@@ -1,5 +1,12 @@
 package com.xavierclavel.cooknco.ui.main
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,6 +52,8 @@ import com.xavierclavel.cooknco.ui.home.HomeScreen
 import com.xavierclavel.cooknco.ui.home.HomeViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipesScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipesViewModel
+import com.xavierclavel.cooknco.ui.i18n.strings
+import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
@@ -130,6 +139,7 @@ fun MainScreen(
                 onNavigateBack = null,
                 onRecipeClick = onNavigateToRecipe,
                 onUserClick = onNavigateToUser,
+                onCookbookClick = onNavigateToCookbook,
                 modifier = Modifier.padding(innerPadding),
             )
             MainTab.COOKBOOKS -> CookbooksScreen(
@@ -166,6 +176,7 @@ private fun MainBottomBar(
     user: UserInfo,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val pillShape = RoundedCornerShape(percent = 50)
     Row(
         modifier = modifier
@@ -187,31 +198,31 @@ private fun MainBottomBar(
         ) {
             NavTabItem(
                 selected = selectedTab == MainTab.FEED,
-                label = "Feed",
+                label = s.navFeed,
                 onClick = { onTabSelected(MainTab.FEED) },
-            ) { tint -> Icon(Icons.Outlined.Home, contentDescription = "Feed", tint = tint, modifier = Modifier.size(20.dp)) }
+            ) { tint -> Icon(Icons.Outlined.Home, contentDescription = s.navFeed, tint = tint, modifier = Modifier.size(20.dp)) }
 
             NavTabItem(
                 selected = selectedTab == MainTab.SEARCH,
-                label = "Search",
+                label = s.navSearch,
                 onClick = { onTabSelected(MainTab.SEARCH) },
-            ) { tint -> Icon(Icons.Outlined.Search, contentDescription = "Search", tint = tint, modifier = Modifier.size(20.dp)) }
+            ) { tint -> Icon(Icons.Outlined.Search, contentDescription = s.navSearch, tint = tint, modifier = Modifier.size(20.dp)) }
 
             NavTabItem(
                 selected = selectedTab == MainTab.COOKBOOKS,
-                label = "Books",
+                label = s.navBooks,
                 onClick = { onTabSelected(MainTab.COOKBOOKS) },
-            ) { tint -> Icon(Icons.Outlined.MenuBook, contentDescription = "Cookbooks", tint = tint, modifier = Modifier.size(20.dp)) }
+            ) { tint -> Icon(Icons.Outlined.MenuBook, contentDescription = s.cookbooks, tint = tint, modifier = Modifier.size(20.dp)) }
 
             NavTabItem(
                 selected = selectedTab == MainTab.PROFILE,
-                label = "Me",
+                label = s.navMe,
                 onClick = { onTabSelected(MainTab.PROFILE) },
             ) { tint ->
                 UserAvatar(
                     userId = user.id,
                     version = user.version,
-                    contentDescription = "Profile",
+                    contentDescription = s.profile,
                     modifier = Modifier
                         .size(22.dp)
                         .clip(CircleShape)
@@ -227,15 +238,22 @@ private fun MainBottomBar(
             fillColor = CookncoGold,
             shadowOffset = 5.dp,
         ) {
-            Icon(Icons.Outlined.Add, contentDescription = "New recipe", tint = CookncoNavy, modifier = Modifier.size(26.dp))
+            Icon(Icons.Outlined.Add, contentDescription = s.newRecipe, tint = CookncoNavy, modifier = Modifier.size(26.dp))
         }
     }
 }
 
 /**
- * One nav-bar slot. Selected: an orange pill sized to its icon+label, opaque white
- * content. Unselected: icon only, navy tint, sharing the remaining width equally with
- * the other unselected slots (`Modifier.weight(1f)`, hence the [RowScope] receiver).
+ * One nav-bar slot: an orange pill with its label when selected, a bare icon when not.
+ *
+ * Every slot is a weight, and the weight is what animates — the selected one grows to make
+ * room for its label while the other three give the width up, all on the same spec, so the
+ * pill slides along the bar instead of appearing in the next slot. Doing it the obvious way
+ * (wrap-content when selected, `weight(1f)` when not) cannot be animated at all: the slot
+ * changes how it is measured, and there is no value in between to tween.
+ *
+ * The label rides its own expand/fade inside that, which is what keeps it from being
+ * squashed out of the pill on the way in.
  */
 @Composable
 private fun RowScope.NavTabItem(
@@ -244,33 +262,57 @@ private fun RowScope.NavTabItem(
     onClick: () -> Unit,
     icon: @Composable (tint: Color) -> Unit,
 ) {
-    if (selected) {
-        Row(
-            modifier = Modifier
-                .height(44.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(CookncoOrange)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 15.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+    val weight by animateFloatAsState(
+        targetValue = if (selected) SELECTED_NAV_WEIGHT else 1f,
+        animationSpec = stickerSwitchSpec(),
+        label = "nav_weight",
+    )
+    val fill by animateColorAsState(
+        targetValue = if (selected) CookncoOrange else Color.Transparent,
+        animationSpec = stickerSwitchSpec(),
+        label = "nav_fill",
+    )
+    val content by animateColorAsState(
+        targetValue = if (selected) CookncoWhite else CookncoNavy,
+        animationSpec = stickerSwitchSpec(),
+        label = "nav_content",
+    )
+    Row(
+        modifier = Modifier
+            .weight(weight)
+            .height(44.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(fill)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
+    ) {
+        icon(content)
+        AnimatedVisibility(
+            visible = selected,
+            enter = expandHorizontally(stickerSwitchSpec(), clip = false) + fadeIn(stickerSwitchSpec()),
+            exit = shrinkHorizontally(stickerSwitchSpec(), clip = false) + fadeOut(stickerSwitchSpec()),
         ) {
-            icon(CookncoWhite)
-            Text(label, color = CookncoWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        }
-    } else {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(44.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            icon(CookncoNavy)
+            Text(
+                text = label,
+                color = content,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }
+
+/**
+ * How much wider the selected slot is than an unselected one.
+ *
+ * Enough for the longest label the bar carries and no more: the three icons it takes the
+ * room from still have to be comfortably tappable.
+ */
+private const val SELECTED_NAV_WEIGHT = 2.6f
 
 private val previewUser = UserInfo(
     id = 1L, version = 1L, username = "Xavier",

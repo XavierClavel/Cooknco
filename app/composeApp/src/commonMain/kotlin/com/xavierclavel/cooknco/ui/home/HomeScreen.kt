@@ -40,8 +40,11 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.EnStrings
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
@@ -75,6 +78,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val s = strings()
     val listState = rememberLazyListState()
 
     val reachedEnd by remember {
@@ -97,8 +101,8 @@ fun HomeScreen(
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp),
         ) {
             uiState.dateGroups.forEach { group ->
-                item(key = "header_${group.label}") {
-                    DateGroupHeader(label = group.label, count = group.recipes.size)
+                item(key = "header_${group.key}") {
+                    DateGroupHeader(label = s.dateGroup(group.key), count = group.recipes.size)
                 }
                 items(group.recipes, key = { it.id }) { recipe ->
                     RecipeCard(
@@ -138,6 +142,7 @@ fun HomeScreen(
 
 @Composable
 private fun HomeHeader(user: UserInfo, onAvatarClick: () -> Unit, modifier: Modifier = Modifier) {
+    val s = strings()
     val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()) }
     Row(
         modifier = modifier
@@ -156,7 +161,7 @@ private fun HomeHeader(user: UserInfo, onAvatarClick: () -> Unit, modifier: Modi
                 letterSpacing = 0.5.sp,
             )
             Text(
-                text = "What's cooking?",
+                text = s.whatsCooking,
                 fontSize = 27.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,
@@ -166,7 +171,7 @@ private fun HomeHeader(user: UserInfo, onAvatarClick: () -> Unit, modifier: Modi
         UserAvatar(
             userId = user.id,
             version = user.version,
-            contentDescription = "Your profile",
+            contentDescription = s.yourProfile,
             modifier = Modifier
                 .size(46.dp)
                 .clip(CircleShape)
@@ -178,6 +183,7 @@ private fun HomeHeader(user: UserInfo, onAvatarClick: () -> Unit, modifier: Modi
 
 @Composable
 private fun DateGroupHeader(label: String, count: Int) {
+    val s = strings()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -195,7 +201,7 @@ private fun DateGroupHeader(label: String, count: Int) {
             Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
         }
         Text(
-            text = "$count new recipe${if (count == 1) "" else "s"}",
+            text = s.newRecipesCount(count),
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = CookncoNavy,
@@ -248,7 +254,7 @@ private fun RecipeCard(
                             .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     ) {
-                        Text("♥ ${recipe.likesCount}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoWhite)
+                        LikeCount(count = recipe.likesCount, color = CookncoWhite)
                     }
                 }
             }
@@ -304,8 +310,8 @@ private val previewRecipes = listOf(
 )
 
 private val previewGroups = listOf(
-    DateGroup("Today", previewRecipes.take(1)),
-    DateGroup("Yesterday", previewRecipes.drop(1)),
+    DateGroup(DateGroupKey.Today, previewRecipes.take(1)),
+    DateGroup(DateGroupKey.Yesterday, previewRecipes.drop(1)),
 )
 
 @Preview(showBackground = true)
@@ -316,7 +322,7 @@ fun HomeScreenPreview() {
             HomeHeader(user = previewUser, onAvatarClick = {})
             LazyColumn(contentPadding = PaddingValues(horizontal = 18.dp)) {
                 previewGroups.forEach { group ->
-                    item { DateGroupHeader(label = group.label, count = group.recipes.size) }
+                    item { DateGroupHeader(label = EnStrings.dateGroup(group.key), count = group.recipes.size) }
                     items(group.recipes, key = { it.id }) { recipe ->
                         RecipeCard(recipe = recipe, onClick = {}, modifier = Modifier.padding(bottom = 16.dp))
                     }

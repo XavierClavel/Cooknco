@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.ui.recipe
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -30,16 +32,11 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,6 +50,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -71,8 +70,11 @@ import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
+import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.Strings
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
@@ -86,7 +88,9 @@ import com.xavierclavel.cooknco.ui.theme.StickerCard
 import com.xavierclavel.cooknco.ui.theme.StickerConfirmDialog
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 import com.xavierclavel.cooknco.ui.theme.StickerPill
-import com.xavierclavel.cooknco.ui.theme.stickerShadow
+import com.xavierclavel.cooknco.ui.theme.StickerSegmentedControl
+import com.xavierclavel.cooknco.ui.theme.StickerTextArea
+import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
 import kotlin.math.roundToInt
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
@@ -146,6 +150,7 @@ fun RecipeScreen(
     viewModel: RecipeViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
     // LocalClipboardManager is deprecated in favour of LocalClipboard, but ClipEntry
     // has no common-code constructor yet, so this stays the multiplatform option.
@@ -189,10 +194,10 @@ fun RecipeScreen(
     if (uiState.showDeleteConfirm && recipe != null) {
         StickerConfirmDialog(
             icon = Icons.Outlined.Delete,
-            title = "Delete this recipe?",
-            message = "${recipe.title} will be removed for everyone. This cannot be undone.",
-            confirmText = "Delete recipe",
-            dismissText = "Keep it",
+            title = s.deleteThisRecipe,
+            message = s.deleteRecipeMessage(recipe.title),
+            confirmText = s.deleteRecipe,
+            dismissText = s.keepIt,
             onConfirm = { viewModel.deleteRecipe() },
             onDismissRequest = { viewModel.dismissDeleteConfirm() },
         )
@@ -221,6 +226,7 @@ private fun RecipeContent(
     onNavigateBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val recipeYield = recipe.yield ?: 1
     var selectedTab by rememberSaveable { mutableStateOf(RecipeTab.INGREDIENTS) }
     var showMenu by rememberSaveable { mutableStateOf(false) }
@@ -236,7 +242,22 @@ private fun RecipeContent(
                     recipeId = recipe.id,
                     version = recipe.version,
                     contentDescription = recipe.title,
-                    modifier = Modifier.fillMaxWidth().height(280.dp),
+                    // The banner is ruled off from the green below it (the artboard's
+                    // `border-bottom:3px solid #0d1821`). Drawn over the image rather than
+                    // laid out under it: the info card overlaps the banner's last 30dp, and
+                    // a rule that took layout space would push that overlap out by 3dp.
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                        .drawWithContent {
+                            drawContent()
+                            val stroke = 3.dp.toPx()
+                            drawRect(
+                                color = CookncoNavy,
+                                topLeft = Offset(0f, size.height - stroke),
+                                size = Size(size.width, stroke),
+                            )
+                        },
                     thumbnail = false,
                 )
                 Row(
@@ -247,23 +268,51 @@ private fun RecipeContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StickerIconButton(onClick = onToggleLike, shadowOffset = 3.dp) {
+                        // Liked fills the button coral, the same treatment the nav bar and
+                        // the switches give a selected state — so the heart on top of it is
+                        // white, not coral on coral.
+                        val likeFill by animateColorAsState(
+                            targetValue = if (uiState.isLiked) CookncoOrange else CookncoBackground,
+                            animationSpec = stickerSwitchSpec(),
+                            label = "like_fill",
+                        )
+                        val likeContent by animateColorAsState(
+                            targetValue = if (uiState.isLiked) CookncoWhite else CookncoNavy,
+                            animationSpec = stickerSwitchSpec(),
+                            label = "like_content",
+                        )
+                        StickerIconButton(
+                            onClick = onToggleLike,
+                            shadowOffset = 3.dp,
+                            fillColor = likeFill,
+                            contentColor = likeContent,
+                        ) {
                             Icon(
                                 imageVector = if (uiState.isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                contentDescription = "Like",
-                                tint = if (uiState.isLiked) CookncoOrange else CookncoNavy,
+                                contentDescription = s.like,
+                                tint = likeContent,
                             )
                         }
+                        val menuFill by animateColorAsState(
+                            targetValue = if (showMenu) CookncoNavy else CookncoBackground,
+                            animationSpec = stickerSwitchSpec(),
+                            label = "menu_fill",
+                        )
+                        val menuContent by animateColorAsState(
+                            targetValue = if (showMenu) CookncoWhite else CookncoNavy,
+                            animationSpec = stickerSwitchSpec(),
+                            label = "menu_content",
+                        )
                         StickerIconButton(
                             onClick = { showMenu = true },
                             shadowOffset = 3.dp,
-                            fillColor = if (showMenu) CookncoNavy else CookncoBackground,
-                            contentColor = if (showMenu) CookncoWhite else CookncoNavy,
+                            fillColor = menuFill,
+                            contentColor = menuContent,
                         ) {
-                            Icon(Icons.Outlined.MoreHoriz, contentDescription = "More")
+                            Icon(Icons.Outlined.MoreHoriz, contentDescription = s.more)
                         }
                     }
                 }
@@ -319,7 +368,7 @@ private fun RecipeContent(
                                     .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
                                     .padding(horizontal = 10.dp, vertical = 4.dp),
                             ) {
-                                Text("♥ ${recipe.likesCount}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoWhite)
+                                LikeCount(count = recipe.likesCount, color = CookncoWhite)
                             }
                         }
                         val hasMeta = recipe.preparationTime != null || recipe.cookingTime != null || recipe.cookingTemperature != null
@@ -361,26 +410,14 @@ private fun RecipeContent(
 
         // ── Tabs ───────────────────────────────────────────────────────────
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 18.dp, end = 18.dp, top = 18.dp)
-                    .stickerShadow(RoundedCornerShape(percent = 50), offsetX = 4.dp, offsetY = 4.dp)
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(CookncoBackground)
-                    .border(3.dp, CookncoNavy, RoundedCornerShape(percent = 50))
-                    .padding(5.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                RecipeTab.entries.forEach { tab ->
-                    RecipeTabItem(
-                        label = tab.label,
-                        selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+            StickerSegmentedControl(
+                options = RecipeTab.entries,
+                selected = selectedTab,
+                onSelect = { selectedTab = it },
+                label = { it.label(s) },
+                spacing = 2.dp,
+                modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp),
+            )
         }
 
         when (selectedTab) {
@@ -388,10 +425,11 @@ private fun RecipeContent(
                 recipe = recipe,
                 uiState = uiState,
                 recipeYield = recipeYield,
+                s = s,
                 onYieldMinus = onYieldMinus,
                 onYieldPlus = onYieldPlus,
             )
-            RecipeTab.STEPS -> stepsTab(recipe = recipe)
+            RecipeTab.STEPS -> stepsTab(recipe = recipe, s = s)
             RecipeTab.NOTES -> item {
                 NotesCard(
                     tips = recipe.tips,
@@ -420,7 +458,7 @@ private fun RecipeContent(
                     shadowOffset = 4.dp,
                     onClick = onShare,
                 ) {
-                    Icon(Icons.Outlined.Share, contentDescription = "Share", modifier = Modifier.align(Alignment.Center), tint = CookncoNavy)
+                    Icon(Icons.Outlined.Share, contentDescription = s.share, modifier = Modifier.align(Alignment.Center), tint = CookncoNavy)
                 }
                 StickerCard(
                     modifier = Modifier.weight(1f).height(56.dp),
@@ -430,7 +468,7 @@ private fun RecipeContent(
                     onClick = onStartCooking,
                 ) {
                     Text(
-                        "Start cooking",
+                        s.startCooking,
                         color = CookncoWhite,
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
@@ -453,12 +491,11 @@ private fun RecipeContent(
     }
 }
 
-private val RecipeTab.label: String
-    get() = when (this) {
-        RecipeTab.INGREDIENTS -> "Ingredients"
-        RecipeTab.STEPS -> "Steps"
-        RecipeTab.NOTES -> "Notes"
-    }
+private fun RecipeTab.label(s: Strings): String = when (this) {
+    RecipeTab.INGREDIENTS -> s.ingredients
+    RecipeTab.STEPS -> s.steps
+    RecipeTab.NOTES -> s.notes
+}
 
 private fun dishClassLabel(dishClass: String): String = dishClass
     .lowercase()
@@ -469,6 +506,9 @@ private fun LazyListScope.ingredientsTab(
     recipe: RecipeInfo,
     uiState: RecipeUiState,
     recipeYield: Int,
+    // Passed in rather than read: a LazyListScope builder is not a composable, so there is
+    // no LocalStrings to reach from here.
+    s: Strings,
     onYieldMinus: () -> Unit,
     onYieldPlus: () -> Unit,
 ) {
@@ -478,7 +518,7 @@ private fun LazyListScope.ingredientsTab(
                 modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Scaled for", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = CookncoNavy, modifier = Modifier.weight(1f))
+                Text(s.scaledFor, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = CookncoNavy, modifier = Modifier.weight(1f))
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(percent = 50))
@@ -491,7 +531,7 @@ private fun LazyListScope.ingredientsTab(
                     Box(
                         modifier = Modifier.size(44.dp).clip(CircleShape).clickable(onClick = onYieldMinus),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Outlined.Remove, contentDescription = "Decrease", tint = CookncoNavy) }
+                    ) { Icon(Icons.Outlined.Remove, contentDescription = s.decrease, tint = CookncoNavy) }
                     Text(
                         "${uiState.selectedYield} pcs",
                         fontWeight = FontWeight.Bold,
@@ -507,7 +547,7 @@ private fun LazyListScope.ingredientsTab(
                             .background(CookncoOrange)
                             .clickable(onClick = onYieldPlus),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Outlined.Add, contentDescription = "Increase", tint = CookncoWhite) }
+                    ) { Icon(Icons.Outlined.Add, contentDescription = s.increase, tint = CookncoWhite) }
                 }
             }
         }
@@ -534,11 +574,11 @@ private fun LazyListScope.ingredientsTab(
     }
 }
 
-private fun LazyListScope.stepsTab(recipe: RecipeInfo) {
+private fun LazyListScope.stepsTab(recipe: RecipeInfo, s: Strings) {
     if (recipe.steps.isEmpty()) {
         item {
             Text(
-                "No steps yet",
+                s.noStepsYet,
                 color = CookncoWhite.copy(alpha = 0.8f),
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             )
@@ -551,8 +591,8 @@ private fun LazyListScope.stepsTab(recipe: RecipeInfo) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val stepsLabel = "${recipe.steps.size} step${if (recipe.steps.size == 1) "" else "s"}" +
-                if (totalMinutes > 0) " · about $totalMinutes min in total" else ""
+            val stepsLabel = s.stepsCount(recipe.steps.size) +
+                if (totalMinutes > 0) " · " + s.aboutMinutesInTotal(totalMinutes) else ""
             Text(stepsLabel, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, modifier = Modifier.weight(1f))
             recipe.cookingTemperature?.let { temperature ->
                 StickerPill(
@@ -562,7 +602,7 @@ private fun LazyListScope.stepsTab(recipe: RecipeInfo) {
                     shadowOffset = 0.dp,
                     contentPadding = PaddingValues(horizontal = 12.dp),
                 ) {
-                    Text("$temperature °C oven", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                    Text(s.ovenAt(temperature), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
                 }
             }
         }
@@ -573,25 +613,6 @@ private fun LazyListScope.stepsTab(recipe: RecipeInfo) {
 }
 
 // ── Reusable sub-composables ──────────────────────────────────────────────────
-
-@Composable
-private fun RecipeTabItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(if (selected) CookncoOrange else Color.Transparent)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            fontSize = 13.5.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-            color = if (selected) CookncoWhite else CookncoNavy,
-        )
-    }
-}
 
 @Composable
 private fun MetaStat(label: String, value: String, modifier: Modifier = Modifier) {
@@ -648,12 +669,6 @@ private fun IngredientRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .border(2.5.dp, CookncoNavy, RoundedCornerShape(7.dp)),
-            )
-            Box(
-                modifier = Modifier
                     .size(34.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(CookncoGreenLight)
@@ -690,6 +705,7 @@ private fun IngredientRow(
 
 @Composable
 private fun StepRow(index: Int, step: String, modifier: Modifier = Modifier) {
+    val s = strings()
     StickerCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -697,7 +713,7 @@ private fun StepRow(index: Int, step: String, modifier: Modifier = Modifier) {
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
             Text(
-                text = "STEP ${index + 1}",
+                text = s.stepNumber(index + 1),
                 fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoGreenDark,
@@ -728,11 +744,12 @@ private fun NotesCard(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     Column(modifier = modifier.fillMaxWidth()) {
         // The author's own tip for the recipe, if they left one — read-only, everyone sees it.
         if (tips.isNotBlank()) {
             Text(
-                text = "FROM ${authorName.uppercase()}, THE AUTHOR",
+                text = s.fromTheAuthor(authorName),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,
@@ -758,7 +775,7 @@ private fun NotesCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "MY NOTES · ONLY YOU SEE THESE",
+                text = s.myNotesOnlyYouSeeThese,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,
@@ -767,42 +784,47 @@ private fun NotesCard(
             )
             if (!isEditing) {
                 StickerPill(shadowOffset = 3.dp, onClick = onStartEdit) {
-                    Text("Edit", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                    Text(s.edit, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
                 }
             }
         }
 
         // The signed-in user's private note — editing, saved and empty states.
         if (isEditing) {
-            TextField(
-                value = notes,
-                onValueChange = onNotesChange,
-                placeholder = { Text("Write notes here!", color = CookncoNavy.copy(alpha = 0.4f)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 4,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = CookncoWhite,
-                    unfocusedContainerColor = CookncoWhite,
-                    focusedBorderColor = CookncoOrange,
-                    unfocusedBorderColor = CookncoNavy.copy(alpha = 0.5f),
-                    focusedTextColor = CookncoNavy,
-                    unfocusedTextColor = CookncoNavy,
-                    cursorColor = CookncoOrange,
-                ),
-                shape = RoundedCornerShape(12.dp),
-            )
+            // The note is edited in the very card it will be read in — the mockup draws no
+            // editing state of its own, and a filled Material field inside the cream card
+            // was the one place on this screen that did not look like the rest of it.
+            StickerCard(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                StickerTextArea(
+                    value = notes,
+                    onValueChange = onNotesChange,
+                    placeholder = s.writeNotesHere,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    placeholderColor = CookncoNavy.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onCancel) { Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f)) }
-                Spacer(Modifier.width(8.dp))
-                Button(
+                StickerPill(height = 48.dp, shadowOffset = 4.dp, onClick = onCancel) {
+                    Text(s.cancel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                }
+                StickerPill(
+                    height = 48.dp,
+                    shadowOffset = 4.dp,
+                    fillColor = CookncoOrange,
+                    contentColor = CookncoWhite,
                     onClick = onSave,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = CookncoOrange, contentColor = CookncoWhite),
-                ) { Text("SAVE", fontWeight = FontWeight.Bold, letterSpacing = 1.sp) }
+                ) {
+                    Text(s.saveCaps, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                }
             }
         } else if (remoteNotes != null) {
             StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
@@ -824,7 +846,7 @@ private fun NotesCard(
                     .padding(16.dp),
             ) {
                 Text(
-                    text = "Write a note here — it stays on this recipe, on every device.",
+                    text = s.writeANoteHere,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = CookncoNavy,
@@ -868,6 +890,7 @@ private fun RecipeActionSheet(
     onDelete: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
+    val s = strings()
     Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(
             modifier = Modifier
@@ -895,13 +918,13 @@ private fun RecipeActionSheet(
                             )
                         }
                         ActionSheetDivider()
-                        ActionSheetRow(label = "Share link", onClick = { onDismissRequest(); onShare() })
+                        ActionSheetRow(label = s.shareLink, onClick = { onDismissRequest(); onShare() })
                         if (isOwner) {
                             ActionSheetDivider()
-                            ActionSheetRow(label = "Edit recipe", onClick = { onDismissRequest(); onEdit() })
+                            ActionSheetRow(label = s.editRecipe, onClick = { onDismissRequest(); onEdit() })
                             ActionSheetDivider()
                             ActionSheetRow(
-                                label = "Delete recipe",
+                                label = s.deleteRecipe,
                                 textColor = MaterialTheme.colorScheme.error,
                                 onClick = { onDismissRequest(); onDelete() },
                             )
@@ -916,7 +939,7 @@ private fun RecipeActionSheet(
                     onClick = onDismissRequest,
                 ) {
                     Text(
-                        text = "Cancel",
+                        text = s.cancel,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = CookncoNavy,
