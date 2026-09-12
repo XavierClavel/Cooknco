@@ -100,8 +100,14 @@ fun CookModeScreen(
     }
 }
 
-/** How much of each side moves a step when tapped; the middle 40% is left alone. */
-private const val EDGE_TAP_FRACTION = 0.3f
+/**
+ * How much of each side moves a step when tapped; the middle is left alone to read.
+ *
+ * Wide, because it costs nothing: the detector never consumes, so the list still scrolls
+ * from anywhere including the strips, and the only thing the middle buys is somewhere to
+ * rest a thumb without changing the step.
+ */
+private const val EDGE_TAP_FRACTION = 0.38f
 
 @Composable
 private fun CookModeContent(
@@ -332,18 +338,21 @@ private fun Modifier.edgeTaps(
         // consumed before it gets here, and that press is exactly the one a cook means.
         val down = awaitFirstDown(requireUnconsumed = false)
         var moved = false
-        var claimed = false
 
         while (true) {
             // Final, so every other node has had its say about this event first.
             val event = awaitPointerEvent(PointerEventPass.Final)
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-            if (change.isConsumed) claimed = true
             if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
                 moved = true
             }
             if (!change.pressed) {
-                if (!moved && !claimed) onTap(down.position, size.width.toFloat())
+                // Consumption is only asked about here, on the release, and never on the
+                // press or the moves in between. A button in front consumes the release,
+                // which is what should hand it the tap; the list consumes the *press* while
+                // a fling settles and consumes *moves* once a drag begins, and treating
+                // either as "somebody else wanted this" is what kept eating the tap.
+                if (!moved && !change.isConsumed) onTap(down.position, size.width.toFloat())
                 break
             }
         }
