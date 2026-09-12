@@ -72,4 +72,9 @@ class CookbookRepository(
         val token = tokenDataStore.tokenFlow.first()
         cookbookApi.searchUsers(query, token)
     }
+
+    suspend fun searchCookbooks(query: String): Result<List<CookbookInfo>> = runCatching {
+        val token = tokenDataStore.tokenFlow.first()
+        cookbookApi.searchCookbooks(query, token)
+    }
 }

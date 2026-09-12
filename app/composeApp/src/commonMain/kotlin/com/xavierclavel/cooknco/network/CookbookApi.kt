@@ -158,4 +158,22 @@ class CookbookApi(private val client: HttpClient) {
         }
         return response.body()
     }
+
+    /**
+     * `GET /cookbook` answers a plain list with no total count (unlike `/user` and
+     * `/ingredient`, which wrap in [shared.dto.SearchResult]) — see `CookbookService.listCookbooks`.
+     * Callers stand in with the loaded page size where a count is needed.
+     */
+    suspend fun searchCookbooks(query: String, token: String? = null): List<CookbookInfo> {
+        val response = client.get("$base/cookbook") {
+            if (token != null) bearerAuth(token)
+            parameter("query", query)
+            parameter("page", 0)
+            parameter("size", 20)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+        return response.body()
+    }
 }
