@@ -205,16 +205,16 @@ class RecipeService: KoinComponent {
      * themselves before calling this: it is the tag that says the owner asked, and nothing
      * here reads it (see `LikeController.deleteLike`, which learned that the hard way).
      *
-     * The flag is set and updated rather than `delete()`d, deliberately. `delete()` on a
-     * soft-deletable bean still cascades to the children, and the children here — steps,
-     * ingredients, likes, cookbook links — are not soft-deletable, so cascading would empty
-     * the recipe it is supposed to be preserving. Setting the column touches one row and
-     * leaves everything hanging off it intact, which is what makes a restore a one-line
-     * `update recipes set deleted = false where id = ?`.
+     * `delete()` is a *soft* delete here, and it leaves the children alone: Ebean only
+     * cascades a soft delete to a child that is soft-deletable itself
+     * (`DefaultPersister.deleteManyDetails`: `if (deleteMode.isHard() || targetDesc.isSoftDelete())`,
+     * commented "only cascade soft deletes when supported by target"). None of steps,
+     * ingredients, likes or cookbook links carry the annotation, so all of them survive —
+     * which is what makes the restore below give back a whole recipe rather than an empty one.
      *
-     * The pictures stay for the same reason: a restored recipe with no photograph is only
-     * most of a restore, and `StorageService` reads the row over raw SQL, so it still sees
-     * an owner and never offers them up as orphans.
+     * The pictures survive for a different reason: nothing deletes them any more.
+     * `StorageService` reads owning rows over raw SQL, which does not apply the flag, so a
+     * deleted recipe still counts as their owner and they are never offered up as orphans.
      */
     fun tryDelete(id: Long) {
         val recipe = getEntityById(id)
@@ -222,8 +222,7 @@ class RecipeService: KoinComponent {
         val referenced = recipeInfo.likesCount > 0 || QCookbookRecipe().recipe.id.eq(recipe.id).exists()
         logger.info { "Deleting recipe ${recipe.id} (${recipe.title}); has references: $referenced" }
         if (referenced) return
-        recipe.deleted = true
-        recipe.update()
+        recipe.delete()
     }
 
     /**
