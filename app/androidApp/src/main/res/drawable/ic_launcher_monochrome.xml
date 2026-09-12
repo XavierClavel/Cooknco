@@ -1,17 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The foreground layer of the adaptive launcher icon: the tomato from the Cook'n'Co logo.
+  The themed-icon layer, for the launchers that recolour every icon to the wallpaper.
 
-  The two paths are copied verbatim from frontend/src/assets/logo.svg — the `.cls-3` body
-  and the `.cls-1` stem — so the icon is the logo's own drawing rather than a redrawing of
-  it. The wordmark beside them is not here and cannot be: it is live type in Geologica
-  Black, with no path form in the SVG, and two lines of it are unreadable at 48dp anyway.
-
-  The outer group scales the mark to 58 of the 108 viewport, inside the 66 an adaptive icon
-  is guaranteed to keep once the launcher has applied its mask. The inner group is the
-  SVG's own transform on the stem, lifted by one unit: both outlines are 2 units wide, so
-  where the SVG puts it the tomato's ring swallows most of the green as soon as that ring
-  is only a few pixels across.
+  The same two paths as the foreground with the colour taken out: the system tints this
+  whole drawable one colour, so a fill and a stroke that differ would come back identical
+  and the outline would simply vanish. What is left is the silhouette, which is what a
+  monochrome layer is meant to be.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -24,8 +18,8 @@
         android:translateX="-30.2"
         android:translateY="19.56">
         <path
-            android:fillColor="#ED6D6B"
-            android:strokeColor="#06151E"
+            android:fillColor="#000000"
+            android:strokeColor="#000000"
             android:strokeWidth="2"
             android:strokeLineJoin="round"
             android:pathData="M42.44,16.5c0,4.59 -3.92,8.16 -8.76,7.97s-8.76,-4.06 -8.76,-8.65 3.92,-8.16 8.76,-7.97 8.76,4.06 8.76,8.65Z" />
@@ -34,8 +28,8 @@
             android:translateY="-12.4"
             android:rotation="20.38">
             <path
-                android:fillColor="#429775"
-                android:strokeColor="#06151E"
+                android:fillColor="#000000"
+                android:strokeColor="#000000"
                 android:strokeWidth="2"
                 android:strokeLineJoin="round"
                 android:pathData="M34.96,4.75h0c0.75,0 1.36,0.61 1.36,1.36v1.91c0,1.18 -0.96,2.14 -2.14,2.14h0c-1.18,0 -2.14,-0.96 -2.14,-2.14v-0.36c0,-1.61 1.31,-2.92 2.92,-2.92Z" />

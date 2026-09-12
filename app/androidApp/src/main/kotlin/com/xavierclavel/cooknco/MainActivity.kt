@@ -5,12 +5,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.di.initFor
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Before super, which is where the theme is read: this swaps Theme.Cooknco.Splash
+        // for the postSplashScreenTheme it names. Skipping it would leave the launch
+        // window's theme on the activity for its whole life.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         AppGraph.initFor(applicationContext)
         // Before any notification can arrive, and idempotent: a channel that does not exist

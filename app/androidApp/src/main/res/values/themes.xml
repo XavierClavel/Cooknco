@@ -1,5 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Cooknco" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      What the activity wears once the launch window is gone.
+
+      windowBackground matters even though Compose paints over it: it is what shows in the
+      gap between the splash being dismissed and the first composed frame, and left at the
+      platform default that gap is a white flash between two cream screens.
+    -->
+    <style name="Theme.Cooknco" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/brand_background</item>
+    </style>
+
+    <!--
+      The launch window.
+
+      Android 12 draws one whether or not an app asks for it, so the choice is between the
+      styled version and a bare icon on the platform's own colour; core-splashscreen backs
+      the same thing onto API 24. The icon is the launcher icon rather than a drawable of
+      its own, which is what makes the tap-to-launch transition line up: the system animates
+      the very icon the user touched into this window.
+
+      Nothing holds this screen open. setKeepOnScreenCondition would let it wait for the
+      session check, but that check is a network call, and an offline launch would then pay
+      the socket timeout staring at a logo — the same reason the version gate in App.kt does
+      not hold either. It hands over on the first frame, and SplashScreen draws the same
+      mark on the same ground so the handover is not visible.
+    -->
+    <style name="Theme.Cooknco.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/brand_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Cooknco</item>
+    </style>
 </resources>

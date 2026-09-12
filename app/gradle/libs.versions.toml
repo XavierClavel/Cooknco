@@ -15,6 +15,9 @@ activityCompose = "1.13.0"
 composeBom = "2026.02.01"
 browser = "1.10.0"
 core = "1.18.0"
+# Backports the Android 12 launch window to API 24, and is the supported way to opt
+# into it at all — the platform draws one regardless, styled or not.
+coreSplashscreen = "1.0.1"
 # Firebase Cloud Messaging, for push notifications. The BOM pins every firebase-*
 # artifact, so firebase-messaging is declared without a version of its own.
 firebaseBom = "34.17.0"
@@ -65,6 +68,7 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 # NotificationCompat, to draw a push while the app is in the foreground.
 androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
