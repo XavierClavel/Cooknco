@@ -1,6 +1,5 @@
 package com.xavierclavel.cooknco.ui.user
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,12 +7,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,22 +22,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -57,13 +49,19 @@ import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberImagePicker
-import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
+import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerIconButton
+import com.xavierclavel.cooknco.ui.theme.stickerShadow
+
+// ── Shared styling helpers (mirrors CookbookEditScreen's private equivalents) ───
 
 private val fieldShape = RoundedCornerShape(12.dp)
 
@@ -72,15 +70,17 @@ private fun editColors() = OutlinedTextFieldDefaults.colors(
     focusedContainerColor = CookncoWhite,
     unfocusedContainerColor = CookncoWhite,
     focusedBorderColor = CookncoOrange,
-    unfocusedBorderColor = CookncoNavy.copy(alpha = 0.5f),
+    unfocusedBorderColor = CookncoNavy,
     focusedTextColor = CookncoNavy,
     unfocusedTextColor = CookncoNavy,
-    focusedLabelColor = CookncoOrange,
-    unfocusedLabelColor = CookncoNavy.copy(alpha = 0.6f),
     cursorColor = CookncoOrange,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FieldLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark, letterSpacing = 0.7.sp, modifier = modifier)
+}
+
 @Composable
 fun UserEditScreen(
     viewModel: UserEditViewModel,
@@ -93,56 +93,32 @@ fun UserEditScreen(
         if (uiState.saved) onNavigateBack()
     }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = viewModel::save,
-                        enabled = !uiState.isSaving,
-                    ) {
-                        if (uiState.isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = CookncoNavy,
-                            )
-                        } else {
-                            Icon(Icons.Outlined.Check, contentDescription = "Save")
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CookncoGreen,
-                    titleContentColor = CookncoNavy,
-                    navigationIconContentColor = CookncoNavy,
-                    actionIconContentColor = CookncoNavy,
-                ),
-            )
-        },
-        containerColor = CookncoBackground,
-    ) { innerPadding ->
+    Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
+        // ── Top bar: back + title only — saving happens from the bottom SAVE button ──
+        Row(
+            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 18.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+            }
+            Text("Edit profile", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, modifier = Modifier.weight(1f))
+        }
+
         when {
-            uiState.isLoading -> Box(
-                Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp) }
+            uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
+            }
 
             else -> UserEditContent(
                 uiState = uiState,
                 onUsernameChange = viewModel::updateUsername,
-                onBioChange = viewModel::updateBio,
+                onBioChange = { viewModel.updateBio(it.take(255)) },
                 onImageSelected = { uri -> viewModel.setPendingImage(uri) },
                 onSave = viewModel::save,
                 onCancel = onNavigateBack,
-                modifier = Modifier.padding(innerPadding),
+                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -159,38 +135,34 @@ private fun UserEditContent(
     modifier: Modifier = Modifier,
 ) {
     val user = uiState.user
-
     val imagePicker = rememberImagePicker(onPicked = onImageSelected)
+    val avatarShape = CircleShape
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
 
         // ── Avatar picker ────────────────────────────────────────────────────
         Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clickable { imagePicker.launch() },
-            contentAlignment = Alignment.BottomEnd,
+            modifier = Modifier.size(130.dp).clickable { imagePicker.launch() },
+            contentAlignment = Alignment.Center,
         ) {
-            // Show the freshly picked image if there is one, otherwise the remote avatar
             val pickedBitmap = uiState.pendingImage?.let { picked ->
                 remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
             }
 
             Box(
                 modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .border(2.5.dp, CookncoNavy, CircleShape)
-                    .background(CookncoGreenLight)
-                    .align(Alignment.Center),
+                    .size(130.dp)
+                    .stickerShadow(avatarShape, offsetX = 5.dp, offsetY = 5.dp)
+                    .clip(avatarShape)
+                    .border(3.dp, CookncoNavy, avatarShape)
+                    .background(CookncoGreenLight),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -219,51 +191,67 @@ private fun UserEditContent(
             // Camera badge
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .align(Alignment.BottomEnd)
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .background(CookncoOrange)
-                    .border(2.dp, CookncoNavy, CircleShape),
+                    .background(CookncoGold)
+                    .border(3.dp, CookncoNavy, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Outlined.CameraAlt,
                     contentDescription = "Change photo",
-                    tint = CookncoWhite,
-                    modifier = Modifier.size(18.dp),
+                    tint = CookncoNavy,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
 
         Text(
             text = "Tap to change photo",
-            style = MaterialTheme.typography.bodySmall,
-            color = CookncoNavy.copy(alpha = 0.5f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = CookncoNavy,
+            modifier = Modifier.padding(top = 14.dp),
         )
 
-        // ── Username ─────────────────────────────────────────────────────────
-        OutlinedTextField(
-            value = uiState.username,
-            onValueChange = onUsernameChange,
-            label = { Text("Username") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            isError = uiState.error?.contains("Username") == true || uiState.error?.contains("username") == true,
-            colors = editColors(),
-            shape = fieldShape,
-        )
-
-        // ── Bio ──────────────────────────────────────────────────────────────
-        OutlinedTextField(
-            value = uiState.bio,
-            onValueChange = onBioChange,
-            label = { Text("Bio") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            maxLines = 6,
-            colors = editColors(),
-            shape = fieldShape,
-            supportingText = { Text("${uiState.bio.length}/255", textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth()) },
-        )
+        // ── Fields card ──────────────────────────────────────────────────────
+        StickerCard(
+            modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
+            shape = RoundedCornerShape(20.dp),
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column {
+                    FieldLabel("USERNAME", modifier = Modifier.padding(bottom = 7.dp))
+                    OutlinedTextField(
+                        value = uiState.username,
+                        onValueChange = onUsernameChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = uiState.error?.contains("username", ignoreCase = true) == true,
+                        colors = editColors(),
+                        shape = fieldShape,
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+                Column {
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp), verticalAlignment = Alignment.Bottom) {
+                        FieldLabel("BIO", modifier = Modifier.weight(1f))
+                        Text("${uiState.bio.length}/255", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
+                    }
+                    OutlinedTextField(
+                        value = uiState.bio,
+                        onValueChange = onBioChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 6,
+                        colors = editColors(),
+                        shape = fieldShape,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
 
         // ── Error ────────────────────────────────────────────────────────────
         if (uiState.error != null) {
@@ -272,44 +260,44 @@ private fun UserEditContent(
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             )
         }
 
-        // ── Save button ──────────────────────────────────────────────────────
-        Button(
-            onClick = onSave,
-            enabled = !uiState.isSaving,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = CookncoOrange,
-                contentColor = CookncoWhite,
-            ),
-            border = BorderStroke(1.5.dp, CookncoNavy),
+        // ── Bottom actions ───────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (uiState.isSaving) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = CookncoWhite)
-            } else {
-                Text("SAVE", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            StickerCard(
+                modifier = Modifier.size(width = 100.dp, height = 56.dp),
+                shape = RoundedCornerShape(16.dp),
+                shadowOffset = 4.dp,
+                onClick = onCancel,
+            ) {
+                Text("Cancel", color = CookncoNavy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.align(Alignment.Center))
+            }
+            StickerCard(
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                fillColor = CookncoOrange,
+                shadowOffset = 4.dp,
+                onClick = if (!uiState.isSaving) onSave else null,
+            ) {
+                if (uiState.isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp).align(Alignment.Center), strokeWidth = 2.dp, color = CookncoWhite)
+                } else {
+                    Text(
+                        text = "SAVE",
+                        color = CookncoWhite,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
             }
         }
-
-        // ── Cancel button ────────────────────────────────────────────────────
-        Button(
-            onClick = onCancel,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = CookncoNavy.copy(alpha = 0.06f),
-                contentColor = CookncoNavy,
-            ),
-            border = BorderStroke(1.5.dp, CookncoNavy.copy(alpha = 0.4f)),
-        ) {
-            Text("Cancel", fontWeight = FontWeight.Medium)
-        }
-
-        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -332,7 +320,7 @@ private val previewEditState = UserEditUiState(
 @Composable
 fun UserEditScreenPreview() {
     CookncoTheme {
-        Surface(color = CookncoBackground) {
+        Box(modifier = Modifier.background(CookncoGreen)) {
             UserEditContent(
                 uiState = previewEditState,
                 onUsernameChange = {},
@@ -349,7 +337,7 @@ fun UserEditScreenPreview() {
 @Composable
 fun UserEditErrorPreview() {
     CookncoTheme {
-        Surface(color = CookncoBackground) {
+        Box(modifier = Modifier.background(CookncoGreen)) {
             UserEditContent(
                 uiState = previewEditState.copy(error = "Username already taken"),
                 onUsernameChange = {},
