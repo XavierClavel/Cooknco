@@ -4,6 +4,7 @@ import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.exceptions.UnauthorizedCause
 import com.xavierclavel.exceptions.UnauthorizedException
 import com.xavierclavel.services.ImageService
+import com.xavierclavel.services.OAuthService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.UserSession
@@ -34,6 +35,7 @@ import org.koin.java.KoinJavaComponent.inject
 object UserController: Controller(USER_URL) {
     val userService : UserService by inject(UserService::class.java)
     val imageService: ImageService by inject(ImageService::class.java)
+    val oauthService: OAuthService by inject(OAuthService::class.java)
 
     override fun Route.routes() {
         getUser()
@@ -48,6 +50,9 @@ object UserController: Controller(USER_URL) {
 
             getSettings()
             updateSettings()
+
+            listMcpClients()
+            revokeMcpClient()
         }
 
         authenticate("admin-session") {
@@ -107,6 +112,30 @@ object UserController: Controller(USER_URL) {
         val settingsDTO = call.receive<UserSettingsDTO>()
         userService.updateSettings(getSessionUserId(), settingsDTO)
         call.respond(HttpStatusCode.OK)
+    }
+
+    /**
+     * The MCP clients this account has approved — the settings screen's "MCP access".
+     *
+     * Under `/user` rather than `/oauth` on purpose: `/oauth` is the spec's surface, spoken
+     * by clients with their own tokens, and this is the account speaking about them with a
+     * session of its own.
+     */
+    private fun Route.listMcpClients() = get("/mcp-clients") {
+        call.respond(oauthService.grantsOf(getSessionUserId()))
+    }
+
+    /**
+     * Withdraws one. Answers 404 rather than 200 when there was no such grant, so a client
+     * the user is looking at in a stale list does not report as revoked twice.
+     */
+    private fun Route.revokeMcpClient() = delete("/mcp-clients/{clientId}") {
+        val clientId = call.parameters["clientId"] ?: return@delete call.respond(HttpStatusCode.BadRequest)
+        if (oauthService.revokeGrant(getSessionUserId(), clientId)) {
+            call.respond(HttpStatusCode.OK)
+        } else {
+            call.respond(HttpStatusCode.NotFound)
+        }
     }
 
     private fun Route.setRole() = put("/{id}/role/{role}") {

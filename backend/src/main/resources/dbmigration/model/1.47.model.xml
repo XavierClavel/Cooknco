@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="oauth_grants" identityType="identity" pkName="pk_oauth_grants" uniqueConstraintName="uq_oauth_grants_user_id_client_id">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="user_id" type="bigint" notnull="true" references="users.id" foreignKeyName="fk_oauth_grants_user_id" foreignKeyIndex="ix_oauth_grants_user_id"/>
+            <column name="client_id" type="varchar(64)" notnull="true"/>
+            <column name="granted_at" type="localdatetime" notnull="true"/>
+            <column name="last_used_at" type="localdatetime" notnull="true"/>
+            <uniqueConstraint name="uq_oauth_grants_user_id_client_id" columnNames="user_id,client_id"/>
+        </createTable>
+    </changeSet>
+</migration>

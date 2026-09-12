@@ -1,7 +1,10 @@
 package com.xavierclavel.services
 
 import com.xavierclavel.models.OAuthClient
+import com.xavierclavel.models.OAuthGrant
 import com.xavierclavel.models.query.QOAuthClient
+import com.xavierclavel.models.query.QOAuthGrant
+import com.xavierclavel.models.query.QUser
 import com.xavierclavel.plugins.AnsweredDecisionData
 import com.xavierclavel.plugins.AuthorizationCodeData
 import com.xavierclavel.plugins.OAuthTokenData
@@ -14,6 +17,7 @@ import io.ktor.http.Url
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import shared.dto.ClientRegistrationRequest
+import shared.infodto.McpClientInfo
 import shared.utils.URL.MCP_URL
 import shared.utils.URL.OAUTH_AUTHORIZATION_SERVER_METADATA
 import shared.utils.URL.OAUTH_PROTECTED_RESOURCE_METADATA
@@ -22,6 +26,7 @@ import shared.utils.URL.WELL_KNOWN_URL
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.Base64
 
 /**
@@ -240,6 +245,7 @@ class OAuthService : KoinComponent {
             return null
         }
         redisService.rememberDecision(pendingId, AnsweredDecisionData(pending.userId, approved = true))
+        rememberGrant(pending.userId, pending.clientId)
         val code = newToken()
         redisService.createAuthorizationCode(
             code,
@@ -275,6 +281,78 @@ class OAuthService : KoinComponent {
         redisService.getDecision(pendingId)
             ?.takeIf { it.userId == sessionUserId }
             ?.let { if (it.approved) Answer.APPROVED else Answer.DECLINED }
+
+    // -------------------------------------------------------------------- grants
+
+    /**
+     * Records that [userId] has approved [clientId], or refreshes the record if they had
+     * already. Called as consent is given rather than as the code is redeemed: what the
+     * user agreed to is the thing being remembered, and a client that never comes back for
+     * its code has still been allowed in and should be revocable.
+     */
+    fun rememberGrant(userId: Long, clientId: String) {
+        val existing = QOAuthGrant().user.id.eq(userId).clientId.eq(clientId).findOne()
+        if (existing != null) {
+            existing.grantedAt = LocalDateTime.now()
+            existing.update()
+            return
+        }
+        val user = QUser().id.eq(userId).findOne() ?: return
+        OAuthGrant(user = user, clientId = clientId).insert()
+    }
+
+    /** Whether this account still allows this client — checked on every MCP request. */
+    fun hasGrant(userId: Long, clientId: String): Boolean =
+        QOAuthGrant().user.id.eq(userId).clientId.eq(clientId).exists()
+
+    /**
+     * The clients an account has approved, newest grant first, each with the registration it
+     * was granted to. Rows whose client registration has since vanished are dropped rather
+     * than shown nameless — there is nothing left for the user to recognise them by.
+     */
+    fun grantsOf(userId: Long): List<McpClientInfo> {
+        val grants = QOAuthGrant()
+            .user.id.eq(userId)
+            .orderBy().grantedAt.desc()
+            .findList()
+        if (grants.isEmpty()) return emptyList()
+        val clients = QOAuthClient()
+            .clientId.`in`(grants.map { it.clientId })
+            .findList()
+            .associateBy { it.clientId }
+        return grants.mapNotNull { grant ->
+            val client = clients[grant.clientId] ?: return@mapNotNull null
+            McpClientInfo(
+                clientId = grant.clientId,
+                clientName = client.clientName,
+                redirectUris = client.redirectUris,
+                grantedAt = grant.grantedAt.toEpochSecond(ZoneOffset.UTC),
+                lastUsedAt = grant.lastUsedAt.toEpochSecond(ZoneOffset.UTC),
+            )
+        }
+    }
+
+    /**
+     * Takes an account's approval back.
+     *
+     * Deleting the row is the whole of it: tokens already issued are checked against a grant
+     * on every request ([tokenFor]) and on every refresh, so they stop working here rather
+     * than whenever they would have expired. Returns false when there was nothing to revoke,
+     * which the controller answers 404 to rather than pretending it revoked something.
+     */
+    fun revokeGrant(userId: Long, clientId: String): Boolean {
+        val grant = QOAuthGrant().user.id.eq(userId).clientId.eq(clientId).findOne() ?: return false
+        grant.delete()
+        logger.info { "Revoked MCP client $clientId for user $userId" }
+        return true
+    }
+
+    private fun touchGrant(userId: Long, clientId: String) {
+        QOAuthGrant().user.id.eq(userId).clientId.eq(clientId).findOne()?.apply {
+            lastUsedAt = LocalDateTime.now()
+            update()
+        }
+    }
 
     // ------------------------------------------------------------ the token step
 
@@ -312,7 +390,14 @@ class OAuthService : KoinComponent {
             throw InvalidTokenRequest("invalid_target", "This server issues tokens for $resourceUri only")
         }
 
+        // Revoked between the consent page and the exchange: rare, but the code is worth
+        // exactly what the grant behind it is worth.
+        if (!hasGrant(data.userId, clientId)) {
+            throw InvalidTokenRequest("invalid_grant", "This account has withdrawn access for this client")
+        }
+
         touch(clientId)
+        touchGrant(data.userId, clientId)
         return issueTokens(OAuthTokenData(clientId = clientId, userId = data.userId, resource = data.resource, scope = data.scope))
     }
 
@@ -336,7 +421,12 @@ class OAuthService : KoinComponent {
             throw InvalidTokenRequest("invalid_target", "This server issues tokens for $resourceUri only")
         }
 
+        if (!hasGrant(data.userId, data.clientId)) {
+            throw InvalidTokenRequest("invalid_grant", "This account has withdrawn access for this client")
+        }
+
         touch(data.clientId)
+        touchGrant(data.userId, data.clientId)
         return issueTokens(data)
     }
 
@@ -360,7 +450,12 @@ class OAuthService : KoinComponent {
      * anything but [resourceUri] is refused here even though this same server minted it.
      */
     suspend fun tokenFor(accessToken: String): OAuthTokenData? =
-        redisService.getAccessToken(accessToken)?.takeIf { it.resource == resourceUri }
+        redisService.getAccessToken(accessToken)
+            ?.takeIf { it.resource == resourceUri }
+            // An access token outlives the click that revokes it — it is an opaque key in
+            // Redis with an hour on it and nothing to look it up by. The grant is what says
+            // whether it is still allowed, so it is read here rather than hunted for there.
+            ?.takeIf { hasGrant(it.userId, it.clientId) }
 
     // ------------------------------------------------------------------- helpers
 
