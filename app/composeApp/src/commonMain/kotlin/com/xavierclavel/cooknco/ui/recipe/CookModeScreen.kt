@@ -3,7 +3,6 @@ package com.xavierclavel.cooknco.ui.recipe
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +28,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -169,18 +172,14 @@ private fun CookModeContent(
                 // without aiming at a button. Before the padding, so the 18dp gutters count
                 // as edge rather than as a dead strip down each side.
                 //
-                // detectTapGestures does not consume drags, so the list still scrolls, and a
-                // child that handles its own taps (the timer) is hit first and swallows them.
-                .pointerInput(currentStep, stepCount) {
-                    detectTapGestures { offset ->
-                        val edge = size.width * EDGE_TAP_FRACTION
-                        when {
-                            offset.x < edge -> onPreviousStep()
-                            // The middle is deliberately inert, and so is the right edge on
-                            // the last step: "Finish" closes the screen, which is not
-                            // something to do to somebody who tapped to read on.
-                            offset.x > size.width - edge && !isLastStep -> onNextStep()
-                        }
+                .edgeTaps(currentStep, stepCount) { offset, width ->
+                    val edge = width * EDGE_TAP_FRACTION
+                    when {
+                        offset.x < edge -> onPreviousStep()
+                        // The middle is deliberately inert, and so is the right edge on
+                        // the last step: "Finish" closes the screen, which is not
+                        // something to do to somebody who tapped to read on.
+                        offset.x > width - edge && !isLastStep -> onNextStep()
                     }
                 }
                 .padding(horizontal = 18.dp),
@@ -300,6 +299,52 @@ private fun CookModeContent(
                     fontSize = 17.sp,
                     modifier = Modifier.align(Alignment.Center),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Taps on the left and right of the step, over a list that also scrolls.
+ *
+ * This was `detectTapGestures`, and on a long step it stopped working in places. That
+ * detector abandons the gesture the moment *anything* consumes an event in it, and the
+ * list underneath consumes in two situations that have nothing to do with the user's
+ * intent: it takes the press outright when a fling is still settling, so that a tap stops
+ * the scroll, and it takes the movement as soon as a finger wanders past the touch slop.
+ * Neither happens on a step short enough to fit the screen — which is why the same spot
+ * answered on one step and not the next.
+ *
+ * So the rule here is what it should have been: a tap moves a step unless the finger
+ * actually moved, or something in front claimed the press for itself — a button, the timer.
+ * Movement is measured rather than inferred from consumption, and nothing is consumed here,
+ * so dragging still scrolls the list exactly as before.
+ *
+ * [onTap] is handed the position and the width it should be read against, since the node
+ * this sits on is wider than the padded content inside it.
+ */
+private fun Modifier.edgeTaps(
+    vararg keys: Any?,
+    onTap: (Offset, Float) -> Unit,
+): Modifier = pointerInput(*keys) {
+    awaitEachGesture {
+        // Not `requireUnconsumed`: a press that lands while the list is settling is
+        // consumed before it gets here, and that press is exactly the one a cook means.
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var moved = false
+        var claimed = false
+
+        while (true) {
+            // Final, so every other node has had its say about this event first.
+            val event = awaitPointerEvent(PointerEventPass.Final)
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (change.isConsumed) claimed = true
+            if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                moved = true
+            }
+            if (!change.pressed) {
+                if (!moved && !claimed) onTap(down.position, size.width.toFloat())
+                break
             }
         }
     }
