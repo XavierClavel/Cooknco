@@ -271,7 +271,7 @@ private fun CookbookContent(
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatChip("${cookbook.recipesCount} recipe${if (cookbook.recipesCount != 1) "s" else ""}")
+                        StatChip(s.recipeCount(cookbook.recipesCount))
                         StatChip(
                             text = s.memberCount(cookbook.usersCount),
                             fillColor = CookncoBlueLight,

@@ -163,8 +163,7 @@ private fun CookbookRow(cookbook: CookbookInfo, onClick: () -> Unit) {
                     lineHeight = 22.sp,
                 )
                 Text(
-                    text = "${cookbook.recipesCount} recipe${if (cookbook.recipesCount != 1) "s" else ""} · " +
-                        s.memberCount(cookbook.usersCount),
+                    text = s.recipeCount(cookbook.recipesCount) + " · " + s.memberCount(cookbook.usersCount),
                     fontSize = 12.5.sp,
                     color = CookncoNavy.copy(alpha = 0.62f),
                 )

@@ -709,18 +709,21 @@ private fun CookbooksScopeContent(
     onCookbookClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
         contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
     ) {
         if (!state.isLoading && state.items.isEmpty()) {
-            item { SearchEmptyState(query = query, browseLabel = "No cookbooks yet") }
+            item { SearchEmptyState(query = query, browseLabel = s.noCookbooksFound) }
         }
         if (state.items.isNotEmpty()) {
             item {
-                val suffix = if (state.items.size >= 20) "+" else ""
                 Text(
-                    text = "${state.count}$suffix cookbook${if (state.count == 1 && suffix.isEmpty()) "" else "s"}",
+                    // A full page means the real total is unknown, so the count is marked
+                    // as a floor — the catalogue decides how, since where the "+" goes is
+                    // not the same question in every language.
+                    text = s.cookbookCount(state.count, capped = state.items.size >= 20),
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = CookncoNavy,
@@ -791,7 +794,7 @@ private fun IngredientsScopeContent(
         contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
     ) {
         if (!state.isLoading && state.items.isEmpty()) {
-            item { SearchEmptyState(query = query, browseLabel = "No ingredients yet") }
+            item { SearchEmptyState(query = query, browseLabel = s.noIngredientsFound) }
         }
         if (state.items.isNotEmpty()) {
             item {

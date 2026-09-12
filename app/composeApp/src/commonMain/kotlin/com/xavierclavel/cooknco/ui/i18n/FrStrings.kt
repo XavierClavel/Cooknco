@@ -232,8 +232,13 @@ object FrStrings : Strings {
     override val shared = "Partagé"
     override val recipes = "Recettes"
     override val members = "Membres"
-    override fun cookbookCount(count: Int) =
-        if (count == 1) "1 carnet de recette" else "$count carnets de recette"
+    override fun cookbookCount(count: Int, capped: Boolean): String {
+        val n = if (capped) "$count+" else "$count"
+        return if (count == 1 && !capped) "1 carnet de recette" else "$n carnets de recette"
+    }
+
+    override val noCookbooksFound = "Aucun carnet de recette"
+    override val noIngredientsFound = "Aucun ingrédient"
     override fun memberCount(count: Int) = if (count == 1) "1 membre" else "$count membres"
     override val leaveCookbook = "Quitter le carnet de recette"
     override val leaveCookbookQuestion = "Voulez-vous vraiment quitter ce carnet de recette ?"
