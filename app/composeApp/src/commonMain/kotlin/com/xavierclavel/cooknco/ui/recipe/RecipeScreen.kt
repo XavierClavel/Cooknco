@@ -107,19 +107,18 @@ import kotlinx.datetime.toLocalDateTime
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-private fun unitLabel(unit: String): String = when (unit) {
-    "NONE", "UNIT" -> ""
-    "GRAM" -> "g"
-    "KILOGRAM" -> "kg"
-    "POUND" -> "lb"
-    "MILLILITERS" -> "mL"
-    "CENTILITER" -> "cL"
-    "LITER" -> "L"
-    "TEASPOON" -> "teaspoons"
-    "TABLESPOON" -> "tablespoons"
-    "CUP" -> "cup"
-    else -> unit
-}
+/**
+ * The unit on a line of ingredients.
+ *
+ * A second table of units lived here, in English, which is where "2 tablespoons sugar"
+ * came from in a French recipe. The names come from the catalogue now, like everywhere
+ * else; what stays is the one thing this screen wants differently — a countable
+ * ingredient prints "2 eggs", not the catalogue's "2 Unit eggs". The catalogue has to
+ * name that unit, because the editor's picker needs a row to show for it; a line of
+ * ingredients does not.
+ */
+private fun unitLabel(unit: String, s: Strings): String =
+    if (unit == "NONE" || unit == "UNIT") "" else s.unitName(unit)
 
 private fun scaleAmount(amount: Float?, selectedYield: Int, recipeYield: Int): String {
     if (amount == null) return ""
@@ -719,8 +718,9 @@ private fun IngredientRow(
     showDivider: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val amountStr = scaleAmount(ingredient.amount, selectedYield, recipeYield)
-    val unitStr = unitLabel(ingredient.unit)
+    val unitStr = unitLabel(ingredient.unit, s)
     val amountLabel = buildString {
         if (amountStr.isNotEmpty()) append(amountStr)
         if (unitStr.isNotEmpty()) append(if (amountStr.isEmpty()) unitStr else " $unitStr")
