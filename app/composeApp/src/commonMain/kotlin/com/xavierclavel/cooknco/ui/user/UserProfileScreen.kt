@@ -24,11 +24,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -39,11 +37,12 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,12 +54,15 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerConfirmDialog
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 
 /**
@@ -77,9 +79,12 @@ fun UserProfileScreen(
     onNavigateToEdit: (() -> Unit)? = null,
     onNavigateToRecipe: (Long) -> Unit = {},
     onNavigateToSettings: (() -> Unit)? = null,
+    onNavigateToFollowers: () -> Unit = {},
+    onNavigateToFollowing: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val clipboardManager = LocalClipboardManager.current
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         when {
@@ -101,6 +106,9 @@ fun UserProfileScreen(
                 onNavigateBack = onNavigateBack,
                 onNavigateToEdit = onNavigateToEdit,
                 onNavigateToSettings = onNavigateToSettings,
+                onNavigateToFollowers = onNavigateToFollowers,
+                onNavigateToFollowing = onNavigateToFollowing,
+                onShare = { clipboardManager.setText(AnnotatedString("cooknco.eu/user?id=${uiState.user!!.id}")) },
                 onLoadMore = { viewModel.loadMoreRecipes() },
                 allLoaded = uiState.allRecipesLoaded,
                 onRecipeClick = onNavigateToRecipe,
@@ -120,6 +128,9 @@ private fun ProfileContent(
     onNavigateBack: (() -> Unit)?,
     onNavigateToEdit: (() -> Unit)?,
     onNavigateToSettings: (() -> Unit)?,
+    onNavigateToFollowers: () -> Unit,
+    onNavigateToFollowing: () -> Unit,
+    onShare: () -> Unit,
     onLoadMore: () -> Unit,
     allLoaded: Boolean,
     onRecipeClick: (Long) -> Unit,
@@ -134,6 +145,11 @@ private fun ProfileContent(
         }
     }
     LaunchedEffect(reachedEnd) { if (reachedEnd && !allLoaded) onLoadMore() }
+
+    // Following someone is reversible with no real consequence to warn about; unfollowing
+    // drops an established relationship, so only that direction is gated behind the shared
+    // destructive-confirmation dialog (see `StickerConfirmDialog`).
+    var showUnfollowConfirm by remember { mutableStateOf(false) }
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -165,26 +181,52 @@ private fun ProfileContent(
         // ── Avatar + name + stats ──────────────────────────────────────────────
         item(span = { GridItemSpan(2) }) {
             StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    UserAvatar(
-                        userId = user.id,
-                        version = user.version,
-                        contentDescription = user.username,
-                        modifier = Modifier.size(82.dp).clip(CircleShape).border(3.dp, CookncoNavy, CircleShape),
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(user.username, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 27.sp)
-                        Row(
-                            modifier = Modifier.padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            ProfileStat(value = user.recipesCount, label = "recipes")
-                            ProfileStat(value = user.followersCount, label = "followers")
-                            ProfileStat(value = user.followsCount, label = "following")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        UserAvatar(
+                            userId = user.id,
+                            version = user.version,
+                            contentDescription = user.username,
+                            modifier = Modifier.size(82.dp).clip(CircleShape).border(3.dp, CookncoNavy, CircleShape),
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(user.username, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 27.sp)
+                            if (isOwnProfile) {
+                                Row(modifier = Modifier.padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
+                                    Text(user.recipesCount.toString(), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                                    Text("recipes", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+                                }
+                            } else {
+                                Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    InlineStat(user.recipesCount, "recipes")
+                                    InlineStat(user.followersCount, "followers")
+                                }
+                            }
+                        }
+                    }
+
+                    // Own profile only: the mockup moves followers/following out of the
+                    // inline text and into two tappable pills that open the list screens.
+                    if (isOwnProfile) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatPillButton(
+                                count = user.followersCount,
+                                label = "followers",
+                                onClick = onNavigateToFollowers,
+                                modifier = Modifier.weight(1f),
+                            )
+                            StatPillButton(
+                                count = user.followsCount,
+                                label = "following",
+                                onClick = onNavigateToFollowing,
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
                 }
@@ -197,7 +239,7 @@ private fun ProfileContent(
             }
         }
 
-        // ── Edit profile / Follow-unfollow ────────────────────────────────────
+        // ── Edit profile / Share, or Follow-unfollow / Share ──────────────────
         item(span = { GridItemSpan(2) }) {
             when {
                 isOwnProfile && onNavigateToEdit != null -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -209,32 +251,49 @@ private fun ProfileContent(
                     ) {
                         Text("Edit profile", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
                     }
+                    StickerCard(
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        shadowOffset = 4.dp,
+                        onClick = onShare,
+                    ) {
+                        Text("Share", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
+                    }
                 }
 
-                !isOwnProfile -> Button(
-                    onClick = onToggleFollow,
-                    enabled = !isFollowLoading,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isFollowing) CookncoNavy.copy(alpha = 0.08f) else CookncoOrange,
-                        contentColor = if (isFollowing) CookncoNavy else CookncoWhite,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (isFollowLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = CookncoNavy)
-                    } else {
-                        Icon(
-                            imageVector = if (isFollowing) Icons.Outlined.PersonRemove else Icons.Outlined.PersonAdd,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            text = if (isFollowing) "Unfollow" else "Follow",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
+                !isOwnProfile -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Tapping while following asks for confirmation first; tapping while not
+                    // following calls straight through — see the dialog above.
+                    val onFollowButtonClick: (() -> Unit)? = when {
+                        isFollowLoading -> null
+                        isFollowing -> { { showUnfollowConfirm = true } }
+                        else -> onToggleFollow
+                    }
+                    StickerCard(
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        shadowOffset = 4.dp,
+                        fillColor = if (isFollowing) CookncoBackground else CookncoOrange,
+                        onClick = onFollowButtonClick,
+                    ) {
+                        if (isFollowLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp).align(Alignment.Center),
+                                strokeWidth = 2.dp,
+                                color = if (isFollowing) CookncoNavy else CookncoWhite,
+                            )
+                        } else {
+                            Text(
+                                text = if (isFollowing) "Unfollow" else "Follow",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = if (isFollowing) CookncoNavy else CookncoWhite,
+                                modifier = Modifier.align(Alignment.Center),
+                            )
+                        }
+                    }
+                    StickerIconButton(onClick = onShare, size = 52.dp, shape = RoundedCornerShape(14.dp), shadowOffset = 4.dp) {
+                        Icon(Icons.Outlined.Share, contentDescription = "Share profile")
                     }
                 }
             }
@@ -256,13 +315,50 @@ private fun ProfileContent(
             }
         }
     }
+
+    if (showUnfollowConfirm) {
+        StickerConfirmDialog(
+            icon = Icons.Outlined.PersonRemove,
+            title = "Unfollow ${user.username}?",
+            message = "You'll stop seeing ${user.username}'s recipes in your feed. You can follow them again anytime.",
+            confirmText = "Unfollow",
+            isConfirming = isFollowLoading,
+            onConfirm = onToggleFollow,
+            onDismissRequest = { showUnfollowConfirm = false },
+        )
+    }
+
+    // Closes itself once the unfollow actually completes, rather than on tapping Unfollow —
+    // `isConfirming` (wired to `isFollowLoading` above) keeps the dialog up while in flight.
+    LaunchedEffect(isFollowing) { if (!isFollowing) showUnfollowConfirm = false }
 }
 
 @Composable
-private fun ProfileStat(value: Int, label: String) {
-    Column {
+private fun InlineStat(value: Int, label: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
         Text(value.toString(), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-        Text(label, fontSize = 12.sp, color = CookncoNavy.copy(alpha = 0.6f))
+        Text(label, fontSize = 12.sp, color = CookncoGreenDark)
+    }
+}
+
+/** The tappable "N followers ›" / "N following ›" pill on the own-profile card. */
+@Composable
+private fun StatPillButton(count: Int, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(CookncoWhite)
+            .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(count.toString(), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            Text("›", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+        }
     }
 }
 
@@ -327,6 +423,9 @@ fun UserProfileOwnPreview() {
                 onNavigateBack = null,
                 onNavigateToEdit = {},
                 onNavigateToSettings = {},
+                onNavigateToFollowers = {},
+                onNavigateToFollowing = {},
+                onShare = {},
                 onLoadMore = {},
                 allLoaded = true,
                 onRecipeClick = {},
@@ -350,6 +449,9 @@ fun UserProfileOtherPreview() {
                 onNavigateBack = {},
                 onNavigateToEdit = null,
                 onNavigateToSettings = null,
+                onNavigateToFollowers = {},
+                onNavigateToFollowing = {},
+                onShare = {},
                 onLoadMore = {},
                 allLoaded = true,
                 onRecipeClick = {},
