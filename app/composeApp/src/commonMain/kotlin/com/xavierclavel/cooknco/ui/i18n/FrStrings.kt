@@ -245,7 +245,6 @@ object FrStrings : Strings {
     override val followers = "abonnés"
     override val following = "abonnements"
     override val followingState = "Abonné"
-    override val followsYouBack = "Vous suit aussi · ses recettes apparaissent dans votre fil"
     override val profilePhoto = "Photo de profil"
     override val changePhoto = "Changer la photo"
     override val tapToChangePhoto = "Appuyez pour changer la photo"

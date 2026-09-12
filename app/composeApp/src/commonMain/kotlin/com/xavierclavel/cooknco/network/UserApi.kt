@@ -59,23 +59,16 @@ class UserApi(private val client: HttpClient) {
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }
 
-    suspend fun isFollowing(token: String, userId: Long): Boolean {
-        val response = client.get("$base/follow/$userId") {
-            bearerAuth(token)
-        }
-        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
-        return response.body()
-    }
-
     /**
-     * Whether [otherUserId] follows [currentUserId] — the other direction from
-     * [isFollowing], and what the profile needs to say "follows you back".
+     * Whether [currentUserId] follows [userId].
      *
-     * `/{id}/followedBy/{targetId}` asks whether {targetId} follows {id}, so the account
-     * being *looked at* is the target and the signed-in one is the path id.
+     * `/follow/{id}/followedBy/{targetId}` asks whether {targetId} follows {id}, so the
+     * account being looked at is the path id and the signed-in one is the target. This used
+     * to call `GET /follow/{id}`, which no route answers — the request failed, the failure
+     * was swallowed into `false`, and a profile you follow said "Follow" forever.
      */
-    suspend fun isFollowedBy(token: String, currentUserId: Long, otherUserId: Long): Boolean {
-        val response = client.get("$base/follow/$currentUserId/followedBy/$otherUserId") {
+    suspend fun isFollowing(token: String, userId: Long, currentUserId: Long): Boolean {
+        val response = client.get("$base/follow/$userId/followedBy/$currentUserId") {
             bearerAuth(token)
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())

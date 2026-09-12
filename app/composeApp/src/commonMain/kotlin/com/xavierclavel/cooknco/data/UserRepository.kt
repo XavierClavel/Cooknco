@@ -27,12 +27,8 @@ class UserRepository(
         userApi.uploadProfileImage(requireToken(), userId, imageBytes, mimeType)
     }
 
-    suspend fun isFollowing(userId: Long): Result<Boolean> = runCatching {
-        userApi.isFollowing(requireToken(), userId)
-    }
-
-    suspend fun isFollowedBy(currentUserId: Long, otherUserId: Long): Result<Boolean> = runCatching {
-        userApi.isFollowedBy(requireToken(), currentUserId, otherUserId)
+    suspend fun isFollowing(userId: Long, currentUserId: Long): Result<Boolean> = runCatching {
+        userApi.isFollowing(requireToken(), userId, currentUserId)
     }
 
     suspend fun follow(userId: Long): Result<Unit> = runCatching {

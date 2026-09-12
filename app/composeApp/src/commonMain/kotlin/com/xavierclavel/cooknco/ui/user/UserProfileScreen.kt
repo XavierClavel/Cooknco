@@ -104,7 +104,7 @@ fun UserProfileScreen(
                 recipes = uiState.recipes,
                 isOwnProfile = viewModel.isOwnProfile,
                 isFollowing = uiState.isFollowing,
-                followsMe = uiState.followsMe,
+
                 isFollowLoading = uiState.isFollowLoading,
                 onToggleFollow = { viewModel.toggleFollow() },
                 onNavigateBack = onNavigateBack,
@@ -127,7 +127,7 @@ private fun ProfileContent(
     recipes: List<RecipeOverview>,
     isOwnProfile: Boolean,
     isFollowing: Boolean,
-    followsMe: Boolean,
+
     isFollowLoading: Boolean,
     onToggleFollow: () -> Unit,
     onNavigateBack: (() -> Unit)?,
@@ -323,31 +323,6 @@ private fun ProfileContent(
                         }
                     }
                 }
-
-                // Only when they follow back, and only on someone else's profile: it explains
-                // why their recipes turn up in the feed, which is the one thing about the
-                // relationship that changes what the app does.
-                if (!isOwnProfile && followsMe) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(CookncoGreenLight)
-                                .border(1.5.dp, CookncoNavy, CircleShape),
-                        )
-                        Text(
-                            text = s.followsYouBack,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = CookncoNavy,
-                        )
-                    }
-                }
             }
         }
 
@@ -476,7 +451,6 @@ fun UserProfileOwnPreview() {
                 recipes = previewRecipes,
                 isOwnProfile = true,
                 isFollowing = false,
-                followsMe = false,
                 isFollowLoading = false,
                 onToggleFollow = {},
                 onNavigateBack = null,
@@ -503,7 +477,6 @@ fun UserProfileOtherPreview() {
                 recipes = previewRecipes,
                 isOwnProfile = false,
                 isFollowing = true,
-                followsMe = true,
                 isFollowLoading = false,
                 onToggleFollow = {},
                 onNavigateBack = {},

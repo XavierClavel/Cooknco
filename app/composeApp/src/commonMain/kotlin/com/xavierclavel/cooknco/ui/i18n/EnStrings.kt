@@ -245,7 +245,6 @@ object EnStrings : Strings {
     override val followers = "followers"
     override val following = "following"
     override val followingState = "Following"
-    override val followsYouBack = "Follows you back · their recipes appear in your feed"
     override val profilePhoto = "Profile photo"
     override val changePhoto = "Change photo"
     override val tapToChangePhoto = "Tap to change photo"

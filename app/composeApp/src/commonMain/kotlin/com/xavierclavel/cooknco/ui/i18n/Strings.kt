@@ -246,7 +246,6 @@ interface Strings {
     val followers: String
     val following: String
     val followingState: String
-    val followsYouBack: String
     val profilePhoto: String
     val changePhoto: String
     val tapToChangePhoto: String
