@@ -29,8 +29,8 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun BrandLogo(
     modifier: Modifier = Modifier,
-    widthFraction: Float = 0.8f,
-    maxWidth: androidx.compose.ui.unit.Dp = 380.dp,
+    widthFraction: Float = 0.66f,
+    maxWidth: androidx.compose.ui.unit.Dp = 310.dp,
 ) {
     Image(
         painter = painterResource(Res.drawable.logo),

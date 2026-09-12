@@ -53,7 +53,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                BrandLogo(widthFraction = 0.72f, maxWidth = 340.dp)
+                BrandLogo(widthFraction = 0.6f, maxWidth = 280.dp)
                 // Faded rather than added: the space it occupies is held from the first
                 // frame, so the logo does not jump off centre when the wait turns out to
                 // be a long one.
