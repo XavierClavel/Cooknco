@@ -256,6 +256,7 @@ interface Strings {
 
     fun searchScopeName(scope: SearchScope): String
     fun recipeSortName(sort: RecipeSort): String
+    fun byAuthor(name: String): String
     fun ingredientCount(count: Int): String
     fun ingredientSortName(sort: IngredientSort): String
     // ── Profile ───────────────────────────────────────────────────────────────

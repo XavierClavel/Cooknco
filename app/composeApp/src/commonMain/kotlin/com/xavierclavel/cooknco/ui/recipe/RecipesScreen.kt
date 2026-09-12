@@ -596,6 +596,7 @@ private fun RecipesScopeContent(
 
 @Composable
 private fun RecipeResultRow(recipe: RecipeOverview, onClick: () -> Unit) {
+    val s = strings()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -619,7 +620,7 @@ private fun RecipeResultRow(recipe: RecipeOverview, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(text = "by ${recipe.owner.username}", fontSize = 12.5.sp, color = CookncoNavy.copy(alpha = 0.62f))
+            Text(text = s.byAuthor(recipe.owner.username), fontSize = 12.5.sp, color = CookncoNavy.copy(alpha = 0.62f))
             LikeCount(count = recipe.likesCount, color = CookncoOrangeDark, fontSize = 12.sp)
         }
     }

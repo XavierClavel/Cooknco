@@ -287,6 +287,7 @@ object FrStrings : Strings {
         RecipeSort.MOST_LIKED -> "Les plus aimées"
     }
 
+    override fun byAuthor(name: String) = "par $name"
     override fun ingredientCount(count: Int) = if (count == 1) "1 ingrédient" else "$count ingrédients"
     override fun ingredientSortName(sort: IngredientSort) = when (sort) {
         IngredientSort.BEST_MATCH -> "Pertinence"

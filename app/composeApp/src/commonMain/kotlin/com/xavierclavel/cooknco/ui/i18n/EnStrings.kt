@@ -279,6 +279,7 @@ object EnStrings : Strings {
         RecipeSort.MOST_LIKED -> "Most liked"
     }
 
+    override fun byAuthor(name: String) = "by $name"
     override fun ingredientCount(count: Int) = if (count == 1) "1 ingredient" else "$count ingredients"
     override fun ingredientSortName(sort: IngredientSort) = when (sort) {
         IngredientSort.BEST_MATCH -> "Best match"
