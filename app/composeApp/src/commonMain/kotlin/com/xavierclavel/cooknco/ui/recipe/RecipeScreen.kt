@@ -494,28 +494,47 @@ private fun RecipeContent(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                // Cook mode walks through the steps one at a time, so with no steps
+                // written there is nothing for it to walk through. Share then takes the
+                // width the button was using, rather than being left a stranded square.
+                val canCook = recipe.steps.isNotEmpty()
                 StickerCard(
-                    modifier = Modifier.size(width = 58.dp, height = 56.dp),
+                    modifier = if (canCook) {
+                        Modifier.size(width = 58.dp, height = 56.dp)
+                    } else {
+                        Modifier.weight(1f).height(56.dp)
+                    },
                     shape = RoundedCornerShape(16.dp),
                     shadowOffset = 4.dp,
                     onClick = onShare,
                 ) {
-                    Icon(Icons.Outlined.Share, contentDescription = s.share, modifier = Modifier.align(Alignment.Center), tint = CookncoNavy)
-                }
-                StickerCard(
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    fillColor = CookncoOrange,
-                    shadowOffset = 4.dp,
-                    onClick = onStartCooking,
-                ) {
-                    Text(
-                        s.startCooking,
-                        color = CookncoWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
+                    Row(
                         modifier = Modifier.align(Alignment.Center),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(Icons.Outlined.Share, contentDescription = s.share, tint = CookncoNavy)
+                        if (!canCook) {
+                            Text(s.share, color = CookncoNavy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                }
+                if (canCook) {
+                    StickerCard(
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        fillColor = CookncoOrange,
+                        shadowOffset = 4.dp,
+                        onClick = onStartCooking,
+                    ) {
+                        Text(
+                            s.startCooking,
+                            color = CookncoWhite,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
                 }
             }
         }
