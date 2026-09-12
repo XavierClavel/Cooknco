@@ -88,6 +88,7 @@ fun MainScreen(
     onNavigateToRecipe: (Long) -> Unit = {},
     onNavigateToEditRecipe: (Long?) -> Unit = {},
     onNavigateToCookbook: (Long) -> Unit = {},
+    onNavigateToIngredient: (Long) -> Unit = {},
     onNavigateToEditCookbook: (Long?) -> Unit = {},
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
@@ -140,6 +141,7 @@ fun MainScreen(
                 onRecipeClick = onNavigateToRecipe,
                 onUserClick = onNavigateToUser,
                 onCookbookClick = onNavigateToCookbook,
+                onIngredientClick = onNavigateToIngredient,
                 modifier = Modifier.padding(innerPadding),
             )
             MainTab.COOKBOOKS -> CookbooksScreen(

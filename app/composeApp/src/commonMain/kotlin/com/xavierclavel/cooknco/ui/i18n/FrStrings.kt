@@ -244,6 +244,8 @@ object FrStrings : Strings {
     override fun followingLink(count: Int) = "$count abonnements ›"
     override val followers = "abonnés"
     override val following = "abonnements"
+    override val followingState = "Abonné"
+    override val followsYouBack = "Vous suit aussi · ses recettes apparaissent dans votre fil"
     override val profilePhoto = "Photo de profil"
     override val changePhoto = "Changer la photo"
     override val tapToChangePhoto = "Appuyez pour changer la photo"
@@ -347,6 +349,13 @@ object FrStrings : Strings {
     override val clearValue = "Effacer"
     override val custom = "libre"
     override fun catalogueType(type: String) = "catalogue · ${type.lowercase()}"
+
+    override val measuredIn = "MESURÉ EN"
+    override fun unitDefault(unit: String) = "$unit · par défaut"
+    override val inYourRecipes = "DANS VOS RECETTES"
+    override val popularWithThis = "POPULAIRES AVEC ÇA"
+    override val nothingCookedWithThis = "Rien n'a encore été cuisiné avec. Ajoutez-le à une recette et il apparaîtra ici."
+    override fun ingredientType(type: String) = type.lowercase().replaceFirstChar { it.uppercase() }
 
     override fun stepOf(step: Int, total: Int) = "ÉTAPE $step SUR $total"
     override val nextStep = "Étape suivante"

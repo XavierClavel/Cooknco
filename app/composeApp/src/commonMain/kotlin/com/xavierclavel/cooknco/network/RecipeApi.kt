@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.network
 
 import com.xavierclavel.cooknco.network.dto.IngredientSearchResult
+import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
@@ -186,6 +187,44 @@ class RecipeApi(private val client: HttpClient) {
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
         }
+        return response.body()
+    }
+
+    /**
+     * One ingredient, for the page that shows it. `GET /ingredient/{id}` answers the full
+     * `IngredientInfo`; [IngredientSummary] takes the part the app has a use for.
+     */
+    suspend fun getIngredient(id: Long, token: String? = null): IngredientSummary {
+        val response = client.get("$base/ingredient/$id") {
+            if (token != null) bearerAuth(token)
+            parameter("locale", ApiClient.locale)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
+    /**
+     * Recipes built on an ingredient — `RecipeFilter.ingredient`.
+     *
+     * [ownerId] narrows it to one cook's, which is what separates "in your recipes" from
+     * "popular with this" on the ingredient page; the two differ only by that and the sort.
+     */
+    suspend fun recipesWithIngredient(
+        ingredientId: Long,
+        token: String?,
+        ownerId: Long? = null,
+        sort: RecipeSort = RecipeSort.RECENT,
+        size: Int = 20,
+    ): List<RecipeOverview> {
+        val response = client.get("$base/recipe") {
+            if (token != null) bearerAuth(token)
+            parameter("ingredient", ingredientId)
+            if (ownerId != null) parameter("user", ownerId)
+            parameter("sort", sort.value)
+            parameter("page", 0)
+            parameter("size", size)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
         return response.body()
     }
 

@@ -21,6 +21,12 @@ data class UserProfileUiState(
     val recipes: List<RecipeOverview> = emptyList(),
     val isLoading: Boolean = true,
     val isFollowing: Boolean = false,
+    /**
+     * Whether they follow *this* account back. Only meaningful on someone else's profile,
+     * and only worth showing when true — "does not follow you back" is not news anyone
+     * asked for.
+     */
+    val followsMe: Boolean = false,
     val isFollowLoading: Boolean = false,
     val allRecipesLoaded: Boolean = false,
     val error: String? = null,
@@ -61,10 +67,13 @@ class UserProfileViewModel(
             _uiState.update { it.copy(isLoading = true) }
             val userDeferred = async { userRepo.getUser(profileUserId) }
             val followDeferred = if (!isOwnProfile) async { userRepo.isFollowing(profileUserId) } else null
+            val followsMeDeferred =
+                if (!isOwnProfile) async { userRepo.isFollowedBy(currentUserId, profileUserId) } else null
             val recipesDeferred = async { userRepo.getUserRecipes(profileUserId, 0) }
 
             val user = userDeferred.await().getOrNull()
             val following = followDeferred?.await()?.getOrNull() ?: false
+            val followsMe = followsMeDeferred?.await()?.getOrNull() ?: false
             val initialRecipes = recipesDeferred.await().getOrNull() ?: emptyList()
 
             recipes.clear()
@@ -76,6 +85,7 @@ class UserProfileViewModel(
                     isLoading = false,
                     user = user,
                     isFollowing = following,
+                    followsMe = followsMe,
                     recipes = recipes.toList(),
                     allRecipesLoaded = initialRecipes.size < pageSize,
                     error = if (user == null) "Failed to load profile" else null,

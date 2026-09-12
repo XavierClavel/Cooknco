@@ -31,6 +31,10 @@ class UserRepository(
         userApi.isFollowing(requireToken(), userId)
     }
 
+    suspend fun isFollowedBy(currentUserId: Long, otherUserId: Long): Result<Boolean> = runCatching {
+        userApi.isFollowedBy(requireToken(), currentUserId, otherUserId)
+    }
+
     suspend fun follow(userId: Long): Result<Unit> = runCatching {
         userApi.follow(requireToken(), userId)
     }

@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.RecipeSort
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
@@ -101,6 +102,7 @@ fun RecipesScreen(
     onRecipeClick: (Long) -> Unit,
     onUserClick: (Long) -> Unit = {},
     onCookbookClick: (Long) -> Unit = {},
+    onIngredientClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
@@ -151,6 +153,7 @@ fun RecipesScreen(
         when (scope) {
             SearchScope.ALL -> AllScopeContent(
                 query = query,
+                onIngredientClick = onIngredientClick,
                 uiState = uiState,
                 usersState = usersState,
                 cookbooksState = cookbooksState,
@@ -185,6 +188,7 @@ fun RecipesScreen(
             SearchScope.INGREDIENTS -> IngredientsScopeContent(
                 state = ingredientsState,
                 query = query,
+                onIngredientClick = onIngredientClick,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -371,6 +375,7 @@ private fun SearchEmptyState(query: String, browseLabel: String, modifier: Modif
 @Composable
 private fun AllScopeContent(
     query: String,
+    onIngredientClick: (Long) -> Unit,
     uiState: RecipesUiState,
     usersState: SimpleListUiState<UserSummary>,
     cookbooksState: SimpleListUiState<CookbookInfo>,
@@ -406,7 +411,7 @@ private fun AllScopeContent(
                 SectionHeader(title = s.ingredientsCaps, trailing = "${ingredientsState.count} →", onSeeAll = { onSeeAll(SearchScope.INGREDIENTS) })
             }
             item {
-                FlowRowIngredients(ingredients = ingredientsState.items.take(3))
+                FlowRowIngredients(onIngredientClick = onIngredientClick, ingredients = ingredientsState.items.take(3))
             }
         }
 
@@ -456,9 +461,11 @@ private fun AllScopeContent(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FlowRowIngredients(ingredients: List<IngredientSummary>) {
+private fun FlowRowIngredients(ingredients: List<IngredientSummary>, onIngredientClick: (Long) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ingredients.forEach { ingredient -> IngredientChip(ingredient = ingredient) }
+        ingredients.forEach { ingredient ->
+            IngredientChip(ingredient = ingredient, onClick = { onIngredientClick(ingredient.id) })
+        }
     }
 }
 
@@ -764,6 +771,7 @@ private fun CookbookResultCard(cookbook: CookbookInfo, onClick: () -> Unit) {
 private fun IngredientsScopeContent(
     state: SimpleListUiState<IngredientSummary>,
     query: String,
+    onIngredientClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -785,7 +793,9 @@ private fun IngredientsScopeContent(
             }
             item {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.items.forEach { ingredient -> IngredientChip(ingredient = ingredient) }
+                    state.items.forEach { ingredient ->
+                        IngredientChip(ingredient = ingredient, onClick = { onIngredientClick(ingredient.id) })
+                    }
                 }
             }
         }
@@ -801,9 +811,9 @@ private fun IngredientsScopeContent(
 
 /** No detail screen exists for a single ingredient, so this chip is display-only. */
 @Composable
-private fun IngredientChip(ingredient: IngredientSummary) {
-    val name = ingredient.name["EN"] ?: ingredient.name.values.firstOrNull() ?: ""
-    StickerPill(height = 44.dp, contentPadding = PaddingValues(start = 6.dp, end = 14.dp)) {
+private fun IngredientChip(ingredient: IngredientSummary, onClick: () -> Unit) {
+    val name = ingredient.name[ApiClient.locale] ?: ingredient.name["EN"] ?: ingredient.name.values.firstOrNull() ?: ""
+    StickerPill(height = 44.dp, contentPadding = PaddingValues(start = 6.dp, end = 14.dp), onClick = onClick) {
         Box(
             modifier = Modifier.size(32.dp).clip(CircleShape).background(CookncoGreenLight).border(2.dp, CookncoNavy, CircleShape),
             contentAlignment = Alignment.Center,

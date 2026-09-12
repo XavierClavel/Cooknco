@@ -33,6 +33,8 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbookScreen
 import com.xavierclavel.cooknco.ui.cookbook.CookbookViewModel
 import com.xavierclavel.cooknco.ui.main.MainScreen
 import com.xavierclavel.cooknco.ui.recipe.CookModeScreen
+import com.xavierclavel.cooknco.ui.recipe.IngredientScreen
+import com.xavierclavel.cooknco.ui.recipe.IngredientViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditScreen
 import com.xavierclavel.cooknco.ui.user.ChangePasswordScreen
 import com.xavierclavel.cooknco.ui.user.ChangePasswordViewModel
@@ -74,6 +76,7 @@ private object Routes {
     const val SETTINGS = "settings"
     const val PASSWORD = "settings/password"
     const val MCP_CLIENTS = "settings/mcp-clients"
+    const val INGREDIENT = "ingredient/{ingredientId}"
 }
 
 @Composable
@@ -164,6 +167,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                         navController.navigate(Routes.RECIPE_CREATE)
                     }
                 },
+                onNavigateToIngredient = { navController.navigate("ingredient/$it") },
                 onNavigateToCookbook = { id ->
                     navController.navigate("cookbook/$id")
                 },
@@ -402,6 +406,23 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateToMcpClients = { navController.navigate(Routes.MCP_CLIENTS) },
                 onLogout = viewModel::logout,
                 isLoggingOut = isLoggingOut,
+            )
+        }
+
+        composable(
+            route = Routes.INGREDIENT,
+            arguments = listOf(navArgument("ingredientId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val ingredientId = backStackEntry.arguments?.read { getLongOrNull("ingredientId") } ?: return@composable
+            val currentUserId = (authState as? AuthState.Authenticated)?.user?.id ?: 0L
+            val ingredientViewModel: IngredientViewModel = viewModel(
+                key = "ingredient_$ingredientId",
+                factory = IngredientViewModel.factory(ingredientId, currentUserId),
+            )
+            IngredientScreen(
+                viewModel = ingredientViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onRecipeClick = { navController.navigate("recipe/$it") },
             )
         }
 

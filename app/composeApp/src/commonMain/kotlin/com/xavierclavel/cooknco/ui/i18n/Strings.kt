@@ -245,6 +245,8 @@ interface Strings {
     fun followingLink(count: Int): String
     val followers: String
     val following: String
+    val followingState: String
+    val followsYouBack: String
     val profilePhoto: String
     val changePhoto: String
     val tapToChangePhoto: String
@@ -322,6 +324,14 @@ interface Strings {
     val clearValue: String
     val custom: String
     fun catalogueType(type: String): String
+
+    // ── One ingredient ────────────────────────────────────────────────────────
+    val measuredIn: String
+    fun unitDefault(unit: String): String
+    val inYourRecipes: String
+    val popularWithThis: String
+    val nothingCookedWithThis: String
+    fun ingredientType(type: String): String
 
     // ── Cook mode ─────────────────────────────────────────────────────────────
     fun stepOf(step: Int, total: Int): String

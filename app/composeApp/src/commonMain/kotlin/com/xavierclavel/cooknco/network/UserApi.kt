@@ -67,6 +67,21 @@ class UserApi(private val client: HttpClient) {
         return response.body()
     }
 
+    /**
+     * Whether [otherUserId] follows [currentUserId] — the other direction from
+     * [isFollowing], and what the profile needs to say "follows you back".
+     *
+     * `/{id}/followedBy/{targetId}` asks whether {targetId} follows {id}, so the account
+     * being *looked at* is the target and the signed-in one is the path id.
+     */
+    suspend fun isFollowedBy(token: String, currentUserId: Long, otherUserId: Long): Boolean {
+        val response = client.get("$base/follow/$currentUserId/followedBy/$otherUserId") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
     suspend fun follow(token: String, userId: Long) {
         val response = client.post("$base/follow/$userId") {
             bearerAuth(token)

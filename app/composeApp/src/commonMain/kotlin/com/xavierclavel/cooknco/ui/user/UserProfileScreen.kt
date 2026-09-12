@@ -59,6 +59,7 @@ import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
@@ -103,6 +104,7 @@ fun UserProfileScreen(
                 recipes = uiState.recipes,
                 isOwnProfile = viewModel.isOwnProfile,
                 isFollowing = uiState.isFollowing,
+                followsMe = uiState.followsMe,
                 isFollowLoading = uiState.isFollowLoading,
                 onToggleFollow = { viewModel.toggleFollow() },
                 onNavigateBack = onNavigateBack,
@@ -125,6 +127,7 @@ private fun ProfileContent(
     recipes: List<RecipeOverview>,
     isOwnProfile: Boolean,
     isFollowing: Boolean,
+    followsMe: Boolean,
     isFollowLoading: Boolean,
     onToggleFollow: () -> Unit,
     onNavigateBack: (() -> Unit)?,
@@ -285,12 +288,29 @@ private fun ProfileContent(
                                 strokeWidth = 2.dp,
                                 color = if (isFollowing) CookncoNavy else CookncoWhite,
                             )
+                        } else if (isFollowing) {
+                            // "✓ Following" rather than "Unfollow": the button says what is
+                            // true, not what pressing it would do. What it does is behind a
+                            // confirmation anyway — see the dialog above.
+                            Row(
+                                modifier = Modifier.align(Alignment.Center),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text("✓", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = CookncoGreenDark)
+                                Text(
+                                    text = s.followingState,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = CookncoNavy,
+                                )
+                            }
                         } else {
                             Text(
-                                text = if (isFollowing) s.unfollow else s.follow,
+                                text = s.follow,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
-                                color = if (isFollowing) CookncoNavy else CookncoWhite,
+                                color = CookncoWhite,
                                 modifier = Modifier.align(Alignment.Center),
                             )
                         }
@@ -298,6 +318,31 @@ private fun ProfileContent(
                     StickerIconButton(onClick = onShare, size = 52.dp, shape = RoundedCornerShape(14.dp), shadowOffset = 4.dp) {
                         Icon(Icons.Outlined.Share, contentDescription = s.shareProfile)
                     }
+                }
+            }
+
+            // Only when they follow back, and only on someone else's profile: it explains
+            // why their recipes turn up in the feed, which is the one thing about the
+            // relationship that changes what the app does.
+            if (!isOwnProfile && followsMe) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(CookncoGreenLight)
+                            .border(1.5.dp, CookncoNavy, CircleShape),
+                    )
+                    Text(
+                        text = s.followsYouBack,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CookncoNavy,
+                    )
                 }
             }
         }
@@ -427,6 +472,7 @@ fun UserProfileOwnPreview() {
                 recipes = previewRecipes,
                 isOwnProfile = true,
                 isFollowing = false,
+                followsMe = false,
                 isFollowLoading = false,
                 onToggleFollow = {},
                 onNavigateBack = null,
@@ -453,6 +499,7 @@ fun UserProfileOtherPreview() {
                 recipes = previewRecipes,
                 isOwnProfile = false,
                 isFollowing = true,
+                followsMe = true,
                 isFollowLoading = false,
                 onToggleFollow = {},
                 onNavigateBack = {},

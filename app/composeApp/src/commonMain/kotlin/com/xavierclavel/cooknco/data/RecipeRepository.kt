@@ -1,6 +1,8 @@
 package com.xavierclavel.cooknco.data
 
 import com.xavierclavel.cooknco.network.RecipeApi
+import com.xavierclavel.cooknco.network.dto.IngredientSummary
+import com.xavierclavel.cooknco.network.RecipeSort
 import com.xavierclavel.cooknco.network.dto.IngredientSearchResult
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
@@ -64,6 +66,23 @@ class RecipeRepository(
     suspend fun saveNotes(recipeId: Long, notes: String, isCreate: Boolean): Result<String> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         recipeApi.saveNotes(recipeId, token, notes, isCreate)
+    }
+
+    suspend fun getIngredient(id: Long): Result<IngredientSummary> = runCatching {
+        recipeApi.getIngredient(id, tokenDataStore.tokenFlow.first())
+    }
+
+    suspend fun recipesWithIngredient(
+        ingredientId: Long,
+        ownerId: Long? = null,
+        sort: RecipeSort = RecipeSort.RECENT,
+    ): Result<List<RecipeOverview>> = runCatching {
+        recipeApi.recipesWithIngredient(
+            ingredientId = ingredientId,
+            token = tokenDataStore.tokenFlow.first(),
+            ownerId = ownerId,
+            sort = sort,
+        )
     }
 
     suspend fun searchIngredients(query: String): Result<IngredientSearchResult> = runCatching {

@@ -244,6 +244,8 @@ object EnStrings : Strings {
     override fun followingLink(count: Int) = "$count following ›"
     override val followers = "followers"
     override val following = "following"
+    override val followingState = "Following"
+    override val followsYouBack = "Follows you back · their recipes appear in your feed"
     override val profilePhoto = "Profile photo"
     override val changePhoto = "Change photo"
     override val tapToChangePhoto = "Tap to change photo"
@@ -347,6 +349,13 @@ object EnStrings : Strings {
     override val clearValue = "Clear"
     override val custom = "custom"
     override fun catalogueType(type: String) = "catalogue · ${type.lowercase()}"
+
+    override val measuredIn = "MEASURED IN"
+    override fun unitDefault(unit: String) = "$unit · default"
+    override val inYourRecipes = "IN YOUR RECIPES"
+    override val popularWithThis = "POPULAR WITH THIS"
+    override val nothingCookedWithThis = "Nothing has been cooked with this yet. Add it to a recipe and it shows up here."
+    override fun ingredientType(type: String) = type.lowercase().replaceFirstChar { it.uppercase() }
 
     override fun stepOf(step: Int, total: Int) = "STEP $step OF $total"
     override val nextStep = "Next step"
