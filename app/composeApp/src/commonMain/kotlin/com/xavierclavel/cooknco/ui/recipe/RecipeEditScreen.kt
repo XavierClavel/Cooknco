@@ -483,7 +483,10 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
         item { SectionLabel(s.timesAndYield) }
         item {
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                // Every row but the first is preceded by a 2dp rule and the 5dp of padding
+                // under it, so the first row — yield — was sitting 7dp tighter to the card's
+                // edge than its neighbours are to theirs. This is that 7dp.
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 7.dp)) {
                     RecipeNumber.entries.forEach { number ->
                         NumberStepperRow(
                             number = number,
