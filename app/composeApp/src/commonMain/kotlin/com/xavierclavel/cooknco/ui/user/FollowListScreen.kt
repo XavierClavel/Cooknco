@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.FollowInfoDto
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
@@ -70,6 +71,7 @@ fun FollowListScreen(
     onNavigateToUser: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
@@ -79,7 +81,7 @@ fun FollowListScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
             }
             Text(
                 text = uiState.profileUser?.username ?: "",
@@ -147,12 +149,13 @@ private fun FollowersList(
     onUserClick: (Long) -> Unit,
     onLoadMore: () -> Unit,
 ) {
+    val s = strings()
     FollowScrollColumn(section = section, onLoadMore = onLoadMore) {
         val pending = section.pending
         val accepted = section.accepted
 
         if (pending.isNotEmpty()) {
-            FollowSectionHeader(title = "PENDING REQUESTS", badge = pending.size)
+            FollowSectionHeader(title = s.pendingRequests, badge = pending.size)
             FollowSectionCard {
                 pending.forEachIndexed { index, entry ->
                     PendingFollowerRow(
@@ -167,15 +170,15 @@ private fun FollowersList(
             }
         }
 
-        FollowSectionHeader(title = "ACCEPTED · ${followersCount ?: accepted.size}")
+        FollowSectionHeader(title = s.acceptedCount(followersCount ?: accepted.size))
         FollowSectionCard {
             if (accepted.isEmpty() && !section.isLoading) {
-                FollowEmptyState("No followers yet")
+                FollowEmptyState(s.noFollowersYet)
             } else {
                 accepted.forEachIndexed { index, entry ->
                     FollowUserRow(
                         user = entry.user,
-                        meta = followedSinceLabel("Following since", entry.followedSince),
+                        meta = followedSinceLabel(s.followingSince, entry.followedSince),
                         onClick = { onUserClick(entry.user.id) },
                     )
                     if (index != accepted.lastIndex) FollowRowDivider()
@@ -195,6 +198,7 @@ private fun FollowingList(
     onUserClick: (Long) -> Unit,
     onLoadMore: () -> Unit,
 ) {
+    val s = strings()
     // Unfollowing an accepted entry is destructive (see UserProfileScreen); cancelling a
     // still-pending request you sent is not, so only this state gates the confirm dialog.
     var pendingUnfollow by remember { mutableStateOf<FollowInfoDto?>(null) }
@@ -204,18 +208,18 @@ private fun FollowingList(
         val following = section.accepted
 
         if (requested.isNotEmpty()) {
-            FollowSectionHeader(title = "REQUESTED — WAITING FOR THEM", badge = requested.size)
+            FollowSectionHeader(title = s.requestedWaiting, badge = requested.size)
             FollowSectionCard {
                 requested.forEachIndexed { index, entry ->
                     FollowUserRow(
                         user = entry.user,
-                        meta = followedSinceLabel("Requested", entry.followedSince),
+                        meta = followedSinceLabel(s.requested, entry.followedSince),
                         onClick = { onUserClick(entry.user.id) },
                     ) {
                         if (actioningUserId == entry.user.id) {
                             CircularProgressIndicator(color = CookncoNavy, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
                         } else {
-                            FollowRowTextAction(text = "Cancel", onClick = { onCancelOrUnfollow(entry.user.id) })
+                            FollowRowTextAction(text = s.cancel, onClick = { onCancelOrUnfollow(entry.user.id) })
                         }
                     }
                     if (index != requested.lastIndex) FollowRowDivider()
@@ -223,21 +227,21 @@ private fun FollowingList(
             }
         }
 
-        FollowSectionHeader(title = "FOLLOWING · ${followingCount ?: following.size}")
+        FollowSectionHeader(title = s.followingCount(followingCount ?: following.size))
         FollowSectionCard {
             if (following.isEmpty() && !section.isLoading) {
-                FollowEmptyState("Not following anyone yet")
+                FollowEmptyState(s.notFollowingAnyone)
             } else {
                 following.forEachIndexed { index, entry ->
                     FollowUserRow(
                         user = entry.user,
-                        meta = followedSinceLabel("Since", entry.followedSince),
+                        meta = followedSinceLabel(s.since, entry.followedSince),
                         onClick = { onUserClick(entry.user.id) },
                     ) {
                         if (actioningUserId == entry.user.id) {
                             CircularProgressIndicator(color = CookncoNavy, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
                         } else {
-                            FollowRowTextAction(text = "Unfollow", onClick = { pendingUnfollow = entry })
+                            FollowRowTextAction(text = s.unfollow, onClick = { pendingUnfollow = entry })
                         }
                     }
                     if (index != following.lastIndex) FollowRowDivider()
@@ -256,9 +260,9 @@ private fun FollowingList(
     pendingUnfollow?.let { entry ->
         StickerConfirmDialog(
             icon = Icons.Outlined.PersonRemove,
-            title = "Unfollow ${entry.user.username}?",
-            message = "They won't show up in your feed anymore. You can follow ${entry.user.username} again anytime.",
-            confirmText = "Unfollow",
+            title = s.unfollowQuestion(entry.user.username),
+            message = s.unfollowMessage(entry.user.username),
+            confirmText = s.unfollow,
             isConfirming = actioningUserId == entry.user.id,
             onConfirm = { onCancelOrUnfollow(entry.user.id) },
             onDismissRequest = { pendingUnfollow = null },
@@ -348,20 +352,21 @@ private fun PendingFollowerRow(
     onDecline: () -> Unit,
     onClick: () -> Unit,
 ) {
+    val s = strings()
     FollowUserRow(
         user = entry.user,
-        meta = followedSinceLabel("Requested", entry.followedSince),
+        meta = followedSinceLabel(s.requested, entry.followedSince),
         onClick = onClick,
     ) {
         if (isActioning) {
             CircularProgressIndicator(color = CookncoNavy, strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
         } else {
             FollowRowIconAction(onClick = onAccept, fillColor = CookncoOrange, contentColor = CookncoWhite) {
-                Icon(Icons.Outlined.Check, contentDescription = "Accept")
+                Icon(Icons.Outlined.Check, contentDescription = s.accept)
             }
             Spacer(Modifier.size(8.dp))
             FollowRowIconAction(onClick = onDecline, fillColor = CookncoWhite, contentColor = CookncoNavy) {
-                Icon(Icons.Outlined.Close, contentDescription = "Decline")
+                Icon(Icons.Outlined.Close, contentDescription = s.decline)
             }
         }
     }

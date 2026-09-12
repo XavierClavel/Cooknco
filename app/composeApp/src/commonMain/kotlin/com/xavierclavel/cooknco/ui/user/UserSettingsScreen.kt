@@ -38,6 +38,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.platform.appVersion
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoBlueDark
@@ -77,6 +78,7 @@ fun UserSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val s = strings()
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
@@ -89,9 +91,9 @@ fun UserSettingsScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
             }
-            Text("Settings", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            Text(s.settings, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
         }
 
         if (uiState.isLoading) {
@@ -108,7 +110,7 @@ fun UserSettingsScreen(
             ) {
                 // ── Language ─────────────────────────────────────────────────────
                 Column {
-                    SettingsSectionLabel("LANGUAGE")
+                    SettingsSectionLabel(s.language)
                     StickerSegmentedControl(
                         options = AccountLocale.entries,
                         selected = uiState.locale,
@@ -120,7 +122,7 @@ fun UserSettingsScreen(
                         shadowOffset = 6.dp,
                     )
                     Text(
-                        text = "What we write to you in — mails and notifications. The app itself is English only.",
+                        text = s.languageNote,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = CookncoGreenDark,
@@ -130,23 +132,23 @@ fun UserSettingsScreen(
 
                 // ── Privacy ──────────────────────────────────────────────────────
                 Column {
-                    SettingsSectionLabel("PRIVACY")
+                    SettingsSectionLabel(s.privacy)
                     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             SettingsToggleRow(
-                                title = "Public account",
-                                description = "Anyone can see your recipes",
+                                title = s.publicAccount,
+                                description = s.publicAccountNote,
                                 checked = uiState.isAccountPublic,
                                 onCheckedChange = { viewModel.toggleAccountPublic() },
                                 modifier = Modifier.padding(14.dp),
                             )
                             HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
                             SettingsToggleRow(
-                                title = "Auto-accept follow requests",
+                                title = s.autoAcceptFollows,
                                 description = if (uiState.isAccountPublic) {
-                                    "Always on while your account is public"
+                                    s.autoAcceptAlwaysOn
                                 } else {
-                                    "Anyone can follow you without asking"
+                                    s.autoAcceptAnyone
                                 },
                                 checked = uiState.isAccountPublic || uiState.autoAcceptFollowRequests,
                                 enabled = !uiState.isAccountPublic,
@@ -159,20 +161,20 @@ fun UserSettingsScreen(
 
                 // ── Notifications ────────────────────────────────────────────────
                 Column {
-                    SettingsSectionLabel("NOTIFICATIONS")
+                    SettingsSectionLabel(s.notifications)
                     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             SettingsToggleRow(
-                                title = "Push on this device",
-                                description = "Likes, follows and cookbook activity",
+                                title = s.pushOnThisDevice,
+                                description = s.pushNote,
                                 checked = uiState.pushEnabled,
                                 onCheckedChange = { viewModel.togglePush() },
                                 modifier = Modifier.padding(14.dp),
                             )
                             HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
                             SettingsToggleRow(
-                                title = "Email notifications",
-                                description = "A digest when people you follow post",
+                                title = s.emailNotifications,
+                                description = s.emailNotificationsNote,
                                 checked = uiState.mailNotificationsEnabled,
                                 onCheckedChange = { viewModel.toggleMailNotifications() },
                                 modifier = Modifier.padding(14.dp),
@@ -193,7 +195,7 @@ fun UserSettingsScreen(
 
                 // ── Account ──────────────────────────────────────────────────────
                 Column {
-                    SettingsSectionLabel("ACCOUNT")
+                    SettingsSectionLabel(s.account)
                     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
@@ -205,7 +207,7 @@ fun UserSettingsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 Text(
-                                    text = "Change password",
+                                    text = s.changePassword,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = CookncoNavy,
@@ -223,7 +225,7 @@ fun UserSettingsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
                                 Text(
-                                    text = "MCP access",
+                                    text = s.mcpAccess,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = CookncoNavy,
@@ -239,8 +241,7 @@ fun UserSettingsScreen(
                                             .padding(horizontal = 9.dp, vertical = 2.dp),
                                     ) {
                                         Text(
-                                            text = "${uiState.mcpClientCount} client" +
-                                                if (uiState.mcpClientCount == 1) "" else "s",
+                                            text = s.clientCount(uiState.mcpClientCount),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = CookncoBlueDark,
@@ -255,7 +256,7 @@ fun UserSettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    text = "App version",
+                                    text = s.appVersion,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = CookncoNavy,
@@ -280,7 +281,7 @@ fun UserSettingsScreen(
                     onClick = { showLogoutConfirm = true },
                 ) {
                     Text(
-                        text = "Log out",
+                        text = s.logOut,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = CookncoOrangeDark,
@@ -298,9 +299,9 @@ fun UserSettingsScreen(
         // dialog this replaced in MainScreen: the session is already being torn down.
         StickerConfirmDialog(
             icon = Icons.AutoMirrored.Outlined.Logout,
-            title = "Log out",
-            message = "You will need to sign in again to reach your recipes on this device.",
-            confirmText = "Log out",
+            title = s.logOut,
+            message = s.logOutMessage,
+            confirmText = s.logOut,
             isConfirming = isLoggingOut,
             onConfirm = onLogout,
             onDismissRequest = { showLogoutConfirm = false },

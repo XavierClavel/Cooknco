@@ -130,6 +130,65 @@ interface Strings {
     val cookbooks: String
     val profile: String
 
+    // ── Settings ──────────────────────────────────────────────────────────────
+    val settings: String
+    val language: String
+    val languageNote: String
+    val privacy: String
+    val publicAccount: String
+    val publicAccountNote: String
+    val autoAcceptFollows: String
+    val autoAcceptAlwaysOn: String
+    val autoAcceptAnyone: String
+    val notifications: String
+    val pushOnThisDevice: String
+    val pushNote: String
+    val emailNotifications: String
+    val emailNotificationsNote: String
+    val account: String
+    val changePassword: String
+    val mcpAccess: String
+    val appVersion: String
+    fun clientCount(count: Int): String
+    val logOutMessage: String
+
+    // ── Change password ───────────────────────────────────────────────────────
+    val currentPasswordCaps: String
+    val newPasswordCaps: String
+    val newPasswordAgainCaps: String
+    val atLeastEightCharacters: String
+    val savePasswordCaps: String
+    val changingPasswordSignsOut: String
+    val notYourCurrentPassword: String
+    val couldNotChangePassword: String
+
+    // ── MCP access ────────────────────────────────────────────────────────────
+    val mcpIntro: String
+    val mcpEmpty: String
+    fun revokeQuestion(client: String): String
+    val revokeMessage: String
+    val revoke: String
+    val connected: String
+    val used: String
+
+    // ── Followers and following ───────────────────────────────────────────────
+    fun followersTab(count: Int): String
+    fun followingTab(count: Int): String
+    val pendingRequests: String
+    fun acceptedCount(count: Int): String
+    val noFollowersYet: String
+    val followingSince: String
+    val requestedWaiting: String
+    val requested: String
+    fun followingCount(count: Int): String
+    val notFollowingAnyone: String
+    val since: String
+    val unfollow: String
+    fun unfollowQuestion(name: String): String
+    fun unfollowMessage(name: String): String
+    val accept: String
+    val decline: String
+
     // ── Cook mode ─────────────────────────────────────────────────────────────
     fun stepOf(step: Int, total: Int): String
     val nextStep: String

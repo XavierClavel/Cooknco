@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.data.UserRepository
 import com.xavierclavel.cooknco.di.AppGraph
+import com.xavierclavel.cooknco.ui.i18n.stringsFor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +49,9 @@ class ChangePasswordViewModel(private val userRepo: UserRepository) : ViewModel(
     fun submit() {
         val state = _uiState.value
         if (!state.canSubmit) return
+        // The copy for the language the app is in right now; a view model has no
+        // composition to read it from. See AuthViewModel.
+        val s = stringsFor(AppLanguage.current.value)
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
             userRepo.updatePassword(state.current, state.new)
@@ -57,9 +62,9 @@ class ChangePasswordViewModel(private val userRepo: UserRepository) : ViewModel(
                             isSaving = false,
                             // 401 here means one thing only: the current password is wrong.
                             error = if (err.message?.contains("401") == true) {
-                                "That is not your current password."
+                                s.notYourCurrentPassword
                             } else {
-                                err.message ?: "Could not change the password"
+                                err.message ?: s.couldNotChangePassword
                             },
                         )
                     }

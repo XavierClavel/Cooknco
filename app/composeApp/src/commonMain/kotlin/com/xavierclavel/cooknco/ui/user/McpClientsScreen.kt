@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.McpClientInfo
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
@@ -58,6 +59,7 @@ fun McpClientsScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
     var pendingRevoke by remember { mutableStateOf<McpClientInfo?>(null) }
 
@@ -78,9 +80,9 @@ fun McpClientsScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
             }
-            Text("MCP access", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            Text(s.mcpAccess, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
         }
 
         Column(
@@ -90,8 +92,7 @@ fun McpClientsScreen(
                 .padding(start = 18.dp, end = 18.dp, top = 10.dp),
         ) {
             Text(
-                text = "Apps you have connected to your recipes. Each can read and write them as you, " +
-                    "until you revoke it here.",
+                text = s.mcpIntro,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = CookncoNavy,
@@ -108,8 +109,7 @@ fun McpClientsScreen(
                     shape = RoundedCornerShape(20.dp),
                 ) {
                     Text(
-                        text = "Nothing connected. Adding this account to an MCP client sends you to a " +
-                            "consent page first — whatever you allow there shows up here.",
+                        text = s.mcpEmpty,
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Medium,
                         color = CookncoNavy.copy(alpha = 0.7f),
@@ -154,10 +154,9 @@ fun McpClientsScreen(
     pendingRevoke?.let { client ->
         StickerConfirmDialog(
             icon = Icons.Outlined.LinkOff,
-            title = "Revoke ${client.clientName}?",
-            message = "It loses access to your recipes straight away, even if it is connected right now. " +
-                "You can connect it again from the app itself.",
-            confirmText = "Revoke",
+            title = s.revokeQuestion(client.clientName),
+            message = s.revokeMessage,
+            confirmText = s.revoke,
             isConfirming = uiState.revokingClientId == client.clientId,
             onConfirm = { viewModel.revoke(client.clientId) },
             onDismissRequest = { pendingRevoke = null },
@@ -167,6 +166,7 @@ fun McpClientsScreen(
 
 @Composable
 private fun McpClientRow(client: McpClientInfo, isRevoking: Boolean, onRevoke: () -> Unit) {
+    val s = strings()
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -192,8 +192,8 @@ private fun McpClientRow(client: McpClientInfo, isRevoking: Boolean, onRevoke: (
                 )
             }
             Text(
-                text = followedSinceLabel("Connected", client.grantedAt) +
-                    " · " + followedSinceLabel("used", client.lastUsedAt).lowercase(),
+                text = followedSinceLabel(s.connected, client.grantedAt) +
+                    " · " + followedSinceLabel(s.used, client.lastUsedAt).lowercase(),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
                 color = CookncoNavy.copy(alpha = 0.55f),
@@ -203,7 +203,7 @@ private fun McpClientRow(client: McpClientInfo, isRevoking: Boolean, onRevoke: (
         if (isRevoking) {
             CircularProgressIndicator(color = CookncoNavy, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
         } else {
-            FollowRowTextAction(text = "Revoke", onClick = onRevoke)
+            FollowRowTextAction(text = s.revoke, onClick = onRevoke)
         }
     }
 }

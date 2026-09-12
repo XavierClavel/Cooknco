@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
@@ -70,6 +71,7 @@ fun ChangePasswordScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
     var showPasswords by remember { mutableStateOf(false) }
 
@@ -85,9 +87,9 @@ fun ChangePasswordScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
             }
-            Text("Change password", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            Text(s.changePassword, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
         }
 
         Column(
@@ -100,19 +102,19 @@ fun ChangePasswordScreen(
             StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), shadowOffset = 6.dp) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     PasswordField(
-                        caption = "CURRENT PASSWORD",
+                        caption = s.currentPasswordCaps,
                         value = uiState.current,
                         onValueChange = viewModel::updateCurrent,
                         visible = showPasswords,
                     )
                     PasswordField(
-                        caption = "NEW PASSWORD",
+                        caption = s.newPasswordCaps,
                         value = uiState.new,
                         onValueChange = viewModel::updateNew,
                         visible = showPasswords,
                     )
                     PasswordField(
-                        caption = "NEW PASSWORD AGAIN",
+                        caption = s.newPasswordAgainCaps,
                         value = uiState.confirm,
                         onValueChange = viewModel::updateConfirm,
                         visible = showPasswords,
@@ -125,14 +127,14 @@ fun ChangePasswordScreen(
                             onClick = { showPasswords = !showPasswords },
                         ) {
                             Text(
-                                text = if (showPasswords) "Hide" else "Show",
+                                text = if (showPasswords) s.hide else s.show,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = CookncoNavy,
                             )
                         }
                         Text(
-                            text = "At least 8 characters.",
+                            text = s.atLeastEightCharacters,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = CookncoGreenDark,
@@ -166,7 +168,7 @@ fun ChangePasswordScreen(
                     )
                 } else {
                     Text(
-                        text = "SAVE PASSWORD",
+                        text = s.savePasswordCaps,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.6.sp,
@@ -177,7 +179,7 @@ fun ChangePasswordScreen(
             }
 
             Text(
-                text = "Changing your password signs this account out everywhere, including here.",
+                text = s.changingPasswordSignsOut,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = CookncoGreenDark,

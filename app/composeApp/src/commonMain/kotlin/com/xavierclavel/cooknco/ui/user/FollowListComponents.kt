@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.UserSummary
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerSegmentedControl
@@ -122,14 +123,15 @@ fun FollowTabs(
     onSelect: (FollowTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     StickerSegmentedControl(
         options = FollowTab.entries,
         selected = active,
         onSelect = onSelect,
         label = { tab ->
             when (tab) {
-                FollowTab.FOLLOWERS -> "Followers $followersCount"
-                FollowTab.FOLLOWING -> "Following $followingCount"
+                FollowTab.FOLLOWERS -> s.followersTab(followersCount)
+                FollowTab.FOLLOWING -> s.followingTab(followingCount)
             }
         },
         modifier = modifier,
