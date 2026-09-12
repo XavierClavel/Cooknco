@@ -189,6 +189,37 @@ interface Strings {
     val accept: String
     val decline: String
 
+    // ── Cookbooks ─────────────────────────────────────────────────────────────
+    val newCookbook: String
+    val editCookbook: String
+    val shared: String
+    val recipes: String
+    val members: String
+    val leaveCookbook: String
+    val leaveCookbookQuestion: String
+    val leave: String
+    fun deleteCookbookQuestion(title: String): String
+    fun deleteCookbookMessage(members: Int, recipes: Int): String
+    val deleteCookbook: String
+    fun addedBy(name: String): String
+    val you: String
+    val admin: String
+    val cookbookPhoto: String
+    val changeCover: String
+    val addCover: String
+    val uploadedWhenYouSave: String
+    val titleRequiredCaps: String
+    val title: String
+    val descriptionCaps: String
+    val visibilityCaps: String
+    val membersCaps: String
+    val addMember: String
+    val visibilityPrivate: String
+    val visibilityProtected: String
+    val visibilityPublic: String
+    val removeMember: String
+    val searchAMember: String
+
     // ── Cook mode ─────────────────────────────────────────────────────────────
     fun stepOf(step: Int, total: Int): String
     val nextStep: String

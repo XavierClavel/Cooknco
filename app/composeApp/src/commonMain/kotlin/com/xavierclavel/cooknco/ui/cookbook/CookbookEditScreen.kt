@@ -56,6 +56,8 @@ import com.xavierclavel.cooknco.network.dto.UserSummary
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.Strings
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
@@ -90,7 +92,12 @@ private fun editFieldColors() = OutlinedTextFieldDefaults.colors(
     cursorColor = CookncoOrange,
 )
 
-private val visibilityOptions = listOf("PRIVATE" to "Private", "PROTECTED" to "Protected", "PUBLIC" to "Public")
+/** The stored value and the word for it; the word comes from the catalogue. */
+private fun visibilityOptions(s: Strings) = listOf(
+    "PRIVATE" to s.visibilityPrivate,
+    "PROTECTED" to s.visibilityProtected,
+    "PUBLIC" to s.visibilityPublic,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,6 +110,7 @@ fun CookbookEditScreen(
     viewModel: CookbookEditViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
     val imagePicker = rememberImagePicker(onPicked = viewModel::setPendingImage)
 
@@ -124,10 +132,10 @@ fun CookbookEditScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
             }
             Text(
-                text = if (cookbookId == null) "New cookbook" else "Edit cookbook",
+                text = if (cookbookId == null) s.newCookbook else s.editCookbook,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,
@@ -172,14 +180,14 @@ fun CookbookEditScreen(
                     when {
                         pickedBitmap != null -> Image(
                             bitmap = pickedBitmap,
-                            contentDescription = "Cookbook photo",
+                            contentDescription = s.cookbookPhoto,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
                         hasExistingPhoto -> CookbookImage(
                             cookbookId = uiState.cookbookId!!,
                             version = uiState.cookbookVersion!!,
-                            contentDescription = "Cookbook photo",
+                            contentDescription = s.cookbookPhoto,
                             modifier = Modifier.fillMaxSize(),
                         )
                         else -> Icon(
@@ -196,7 +204,7 @@ fun CookbookEditScreen(
                         shadowOffset = 0.dp,
                     ) {
                         Text(
-                            text = if (hasAnyPhoto) "Change cover" else "Add cover",
+                            text = if (hasAnyPhoto) s.changeCover else s.addCover,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = CookncoNavy,
@@ -207,7 +215,7 @@ fun CookbookEditScreen(
             if (pickedImage != null) {
                 item {
                     Text(
-                        text = "Uploaded when you save.",
+                        text = s.uploadedWhenYouSave,
                         color = CookncoNavy.copy(alpha = 0.6f),
                         fontSize = 11.5.sp,
                     )
@@ -222,7 +230,7 @@ fun CookbookEditScreen(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         Column {
-                            FieldLabel("TITLE *", modifier = Modifier.padding(bottom = 7.dp))
+                            FieldLabel(s.titleRequiredCaps, modifier = Modifier.padding(bottom = 7.dp))
                             OutlinedTextField(
                                 value = uiState.title,
                                 onValueChange = viewModel::updateTitle,
@@ -234,7 +242,7 @@ fun CookbookEditScreen(
                             )
                         }
                         Column {
-                            FieldLabel("DESCRIPTION", modifier = Modifier.padding(bottom = 7.dp))
+                            FieldLabel(s.descriptionCaps, modifier = Modifier.padding(bottom = 7.dp))
                             OutlinedTextField(
                                 value = uiState.description,
                                 onValueChange = viewModel::updateDescription,
@@ -251,12 +259,12 @@ fun CookbookEditScreen(
             // ── Visibility ────────────────────────────────────────────────────
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FieldLabel("VISIBILITY", color = CookncoNavy)
+                    FieldLabel(s.visibilityCaps, color = CookncoNavy)
                     StickerSegmentedControl(
-                        options = visibilityOptions.map { it.first },
+                        options = visibilityOptions(s).map { it.first },
                         selected = uiState.visibility,
                         onSelect = viewModel::updateVisibility,
-                        label = { value -> visibilityOptions.first { it.first == value }.second },
+                        label = { value -> visibilityOptions(s).first { it.first == value }.second },
                         shape = RoundedCornerShape(20.dp),
                         segmentShape = RoundedCornerShape(15.dp),
                         spacing = 5.dp,
@@ -272,7 +280,7 @@ fun CookbookEditScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    FieldLabel("MEMBERS", modifier = Modifier.weight(1f), color = CookncoNavy)
+                    FieldLabel(s.membersCaps, modifier = Modifier.weight(1f), color = CookncoNavy)
                     StickerPill(
                         onClick = viewModel::addMember,
                         height = 44.dp,
@@ -281,7 +289,7 @@ fun CookbookEditScreen(
                     ) {
                         Icon(Icons.Outlined.Add, contentDescription = null, tint = CookncoNavy, modifier = Modifier.size(16.dp))
                         Text(
-                            text = "Add member",
+                            text = s.addMember,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = CookncoNavy,
@@ -327,7 +335,7 @@ fun CookbookEditScreen(
                         onClick = onNavigateBack,
                     ) {
                         Text(
-                            text = "Cancel",
+                            text = s.cancel,
                             color = CookncoNavy,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
@@ -349,7 +357,7 @@ fun CookbookEditScreen(
                             )
                         } else {
                             Text(
-                                text = "SAVE",
+                                text = s.saveCaps,
                                 color = CookncoWhite,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
@@ -385,6 +393,7 @@ private fun MemberEditRow(
     onRoleChange: (Boolean) -> Unit,
     onRemove: () -> Unit,
 ) {
+    val s = strings()
     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowOffset = 5.dp) {
         Column(
             modifier = Modifier.padding(top = 10.dp, bottom = 10.dp, start = 12.dp, end = 10.dp),
@@ -427,7 +436,7 @@ private fun MemberEditRow(
                     ) {
                         val textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy)
                         if (member.searchQuery.isEmpty()) {
-                            Text("Search a member", style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.35f)))
+                            Text(s.searchAMember, style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.35f)))
                         }
                         BasicTextField(
                             value = member.searchQuery,
@@ -446,7 +455,7 @@ private fun MemberEditRow(
                 ) {
                     Icon(
                         Icons.Outlined.Delete,
-                        contentDescription = "Remove member",
+                        contentDescription = s.removeMember,
                         tint = CookncoOrangeDark,
                     )
                 }

@@ -42,6 +42,7 @@ import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoBlueLight
 import com.xavierclavel.cooknco.ui.theme.CookncoBlueDark
@@ -75,6 +76,7 @@ private fun CookbooksScreenContent(
     onNewCookbook: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         Column(
             modifier = Modifier
@@ -82,7 +84,7 @@ private fun CookbooksScreenContent(
                 .statusBarsPadding()
                 .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 14.dp),
         ) {
-            Text("Cookbooks", fontSize = 27.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 33.sp)
+            Text(s.cookbooks, fontSize = 27.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 33.sp)
             Text(
                 text = "${cookbooks.size} book${if (cookbooks.size == 1) "" else "s"}",
                 fontSize = 13.sp,
@@ -114,6 +116,7 @@ private fun CookbooksScreenContent(
 
 @Composable
 private fun NewCookbookRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val s = strings()
     val shape = RoundedCornerShape(20.dp)
     Row(
         modifier = modifier
@@ -125,7 +128,7 @@ private fun NewCookbookRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text("+", fontSize = 20.sp, color = CookncoNavy)
-        Text("New cookbook", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+        Text(s.newCookbook, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
     }
 }
 
@@ -140,6 +143,7 @@ private fun Modifier.dashedBorder(shape: RoundedCornerShape, color: Color, width
 
 @Composable
 private fun CookbookRow(cookbook: CookbookInfo, onClick: () -> Unit) {
+    val s = strings()
     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), onClick = onClick) {
         Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             CookbookImage(
@@ -177,7 +181,7 @@ private fun CookbookRow(cookbook: CookbookInfo, onClick: () -> Unit) {
                                 .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
                                 .padding(horizontal = 9.dp, vertical = 2.dp),
                         ) {
-                            Text("Shared", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CookncoBlueDark)
+                            Text(s.shared, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CookncoBlueDark)
                         }
                     }
                 }

@@ -51,6 +51,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoBlueDark
 import com.xavierclavel.cooknco.ui.theme.CookncoBlueLight
@@ -75,6 +76,7 @@ fun CookbookScreen(
     viewModel: CookbookViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(uiState.left) { if (uiState.left) onNavigateBack() }
@@ -112,17 +114,17 @@ fun CookbookScreen(
     if (uiState.showLeaveConfirm) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelLeave() },
-            title = { Text("Leave Cookbook", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to leave this cookbook?") },
+            title = { Text(s.leaveCookbook, fontWeight = FontWeight.Bold) },
+            text = { Text(s.leaveCookbookQuestion) },
             confirmButton = {
                 Button(
                     onClick = { viewModel.leave() },
                     colors = ButtonDefaults.buttonColors(containerColor = CookncoOrange, contentColor = CookncoWhite),
-                ) { Text("Leave", fontWeight = FontWeight.Bold) }
+                ) { Text(s.leave, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.cancelLeave() }) {
-                    Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f))
+                    Text(s.cancel, color = CookncoNavy.copy(alpha = 0.7f))
                 }
             },
         )
@@ -133,11 +135,10 @@ fun CookbookScreen(
         val usersCount = cookbook?.usersCount ?: 0
         StickerConfirmDialog(
             icon = Icons.Outlined.Delete,
-            title = "Delete ${cookbook?.title ?: "cookbook"}?",
-            message = "The cookbook goes for all $usersCount member${if (usersCount != 1) "s" else ""}. " +
-                "The $recipesCount recipe${if (recipesCount != 1) "s" else ""} inside stay with their authors.",
-            confirmText = "Delete cookbook",
-            dismissText = "Keep it",
+            title = s.deleteCookbookQuestion(cookbook?.title ?: ""),
+            message = s.deleteCookbookMessage(usersCount, recipesCount),
+            confirmText = s.deleteCookbook,
+            dismissText = s.keepIt,
             onConfirm = viewModel::delete,
             onDismissRequest = viewModel::cancelDelete,
             isConfirming = uiState.isDeleting,
@@ -163,6 +164,7 @@ private fun CookbookContent(
     onNavigateBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
@@ -193,7 +195,7 @@ private fun CookbookContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
                     }
                     if (isAdmin) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -249,7 +251,7 @@ private fun CookbookContent(
         // ── Recipes section ──────────────────────────────────────────────────
         if (recipes.isNotEmpty()) {
             item {
-                SectionHeader(title = "Recipes", count = recipes.size)
+                SectionHeader(title = s.recipes, count = recipes.size)
             }
             item {
                 StickerCard(
@@ -272,7 +274,7 @@ private fun CookbookContent(
         // ── Members section ──────────────────────────────────────────────────
         if (members.isNotEmpty()) {
             item {
-                SectionHeader(title = "Members", count = members.size)
+                SectionHeader(title = s.members, count = members.size)
             }
             item {
                 StickerCard(
@@ -307,7 +309,7 @@ private fun CookbookContent(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Icon(Icons.Outlined.ExitToApp, contentDescription = null, tint = CookncoBackground, modifier = Modifier.size(18.dp))
-                    Text("Leave cookbook", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoBackground)
+                    Text(s.leaveCookbook, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoBackground)
                 }
             }
         }
@@ -388,6 +390,7 @@ private fun RecipeRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -420,7 +423,7 @@ private fun RecipeRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Added by ${recipe.addedByUsername}",
+                    text = s.addedBy(recipe.addedByUsername),
                     fontSize = 12.sp,
                     color = CookncoGreenDark,
                 )
@@ -441,6 +444,7 @@ private fun MemberRow(
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(12.dp),
@@ -466,8 +470,8 @@ private fun MemberRow(
             )
 
             when {
-                isCurrentUser -> RoleBadge(label = "You", fillColor = CookncoBackground, textColor = CookncoNavy)
-                member.isAdmin -> RoleBadge(label = "Admin", fillColor = CookncoOrange, textColor = CookncoWhite)
+                isCurrentUser -> RoleBadge(label = s.you, fillColor = CookncoBackground, textColor = CookncoNavy)
+                member.isAdmin -> RoleBadge(label = s.admin, fillColor = CookncoOrange, textColor = CookncoWhite)
             }
         }
         if (showDivider) {
