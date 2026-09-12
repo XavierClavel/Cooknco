@@ -17,6 +17,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import com.xavierclavel.services.RecipeService
+import org.koin.core.component.inject
+import io.ebean.DB
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import io.ktor.client.request.put
@@ -39,6 +42,8 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.assertFalse
 
 class RecipeControllerTest : ApplicationTest() {
+    private val recipeService: RecipeService by inject()
+
 
     val recipeDTO = RecipeDTO(
         title = "My recipe",
@@ -540,6 +545,47 @@ class RecipeControllerTest : ApplicationTest() {
         val recipeInfo = client.createRecipe(recipeDTO)
         client.assertRecipeExists(recipeInfo.id)
         client.deleteRecipe(recipeInfo.id)
+        client.assertRecipeDoesNotExist(recipeInfo.id)
+    }
+
+    /**
+     * Deleting hides the recipe; it does not destroy it. The row and everything hanging off
+     * it stay, which is what makes the deletion undoable — and the reason the flag exists at
+     * all, after `DELETE /like/{id}` spent a release erasing recipes nobody meant to delete.
+     */
+    @Test
+    fun `a deleted recipe keeps its row and its ingredients`() = runTestAsAdmin {
+        val recipe = client.createRecipe(recipeDTO)
+        val ingredientsBefore = countRows("recipe_ingredient", recipe.id)
+
+        client.deleteRecipe(recipe.id)
+
+        client.assertRecipeDoesNotExist(recipe.id)
+        assertEquals(1, countRows("recipes", recipe.id), "the recipe row should still be there")
+        assertEquals(ingredientsBefore, countRows("recipe_ingredient", recipe.id), "its ingredients should still be there")
+    }
+
+    /** And putting the flag back brings the recipe back, whole. */
+    @Test
+    fun `a deleted recipe can be restored`() = runTestAsAdmin {
+        val recipe = client.createRecipe(recipeDTO)
+        client.deleteRecipe(recipe.id)
+        client.assertRecipeDoesNotExist(recipe.id)
+
+        assertEquals(true, recipeService.restore(recipe.id), "restore should report having restored it")
+
+        val restored = client.getRecipe(recipe.id)
+        assertEquals(recipe.title, restored.title)
+        assertEquals(recipe.ingredients.size, restored.ingredients.size)
+    }
+
+    /** Counts rows a soft delete must not have removed — raw SQL, since Ebean hides them. */
+    private fun countRows(table: String, recipeId: Long): Int {
+        val column = if (table == "recipes") "id" else "recipe_id"
+        return DB.sqlQuery("select count(*) as c from $table where $column = :id")
+            .setParameter("id", recipeId)
+            .findOne()
+            ?.getInteger("c") ?: 0
     }
 
     @Test

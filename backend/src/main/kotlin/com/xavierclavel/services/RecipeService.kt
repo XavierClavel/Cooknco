@@ -197,15 +197,49 @@ class RecipeService: KoinComponent {
         getEntityById(id).tagForDeletion().update()
     }
 
+    /**
+     * Takes a recipe out of the product without destroying it.
+     *
+     * A recipe that something still points at — a like, a cookbook — is kept whole instead,
+     * because it is not only its owner's any more. Callers must check `taggedForDeletion`
+     * themselves before calling this: it is the tag that says the owner asked, and nothing
+     * here reads it (see `LikeController.deleteLike`, which learned that the hard way).
+     *
+     * The flag is set and updated rather than `delete()`d, deliberately. `delete()` on a
+     * soft-deletable bean still cascades to the children, and the children here — steps,
+     * ingredients, likes, cookbook links — are not soft-deletable, so cascading would empty
+     * the recipe it is supposed to be preserving. Setting the column touches one row and
+     * leaves everything hanging off it intact, which is what makes a restore a one-line
+     * `update recipes set deleted = false where id = ?`.
+     *
+     * The pictures stay for the same reason: a restored recipe with no photograph is only
+     * most of a restore, and `StorageService` reads the row over raw SQL, so it still sees
+     * an owner and never offers them up as orphans.
+     */
     fun tryDelete(id: Long) {
         val recipe = getEntityById(id)
         val recipeInfo = recipe.toInfo(Locale.EN)
-        logger.info {recipe}
-        logger.info {"Has references: ${recipeInfo.likesCount > 0 || QCookbookRecipe().recipe.id.eq(recipe.id).exists()}"}
-        if (recipeInfo.likesCount > 0 || QCookbookRecipe().recipe.id.eq(recipe.id).exists()) return
-        recipe.delete()
-        imageService.deleteImage(RECIPES_IMG_PATH, id, recipe.imageVersion)
-        imageService.deleteImage(RECIPES_THUMBNAIL_PATH, id, recipe.imageVersion)
+        val referenced = recipeInfo.likesCount > 0 || QCookbookRecipe().recipe.id.eq(recipe.id).exists()
+        logger.info { "Deleting recipe ${recipe.id} (${recipe.title}); has references: $referenced" }
+        if (referenced) return
+        recipe.deleted = true
+        recipe.update()
+    }
+
+    /**
+     * Puts a soft-deleted recipe back, with everything that was still attached to it.
+     *
+     * Not reachable from the API — there is no screen for it — but this is the whole point
+     * of the flag, and the operator running it from a console should be running tested code
+     * rather than inventing the `update` on the spot.
+     */
+    fun restore(id: Long): Boolean {
+        val recipe = QRecipe().setIncludeSoftDeletes().id.eq(id).findOne() ?: return false
+        if (!recipe.deleted) return false
+        recipe.deleted = false
+        recipe.update()
+        logger.info { "Restored recipe ${recipe.id} (${recipe.title})" }
+        return true
     }
 
     private fun queryByOwner(username: String) =
