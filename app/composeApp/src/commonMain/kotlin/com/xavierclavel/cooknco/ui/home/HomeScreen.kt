@@ -64,6 +64,12 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onRecipeClick: (Long) -> Unit = {},
     onUserClick: (Long) -> Unit = {},
+    /**
+     * Where the greeting's avatar goes. Not [onUserClick] with your own id: that pushes
+     * the other-people's-profile route, which carries a back arrow and no settings gear,
+     * so it opened a second, lesser copy of a screen the bottom bar already holds.
+     */
+    onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -82,7 +88,7 @@ fun HomeScreen(
     }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
-        HomeHeader(user = user, onAvatarClick = { onUserClick(user.id) })
+        HomeHeader(user = user, onAvatarClick = onProfileClick)
 
         LazyColumn(
             state = listState,
@@ -138,7 +144,10 @@ private fun HomeHeader(user: UserInfo, onAvatarClick: () -> Unit, modifier: Modi
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.Bottom,
+        // Top, not Bottom: the greeting runs to two lines in some languages, and an
+        // avatar hung off the bottom of a block that tall sits well below the date it is
+        // meant to be level with.
+        verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {

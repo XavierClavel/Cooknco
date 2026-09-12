@@ -131,6 +131,7 @@ fun MainScreen(
                 viewModel = homeViewModel,
                 onRecipeClick = onNavigateToRecipe,
                 onUserClick = onNavigateToUser,
+                onProfileClick = { selectedTab = MainTab.PROFILE },
                 modifier = Modifier.padding(innerPadding),
             )
             MainTab.SEARCH -> RecipesScreen(
