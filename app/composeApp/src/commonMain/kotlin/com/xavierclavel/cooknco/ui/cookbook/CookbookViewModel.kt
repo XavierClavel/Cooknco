@@ -26,6 +26,7 @@ data class CookbookUiState(
     val showLeaveConfirm: Boolean = false,
     val left: Boolean = false,
     val showDeleteConfirm: Boolean = false,
+    val isDeleting: Boolean = false,
     val deleted: Boolean = false,
 )
 
@@ -123,12 +124,13 @@ class CookbookViewModel(
 
     fun delete() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isDeleting = true) }
             repo.deleteCookbook(cookbookId)
                 .onSuccess {
-                    _uiState.update { it.copy(deleted = true, showDeleteConfirm = false) }
+                    _uiState.update { it.copy(deleted = true, showDeleteConfirm = false, isDeleting = false) }
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(error = error.message, showDeleteConfirm = false) }
+                    _uiState.update { it.copy(error = error.message, showDeleteConfirm = false, isDeleting = false) }
                 }
         }
     }

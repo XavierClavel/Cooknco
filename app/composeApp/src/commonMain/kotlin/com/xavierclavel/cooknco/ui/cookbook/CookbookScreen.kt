@@ -1,21 +1,20 @@
 package com.xavierclavel.cooknco.ui.cookbook
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -51,14 +51,18 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoBlueDark
+import com.xavierclavel.cooknco.ui.theme.CookncoBlueLight
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerConfirmDialog
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
-import com.xavierclavel.cooknco.ui.theme.StickerPill
 
 @Composable
 fun CookbookScreen(
@@ -93,6 +97,7 @@ fun CookbookScreen(
                 recipes = uiState.recipes,
                 members = uiState.members,
                 isAdmin = uiState.isAdmin,
+                currentUserId = currentUserId,
                 error = uiState.error,
                 onLeave = viewModel::confirmLeave,
                 onEdit = { onNavigateToEdit(cookbook.id) },
@@ -124,21 +129,18 @@ fun CookbookScreen(
     }
 
     if (uiState.showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelDelete() },
-            title = { Text("Delete Cookbook", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to delete this cookbook? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.delete() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text("Delete", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.cancelDelete() }) {
-                    Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f))
-                }
-            },
+        val recipesCount = cookbook?.recipesCount ?: 0
+        val usersCount = cookbook?.usersCount ?: 0
+        StickerConfirmDialog(
+            icon = Icons.Outlined.Delete,
+            title = "Delete ${cookbook?.title ?: "cookbook"}?",
+            message = "The cookbook goes for all $usersCount member${if (usersCount != 1) "s" else ""}. " +
+                "The $recipesCount recipe${if (recipesCount != 1) "s" else ""} inside stay with their authors.",
+            confirmText = "Delete cookbook",
+            dismissText = "Keep it",
+            onConfirm = viewModel::delete,
+            onDismissRequest = viewModel::cancelDelete,
+            isConfirming = uiState.isDeleting,
         )
     }
 }
@@ -151,6 +153,7 @@ private fun CookbookContent(
     recipes: List<CookbookRecipeInfo>,
     members: List<CookbookUserInfo>,
     isAdmin: Boolean,
+    currentUserId: Long,
     error: String?,
     onLeave: () -> Unit,
     onEdit: () -> Unit,
@@ -171,7 +174,16 @@ private fun CookbookContent(
                     cookbookId = cookbook.id,
                     version = cookbook.version,
                     contentDescription = cookbook.title,
-                    modifier = Modifier.fillMaxWidth().height(240.dp),
+                    modifier = Modifier.fillMaxWidth().height(250.dp),
+                )
+                // The mockup's banner sits on a hard navy rule where it meets the
+                // overlapping info card, rather than fading straight into it.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(CookncoNavy),
                 )
                 Row(
                     modifier = Modifier
@@ -209,10 +221,10 @@ private fun CookbookContent(
                 ) {
                     Text(
                         text = cookbook.title,
-                        fontSize = 26.sp,
+                        fontSize = 27.sp,
                         fontWeight = FontWeight.Bold,
                         color = CookncoNavy,
-                        lineHeight = 31.sp,
+                        lineHeight = 33.sp,
                     )
                     if (cookbook.description.isNotBlank()) {
                         Text(
@@ -224,24 +236,12 @@ private fun CookbookContent(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatChip("${cookbook.recipesCount} recipe${if (cookbook.recipesCount != 1) "s" else ""}")
-                        StatChip("${cookbook.usersCount} member${if (cookbook.usersCount != 1) "s" else ""}")
+                        StatChip(
+                            text = "${cookbook.usersCount} member${if (cookbook.usersCount != 1) "s" else ""}",
+                            fillColor = CookncoBlueLight,
+                            textColor = CookncoBlueDark,
+                        )
                     }
-                }
-            }
-        }
-
-        // ── Leave button ─────────────────────────────────────────────────────
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 4.dp),
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                StickerPill(onClick = onLeave, height = 40.dp, shadowOffset = 3.dp) {
-                    Icon(Icons.Outlined.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Leave", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
         }
@@ -251,12 +251,21 @@ private fun CookbookContent(
             item {
                 SectionHeader(title = "Recipes", count = recipes.size)
             }
-            items(recipes, key = { "recipe_${it.id}" }) { recipe ->
-                RecipeRow(
-                    recipe = recipe,
-                    onClick = { onNavigateToRecipe(recipe.id) },
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
-                )
+            item {
+                StickerCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    shape = RoundedCornerShape(20.dp),
+                ) {
+                    Column {
+                        recipes.forEachIndexed { index, recipe ->
+                            RecipeRow(
+                                recipe = recipe,
+                                showDivider = index != recipes.lastIndex,
+                                onClick = { onNavigateToRecipe(recipe.id) },
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -265,12 +274,41 @@ private fun CookbookContent(
             item {
                 SectionHeader(title = "Members", count = members.size)
             }
-            items(members, key = { "member_${it.id}" }) { member ->
-                MemberRow(
-                    member = member,
-                    onClick = { onNavigateToUser(member.id) },
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
-                )
+            item {
+                StickerCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    shape = RoundedCornerShape(20.dp),
+                ) {
+                    Column {
+                        members.forEachIndexed { index, member ->
+                            MemberRow(
+                                member = member,
+                                isCurrentUser = member.id == currentUserId,
+                                showDivider = index != members.lastIndex,
+                                onClick = { onNavigateToUser(member.id) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Leave cookbook ───────────────────────────────────────────────────
+        item {
+            StickerCard(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp).height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                fillColor = CookncoGreenDark,
+                onClick = onLeave,
+            ) {
+                Row(
+                    modifier = Modifier.align(Alignment.Center),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.ExitToApp, contentDescription = null, tint = CookncoBackground, modifier = Modifier.size(18.dp))
+                    Text("Leave cookbook", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoBackground)
+                }
             }
         }
 
@@ -298,49 +336,64 @@ private fun SectionHeader(title: String, count: Int, modifier: Modifier = Modifi
     ) {
         Text(
             text = title,
-            fontSize = 20.sp,
+            fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
             color = CookncoNavy,
         )
         Box(
             modifier = Modifier
-                .clip(CircleShape)
+                .clip(RoundedCornerShape(percent = 50))
                 .background(CookncoOrange)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+                .padding(horizontal = 10.dp, vertical = 3.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = count.toString(),
                 color = CookncoWhite,
                 fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
+                fontSize = 12.sp,
             )
         }
     }
 }
 
 @Composable
-private fun StatChip(label: String, modifier: Modifier = Modifier) {
+private fun StatChip(
+    text: String,
+    modifier: Modifier = Modifier,
+    fillColor: Color = CookncoWhite,
+    textColor: Color = CookncoNavy,
+) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(percent = 50))
-            .background(CookncoWhite)
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .background(fillColor)
+            .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+            .padding(horizontal = 12.dp, vertical = 5.dp),
     ) {
         Text(
-            text = label,
+            text = text,
             fontSize = 12.5.sp,
-            fontWeight = FontWeight.Medium,
-            color = CookncoNavy,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
         )
     }
 }
 
 @Composable
-private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    StickerCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), onClick = onClick) {
+private fun RecipeRow(
+    recipe: CookbookRecipeInfo,
+    showDivider: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -348,7 +401,10 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier:
                 recipeId = recipe.id,
                 version = 1L,
                 contentDescription = recipe.title,
-                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(2.dp, CookncoNavy, RoundedCornerShape(12.dp)),
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -356,7 +412,8 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier:
             ) {
                 Text(
                     text = recipe.title,
-                    fontSize = 15.sp,
+                    fontSize = 15.5.sp,
+                    lineHeight = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
                     maxLines = 1,
@@ -365,18 +422,28 @@ private fun RecipeRow(recipe: CookbookRecipeInfo, onClick: () -> Unit, modifier:
                 Text(
                     text = "Added by ${recipe.addedByUsername}",
                     fontSize = 12.sp,
-                    color = CookncoNavy.copy(alpha = 0.55f),
+                    color = CookncoGreenDark,
                 )
             }
+            Text("›", fontSize = 18.sp, color = CookncoGreenDark)
+        }
+        if (showDivider) {
+            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(CookncoNavy.copy(alpha = 0.1f)))
         }
     }
 }
 
 @Composable
-private fun MemberRow(member: CookbookUserInfo, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
-    StickerCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), onClick = onClick) {
+private fun MemberRow(
+    member: CookbookUserInfo,
+    isCurrentUser: Boolean,
+    showDivider: Boolean,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -384,33 +451,50 @@ private fun MemberRow(member: CookbookUserInfo, onClick: () -> Unit = {}, modifi
                 userId = member.id,
                 version = 1L,
                 contentDescription = member.username,
-                modifier = Modifier.size(44.dp).clip(CircleShape),
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, CookncoNavy, CircleShape),
             )
 
             Text(
                 text = member.username,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
                 color = CookncoNavy,
                 modifier = Modifier.weight(1f),
             )
 
-            if (member.isAdmin) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(CookncoOrange)
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                ) {
-                    Text(
-                        text = "Admin",
-                        color = CookncoWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.5.sp,
-                    )
-                }
+            when {
+                isCurrentUser -> RoleBadge(label = "You", fillColor = CookncoBackground, textColor = CookncoNavy)
+                member.isAdmin -> RoleBadge(label = "Admin", fillColor = CookncoOrange, textColor = CookncoWhite)
             }
         }
+        if (showDivider) {
+            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(CookncoNavy.copy(alpha = 0.1f)))
+        }
+    }
+}
+
+@Composable
+private fun RoleBadge(
+    label: String,
+    fillColor: Color,
+    textColor: Color,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(fillColor)
+            .border(2.dp, CookncoNavy, RoundedCornerShape(7.dp))
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = label,
+            color = textColor,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.5.sp,
+        )
     }
 }
 
@@ -447,6 +531,7 @@ fun CookbookContentPreview() {
                 recipes = previewRecipes,
                 members = previewMembers,
                 isAdmin = true,
+                currentUserId = 1L,
                 error = null,
                 onLeave = {},
                 onEdit = {},
@@ -466,6 +551,7 @@ fun CookbookContentMemberPreview() {
                 recipes = previewRecipes,
                 members = previewMembers,
                 isAdmin = false,
+                currentUserId = 2L,
                 error = null,
                 onLeave = {},
                 onEdit = {},

@@ -7,11 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,7 +29,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -48,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -58,7 +55,9 @@ import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
@@ -66,6 +65,7 @@ import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 import com.xavierclavel.cooknco.ui.theme.StickerPill
+import com.xavierclavel.cooknco.ui.theme.stickerShadow
 
 // ── Shared styling helpers (mirrors RecipeEditScreen's private equivalents) ──────
 
@@ -86,7 +86,7 @@ private fun editFieldColors() = OutlinedTextFieldDefaults.colors(
 
 private val visibilityOptions = listOf("PRIVATE" to "Private", "PROTECTED" to "Protected", "PUBLIC" to "Public")
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CookbookEditScreen(
     cookbookId: Long?,
@@ -127,13 +127,6 @@ fun CookbookEditScreen(
                 color = CookncoNavy,
                 modifier = Modifier.weight(1f),
             )
-            StickerPill(onClick = { viewModel.save() }, height = 44.dp, shadowOffset = 3.dp) {
-                if (uiState.isSaving) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = CookncoNavy)
-                } else {
-                    Text("Save", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-                }
-            }
         }
 
         if (uiState.isLoading) {
@@ -158,15 +151,17 @@ fun CookbookEditScreen(
         ) {
             // ── Photo ─────────────────────────────────────────────────────────
             item {
+                val hasAnyPhoto = pickedBitmap != null || hasExistingPhoto
+                val photoShape = RoundedCornerShape(20.dp)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(18.dp))
+                        .height(96.dp)
+                        .stickerShadow(photoShape)
+                        .clip(photoShape)
                         .background(CookncoGreenLight)
-                        .border(3.dp, CookncoNavy, RoundedCornerShape(18.dp))
+                        .border(3.dp, CookncoNavy, photoShape)
                         .clickable { imagePicker.launch() },
-                    contentAlignment = Alignment.Center,
                 ) {
                     when {
                         pickedBitmap != null -> Image(
@@ -181,10 +176,25 @@ fun CookbookEditScreen(
                             contentDescription = "Cookbook photo",
                             modifier = Modifier.fillMaxSize(),
                         )
-                        else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Outlined.CameraAlt, contentDescription = null, tint = CookncoNavy.copy(alpha = 0.5f), modifier = Modifier.size(36.dp))
-                            Text("Tap to add a photo", color = CookncoNavy.copy(alpha = 0.6f), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
-                        }
+                        else -> Icon(
+                            Icons.Outlined.CameraAlt,
+                            contentDescription = null,
+                            tint = CookncoNavy.copy(alpha = 0.4f),
+                            modifier = Modifier.padding(start = 12.dp).size(24.dp).align(Alignment.CenterStart),
+                        )
+                    }
+                    StickerPill(
+                        modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+                        onClick = { imagePicker.launch() },
+                        height = 44.dp,
+                        shadowOffset = 0.dp,
+                    ) {
+                        Text(
+                            text = if (hasAnyPhoto) "Change cover" else "Add cover",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                        )
                     }
                 }
             }
@@ -200,36 +210,59 @@ fun CookbookEditScreen(
 
             // ── Basics ────────────────────────────────────────────────────────
             item {
-                OutlinedTextField(
-                    value = uiState.title,
-                    onValueChange = viewModel::updateTitle,
-                    label = { Text("Title *") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = uiState.error?.contains("Title") == true,
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
-            }
-            item {
-                OutlinedTextField(
-                    value = uiState.description,
-                    onValueChange = viewModel::updateDescription,
-                    label = { Text("Description") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    colors = editFieldColors(),
-                    shape = fieldShape,
-                )
+                StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        Column {
+                            FieldLabel("TITLE *", modifier = Modifier.padding(bottom = 7.dp))
+                            OutlinedTextField(
+                                value = uiState.title,
+                                onValueChange = viewModel::updateTitle,
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                isError = uiState.error?.contains("Title") == true,
+                                colors = editFieldColors(),
+                                shape = fieldShape,
+                            )
+                        }
+                        Column {
+                            FieldLabel("DESCRIPTION", modifier = Modifier.padding(bottom = 7.dp))
+                            OutlinedTextField(
+                                value = uiState.description,
+                                onValueChange = viewModel::updateDescription,
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 3,
+                                colors = editFieldColors(),
+                                shape = fieldShape,
+                            )
+                        }
+                    }
+                }
             }
 
             // ── Visibility ────────────────────────────────────────────────────
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Visibility", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoNavy.copy(alpha = 0.75f))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FieldLabel("VISIBILITY", color = CookncoNavy)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .stickerShadow(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(CookncoBackground)
+                            .border(3.dp, CookncoNavy, RoundedCornerShape(20.dp))
+                            .padding(5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
                         visibilityOptions.forEach { (value, label) ->
-                            VisibilityChip(label = label, selected = uiState.visibility == value, onClick = { viewModel.updateVisibility(value) })
+                            VisibilitySegment(
+                                label = label,
+                                selected = uiState.visibility == value,
+                                onClick = { viewModel.updateVisibility(value) },
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
                 }
@@ -238,28 +271,25 @@ fun CookbookEditScreen(
             // ── Members ───────────────────────────────────────────────────────
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = "MEMBERS · ${uiState.members.size}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CookncoNavy,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(CookncoGreen)
-                            .border(1.5.dp, CookncoNavy, CircleShape)
-                            .clickable(onClick = viewModel::addMember),
-                        contentAlignment = Alignment.Center,
+                    FieldLabel("MEMBERS", modifier = Modifier.weight(1f), color = CookncoNavy)
+                    StickerPill(
+                        onClick = viewModel::addMember,
+                        height = 44.dp,
+                        fillColor = CookncoGold,
+                        shadowOffset = 3.dp,
                     ) {
-                        Icon(Icons.Outlined.Add, contentDescription = "Add member", tint = CookncoNavy, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Outlined.Add, contentDescription = null, tint = CookncoNavy, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = "Add member",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
                     }
                 }
             }
@@ -322,10 +352,11 @@ fun CookbookEditScreen(
                             )
                         } else {
                             Text(
-                                text = "Save cookbook",
+                                text = "SAVE",
                                 color = CookncoWhite,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
+                                letterSpacing = 1.sp,
                                 modifier = Modifier.align(Alignment.Center),
                             )
                         }
@@ -337,17 +368,33 @@ fun CookbookEditScreen(
 }
 
 @Composable
-private fun VisibilityChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun FieldLabel(text: String, modifier: Modifier = Modifier, color: Color = CookncoGreenDark) {
+    Text(
+        text = text,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        color = color,
+        letterSpacing = 0.7.sp,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun VisibilitySegment(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50.dp))
-            .background(if (selected) CookncoOrange else CookncoWhite)
-            .border(1.5.dp, if (selected) CookncoNavy else CookncoNavy.copy(alpha = 0.35f), RoundedCornerShape(50.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(15.dp))
+            .background(if (selected) CookncoOrange else Color.Transparent)
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = if (selected) CookncoWhite else CookncoNavy, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontSize = 14.sp)
+        Text(
+            text = label,
+            color = if (selected) CookncoWhite else CookncoNavy,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            fontSize = 13.5.sp,
+        )
     }
 }
 
@@ -362,7 +409,10 @@ private fun MemberEditRow(
     onRemove: () -> Unit,
 ) {
     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowOffset = 5.dp) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.padding(top = 10.dp, bottom = 10.dp, start = 12.dp, end = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 UserAvatar(
                     userId = member.userId,
@@ -379,10 +429,9 @@ private fun MemberEditRow(
                     OutlinedTextField(
                         value = member.searchQuery,
                         onValueChange = onQueryChange,
-                        label = { Text("Username") },
                         modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth(),
                         singleLine = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = member.showDropdown) },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                         colors = editFieldColors(),
                         shape = fieldShape,
                     )
@@ -393,12 +442,16 @@ private fun MemberEditRow(
                     }
                 }
 
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = "Remove member",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(start = 4.dp).clickable(onClick = onRemove),
-                )
+                Box(
+                    modifier = Modifier.size(44.dp).clickable(onClick = onRemove),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        contentDescription = "Remove member",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
 
             Row(
