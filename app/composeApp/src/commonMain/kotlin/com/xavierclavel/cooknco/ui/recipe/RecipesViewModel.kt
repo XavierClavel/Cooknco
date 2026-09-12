@@ -147,6 +147,9 @@ class RecipesViewModel(
 
     fun loadMore() {
         if (_uiState.value.isLoading || _uiState.value.allLoaded) return
+        // Set here rather than inside loadPage, which runs in the coroutine: two calls in
+        // one frame would both get past the guard and both append the same page.
+        _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch { loadPage(loadedQuery, loadedSort) }
     }
 
@@ -156,7 +159,10 @@ class RecipesViewModel(
             val token = tokenDataStore.tokenFlow.first()
             recipeApi.searchRecipes(token = token, query = q, sort = s, page = page, size = pageSize)
         }.onSuccess { results ->
-            buffer.addAll(results)
+            // Same reason as the feed: a page can overlap the one before it, and these are
+            // rendered keyed by id.
+            val known = buffer.mapTo(HashSet()) { it.id }
+            buffer.addAll(results.filterNot { it.id in known })
             page++
             _uiState.update {
                 it.copy(

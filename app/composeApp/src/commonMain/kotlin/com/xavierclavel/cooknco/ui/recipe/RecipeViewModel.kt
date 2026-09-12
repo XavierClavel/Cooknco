@@ -80,18 +80,28 @@ class RecipeViewModel(
         }
     }
 
+    /**
+     * Flips the heart and the count together, before the request goes out.
+     *
+     * The count matters as much as the heart: it is the only thing on the screen that says
+     * the tap did anything to the recipe rather than to the button, and nothing reloads the
+     * recipe afterwards. Both halves are put back if the call fails.
+     */
     fun toggleLike() {
         val currentlyLiked = _uiState.value.isLiked
-        // Optimistic update
-        _uiState.update { it.copy(isLiked = !currentlyLiked) }
+        _uiState.update { it.copy(isLiked = !currentlyLiked, recipe = it.recipe?.withLikeDelta(if (currentlyLiked) -1 else 1)) }
         viewModelScope.launch {
             val result = if (currentlyLiked) repo.removeLike(recipeId) else repo.addLike(recipeId)
             result.onFailure {
-                // Revert on failure
-                _uiState.update { it.copy(isLiked = currentlyLiked) }
+                _uiState.update {
+                    it.copy(isLiked = currentlyLiked, recipe = it.recipe?.withLikeDelta(if (currentlyLiked) 1 else -1))
+                }
             }
         }
     }
+
+    private fun RecipeInfo.withLikeDelta(delta: Int) =
+        copy(likesCount = (likesCount + delta).coerceAtLeast(0))
 
     fun setYield(n: Int) {
         if (n >= 1) {

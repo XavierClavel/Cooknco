@@ -41,6 +41,17 @@ class UserProfileViewModel(
     private val recipes = mutableListOf<RecipeOverview>()
     private val pageSize = 20
 
+    /**
+     * Whether a further page is in flight.
+     *
+     * Held here and set *before* the coroutine starts, rather than read off
+     * [UserProfileUiState.isLoading] — that one only covers the initial load, so two
+     * scroll-triggered calls in the same frame both passed the guard, both fetched
+     * [recipePage], and both appended it. A LazyVerticalGrid keyed by recipe id then found
+     * the same key twice and threw.
+     */
+    private var isLoadingMore = false
+
     init {
         loadAll()
     }
@@ -75,11 +86,17 @@ class UserProfileViewModel(
 
     fun loadMoreRecipes() {
         val state = _uiState.value
-        if (state.isLoading || state.allRecipesLoaded) return
+        if (state.isLoading || state.allRecipesLoaded || isLoadingMore) return
+        isLoadingMore = true
         viewModelScope.launch {
             userRepo.getUserRecipes(profileUserId, recipePage)
                 .onSuccess { newRecipes ->
-                    recipes.addAll(newRecipes)
+                    // Pages are offsets into a list that can change under us — a recipe
+                    // added while reading shifts the window and repeats one. Dropping what
+                    // is already held costs a set and makes that unremarkable instead of
+                    // fatal.
+                    val known = recipes.mapTo(HashSet()) { it.id }
+                    recipes.addAll(newRecipes.filterNot { it.id in known })
                     recipePage++
                     _uiState.update {
                         it.copy(
@@ -88,7 +105,7 @@ class UserProfileViewModel(
                         )
                     }
                 }
-        }
+        }.invokeOnCompletion { isLoadingMore = false }
     }
 
     fun toggleFollow() {
