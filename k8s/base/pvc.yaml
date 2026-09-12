@@ -47,3 +47,16 @@ spec:
   resources:
     requests:
       storage: 1Gi
+---
+# Destination for the nightly CronJob in backup.yaml. Sized for one mirror of
+# `pictures` (which the backup never prunes) plus RETENTION_DAYS of compressed
+# database dumps — so it has to stay comfortably larger than `pictures` itself.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backups
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi

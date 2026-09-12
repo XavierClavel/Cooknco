@@ -13,6 +13,7 @@ resources:
   - mail-service-db.yaml
   - mail-service.yaml
   - certificate.yaml
+  - backup.yaml
   - ingress.yaml
 
 # includeSelectors: false — never inject these into Deployment selectors, which

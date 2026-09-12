@@ -1,0 +1,188 @@
+# Nightly backup of the two things in this release that cannot be rebuilt from
+# an image: the PostgreSQL databases and the user-uploaded pictures.
+#
+# It is a CronJob rather than a script on the host so that the backup is part of
+# the release — it is rendered, validated and applied by the same pipeline as
+# everything else, and it needs no cluster credentials: it reaches the databases
+# over their Services with the same secrets they were created from, and reads
+# the pictures through a volume mount. Nothing here talks to the API server, so
+# the pod runs with no ServiceAccount permissions of its own.
+#
+# Redis is deliberately absent: it is a cache and session store, rebuilt on
+# demand. So is pvc/logs — it is an append-only record, not state the app reads
+# back, and copying it nightly would dominate the backup volume.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cooknco-backup-script
+data:
+  backup.sh: |
+    #!/bin/sh
+    set -eu
+
+    RETENTION_DAYS="${RETENTION_DAYS:-14}"
+    STAMP="$(date -u +%Y%m%d-%H%M%S)"
+    DEST="/backups/db/$STAMP"
+    # Dumps are written here and only renamed to $DEST once all of them are
+    # complete and verified, so a run killed halfway never leaves a directory
+    # that looks like a restorable backup.
+    TMP="/backups/db/.incomplete-$STAMP"
+
+    log() { printf '==> %s %s\n' "$(date -u +%H:%M:%S)" "$*"; }
+
+    # A database pod that happens to be mid-roll at the scheduled minute is not
+    # a failed backup — wait a couple of minutes for it before giving up.
+    wait_for() {
+      _host="$1"; _user="$2"; _i=0
+      while ! pg_isready -q -h "$_host" -U "$_user" -t 5; do
+        _i=$((_i + 1))
+        [ "$_i" -lt 24 ] || { echo "$_host never became ready" >&2; return 1; }
+        sleep 5
+      done
+    }
+
+    dump() {
+      _host="$1"; _user="$2"; _db="$3"; _pw="$4"; _out="$5"
+      wait_for "$_host" "$_user"
+      log "pg_dump $_host/$_db -> $_out"
+      # -Fc is the compressed custom format pg_restore reads, and the same
+      # format k8s/migration/ produces, so one restore procedure covers both.
+      # --no-owner/--no-acl: role names need not match on the way back in.
+      PGPASSWORD="$_pw" pg_dump -h "$_host" -U "$_user" -d "$_db" \
+        -Fc --no-owner --no-acl -f "$_out"
+      # A dump nobody can read is not a backup. Parsing the archive's table of
+      # contents catches a truncated or empty file here, while the previous
+      # backups are all still on disk — the retention sweep below runs only if
+      # this whole script reaches it.
+      pg_restore --list "$_out" > /dev/null
+      ls -lh "$_out"
+    }
+
+    rm -rf "$TMP"
+    mkdir -p "$TMP"
+
+    dump cooknco-database      "$APP_USER"  "$APP_DB"  "$APP_PASSWORD"  "$TMP/cooknco.dump"
+    dump mail-service-database "$MAIL_USER" "$MAIL_DB" "$MAIL_PASSWORD" "$TMP/mail-service.dump"
+
+    (cd "$TMP" && sha256sum ./*.dump > SHA256SUMS)
+    mv "$TMP" "$DEST"
+    log "database backup complete: $DEST"
+
+    # Pictures are mirrored rather than archived per-run: a nightly tar of the
+    # whole volume would need one full copy per retained day, while uploads are
+    # write-once, so -u copies only what is new. The mirror never deletes, which
+    # also means a picture removed from the live volume survives here.
+    log "mirroring pictures -> /backups/pictures"
+    mkdir -p /backups/pictures
+    cp -a -u /pictures/. /backups/pictures/
+    log "pictures held: $(find /backups/pictures -type f | wc -l) files"
+
+    # Reached only when every step above succeeded, so a failing backup can
+    # never be what deletes the last good one.
+    log "pruning database backups older than $RETENTION_DAYS days"
+    find /backups/db -mindepth 1 -maxdepth 1 -type d -name '2*' \
+      -mtime "+$RETENTION_DAYS" -exec rm -rf {} +
+    find /backups/db -mindepth 1 -maxdepth 1 -type d -name '.incomplete-*' \
+      -mtime +1 -exec rm -rf {} +
+
+    log "backups on disk:"
+    ls -1 /backups/db
+    du -sh /backups/db /backups/pictures
+    df -h /backups | tail -1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cooknco-backup
+spec:
+  # 02:15 in whatever zone the controller manager runs in (UTC on this
+  # cluster). No spec.timeZone: the exact minute does not matter, and the field
+  # would be one more thing to keep in step with the cluster version.
+  schedule: "15 2 * * *"
+  # A run that overlaps the previous one would have two writers on the mirror
+  # and two dumps competing for the same database.
+  concurrencyPolicy: Forbid
+  # If the node was down at 02:15, still run on the way back up rather than
+  # skipping the night entirely.
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      # Bounds a run that cannot make progress — most likely a pod left Pending
+      # because pvc/pictures is mounted on another node (see below). Without
+      # it the Job would sit there until the next night's run is refused by
+      # concurrencyPolicy, and the failure would be silent.
+      activeDeadlineSeconds: 7200
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backup
+              # Pinned to the same version the servers run: pg_dump may be
+              # newer than the server it reads but never older, so this tag
+              # moves when database.yaml and mail-service-db.yaml move.
+              image: postgres:17.2
+              command: ["sh", "/scripts/backup.sh"]
+              env:
+                # Named apart from POSTGRES_* on purpose: the two databases
+                # carry their credentials under the same keys in different
+                # secrets, so envFrom would collide.
+                - name: APP_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: cooknco-secrets
+                      key: postgres-db
+                - name: APP_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: cooknco-secrets
+                      key: postgres-user
+                - name: APP_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: cooknco-secrets
+                      key: postgres-password
+                - name: MAIL_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: mail-database-secrets
+                      key: POSTGRES_DB
+                - name: MAIL_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: mail-database-secrets
+                      key: POSTGRES_USER
+                - name: MAIL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: mail-database-secrets
+                      key: POSTGRES_PASSWORD
+                - name: RETENTION_DAYS
+                  value: "14"
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+                # Read-only: this job is the one thing besides the backend that
+                # opens the uploads volume, and it has no reason to write to it.
+                - name: pictures
+                  mountPath: /pictures
+                  readOnly: true
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: backups
+            # pvc/pictures is ReadWriteOnce, so this pod and cooknco-backend
+            # have to land on the same node. That holds on a single-node
+            # cluster; if one is ever added, give this pod a podAffinity on
+            # app=cooknco-backend rather than letting it sit Pending.
+            - name: pictures
+              persistentVolumeClaim:
+                claimName: pictures
+            - name: script
+              configMap:
+                name: cooknco-backup-script
