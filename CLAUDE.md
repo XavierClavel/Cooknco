@@ -241,9 +241,17 @@ off the request that needs it: Google builds the callback itself, so `?locale=` 
 when the flow leaves (`onStateCreated`) and consumed when the state comes back.
 
 The app reports `deviceLocale` — the real platform language — rather than the constant it
-used to send. `ApiClient.LOCALE` still exists and is still `EN`, because what the app asks
-for *content* in is a different question from what the backend writes to its user in: the
-app's own copy is English-only.
+used to send. Its own copy is no longer English-only: `ui/i18n/Strings.kt` holds every word
+it says, once per language, behind a composition local, and `AppLanguage` resolves which to
+use by the same rule the backend follows — the account's choice if it has one, the handset's
+otherwise. Picking a language in the app's settings therefore changes the app itself as well
+as what is mailed to the account.
+
+`ApiClient.locale` follows that instead of being pinned to `EN`, because what the app asks
+for *content* in and what it is written in are no longer different answers. A `Strings` is
+also reachable outside composition (`stringsFor(AppLanguage.current.value)`), which is how
+the view models write their error copy — see `AuthViewModel.parseError`, which is
+translatable only because the backend answers with a cause rather than a sentence.
 
 ## The MCP endpoint holds the SDK back on purpose
 

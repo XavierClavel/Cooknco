@@ -200,10 +200,10 @@ private fun CookbookContent(
                     if (isAdmin) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             StickerIconButton(onClick = onEdit, shadowOffset = 3.dp) {
-                                Icon(Icons.Outlined.Edit, contentDescription = "Edit")
+                                Icon(Icons.Outlined.Edit, contentDescription = s.edit)
                             }
                             StickerIconButton(onClick = onDelete, shadowOffset = 3.dp) {
-                                Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Outlined.Delete, contentDescription = s.delete, tint = MaterialTheme.colorScheme.error)
                             }
                         }
                     }

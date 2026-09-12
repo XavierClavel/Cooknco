@@ -260,7 +260,68 @@ interface Strings {
     val update: String
     val notNow: String
     val checkYourEmail: String
+    val verificationSent: String
     val backToLogin: String
+
+    // ── Recipe editor ─────────────────────────────────────────────────────────
+    val editRecipeTitle: String
+    val stepBasics: String
+    val stepIngredients: String
+    val stepSteps: String
+    val stepPhoto: String
+    val theBasics: String
+    val theBasicsSubtitle: String
+    val nameYourRecipe: String
+    val aLineAboutTheDish: String
+    val timesAndYield: String
+    val dishClass: String
+    val ingredientsSubtitle: String
+    fun addedCount(count: Int): String
+    val nothingYetSearchAbove: String
+    val searchAnIngredient: String
+    val catalogue: String
+    fun addAsCustom(name: String): String
+    fun removeNamed(name: String): String
+    val stepsSubtitle: String
+    val addStep: String
+    val tipsOptional: String
+    val tipsPlaceholder: String
+    val describeThisStep: String
+    val dragToReorder: String
+    val removeStep: String
+    val photoAndPublish: String
+    val photoSubtitle: String
+    val recipePhoto: String
+    val tapToAddPhoto: String
+    val takeAPhoto: String
+    val chooseAnother: String
+    val readyToPublish: String
+    val noIngredientsYet: String
+    fun ingredientsAllFromCatalogue(count: Int): String
+    fun ingredientsAdded(count: Int): String
+    fun cookMinutes(minutes: String): String
+    val untitledRecipe: String
+    val publishCaps: String
+    fun nextStepLabel(step: String): String
+    fun dishClassName(value: String): String
+    fun unitName(value: String): String
+    val yieldLabel: String
+    val yieldHint: String
+    val prepTime: String
+    val prepHint: String
+    val cookTime: String
+    val cookHint: String
+    val ovenTemp: String
+    val ovenHint: String
+    fun totalMinutes(total: Int): String
+    val noTimesYet: String
+    val sectionWeight: String
+    val sectionVolume: String
+    val sectionCount: String
+    fun setValue(label: String): String
+    val clearValue: String
+    val custom: String
+    fun catalogueType(type: String): String
 
     // ── Cook mode ─────────────────────────────────────────────────────────────
     fun stepOf(step: Int, total: Int): String

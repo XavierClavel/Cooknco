@@ -73,7 +73,7 @@ fun EmailVerificationSentScreen(
                     )
 
                     Text(
-                        text = "We've sent a verification link to your address. Click it to activate your account and start cooking!",
+                        text = s.verificationSent,
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                         color = CookncoNavy.copy(alpha = 0.75f),

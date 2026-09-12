@@ -86,6 +86,8 @@ import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.RecipeImage
+import com.xavierclavel.cooknco.ui.i18n.Strings
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
@@ -103,31 +105,8 @@ import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyColumnState
 
-private val dishClasses = listOf(
-    "ENTREE" to "Entrée",
-    "MAIN_DISH" to "Main dish",
-    "DESERT" to "Dessert",
-    "SALTY_SNACK" to "Salty snack",
-    "SUGARY_SNACK" to "Sugary snack",
-    "DRINK" to "Drink",
-    "OTHER" to "Other",
-)
-
-private val unitLabels = mapOf(
-    "NONE" to "—",
-    "UNIT" to "Unit",
-    "GRAM" to "g",
-    "KILOGRAM" to "kg",
-    "POUND" to "lb",
-    "MILLILITERS" to "mL",
-    "CENTILITER" to "cL",
-    "LITER" to "L",
-    "TEASPOON" to "tsp",
-    "TABLESPOON" to "tbsp",
-    "CUP" to "cup",
-)
-
-private fun unitFieldLabel(unit: String): String = unitLabels[unit] ?: unit
+/** The values the API stores; what each is called comes from the catalogue. */
+private val dishClasses = listOf("ENTREE", "MAIN_DISH", "DESERT", "SALTY_SNACK", "SUGARY_SNACK", "DRINK", "OTHER")
 
 // Custom rows carry no capability data, so they accept the whole catalog.
 private fun unitsForIngredient(allowedTypes: List<String>, units: List<UnitInfo>): List<UnitInfo> =
@@ -138,26 +117,34 @@ private fun unitsForIngredient(allowedTypes: List<String>, units: List<UnitInfo>
  * three headings the mockup happens to draw, so a unit type added to the catalogue lands in
  * a section of its own instead of silently joining the last one.
  */
-private fun unitSectionLabel(type: String): String? = when (type) {
-    "WEIGHT" -> "Weight"
-    "VOLUME" -> "Volume"
-    "AMOUNT" -> "Count"
+private fun unitSectionLabel(type: String, s: Strings): String? = when (type) {
+    "WEIGHT" -> s.sectionWeight
+    "VOLUME" -> s.sectionVolume
+    "AMOUNT" -> s.sectionCount
     "NONE" -> null
     else -> type.lowercase().replaceFirstChar { it.uppercase() }
 }
 
 /** "catalogue · grain" for a catalogue ingredient, "custom" for one the user typed. */
-private fun EditIngredient.originLabel(): String = when {
-    ingredientId == null -> "custom"
-    type.isNotEmpty() -> "catalogue \u00b7 ${type.lowercase()}"
-    else -> "catalogue"
+private fun EditIngredient.originLabel(s: Strings): String = when {
+    ingredientId == null -> s.custom
+    type.isNotEmpty() -> s.catalogueType(type)
+    else -> s.catalogue
 }
 
-private enum class EditorStep(val label: String) {
-    BASICS("Basics"),
-    INGREDIENTS("Ingredients"),
-    STEPS("Steps"),
-    PHOTO("Photo"),
+private enum class EditorStep {
+    BASICS,
+    INGREDIENTS,
+    STEPS,
+    PHOTO,
+    ;
+
+    fun label(s: Strings) = when (this) {
+        BASICS -> s.stepBasics
+        INGREDIENTS -> s.stepIngredients
+        STEPS -> s.stepSteps
+        PHOTO -> s.stepPhoto
+    }
 }
 
 // ── Shared styling helpers ────────────────────────────────────────────────────
@@ -286,6 +273,7 @@ fun RecipeEditScreen(
     viewModel: RecipeEditViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
     var currentStep by rememberSaveable { mutableIntStateOf(0) }
     val steps = EditorStep.entries
@@ -314,13 +302,13 @@ fun RecipeEditScreen(
                 // Step 0 has nowhere to go "back" to inside the wizard, so the icon reads
                 // as a close (cancel) rather than a back arrow — steps 1-3 step back instead.
                 if (currentStep == 0) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Cancel")
+                    Icon(Icons.Outlined.Close, contentDescription = s.cancel)
                 } else {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
                 }
             }
             Text(
-                text = if (recipeId == null) "New recipe" else "Edit recipe",
+                text = if (recipeId == null) s.newRecipe else s.editRecipeTitle,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,
@@ -347,7 +335,7 @@ fun RecipeEditScreen(
                             .border(1.5.dp, CookncoNavy, RoundedCornerShape(3.dp)),
                     )
                     Text(
-                        text = step.label.uppercase(),
+                        text = step.label(s).uppercase(),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (index <= currentStep) CookncoNavy else CookncoGreenDark,
@@ -393,7 +381,7 @@ fun RecipeEditScreen(
                     onClick = { currentStep-- },
                 ) {
                     Text(
-                        text = "Back",
+                        text = s.back,
                         color = CookncoNavy,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
@@ -418,7 +406,7 @@ fun RecipeEditScreen(
                     )
                 } else {
                     Text(
-                        text = if (currentStep < steps.lastIndex) "Next: ${steps[currentStep + 1].label.lowercase()}" else "PUBLISH",
+                        text = if (currentStep < steps.lastIndex) s.nextStepLabel(steps[currentStep + 1].label(s).lowercase()) else s.publishCaps,
                         color = CookncoWhite,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
@@ -445,6 +433,7 @@ fun RecipeEditScreen(
 
 @Composable
 private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel, modifier: Modifier = Modifier) {
+    val s = strings()
     var picking by remember { mutableStateOf<RecipeNumber?>(null) }
 
     LazyColumn(
@@ -452,17 +441,17 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         item {
-            StepHeading(title = "The basics", subtitle = "Only the title is required — the rest can wait.")
+            StepHeading(title = s.theBasics, subtitle = s.theBasicsSubtitle)
         }
         item {
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Column {
-                        FieldCaption("TITLE *")
+                        FieldCaption(s.titleRequiredCaps)
                         StickerField(
                             value = uiState.title,
                             onValueChange = viewModel::updateTitle,
-                            placeholder = "Name your recipe",
+                            placeholder = s.nameYourRecipe,
                             singleLine = true,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -470,11 +459,11 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
                         )
                     }
                     Column {
-                        FieldCaption("DESCRIPTION")
+                        FieldCaption(s.descriptionCaps)
                         StickerField(
                             value = uiState.description,
                             onValueChange = viewModel::updateDescription,
-                            placeholder = "A line about the dish",
+                            placeholder = s.aLineAboutTheDish,
                             fontSize = 15.sp,
                             lineHeight = 22.sp,
                             minHeight = 52.dp,
@@ -483,7 +472,7 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
                 }
             }
         }
-        item { SectionLabel("Times & yield") }
+        item { SectionLabel(s.timesAndYield) }
         item {
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -497,7 +486,7 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
                         HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
                     }
                     Text(
-                        text = totalTimeLabel(uiState),
+                        text = totalTimeLabel(uiState, s),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = CookncoGreenDark,
@@ -506,11 +495,15 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
                 }
             }
         }
-        item { SectionLabel("Dish class") }
+        item { SectionLabel(s.dishClass) }
         item {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                dishClasses.forEach { (value, label) ->
-                    DishClassChip(label = label, selected = uiState.dishClass == value, onClick = { viewModel.updateDishClass(value) })
+                dishClasses.forEach { value ->
+                    DishClassChip(
+                        label = s.dishClassName(value),
+                        selected = uiState.dishClass == value,
+                        onClick = { viewModel.updateDishClass(value) },
+                    )
                 }
             }
         }
@@ -521,7 +514,7 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
         NumberPickerSheet(
             number = number,
             value = number.valueOf(uiState),
-            totalLabel = totalTimeLabel(uiState),
+            totalLabel = totalTimeLabel(uiState, s),
             onConfirm = { number.update(viewModel, it); picking = null },
             onDismissRequest = { picking = null },
         )
@@ -534,17 +527,29 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
  * because "5 minutes" is a sensible nudge for a time and a useless one for an oven.
  */
 private enum class RecipeNumber(
-    val title: String,
-    val hint: String,
     val unit: String,
     val step: Int,
     val max: Int,
     val presets: List<Int>,
 ) {
-    YIELD("Yield", "What one batch makes", "pcs", 1, 999, listOf(1, 2, 4, 6, 8, 12)),
-    PREP("Prep time", "Hands-on, before cooking", "min", 5, 1440, listOf(5, 10, 15, 30, 60)),
-    COOK("Cook time", "Drives the cook-mode timer", "min", 5, 1440, listOf(10, 20, 35, 60, 90)),
-    TEMP("Oven temp", "Leave at 0 if no oven", "°C", 10, 300, listOf(150, 180, 200, 220, 240));
+    YIELD("pcs", 1, 999, listOf(1, 2, 4, 6, 8, 12)),
+    PREP("min", 5, 1440, listOf(5, 10, 15, 30, 60)),
+    COOK("min", 5, 1440, listOf(10, 20, 35, 60, 90)),
+    TEMP("°C", 10, 300, listOf(150, 180, 200, 220, 240));
+
+    fun title(s: Strings) = when (this) {
+        YIELD -> s.yieldLabel
+        PREP -> s.prepTime
+        COOK -> s.cookTime
+        TEMP -> s.ovenTemp
+    }
+
+    fun hint(s: Strings) = when (this) {
+        YIELD -> s.yieldHint
+        PREP -> s.prepHint
+        COOK -> s.cookHint
+        TEMP -> s.ovenHint
+    }
 
     fun valueOf(state: RecipeEditUiState): Int = when (this) {
         YIELD -> state.yield
@@ -574,9 +579,9 @@ private enum class RecipeNumber(
     }
 }
 
-private fun totalTimeLabel(state: RecipeEditUiState): String {
+private fun totalTimeLabel(state: RecipeEditUiState, s: Strings): String {
     val total = (state.prepTime.toIntOrNull() ?: 0) + (state.cookTime.toIntOrNull() ?: 0)
-    return if (total > 0) "Total $total min · shown on the recipe card" else "No times yet · the card shows none"
+    return if (total > 0) s.totalMinutes(total) else s.noTimesYet
 }
 
 /** One row of the TIMES & YIELD card: name and hint, then a −/value/+ pill. */
@@ -587,14 +592,15 @@ private fun NumberStepperRow(
     onValueChange: (Int) -> Unit,
     onTypeIt: () -> Unit,
 ) {
+    val s = strings()
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 9.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(number.title, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-            Text(number.hint, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
+            Text(number.title(s), fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            Text(number.hint(s), fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
         }
         Row(
             modifier = Modifier
@@ -675,6 +681,7 @@ private fun NumberPickerSheet(
     onConfirm: (Int) -> Unit,
     onDismissRequest: () -> Unit,
 ) {
+    val s = strings()
     var draft by remember { mutableIntStateOf(value) }
     var typing by remember { mutableStateOf(false) }
 
@@ -687,9 +694,9 @@ private fun NumberPickerSheet(
                 StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), shadowOffset = 6.dp) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)) {
-                            Text(number.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                            Text(number.title(s), fontSize = 19.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
                             Text(
-                                text = number.hint,
+                                text = number.hint(s),
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = CookncoGreenDark,
@@ -823,7 +830,7 @@ private fun NumberPickerSheet(
                         onClick = { onConfirm(draft) },
                     ) {
                         Text(
-                            text = if (draft > 0) "Set ${number.labelFor(draft)}" else "Clear",
+                            text = if (draft > 0) s.setValue(number.labelFor(draft)) else s.clearValue,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = CookncoWhite,
@@ -908,6 +915,7 @@ private fun DishClassChip(label: String, selected: Boolean, onClick: () -> Unit)
  */
 @Composable
 private fun IngredientsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel, modifier: Modifier = Modifier) {
+    val s = strings()
     val searchIndex = uiState.ingredients.indexOfFirst { !it.isResolved }
     LaunchedEffect(searchIndex) { if (searchIndex < 0) viewModel.addIngredient() }
     val search = uiState.ingredients.getOrNull(searchIndex)
@@ -918,7 +926,7 @@ private fun IngredientsStep(uiState: RecipeEditUiState, viewModel: RecipeEditVie
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StepHeading(title = "Ingredients", subtitle = "Pick from the catalogue so amounts scale and lists merge.")
+            StepHeading(title = s.stepIngredients, subtitle = s.ingredientsSubtitle)
         }
 
         if (search != null) {
@@ -942,7 +950,7 @@ private fun IngredientsStep(uiState: RecipeEditUiState, viewModel: RecipeEditVie
 
         item {
             Text(
-                text = "ADDED · ${added.size}",
+                text = s.addedCount(added.size),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,
@@ -954,7 +962,7 @@ private fun IngredientsStep(uiState: RecipeEditUiState, viewModel: RecipeEditVie
         if (added.isEmpty()) {
             item {
                 Text(
-                    text = "Nothing yet — search above to add the first one.",
+                    text = s.nothingYetSearchAbove,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = CookncoNavy.copy(alpha = 0.6f),
@@ -984,6 +992,7 @@ private val EditIngredient.isResolved get() = ingredientId != null || customName
 
 @Composable
 private fun IngredientSearchField(query: String, onQueryChange: (String) -> Unit) {
+    val s = strings()
     StickerCard(
         modifier = Modifier.fillMaxWidth().height(54.dp),
         shape = RoundedCornerShape(16.dp),
@@ -998,7 +1007,7 @@ private fun IngredientSearchField(query: String, onQueryChange: (String) -> Unit
             Box(modifier = Modifier.weight(1f)) {
                 val textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium, color = CookncoNavy)
                 if (query.isEmpty()) {
-                    Text("Search an ingredient", style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.4f)))
+                    Text(s.searchAnIngredient, style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.4f)))
                 }
                 BasicTextField(
                     value = query,
@@ -1024,6 +1033,7 @@ private fun IngredientSearchResults(
     onSelect: (IngredientSummary) -> Unit,
     onSelectCustom: () -> Unit,
 ) {
+    val s = strings()
     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowOffset = 5.dp) {
         Column(modifier = Modifier.fillMaxWidth()) {
             results.forEach { result ->
@@ -1038,7 +1048,7 @@ private fun IngredientSearchResults(
                 ) {
                     IngredientThumb(type = result.type, size = 30.dp, radius = 8.dp)
                     Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy, modifier = Modifier.weight(1f))
-                    Text("catalogue", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
+                    Text(s.catalogue, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
                 }
                 HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
             }
@@ -1052,7 +1062,7 @@ private fun IngredientSearchResults(
             ) {
                 Box(modifier = Modifier.size(30.dp).dashedBorder(CookncoNavy, RoundedCornerShape(8.dp), strokeWidth = 2.dp))
                 Text(
-                    text = "Add \"${query.trim()}\" as custom",
+                    text = s.addAsCustom(query.trim()),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                     color = CookncoNavy,
@@ -1093,6 +1103,7 @@ private fun AddedIngredientCard(
     onComplementChange: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
+    val s = strings()
     val availableUnits = unitsForIngredient(ingredient.allowedTypes, units)
     val showAmount = ingredient.unit != "NONE"
     var unitExpanded by remember { mutableStateOf(false) }
@@ -1119,7 +1130,7 @@ private fun AddedIngredientCard(
                     if (ingredient.complement.isEmpty()) {
                         // Where the recipe says nothing, the catalogue does: the artboard's
                         // "catalogue · grain" is this line with no note written yet.
-                        Text(ingredient.originLabel(), style = noteStyle.copy(color = CookncoGreenDark.copy(alpha = 0.75f)))
+                        Text(ingredient.originLabel(s), style = noteStyle.copy(color = CookncoGreenDark.copy(alpha = 0.75f)))
                     }
                     BasicTextField(
                         value = ingredient.complement,
@@ -1162,9 +1173,9 @@ private fun AddedIngredientCard(
                 expanded = unitExpanded,
                 onDismissRequest = { unitExpanded = false },
                 items = availableUnits,
-                label = { unitFieldLabel(it.name) },
+                label = { s.unitName(it.name) },
                 selected = { it.name == ingredient.unit },
-                sectionOf = { unitSectionLabel(it.type) },
+                sectionOf = { unitSectionLabel(it.type, s) },
                 onSelect = { onUnitChange(it.name); unitExpanded = false },
                 alignEnd = true,
                 width = 196.dp,
@@ -1180,7 +1191,7 @@ private fun AddedIngredientCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Text(unitFieldLabel(ingredient.unit), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                    Text(s.unitName(ingredient.unit), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
                     Text(if (unitExpanded) "\u25b4" else "\u25be", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
                 }
             }
@@ -1191,7 +1202,7 @@ private fun AddedIngredientCard(
             ) {
                 Icon(
                     Icons.Outlined.Delete,
-                    contentDescription = "Remove ${ingredient.ingredientName}",
+                    contentDescription = s.removeNamed(ingredient.ingredientName),
                     tint = CookncoOrangeDark,
                     modifier = Modifier.size(20.dp),
                 )
@@ -1204,6 +1215,7 @@ private fun AddedIngredientCard(
 
 @Composable
 private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel, modifier: Modifier = Modifier) {
+    val s = strings()
     val lazyListState = rememberLazyListState()
     val reorderState = rememberReorderableLazyColumnState(lazyListState) { from, to ->
         val steps = uiState.steps
@@ -1218,7 +1230,7 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            StepHeading(title = "Steps", subtitle = "Drag to reorder. Each step becomes one card in cook mode.")
+            StepHeading(title = s.stepSteps, subtitle = s.stepsSubtitle)
         }
 
         uiState.steps.forEachIndexed { index, step ->
@@ -1254,11 +1266,11 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-                Text("Add step", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                Text(s.addStep, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
             }
         }
         item {
-            SectionLabel("Tips (optional)")
+            SectionLabel(s.tipsOptional)
         }
         item {
             StickerCard(
@@ -1269,7 +1281,7 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
                 StickerTextArea(
                     value = uiState.tips,
                     onValueChange = viewModel::updateTips,
-                    placeholder = "Anything you would tell a friend cooking this for the first time…",
+                    placeholder = s.tipsPlaceholder,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
                 )
@@ -1292,6 +1304,7 @@ private fun StepEditCard(
     onStepChange: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
+    val s = strings()
     StickerCard(
         modifier = Modifier.fillMaxWidth().shadow(elevation, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(18.dp),
@@ -1304,7 +1317,7 @@ private fun StepEditCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "STEP ${index + 1}",
+                    text = s.stepNumber(index + 1),
                     fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = CookncoGreenDark,
@@ -1313,7 +1326,7 @@ private fun StepEditCard(
                 StickerTextArea(
                     value = step.text,
                     onValueChange = onStepChange,
-                    placeholder = "Describe this step…",
+                    placeholder = s.describeThisStep,
                     modifier = Modifier.padding(top = 5.dp),
                 )
             }
@@ -1324,7 +1337,7 @@ private fun StepEditCard(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.DragIndicator,
-                        contentDescription = "Drag to reorder",
+                        contentDescription = s.dragToReorder,
                         tint = CookncoNavy,
                     )
                 }
@@ -1334,7 +1347,7 @@ private fun StepEditCard(
                 ) {
                     Icon(
                         Icons.Outlined.Delete,
-                        contentDescription = "Remove step",
+                        contentDescription = s.removeStep,
                         tint = CookncoOrangeDark,
                     )
                 }
@@ -1353,6 +1366,7 @@ private fun PhotoStep(
     onImagePicked: (PickedImage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val imagePicker = rememberImagePicker(onPicked = onImagePicked)
     val pickedBitmap = pickedImage?.let { picked ->
         remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
@@ -1366,7 +1380,7 @@ private fun PhotoStep(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StepHeading(title = "Photo & publish", subtitle = "One photo of the finished dish. You can change it later.")
+            StepHeading(title = s.photoAndPublish, subtitle = s.photoSubtitle)
         }
         item {
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
@@ -1382,20 +1396,20 @@ private fun PhotoStep(
                         when {
                             pickedBitmap != null -> Image(
                                 bitmap = pickedBitmap,
-                                contentDescription = "Recipe photo",
+                                contentDescription = s.recipePhoto,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
                             )
                             hasExistingPhoto -> RecipeImage(
                                 recipeId = uiState.recipeId!!,
                                 version = uiState.recipeVersion!!,
-                                contentDescription = "Recipe photo",
+                                contentDescription = s.recipePhoto,
                                 thumbnail = false,
                                 modifier = Modifier.fillMaxSize(),
                             )
                             else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Outlined.CameraAlt, contentDescription = null, tint = CookncoNavy.copy(alpha = 0.5f), modifier = Modifier.size(36.dp))
-                                Text("Tap to add a photo", color = CookncoNavy.copy(alpha = 0.6f), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                                Text(s.tapToAddPhoto, color = CookncoNavy.copy(alpha = 0.6f), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
                             }
                         }
                     }
@@ -1407,8 +1421,8 @@ private fun PhotoStep(
                             .padding(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        PhotoActionButton(text = "Take a photo", onClick = { imagePicker.launch() }, modifier = Modifier.weight(1f))
-                        PhotoActionButton(text = "Choose another", onClick = { imagePicker.launch() }, modifier = Modifier.weight(1f))
+                        PhotoActionButton(text = s.takeAPhoto, onClick = { imagePicker.launch() }, modifier = Modifier.weight(1f))
+                        PhotoActionButton(text = s.chooseAnother, onClick = { imagePicker.launch() }, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -1416,7 +1430,7 @@ private fun PhotoStep(
         if (pickedImage != null) {
             item {
                 Text(
-                    text = "Uploaded when you save.",
+                    text = s.uploadedWhenYouSave,
                     color = CookncoNavy.copy(alpha = 0.6f),
                     fontSize = 11.5.sp,
                 )
@@ -1424,7 +1438,7 @@ private fun PhotoStep(
         }
         item {
             Column {
-                SectionLabel("Ready to publish")
+                SectionLabel(s.readyToPublish)
                 PublishChecklist(uiState = uiState)
             }
         }
@@ -1452,26 +1466,27 @@ private fun PhotoActionButton(text: String, onClick: () -> Unit, modifier: Modif
 // nothing new is computed or validated here.
 @Composable
 private fun PublishChecklist(uiState: RecipeEditUiState, modifier: Modifier = Modifier) {
-    val dishClassLabel = dishClasses.firstOrNull { it.first == uiState.dishClass }?.second ?: uiState.dishClass
+    val s = strings()
+    val dishClassLabel = s.dishClassName(uiState.dishClass)
     val ingredientCount = uiState.ingredients.count { it.ingredientId != null || it.customName != null }
     val catalogCount = uiState.ingredients.count { it.ingredientId != null }
     val ingredientsLine = when {
-        ingredientCount == 0 -> "No ingredients yet"
-        catalogCount == ingredientCount -> "$ingredientCount ingredient${if (ingredientCount == 1) "" else "s"}, all from the catalogue"
-        else -> "$ingredientCount ingredient${if (ingredientCount == 1) "" else "s"} added"
+        ingredientCount == 0 -> s.noIngredientsYet
+        catalogCount == ingredientCount -> s.ingredientsAllFromCatalogue(ingredientCount)
+        else -> s.ingredientsAdded(ingredientCount)
     }
     val stepCount = uiState.steps.count { it.text.isNotBlank() }
     val stepsLine = if (uiState.cookTime.isNotBlank()) {
-        "$stepCount step${if (stepCount == 1) "" else "s"} · ${uiState.cookTime} min cook"
+        s.stepsCount(stepCount) + " · " + s.cookMinutes(uiState.cookTime)
     } else {
-        "$stepCount step${if (stepCount == 1) "" else "s"}"
+        s.stepsCount(stepCount)
     }
 
     StickerCard(modifier = modifier.fillMaxWidth(), shadowOffset = 6.dp) {
         Column(modifier = Modifier.fillMaxWidth()) {
             ChecklistRow(
-                title = if (uiState.title.isNotBlank()) "${uiState.title} · ${dishClassLabel.lowercase()}" else "Untitled recipe",
-                trailing = "Basics ✓",
+                title = if (uiState.title.isNotBlank()) "${uiState.title} · ${dishClassLabel.lowercase()}" else s.untitledRecipe,
+                trailing = s.stepBasics + " ✓",
                 showDivider = true,
             )
             ChecklistRow(title = ingredientsLine, trailing = "✓", showDivider = true)

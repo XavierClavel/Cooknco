@@ -467,7 +467,7 @@ private fun MemberEditRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Admin",
+                    text = s.admin,
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Medium,
                     color = CookncoNavy,
