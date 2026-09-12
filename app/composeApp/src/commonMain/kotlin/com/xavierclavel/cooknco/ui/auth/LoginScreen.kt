@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -69,8 +69,12 @@ fun LoginScreen(
                 contentDescription = "Cook'n'Co",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .height(140.dp)
-                    .padding(bottom = 22.dp),
+                    // Sized on its width, not its height: the mark is a wide badge, so
+                    // 140.dp of height left it covering barely half the screen. The cap
+                    // stops it becoming a billboard on a tablet.
+                    .fillMaxWidth(0.78f)
+                    .widthIn(max = 340.dp)
+                    .padding(bottom = 24.dp),
             )
 
             AuthCard {
