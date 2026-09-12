@@ -194,6 +194,20 @@ data class UserSettingsDTO(
     val isAccountPublic: Boolean = false,
 )
 
+/**
+ * One row of a followers/following list (`FollowController.getFollowers`/`getFollows`):
+ * [user] is whichever side of the relationship the endpoint is listing (the follower on
+ * `/followers`, the followed account on `/follows` — see `Follow.toFollowersInfo`/
+ * `toFollowsInfo` server-side), and [pending] is why both screens show requested and
+ * accepted rows together rather than needing a separate pending-only endpoint.
+ */
+@Serializable
+data class FollowInfoDto(
+    val user: UserSummary,
+    val followedSince: Long,
+    val pending: Boolean,
+)
+
 // ------------------------------------------------------------- notifications
 
 /**

@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.network
 
+import com.xavierclavel.cooknco.network.dto.FollowInfoDto
 import com.xavierclavel.cooknco.network.dto.UserDTO
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
@@ -73,6 +74,44 @@ class UserApi(private val client: HttpClient) {
 
     suspend fun unfollow(token: String, userId: Long) {
         val response = client.delete("$base/follow/$userId") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    /** Both pending and accepted followers come back together — see [FollowInfoDto]. */
+    suspend fun getFollowers(token: String?, userId: Long, page: Int, size: Int = 20): List<FollowInfoDto> {
+        val response = client.get("$base/follow/$userId/followers") {
+            if (token != null) bearerAuth(token)
+            parameter("page", page)
+            parameter("size", size)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
+    /** Both requested and accepted follows come back together — see [FollowInfoDto]. */
+    suspend fun getFollows(token: String?, userId: Long, page: Int, size: Int = 20): List<FollowInfoDto> {
+        val response = client.get("$base/follow/$userId/follows") {
+            if (token != null) bearerAuth(token)
+            parameter("page", page)
+            parameter("size", size)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
+    /** Accepts a pending request *from* [followerId] — call while authenticated as the followed account. */
+    suspend fun acceptFollowRequest(token: String, followerId: Long) {
+        val response = client.post("$base/follow/$followerId/request") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    /** Declines a pending request *from* [followerId] — call while authenticated as the followed account. */
+    suspend fun declineFollowRequest(token: String, followerId: Long) {
+        val response = client.delete("$base/follow/$followerId/request") {
             bearerAuth(token)
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())

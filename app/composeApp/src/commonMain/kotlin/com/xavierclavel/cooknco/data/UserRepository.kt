@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.data
 
 import com.xavierclavel.cooknco.network.UserApi
+import com.xavierclavel.cooknco.network.dto.FollowInfoDto
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
@@ -35,6 +36,22 @@ class UserRepository(
 
     suspend fun unfollow(userId: Long): Result<Unit> = runCatching {
         userApi.unfollow(requireToken(), userId)
+    }
+
+    suspend fun getFollowers(userId: Long, page: Int): Result<List<FollowInfoDto>> = runCatching {
+        userApi.getFollowers(token(), userId, page)
+    }
+
+    suspend fun getFollows(userId: Long, page: Int): Result<List<FollowInfoDto>> = runCatching {
+        userApi.getFollows(token(), userId, page)
+    }
+
+    suspend fun acceptFollowRequest(followerId: Long): Result<Unit> = runCatching {
+        userApi.acceptFollowRequest(requireToken(), followerId)
+    }
+
+    suspend fun declineFollowRequest(followerId: Long): Result<Unit> = runCatching {
+        userApi.declineFollowRequest(requireToken(), followerId)
     }
 
     suspend fun getUserRecipes(profileUserId: Long, page: Int): Result<List<RecipeOverview>> = runCatching {
