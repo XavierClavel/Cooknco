@@ -220,6 +220,48 @@ interface Strings {
     val removeMember: String
     val searchAMember: String
 
+    // ── Search ────────────────────────────────────────────────────────────────
+    val searchARecipe: String
+    val searchEllipsis: String
+    val clear: String
+    val everything: String
+    fun noResultsFor(query: String): String
+    val nothingHereYet: String
+    val ingredientsCaps: String
+    val recipesCaps: String
+    val peopleCaps: String
+    val cookbooksCaps: String
+    fun seeAll(count: Int, approximate: Boolean): String
+    val noRecipesYet: String
+    val noUsersYet: String
+    fun recipeCount(count: Int): String
+    fun userCount(count: Int): String
+
+    // ── Profile ───────────────────────────────────────────────────────────────
+    val editProfile: String
+    val shareProfile: String
+    val follow: String
+    fun followersLink(count: Int): String
+    fun followingLink(count: Int): String
+    val followers: String
+    val following: String
+    val profilePhoto: String
+    val changePhoto: String
+    val tapToChangePhoto: String
+    val usernameCaps: String
+    val bioCaps: String
+
+    // ── Update, verification ──────────────────────────────────────────────────
+    val timeToUpdate: String
+    val updateRequiredMessage: String
+    fun latestVersion(version: String): String
+    val updateNow: String
+    val updateAvailable: String
+    val update: String
+    val notNow: String
+    val checkYourEmail: String
+    val backToLogin: String
+
     // ── Cook mode ─────────────────────────────────────────────────────────────
     fun stepOf(step: Int, total: Int): String
     val nextStep: String

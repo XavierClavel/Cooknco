@@ -68,6 +68,7 @@ import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
@@ -102,6 +103,7 @@ fun RecipesScreen(
     onCookbookClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val query by viewModel.query.collectAsState()
     val sort by viewModel.sort.collectAsState()
     val scope by viewModel.scope.collectAsState()
@@ -123,14 +125,14 @@ fun RecipesScreen(
         ) {
             if (onNavigateBack != null) {
                 StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
                 }
             }
             SearchField(
                 query = query,
                 onQueryChange = { viewModel.query.value = it },
                 onClear = { viewModel.query.value = "" },
-                placeholder = if (scope == SearchScope.RECIPES) "Search a recipe…" else "Search…",
+                placeholder = if (scope == SearchScope.RECIPES) s.searchARecipe else s.searchEllipsis,
                 focusRequester = focusRequester,
                 modifier = Modifier.weight(1f),
             )
@@ -200,6 +202,7 @@ private fun SearchField(
     modifier: Modifier = Modifier,
     placeholder: String = "Search a recipe…",
 ) {
+    val s = strings()
     Row(
         modifier = modifier
             .height(54.dp)
@@ -229,7 +232,7 @@ private fun SearchField(
         if (query.isNotEmpty()) {
             Icon(
                 Icons.Outlined.Close,
-                contentDescription = "Clear",
+                contentDescription = s.clear,
                 tint = CookncoNavy,
                 modifier = Modifier.size(16.dp).clickable(onClick = onClear),
             )
@@ -257,6 +260,7 @@ private fun ScopePillsRow(
     onScopeSelected: (SearchScope) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val recipesCount = if (uiState.isLoading && uiState.recipes.isEmpty()) {
         null
     } else {
@@ -348,6 +352,7 @@ private fun SectionHeader(title: String, trailing: String, onSeeAll: () -> Unit)
 
 @Composable
 private fun SearchEmptyState(query: String, browseLabel: String, modifier: Modifier = Modifier) {
+    val s = strings()
     Column(
         modifier = modifier.fillMaxWidth().padding(top = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -355,7 +360,7 @@ private fun SearchEmptyState(query: String, browseLabel: String, modifier: Modif
     ) {
         Text("🔍", fontSize = 48.sp)
         Text(
-            text = if (query.isBlank()) browseLabel else "No results for \"$query\"",
+            text = if (query.isBlank()) browseLabel else s.noResultsFor(query),
             fontWeight = FontWeight.Bold,
             color = CookncoNavy.copy(alpha = 0.6f),
             textAlign = TextAlign.Center,
@@ -376,6 +381,7 @@ private fun AllScopeContent(
     onSeeAll: (SearchScope) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val nothingLoadedYet = uiState.recipes.isEmpty() && usersState.items.isEmpty() &&
         cookbooksState.items.isEmpty() && ingredientsState.items.isEmpty()
     val stillLoading = uiState.isLoading || usersState.isLoading || cookbooksState.isLoading || ingredientsState.isLoading
@@ -392,12 +398,12 @@ private fun AllScopeContent(
             }
         }
         if (nothingLoadedYet && !stillLoading) {
-            item { SearchEmptyState(query = query, browseLabel = "Nothing here yet") }
+            item { SearchEmptyState(query = query, browseLabel = s.nothingHereYet) }
         }
 
         if (ingredientsState.items.isNotEmpty()) {
             item {
-                SectionHeader(title = "INGREDIENTS", trailing = "${ingredientsState.count} →", onSeeAll = { onSeeAll(SearchScope.INGREDIENTS) })
+                SectionHeader(title = s.ingredientsCaps, trailing = "${ingredientsState.count} →", onSeeAll = { onSeeAll(SearchScope.INGREDIENTS) })
             }
             item {
                 FlowRowIngredients(ingredients = ingredientsState.items.take(3))
@@ -406,7 +412,7 @@ private fun AllScopeContent(
 
         if (uiState.recipes.isNotEmpty()) {
             item {
-                SectionHeader(title = "RECIPES", trailing = "See all ${uiState.recipes.size}${if (!uiState.allLoaded) "+" else ""} →", onSeeAll = { onSeeAll(SearchScope.RECIPES) })
+                SectionHeader(title = s.recipesCaps, trailing = s.seeAll(uiState.recipes.size, !uiState.allLoaded), onSeeAll = { onSeeAll(SearchScope.RECIPES) })
             }
             item {
                 StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
@@ -421,7 +427,7 @@ private fun AllScopeContent(
 
         if (usersState.items.isNotEmpty()) {
             item {
-                SectionHeader(title = "PEOPLE", trailing = "${usersState.count} →", onSeeAll = { onSeeAll(SearchScope.USERS) })
+                SectionHeader(title = s.peopleCaps, trailing = "${usersState.count} →", onSeeAll = { onSeeAll(SearchScope.USERS) })
             }
             item {
                 StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
@@ -437,7 +443,7 @@ private fun AllScopeContent(
         if (cookbooksState.items.isNotEmpty()) {
             item {
                 val trailing = "${cookbooksState.count}${if (cookbooksState.items.size >= 20) "+" else ""} →"
-                SectionHeader(title = "COOKBOOKS", trailing = trailing, onSeeAll = { onSeeAll(SearchScope.COOKBOOKS) })
+                SectionHeader(title = s.cookbooksCaps, trailing = trailing, onSeeAll = { onSeeAll(SearchScope.COOKBOOKS) })
             }
             items(cookbooksState.items.take(2), key = { "all-${it.id}" }) { cookbook ->
                 Box(modifier = Modifier.padding(bottom = 10.dp)) {
@@ -468,6 +474,7 @@ private fun RecipesScopeContent(
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val listState = rememberLazyListState()
     val reachedEnd by remember {
         derivedStateOf {
@@ -493,7 +500,7 @@ private fun RecipesScopeContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "${uiState.recipes.size} recipe" + if (uiState.recipes.size == 1) "" else "s",
+                    text = s.recipeCount(uiState.recipes.size),
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = CookncoNavy,
@@ -542,7 +549,7 @@ private fun RecipesScopeContent(
                 ) {
                     Text("🍳", fontSize = 48.sp)
                     Text(
-                        text = if (query.isBlank()) "No recipes yet" else "No results for \"$query\"",
+                        text = if (query.isBlank()) s.noRecipesYet else s.noResultsFor(query),
                         fontWeight = FontWeight.Bold,
                         color = CookncoNavy.copy(alpha = 0.6f),
                         textAlign = TextAlign.Center,
@@ -614,17 +621,18 @@ private fun UsersScopeContent(
     onUserClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
         contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
     ) {
         if (!state.isLoading && state.items.isEmpty()) {
-            item { SearchEmptyState(query = query, browseLabel = "No users yet") }
+            item { SearchEmptyState(query = query, browseLabel = s.noUsersYet) }
         }
         if (state.items.isNotEmpty()) {
             item {
                 Text(
-                    text = "${state.count} user${if (state.count == 1) "" else "s"}",
+                    text = s.userCount(state.count),
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = CookncoNavy,

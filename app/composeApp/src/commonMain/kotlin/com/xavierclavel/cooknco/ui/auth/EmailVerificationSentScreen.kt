@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
@@ -35,6 +36,7 @@ fun EmailVerificationSentScreen(
     onBackToLogin: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     Surface(
         modifier = modifier.fillMaxSize(),
         color = CookncoGreen,
@@ -63,7 +65,7 @@ fun EmailVerificationSentScreen(
                     )
 
                     Text(
-                        text = "Check your email",
+                        text = s.checkYourEmail,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = CookncoNavy,
@@ -80,7 +82,7 @@ fun EmailVerificationSentScreen(
                     Spacer(Modifier.height(4.dp))
 
                     AuthButton(
-                        text = "Back to Login",
+                        text = s.backToLogin,
                         onClick = onBackToLogin,
                         leadingIcon = Icons.Outlined.Login,
                     )

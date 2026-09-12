@@ -55,6 +55,7 @@ import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
@@ -137,6 +138,7 @@ private fun ProfileContent(
     onRecipeClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val gridState = rememberLazyGridState()
     val reachedEnd by remember {
         derivedStateOf {
@@ -168,12 +170,12 @@ private fun ProfileContent(
             ) {
                 if (onNavigateBack != null) {
                     StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
                     }
                 }
                 if (isOwnProfile && onNavigateToSettings != null) {
                     StickerIconButton(onClick = onNavigateToSettings, shadowOffset = 3.dp) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Settings")
+                        Icon(Icons.Outlined.Settings, contentDescription = s.settings)
                     }
                 }
             }
@@ -218,13 +220,13 @@ private fun ProfileContent(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             StatPillButton(
                                 count = user.followersCount,
-                                label = "followers",
+                                label = s.followers,
                                 onClick = onNavigateToFollowers,
                                 modifier = Modifier.weight(1f),
                             )
                             StatPillButton(
                                 count = user.followsCount,
-                                label = "following",
+                                label = s.following,
                                 onClick = onNavigateToFollowing,
                                 modifier = Modifier.weight(1f),
                             )
@@ -250,7 +252,7 @@ private fun ProfileContent(
                         shadowOffset = 4.dp,
                         onClick = onNavigateToEdit,
                     ) {
-                        Text("Edit profile", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
+                        Text(s.editProfile, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
                     }
                     StickerCard(
                         modifier = Modifier.weight(1f).height(48.dp),
@@ -258,7 +260,7 @@ private fun ProfileContent(
                         shadowOffset = 4.dp,
                         onClick = onShare,
                     ) {
-                        Text("Share", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
+                        Text(s.share, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
                     }
                 }
 
@@ -285,7 +287,7 @@ private fun ProfileContent(
                             )
                         } else {
                             Text(
-                                text = if (isFollowing) "Unfollow" else "Follow",
+                                text = if (isFollowing) s.unfollow else s.follow,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
                                 color = if (isFollowing) CookncoNavy else CookncoWhite,
@@ -294,7 +296,7 @@ private fun ProfileContent(
                         }
                     }
                     StickerIconButton(onClick = onShare, size = 52.dp, shape = RoundedCornerShape(14.dp), shadowOffset = 4.dp) {
-                        Icon(Icons.Outlined.Share, contentDescription = "Share profile")
+                        Icon(Icons.Outlined.Share, contentDescription = s.shareProfile)
                     }
                 }
             }
@@ -304,7 +306,7 @@ private fun ProfileContent(
         if (recipes.isEmpty()) {
             item(span = { GridItemSpan(2) }) {
                 Text(
-                    text = "No recipes yet",
+                    text = s.noRecipesYet,
                     color = CookncoNavy.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
                     textAlign = TextAlign.Center,
@@ -320,9 +322,9 @@ private fun ProfileContent(
     if (showUnfollowConfirm) {
         StickerConfirmDialog(
             icon = Icons.Outlined.PersonRemove,
-            title = "Unfollow ${user.username}?",
+            title = s.unfollowQuestion(user.username),
             message = "You'll stop seeing ${user.username}'s recipes in your feed. You can follow them again anytime.",
-            confirmText = "Unfollow",
+            confirmText = s.unfollow,
             isConfirming = isFollowLoading,
             onConfirm = onToggleFollow,
             onDismissRequest = { showUnfollowConfirm = false },

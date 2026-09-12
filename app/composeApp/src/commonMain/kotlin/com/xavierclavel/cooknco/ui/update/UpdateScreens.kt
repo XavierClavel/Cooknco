@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xavierclavel.cooknco.ui.auth.AuthButton
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
@@ -49,6 +50,7 @@ fun UpdateRequiredScreen(
     onOpenStore: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -81,7 +83,7 @@ fun UpdateRequiredScreen(
                     )
 
                     Text(
-                        text = "Time to update",
+                        text = s.timeToUpdate,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = CookncoNavy,
@@ -89,8 +91,7 @@ fun UpdateRequiredScreen(
                     )
 
                     Text(
-                        text = "This version of Cook&Co is no longer supported. " +
-                            "Update to keep cooking — your recipes are waiting for you.",
+                        text = s.updateRequiredMessage,
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                         color = CookncoBackground,
@@ -98,7 +99,7 @@ fun UpdateRequiredScreen(
 
                     if (latestVersion.isNotBlank()) {
                         Text(
-                            text = "Latest version: $latestVersion",
+                            text = s.latestVersion(latestVersion),
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center,
                             color = CookncoBackground,
@@ -112,7 +113,7 @@ fun UpdateRequiredScreen(
                     // missing link.
                     if (onOpenStore != null) {
                         AuthButton(
-                            text = "Update now",
+                            text = s.updateNow,
                             onClick = onOpenStore,
                             leadingIcon = Icons.Outlined.SystemUpdate,
                         )
@@ -135,6 +136,7 @@ fun UpdateAvailableDialog(
     onOpenStore: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
+    val s = strings()
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -144,7 +146,7 @@ fun UpdateAvailableDialog(
                 tint = CookncoOrange,
             )
         },
-        title = { Text("Update available", fontWeight = FontWeight.Bold) },
+        title = { Text(s.updateAvailable, fontWeight = FontWeight.Bold) },
         text = {
             Text(
                 if (latestVersion.isNotBlank()) "Cook&Co $latestVersion is out. Get the newest recipes, fixes and features."
@@ -153,11 +155,11 @@ fun UpdateAvailableDialog(
         },
         confirmButton = {
             if (onOpenStore != null) {
-                TextButton(onClick = { onOpenStore(); onDismiss() }) { Text("Update") }
+                TextButton(onClick = { onOpenStore(); onDismiss() }) { Text(s.update) }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Not now") }
+            TextButton(onClick = onDismiss) { Text(s.notNow) }
         },
     )
 }

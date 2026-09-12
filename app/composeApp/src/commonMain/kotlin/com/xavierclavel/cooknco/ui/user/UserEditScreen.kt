@@ -49,6 +49,7 @@ import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberImagePicker
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
@@ -87,6 +88,7 @@ fun UserEditScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(uiState.saved) {
@@ -101,9 +103,9 @@ fun UserEditScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
             }
-            Text("Edit profile", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, modifier = Modifier.weight(1f))
+            Text(s.editProfile, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, modifier = Modifier.weight(1f))
         }
 
         when {
@@ -134,6 +136,7 @@ private fun UserEditContent(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val user = uiState.user
     val imagePicker = rememberImagePicker(onPicked = onImageSelected)
     val avatarShape = CircleShape
@@ -174,7 +177,7 @@ private fun UserEditContent(
                 if (pickedBitmap != null) {
                     Image(
                         bitmap = pickedBitmap,
-                        contentDescription = "Profile photo",
+                        contentDescription = s.profilePhoto,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -200,7 +203,7 @@ private fun UserEditContent(
             ) {
                 Icon(
                     Icons.Outlined.CameraAlt,
-                    contentDescription = "Change photo",
+                    contentDescription = s.changePhoto,
                     tint = CookncoNavy,
                     modifier = Modifier.size(20.dp),
                 )
@@ -208,7 +211,7 @@ private fun UserEditContent(
         }
 
         Text(
-            text = "Tap to change photo",
+            text = s.tapToChangePhoto,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = CookncoNavy,
@@ -222,7 +225,7 @@ private fun UserEditContent(
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Column {
-                    FieldLabel("USERNAME", modifier = Modifier.padding(bottom = 7.dp))
+                    FieldLabel(s.usernameCaps, modifier = Modifier.padding(bottom = 7.dp))
                     OutlinedTextField(
                         value = uiState.username,
                         onValueChange = onUsernameChange,
@@ -236,7 +239,7 @@ private fun UserEditContent(
                 }
                 Column {
                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp), verticalAlignment = Alignment.Bottom) {
-                        FieldLabel("BIO", modifier = Modifier.weight(1f))
+                        FieldLabel(s.bioCaps, modifier = Modifier.weight(1f))
                         Text("${uiState.bio.length}/255", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
                     }
                     OutlinedTextField(
@@ -275,7 +278,7 @@ private fun UserEditContent(
                 shadowOffset = 4.dp,
                 onClick = onCancel,
             ) {
-                Text("Cancel", color = CookncoNavy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.align(Alignment.Center))
+                Text(s.cancel, color = CookncoNavy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.align(Alignment.Center))
             }
             StickerCard(
                 modifier = Modifier.weight(1f).height(56.dp),
@@ -288,7 +291,7 @@ private fun UserEditContent(
                     CircularProgressIndicator(modifier = Modifier.size(20.dp).align(Alignment.Center), strokeWidth = 2.dp, color = CookncoWhite)
                 } else {
                     Text(
-                        text = "SAVE",
+                        text = s.saveCaps,
                         color = CookncoWhite,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
