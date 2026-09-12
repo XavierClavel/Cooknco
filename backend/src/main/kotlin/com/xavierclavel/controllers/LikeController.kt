@@ -58,7 +58,13 @@ object LikeController: Controller(LIKE_URL) {
         val userId = getSessionUserId()
         val result = likeService.deleteLike(recipeId, userId) ?: return@delete call.respond(HttpStatusCode.BadRequest)
         if (!result) return@delete call.respond(HttpStatusCode.BadRequest)
-        recipeService.tryDelete(recipeId)
+        // Purging is only for a recipe whose owner already asked for deletion and which was
+        // kept alive by what still referenced it. tryDelete does not check the tag itself, so
+        // calling it unconditionally erased a live recipe the moment its last like was taken
+        // back — see the same check in CookncoMcpServer's like_recipe.
+        if (recipeService.getEntityById(recipeId).taggedForDeletion) {
+            recipeService.tryDelete(recipeId)
+        }
         call.respond(HttpStatusCode.OK)
     }
 

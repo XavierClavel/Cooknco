@@ -37,6 +37,20 @@ class LikeControllerTest : ApplicationTest() {
         logger.info { "final check"}
     }
 
+    /**
+     * Taking a like back must leave the recipe standing. `RecipeService.tryDelete` does not
+     * check whether the owner ever asked for the recipe to go, so calling it after every
+     * unlike — which this endpoint used to do — erased a live recipe the moment its last
+     * like was removed, and the screen that had just unliked it 404'd.
+     */
+    @Test
+    fun `deleting a like leaves the recipe alone`() = runTestAsAdmin {
+        val recipe = client.createRecipe()
+        client.createLike(recipe.id)
+        client.deleteLike(recipe.id)
+        assertEquals(0, client.getRecipe(recipe.id).likesCount)
+    }
+
     @Test
     fun `list likes by user`() = runTestAsAdmin {
         val userId = client.getMe().id
