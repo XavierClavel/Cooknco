@@ -83,6 +83,8 @@ fun MainScreen(
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    onNavigateToFollowers: () -> Unit = {},
+    onNavigateToFollowing: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(user.id))
@@ -141,6 +143,8 @@ fun MainScreen(
                 onNavigateToEdit = onNavigateToEditProfile,
                 onNavigateToRecipe = onNavigateToRecipe,
                 onNavigateToSettings = onNavigateToSettings,
+                onNavigateToFollowers = onNavigateToFollowers,
+                onNavigateToFollowing = onNavigateToFollowing,
                 modifier = Modifier.padding(innerPadding),
             )
         }

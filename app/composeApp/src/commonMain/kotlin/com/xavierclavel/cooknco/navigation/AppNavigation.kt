@@ -33,6 +33,10 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbookViewModel
 import com.xavierclavel.cooknco.ui.main.MainScreen
 import com.xavierclavel.cooknco.ui.recipe.CookModeScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditScreen
+import com.xavierclavel.cooknco.ui.user.FollowersScreen
+import com.xavierclavel.cooknco.ui.user.FollowersViewModel
+import com.xavierclavel.cooknco.ui.user.FollowingScreen
+import com.xavierclavel.cooknco.ui.user.FollowingViewModel
 import com.xavierclavel.cooknco.ui.user.UserEditScreen
 import com.xavierclavel.cooknco.ui.user.UserEditViewModel
 import com.xavierclavel.cooknco.ui.user.UserProfileScreen
@@ -60,6 +64,8 @@ private object Routes {
     const val COOKBOOK_CREATE = "cookbook/create"
     const val USER = "user/{userId}"
     const val USER_EDIT = "user/{userId}/edit"
+    const val USER_FOLLOWERS = "user/{userId}/followers"
+    const val USER_FOLLOWING = "user/{userId}/following"
     const val RECIPES = "recipes"
     const val SETTINGS = "settings"
 }
@@ -140,6 +146,8 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 onNavigateToEditProfile = { navController.navigate("user/${user.id}/edit") },
+                onNavigateToFollowers = { navController.navigate("user/${user.id}/followers") },
+                onNavigateToFollowing = { navController.navigate("user/${user.id}/following") },
                 onNavigateToRecipe = { recipeId ->
                     navController.navigate("recipe/$recipeId")
                 },
@@ -335,6 +343,44 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateToEdit = { navController.navigate("user/$userId/edit") },
                 onNavigateToRecipe = { recipeId -> navController.navigate("recipe/$recipeId") },
                 onNavigateToSettings = null,
+                onNavigateToFollowers = { navController.navigate("user/$userId/followers") },
+                onNavigateToFollowing = { navController.navigate("user/$userId/following") },
+            )
+        }
+
+        composable(
+            route = Routes.USER_FOLLOWERS,
+            arguments = listOf(navArgument("userId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.read { getLongOrNull("userId") } ?: return@composable
+            val followersViewModel: FollowersViewModel = viewModel(
+                key = "followers_$userId",
+                factory = FollowersViewModel.factory(userId),
+            )
+            FollowersScreen(
+                viewModel = followersViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToFollowing = {
+                    navController.navigate("user/$userId/following") { launchSingleTop = true }
+                },
+            )
+        }
+
+        composable(
+            route = Routes.USER_FOLLOWING,
+            arguments = listOf(navArgument("userId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.read { getLongOrNull("userId") } ?: return@composable
+            val followingViewModel: FollowingViewModel = viewModel(
+                key = "following_$userId",
+                factory = FollowingViewModel.factory(userId),
+            )
+            FollowingScreen(
+                viewModel = followingViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToFollowers = {
+                    navController.navigate("user/$userId/followers") { launchSingleTop = true }
+                },
             )
         }
 
