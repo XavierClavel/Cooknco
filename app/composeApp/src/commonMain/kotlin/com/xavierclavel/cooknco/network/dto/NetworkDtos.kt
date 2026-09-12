@@ -188,10 +188,44 @@ data class RecipeSearchResult(
     val items: List<RecipeOverview>,
 )
 
+/**
+ * An MCP client this account has approved (`GET /user/mcp-clients` — `shared.infodto.McpClientInfo`).
+ *
+ * [clientName] is whatever the client called itself when it registered, so it is untrusted
+ * text: it is shown next to [redirectUris], the part a client cannot lie about, for the same
+ * reason the consent page does.
+ */
+@Serializable
+data class McpClientInfo(
+    val clientId: String,
+    val clientName: String,
+    val redirectUris: List<String> = emptyList(),
+    val grantedAt: Long,
+    val lastUsedAt: Long,
+)
+
+/** Body of `PUT /user/password` — `shared.dto.PasswordDTO`. */
+@Serializable
+data class PasswordDTO(
+    val old: String,
+    val new: String,
+)
+
 @Serializable
 data class UserSettingsDTO(
     val autoAcceptFollowRequests: Boolean = false,
     val isAccountPublic: Boolean = false,
+    /**
+     * The language the backend writes to this account in ("FR"/"EN"), or null.
+     *
+     * Null on the way out means nothing has ever told it; null on the way *in* means
+     * "leave it alone" — see `shared.dto.UserSettingsDTO`. Both nullable fields here rely
+     * on kotlinx omitting a property that still holds its default, so a save from a screen
+     * that does not know about one of them cannot wipe it.
+     */
+    val locale: String? = null,
+    /** Mails about what the people you follow are up to. Null means "leave it alone". */
+    val mailNotificationsEnabled: Boolean? = null,
 )
 
 /**

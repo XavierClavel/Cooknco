@@ -75,7 +75,7 @@ class RecipeApi(private val client: HttpClient) {
     suspend fun getRecipe(id: Long, token: String? = null): RecipeInfo {
         val response = client.get("$base/recipe/$id") {
             if (token != null) bearerAuth(token)
-            parameter("locale", ApiClient.LOCALE)
+            parameter("locale", ApiClient.locale)
         }
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
@@ -189,18 +189,19 @@ class RecipeApi(private val client: HttpClient) {
         return response.body()
     }
 
+    /** Served as `text/plain` — see [decodeJsonText]. */
     suspend fun searchIngredients(query: String, token: String? = null): IngredientSearchResult {
         val response = client.get("$base/ingredient") {
             if (token != null) bearerAuth(token)
             parameter("query", query)
             parameter("page", 0)
             parameter("size", 20)
-            parameter("locale", ApiClient.LOCALE)
+            parameter("locale", ApiClient.locale)
         }
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
         }
-        return response.body()
+        return response.decodeJsonText()
     }
 
     suspend fun listUnits(): List<UnitInfo> {

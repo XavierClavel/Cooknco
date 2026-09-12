@@ -4,6 +4,7 @@ import com.xavierclavel.cooknco.network.UserApi
 import com.xavierclavel.cooknco.network.dto.FollowInfoDto
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.network.dto.McpClientInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
 import kotlinx.coroutines.flow.first
 
@@ -56,6 +57,18 @@ class UserRepository(
 
     suspend fun getUserRecipes(profileUserId: Long, page: Int): Result<List<RecipeOverview>> = runCatching {
         userApi.getUserRecipes(token(), profileUserId, page)
+    }
+
+    suspend fun getMcpClients(): Result<List<McpClientInfo>> = runCatching {
+        userApi.getMcpClients(requireToken())
+    }
+
+    suspend fun revokeMcpClient(clientId: String): Result<Unit> = runCatching {
+        userApi.revokeMcpClient(requireToken(), clientId)
+    }
+
+    suspend fun updatePassword(old: String, new: String): Result<Unit> = runCatching {
+        userApi.updatePassword(requireToken(), old, new)
     }
 
     suspend fun getSettings(): Result<UserSettingsDTO> = runCatching {

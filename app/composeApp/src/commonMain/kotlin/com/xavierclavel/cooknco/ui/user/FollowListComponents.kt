@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,9 +28,8 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.UserSummary
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
-import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
-import com.xavierclavel.cooknco.ui.theme.StickerPill
+import com.xavierclavel.cooknco.ui.theme.StickerSegmentedControl
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
@@ -47,10 +45,16 @@ fun FollowUserRow(
     user: UserSummary,
     meta: String,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(start = 12.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            // The whole row, not just the avatar or the name: the trailing actions handle
+            // their own taps, so anything that is not one of them opens the account.
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(start = 12.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -109,67 +113,27 @@ fun FollowRowTextAction(text: String, onClick: () -> Unit, modifier: Modifier = 
     }
 }
 
-private enum class FollowTab { FOLLOWERS, FOLLOWING }
-
-/** The "Followers N | Following N" segmented control shared by both list screens. */
+/** The "Followers N | Following N" switch at the top of [FollowListScreen]. */
 @Composable
-private fun FollowTabs(
+fun FollowTabs(
     followersCount: Int,
     followingCount: Int,
     active: FollowTab,
-    onFollowersClick: () -> Unit,
-    onFollowingClick: () -> Unit,
+    onSelect: (FollowTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    StickerPill(
-        modifier = modifier.fillMaxWidth(),
-        height = 54.dp,
-        contentPadding = PaddingValues(3.dp),
-        shadowOffset = 4.dp,
-    ) {
-        FollowTabSegment(
-            label = "Followers $followersCount",
-            selected = active == FollowTab.FOLLOWERS,
-            onClick = onFollowersClick,
-            modifier = Modifier.weight(1f),
-        )
-        FollowTabSegment(
-            label = "Following $followingCount",
-            selected = active == FollowTab.FOLLOWING,
-            onClick = onFollowingClick,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun RowScope.FollowTabSegment(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .clip(RoundedCornerShape(percent = 50))
-            .then(if (selected) Modifier.background(CookncoOrange) else Modifier)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            fontSize = 13.5.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-            color = if (selected) CookncoWhite else CookncoNavy,
-        )
-    }
-}
-
-@Composable
-fun FollowersTabs(followersCount: Int, followingCount: Int, onFollowingClick: () -> Unit, modifier: Modifier = Modifier) {
-    FollowTabs(followersCount, followingCount, FollowTab.FOLLOWERS, onFollowersClick = {}, onFollowingClick = onFollowingClick, modifier = modifier)
-}
-
-@Composable
-fun FollowingTabs(followersCount: Int, followingCount: Int, onFollowersClick: () -> Unit, modifier: Modifier = Modifier) {
-    FollowTabs(followersCount, followingCount, FollowTab.FOLLOWING, onFollowersClick = onFollowersClick, onFollowingClick = {}, modifier = modifier)
+    StickerSegmentedControl(
+        options = FollowTab.entries,
+        selected = active,
+        onSelect = onSelect,
+        label = { tab ->
+            when (tab) {
+                FollowTab.FOLLOWERS -> "Followers $followersCount"
+                FollowTab.FOLLOWING -> "Following $followingCount"
+            }
+        },
+        modifier = modifier,
+    )
 }
 
 /**

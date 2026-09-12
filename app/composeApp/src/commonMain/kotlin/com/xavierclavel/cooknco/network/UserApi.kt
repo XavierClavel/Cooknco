@@ -1,6 +1,8 @@
 package com.xavierclavel.cooknco.network
 
 import com.xavierclavel.cooknco.network.dto.FollowInfoDto
+import com.xavierclavel.cooknco.network.dto.McpClientInfo
+import com.xavierclavel.cooknco.network.dto.PasswordDTO
 import com.xavierclavel.cooknco.network.dto.UserDTO
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
@@ -113,6 +115,33 @@ class UserApi(private val client: HttpClient) {
     suspend fun declineFollowRequest(token: String, followerId: Long) {
         val response = client.delete("$base/follow/$followerId/request") {
             bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    /** The MCP clients this account has approved, newest first. */
+    suspend fun getMcpClients(token: String): List<McpClientInfo> {
+        val response = client.get("$base/user/mcp-clients") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
+    /** Withdraws one. 404 means it was already gone — see `UserController.revokeMcpClient`. */
+    suspend fun revokeMcpClient(token: String, clientId: String) {
+        val response = client.delete("$base/user/mcp-clients/$clientId") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    /** `PUT /user/password` — the backend checks [old] itself and answers 401 if it is wrong. */
+    suspend fun updatePassword(token: String, old: String, new: String) {
+        val response = client.put("$base/user/password") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(PasswordDTO(old = old, new = new))
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }

@@ -146,6 +146,7 @@ class CookbookApi(private val client: HttpClient) {
         return response.body()
     }
 
+    /** Served as `text/plain` — see [decodeJsonText]. */
     suspend fun searchUsers(query: String, token: String? = null): UserSearchResult {
         val response = client.get("$base/user") {
             if (token != null) bearerAuth(token)
@@ -156,7 +157,7 @@ class CookbookApi(private val client: HttpClient) {
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
         }
-        return response.body()
+        return response.decodeJsonText()
     }
 
     /**

@@ -19,6 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.xavierclavel.cooknco.PushNotifications
 import com.xavierclavel.cooknco.di.AppGraph
+import kotlinx.coroutines.flow.first
 import com.xavierclavel.cooknco.ui.auth.AuthState
 import com.xavierclavel.cooknco.ui.auth.AuthViewModel
 import com.xavierclavel.cooknco.platform.EnsureNotificationPermission
@@ -33,10 +34,13 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbookViewModel
 import com.xavierclavel.cooknco.ui.main.MainScreen
 import com.xavierclavel.cooknco.ui.recipe.CookModeScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditScreen
-import com.xavierclavel.cooknco.ui.user.FollowersScreen
-import com.xavierclavel.cooknco.ui.user.FollowersViewModel
-import com.xavierclavel.cooknco.ui.user.FollowingScreen
-import com.xavierclavel.cooknco.ui.user.FollowingViewModel
+import com.xavierclavel.cooknco.ui.user.ChangePasswordScreen
+import com.xavierclavel.cooknco.ui.user.ChangePasswordViewModel
+import com.xavierclavel.cooknco.ui.user.FollowListScreen
+import com.xavierclavel.cooknco.ui.user.FollowListViewModel
+import com.xavierclavel.cooknco.ui.user.McpClientsScreen
+import com.xavierclavel.cooknco.ui.user.McpClientsViewModel
+import com.xavierclavel.cooknco.ui.user.FollowTab
 import com.xavierclavel.cooknco.ui.user.UserEditScreen
 import com.xavierclavel.cooknco.ui.user.UserEditViewModel
 import com.xavierclavel.cooknco.ui.user.UserProfileScreen
@@ -68,6 +72,8 @@ private object Routes {
     const val USER_FOLLOWING = "user/{userId}/following"
     const val RECIPES = "recipes"
     const val SETTINGS = "settings"
+    const val PASSWORD = "settings/password"
+    const val MCP_CLIENTS = "settings/mcp-clients"
 }
 
 @Composable
@@ -348,40 +354,27 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             )
         }
 
-        composable(
-            route = Routes.USER_FOLLOWERS,
-            arguments = listOf(navArgument("userId") { type = NavType.LongType }),
-        ) { backStackEntry ->
-            val userId = backStackEntry.arguments?.read { getLongOrNull("userId") } ?: return@composable
-            val followersViewModel: FollowersViewModel = viewModel(
-                key = "followers_$userId",
-                factory = FollowersViewModel.factory(userId),
-            )
-            FollowersScreen(
-                viewModel = followersViewModel,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToFollowing = {
-                    navController.navigate("user/$userId/following") { launchSingleTop = true }
-                },
-            )
-        }
-
-        composable(
-            route = Routes.USER_FOLLOWING,
-            arguments = listOf(navArgument("userId") { type = NavType.LongType }),
-        ) { backStackEntry ->
-            val userId = backStackEntry.arguments?.read { getLongOrNull("userId") } ?: return@composable
-            val followingViewModel: FollowingViewModel = viewModel(
-                key = "following_$userId",
-                factory = FollowingViewModel.factory(userId),
-            )
-            FollowingScreen(
-                viewModel = followingViewModel,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToFollowers = {
-                    navController.navigate("user/$userId/followers") { launchSingleTop = true }
-                },
-            )
+        // Followers and Following are one screen with a switch (see FollowListScreen), so
+        // both routes land on it and only differ in which tab opens.
+        listOf(
+            Routes.USER_FOLLOWERS to FollowTab.FOLLOWERS,
+            Routes.USER_FOLLOWING to FollowTab.FOLLOWING,
+        ).forEach { (route, initialTab) ->
+            composable(
+                route = route,
+                arguments = listOf(navArgument("userId") { type = NavType.LongType }),
+            ) { backStackEntry ->
+                val userId = backStackEntry.arguments?.read { getLongOrNull("userId") } ?: return@composable
+                val followListViewModel: FollowListViewModel = viewModel(
+                    key = "follow_list_$userId",
+                    factory = FollowListViewModel.factory(userId, initialTab),
+                )
+                FollowListScreen(
+                    viewModel = followListViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToUser = { navController.navigate("user/$it") },
+                )
+            }
         }
 
         composable(
@@ -405,8 +398,26 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             UserSettingsScreen(
                 viewModel = settingsViewModel,
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToPassword = { navController.navigate(Routes.PASSWORD) },
+                onNavigateToMcpClients = { navController.navigate(Routes.MCP_CLIENTS) },
                 onLogout = viewModel::logout,
                 isLoggingOut = isLoggingOut,
+            )
+        }
+
+        composable(Routes.MCP_CLIENTS) {
+            val mcpViewModel: McpClientsViewModel = viewModel(factory = McpClientsViewModel.factory())
+            McpClientsScreen(
+                viewModel = mcpViewModel,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.PASSWORD) {
+            val passwordViewModel: ChangePasswordViewModel = viewModel(factory = ChangePasswordViewModel.factory())
+            ChangePasswordScreen(
+                viewModel = passwordViewModel,
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }
@@ -443,7 +454,11 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
      */
     val signedIn = authState is AuthState.Authenticated
     LaunchedEffect(signedIn) {
-        if (signedIn) AppGraph.pushRepository.registerCurrentDevice()
+        // Skipped when push is switched off for this handset (settings): registration runs
+        // on every launch, so without this it would undo the switch the next morning.
+        if (signedIn && AppGraph.devicePreferences.pushEnabled.first()) {
+            AppGraph.pushRepository.registerCurrentDevice()
+        }
     }
 
     /**
