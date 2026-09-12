@@ -1,7 +1,6 @@
 package com.xavierclavel.cooknco.ui.splash
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -21,14 +19,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import com.xavierclavel.cooknco.resources.Res
-import com.xavierclavel.cooknco.resources.logo
+import com.xavierclavel.cooknco.ui.components.BrandLogo
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import kotlinx.coroutines.delay
-import org.jetbrains.compose.resources.painterResource
 
 /**
  * What is on screen while the stored session is checked.
@@ -58,12 +53,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Image(
-                    painter = painterResource(Res.drawable.logo),
-                    contentDescription = "Cook'n'Co",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxWidth(0.6f).widthIn(max = 280.dp),
-                )
+                BrandLogo(widthFraction = 0.72f, maxWidth = 340.dp)
                 // Faded rather than added: the space it occupies is held from the first
                 // frame, so the logo does not jump off centre when the wait turns out to
                 // be a long one.
