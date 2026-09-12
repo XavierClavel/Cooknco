@@ -67,7 +67,7 @@ fun LoginScreen(
                 contentDescription = "Cook'n'Co",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .height(90.dp)
+                    .height(140.dp)
                     .padding(bottom = 22.dp),
             )
 
