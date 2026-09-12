@@ -41,6 +41,7 @@ import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
+import com.xavierclavel.cooknco.network.dto.displayName
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.i18n.Strings
@@ -201,10 +202,6 @@ private fun IngredientCard(ingredient: IngredientSummary, s: Strings) {
         }
     }
 }
-
-/** The name in the language the app is in, falling back to whatever the catalogue has. */
-private fun IngredientSummary.displayName(): String =
-    name[ApiClient.locale] ?: name["EN"] ?: name.values.firstOrNull() ?: ""
 
 @Composable
 private fun SectionHeading(title: String, trailing: String? = null) {

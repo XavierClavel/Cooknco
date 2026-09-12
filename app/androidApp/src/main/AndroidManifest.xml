@@ -34,6 +34,22 @@
             </intent-filter>
         </activity>
 
+        <!-- Hands a camera app a writable URI for the one file a capture is staged in.
+             A file:// URI has thrown FileUriExposedException since Android 7, which is this
+             app's floor, so there is no version of this that works without a provider.
+             Note what is *not* declared alongside it: android.permission.CAMERA. The
+             capture intent does not need it — the camera app has its own — and declaring it
+             would make the intent require a grant from us as well. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Receives pushes. Also started with the app not running, which is why it sets
              up the object graph itself. -->
         <service

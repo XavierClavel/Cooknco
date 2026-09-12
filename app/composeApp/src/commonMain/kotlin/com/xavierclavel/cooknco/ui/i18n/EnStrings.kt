@@ -329,7 +329,6 @@ object EnStrings : Strings {
     override fun addedCount(count: Int) = "ADDED · $count"
     override val nothingYetSearchAbove = "Nothing yet — search above to add the first one."
     override val searchAnIngredient = "Search an ingredient"
-    override val catalogue = "catalogue"
     override fun addAsCustom(name: String) = "Add \"$name\" as custom"
     override fun removeNamed(name: String) = "Remove $name"
     override val stepsSubtitle = "Drag to reorder. Each step becomes one card in cook mode."
@@ -398,7 +397,24 @@ object EnStrings : Strings {
     override fun setValue(label: String) = "Set $label"
     override val clearValue = "Clear"
     override val custom = "custom"
-    override fun catalogueType(type: String) = "catalogue · ${type.lowercase()}"
+    override fun ingredientTypeName(type: String) = when (type.uppercase()) {
+        "VEGETABLE" -> "vegetable"
+        "FRUIT" -> "fruit"
+        "GRAIN" -> "grain"
+        "NUT" -> "nut"
+        "DAIRY" -> "dairy & eggs"
+        "FISH" -> "fish & seafood"
+        "MEAT" -> "meat"
+        "CONDIMENT" -> "condiment"
+        "OIL" -> "oil"
+        "BAKERY" -> "bakery"
+        "BEVERAGE_INGREDIENT" -> "beverage"
+        "ALCOHOL" -> "alcohol"
+        "MISCELLANEOUS" -> "other"
+        // A type this build predates: the raw name reads better than nothing, and the
+        // catalogue is the backend's to grow.
+        else -> type.lowercase().replace('_', ' ')
+    }
 
     override val measuredIn = "MEASURED IN"
     override fun unitDefault(unit: String) = "$unit · default"

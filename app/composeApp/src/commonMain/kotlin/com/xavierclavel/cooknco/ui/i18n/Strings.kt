@@ -302,7 +302,6 @@ interface Strings {
     fun addedCount(count: Int): String
     val nothingYetSearchAbove: String
     val searchAnIngredient: String
-    val catalogue: String
     fun addAsCustom(name: String): String
     fun removeNamed(name: String): String
     val stepsSubtitle: String
@@ -344,7 +343,7 @@ interface Strings {
     fun setValue(label: String): String
     val clearValue: String
     val custom: String
-    fun catalogueType(type: String): String
+    fun ingredientTypeName(type: String): String
 
     // ── One ingredient ────────────────────────────────────────────────────────
     val measuredIn: String

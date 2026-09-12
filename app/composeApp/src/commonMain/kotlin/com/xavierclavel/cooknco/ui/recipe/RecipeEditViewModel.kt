@@ -12,6 +12,7 @@ import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientSaveDto
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.dto.UnitInfo
+import com.xavierclavel.cooknco.network.dto.displayName
 import com.xavierclavel.cooknco.platform.PickedImage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -198,7 +199,7 @@ class RecipeEditViewModel(
     }
 
     fun selectIngredient(index: Int, summary: IngredientSummary) {
-        val name = summary.name["EN"] ?: summary.name.values.firstOrNull() ?: ""
+        val name = summary.displayName()
         _uiState.update { state ->
             val list = state.ingredients.toMutableList()
             if (index < list.size) {

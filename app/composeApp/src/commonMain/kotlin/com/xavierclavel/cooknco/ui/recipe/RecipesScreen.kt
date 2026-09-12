@@ -66,6 +66,7 @@ import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserSummary
+import com.xavierclavel.cooknco.network.dto.displayName
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
@@ -861,7 +862,7 @@ private fun IngredientsScopeContent(
 /** No detail screen exists for a single ingredient, so this chip is display-only. */
 @Composable
 private fun IngredientChip(ingredient: IngredientSummary, onClick: () -> Unit) {
-    val name = ingredient.name[ApiClient.locale] ?: ingredient.name["EN"] ?: ingredient.name.values.firstOrNull() ?: ""
+    val name = ingredient.displayName()
     StickerPill(height = 44.dp, contentPadding = PaddingValues(start = 6.dp, end = 14.dp), onClick = onClick) {
         Box(
             modifier = Modifier.size(32.dp).clip(CircleShape).background(CookncoGreenLight).border(2.dp, CookncoNavy, CircleShape),

@@ -337,7 +337,6 @@ object FrStrings : Strings {
     override fun addedCount(count: Int) = "AJOUTÉS · $count"
     override val nothingYetSearchAbove = "Rien pour l'instant — cherchez ci-dessus pour ajouter le premier."
     override val searchAnIngredient = "Rechercher un ingrédient"
-    override val catalogue = "catalogue"
     override fun addAsCustom(name: String) = "Ajouter « $name » comme ingrédient libre"
     override fun removeNamed(name: String) = "Retirer $name"
     override val stepsSubtitle = "Glissez pour réordonner. Chaque étape devient une carte en mode cuisine."
@@ -406,7 +405,22 @@ object FrStrings : Strings {
     override fun setValue(label: String) = "Définir $label"
     override val clearValue = "Effacer"
     override val custom = "libre"
-    override fun catalogueType(type: String) = "catalogue · ${type.lowercase()}"
+    override fun ingredientTypeName(type: String) = when (type.uppercase()) {
+        "VEGETABLE" -> "légume"
+        "FRUIT" -> "fruit"
+        "GRAIN" -> "féculent"
+        "NUT" -> "fruit à coque"
+        "DAIRY" -> "crèmerie"
+        "FISH" -> "poisson & fruits de mer"
+        "MEAT" -> "viande"
+        "CONDIMENT" -> "condiment"
+        "OIL" -> "huile"
+        "BAKERY" -> "boulangerie"
+        "BEVERAGE_INGREDIENT" -> "boisson"
+        "ALCOHOL" -> "alcool"
+        "MISCELLANEOUS" -> "divers"
+        else -> type.lowercase().replace('_', ' ')
+    }
 
     override val measuredIn = "MESURÉ EN"
     override fun unitDefault(unit: String) = "$unit · par défaut"

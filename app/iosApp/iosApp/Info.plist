@@ -47,6 +47,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Cook&amp;co needs access to your camera so you can photograph a dish.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Cook&amp;co needs access to your photos so you can set a profile picture.</string>
 </dict>

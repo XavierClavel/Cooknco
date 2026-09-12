@@ -83,7 +83,9 @@ import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.UnitInfo
+import com.xavierclavel.cooknco.network.dto.displayName
 import com.xavierclavel.cooknco.platform.PickedImage
+import com.xavierclavel.cooknco.platform.rememberCameraCapture
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.i18n.Strings
@@ -125,11 +127,17 @@ private fun unitSectionLabel(type: String, s: Strings): String? = when (type) {
     else -> type.lowercase().replaceFirstChar { it.uppercase() }
 }
 
-/** "catalogue · grain" for a catalogue ingredient, "custom" for one the user typed. */
-private fun EditIngredient.originLabel(s: Strings): String = when {
+/**
+ * What the note line says before anything has been written on it.
+ *
+ * It used to name the catalogue — "catalogue", "catalogue · grain" — which told the cook
+ * where the app had looked the ingredient up rather than anything about the ingredient.
+ * What is left is the kind, for the entries that have one, and nothing at all for the rest.
+ */
+private fun EditIngredient.originLabel(s: Strings): String? = when {
     ingredientId == null -> s.custom
-    type.isNotEmpty() -> s.catalogueType(type)
-    else -> s.catalogue
+    type.isNotEmpty() -> s.ingredientTypeName(type)
+    else -> null
 }
 
 private enum class EditorStep {
@@ -824,7 +832,7 @@ private fun NumberPickerSheet(
                         onClick = onDismissRequest,
                     ) {
                         Text(
-                            "Cancel",
+                            s.cancel,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = CookncoNavy,
@@ -1046,7 +1054,7 @@ private fun IngredientSearchResults(
     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowOffset = 5.dp) {
         Column(modifier = Modifier.fillMaxWidth()) {
             results.forEach { result ->
-                val name = result.name["EN"] ?: result.name.values.firstOrNull() ?: ""
+                val name = result.displayName()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1057,7 +1065,6 @@ private fun IngredientSearchResults(
                 ) {
                     IngredientThumb(type = result.type, size = 30.dp, radius = 8.dp)
                     Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy, modifier = Modifier.weight(1f))
-                    Text(s.catalogue, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
                 }
                 HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
             }
@@ -1136,10 +1143,8 @@ private fun AddedIngredientCard(
                 )
                 Box {
                     val noteStyle = TextStyle(fontSize = 11.5.sp, fontWeight = FontWeight.Medium, color = CookncoGreenDark)
-                    if (ingredient.complement.isEmpty()) {
-                        // Where the recipe says nothing, the catalogue does: the artboard's
-                        // "catalogue · grain" is this line with no note written yet.
-                        Text(ingredient.originLabel(s), style = noteStyle.copy(color = CookncoGreenDark.copy(alpha = 0.75f)))
+                    ingredient.originLabel(s)?.takeIf { ingredient.complement.isEmpty() }?.let { origin ->
+                        Text(origin, style = noteStyle.copy(color = CookncoGreenDark.copy(alpha = 0.75f)))
                     }
                     BasicTextField(
                         value = ingredient.complement,
@@ -1377,6 +1382,7 @@ private fun PhotoStep(
 ) {
     val s = strings()
     val imagePicker = rememberImagePicker(onPicked = onImagePicked)
+    val cameraCapture = rememberCameraCapture(onPicked = onImagePicked)
     val pickedBitmap = pickedImage?.let { picked ->
         remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
     }
@@ -1430,7 +1436,7 @@ private fun PhotoStep(
                             .padding(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        PhotoActionButton(text = s.takeAPhoto, onClick = { imagePicker.launch() }, modifier = Modifier.weight(1f))
+                        PhotoActionButton(text = s.takeAPhoto, onClick = { cameraCapture.launch() }, modifier = Modifier.weight(1f))
                         PhotoActionButton(text = s.chooseAnother, onClick = { imagePicker.launch() }, modifier = Modifier.weight(1f))
                     }
                 }

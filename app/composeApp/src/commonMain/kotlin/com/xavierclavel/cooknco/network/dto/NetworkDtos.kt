@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.network.dto
 
+import com.xavierclavel.cooknco.network.ApiClient
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -118,6 +119,21 @@ data class IngredientSummary(
     val allowedTypes: List<String> = emptyList(),
     val defaultUnit: String? = null,
 )
+
+/**
+ * The name in the language the app is in.
+ *
+ * The backend answers with every translation it has, keyed by locale, so which one is
+ * shown is the client's decision — and it was being made three different ways: the
+ * ingredient page asked for the current locale, while the editor's search results and the
+ * row it wrote on picking one both asked for "EN" outright, which is why searching for an
+ * ingredient in French answered in English.
+ *
+ * The fallbacks matter as much as the first choice: a catalogue entry that has not been
+ * translated yet still has to appear under some name, or it reads as an empty row.
+ */
+fun IngredientSummary.displayName(): String =
+    name[ApiClient.locale] ?: name["EN"] ?: name.values.firstOrNull() ?: ""
 
 @Serializable
 data class UnitInfo(
