@@ -1,5 +1,6 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.exceptions.BadRequestCause
 import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.services.DefaultImageService
@@ -10,6 +11,7 @@ import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getStringQueryParam
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.logger
 import com.xavierclavel.utils.receiveImage
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
@@ -82,13 +84,22 @@ object AdminStorageController: Controller("storage") {
     private fun Route.deleteImage() = delete {
         val bucket = getEnumQueryParam<ImageBucket>("bucket") ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
         val filename = getStringQueryParam("file") ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
-        if (!storageService.deleteFile(bucket, filename)) call.respond(HttpStatusCode.NotFound)
-        else call.respond(HttpStatusCode.OK)
+        val adminId = getSessionUserId()
+        if (!storageService.deleteFile(bucket, filename)) {
+            call.respond(HttpStatusCode.NotFound)
+        } else {
+            logger.info { "Image ${bucket.dir}/$filename deleted by admin $adminId" }
+            call.respond(HttpStatusCode.OK)
+        }
     }
 
     /** Sweeps superseded, orphaned or unrecognised files. Accepts `dryRun` to count first. */
     private fun Route.cleanup() = post("/cleanup") {
-        call.respond(storageService.cleanup(call.receive<StorageCleanupDTO>()))
+        val adminId = getSessionUserId()
+        val dto = call.receive<StorageCleanupDTO>()
+        val result = storageService.cleanup(dto)
+        logger.info { "Storage cleanup of ${dto.statuses} run by admin $adminId (dryRun: ${dto.dryRun})" }
+        call.respond(result)
     }
 
     // ---------------------------------------------------------------- defaults
@@ -106,15 +117,22 @@ object AdminStorageController: Controller("storage") {
 
     private fun Route.replaceDefault() = post("/{image}") {
         val image = getEnumPathParam<DefaultImage>("image")
+        val adminId = getSessionUserId()
         val (source, metadata) = receiveImage()
         defaultImageService.replace(image, source, metadata)
+        logger.info { "Default image $image replaced by admin $adminId" }
         call.respond(HttpStatusCode.OK)
     }
 
     /** Removes the uploaded default, putting the one packaged with the app back in service. */
     private fun Route.resetDefault() = delete("/{image}") {
         val image = getEnumPathParam<DefaultImage>("image")
-        if (!defaultImageService.reset(image)) call.respond(HttpStatusCode.NotFound)
-        else call.respond(HttpStatusCode.OK)
+        val adminId = getSessionUserId()
+        if (!defaultImageService.reset(image)) {
+            call.respond(HttpStatusCode.NotFound)
+        } else {
+            logger.info { "Default image $image reset to the packaged one by admin $adminId" }
+            call.respond(HttpStatusCode.OK)
+        }
     }
 }

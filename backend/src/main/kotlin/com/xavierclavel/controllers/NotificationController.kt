@@ -8,6 +8,7 @@ import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getLocale
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getPaging
+import com.xavierclavel.utils.logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -72,15 +73,21 @@ object NotificationController: Controller(NOTIFICATION_URL) {
     }
 
     private fun Route.markRead() = post("/{id}/read") {
-        if (!notificationService.markRead(getSessionUserId(), getPathId())) {
+        val userId = getSessionUserId()
+        val notificationId = getPathId()
+        if (!notificationService.markRead(userId, notificationId)) {
             call.respond(HttpStatusCode.NotFound)
         } else {
+            logger.info { "Notification $notificationId marked read by user $userId" }
             call.respond(HttpStatusCode.OK)
         }
     }
 
     private fun Route.markAllRead() = post("/read") {
-        call.respond(HttpStatusCode.OK, notificationService.markAllRead(getSessionUserId()))
+        val userId = getSessionUserId()
+        val marked = notificationService.markAllRead(userId)
+        logger.info { "All notifications marked read by user $userId ($marked)" }
+        call.respond(HttpStatusCode.OK, marked)
     }
 
     /**
@@ -92,9 +99,12 @@ object NotificationController: Controller(NOTIFICATION_URL) {
      * their list.
      */
     private fun Route.clearNotification() = delete("/{id}") {
-        if (!notificationService.clear(getSessionUserId(), getPathId())) {
+        val userId = getSessionUserId()
+        val notificationId = getPathId()
+        if (!notificationService.clear(userId, notificationId)) {
             call.respond(HttpStatusCode.NotFound)
         } else {
+            logger.info { "Notification $notificationId cleared by user $userId" }
             call.respond(HttpStatusCode.OK)
         }
     }
@@ -107,7 +117,10 @@ object NotificationController: Controller(NOTIFICATION_URL) {
      * action offered next to this one.
      */
     private fun Route.clearAll() = delete {
-        call.respond(HttpStatusCode.OK, notificationService.clearAll(getSessionUserId()))
+        val userId = getSessionUserId()
+        val cleared = notificationService.clearAll(userId)
+        logger.info { "All notifications cleared by user $userId ($cleared)" }
+        call.respond(HttpStatusCode.OK, cleared)
     }
 
     /**
@@ -119,7 +132,13 @@ object NotificationController: Controller(NOTIFICATION_URL) {
      * website in French should get each notification in the language it will be read in.
      */
     private fun Route.registerDevice() = post {
-        deviceService.register(getSessionUserId(), call.receive<DeviceRegistrationDTO>(), getLocale())
+        val userId = getSessionUserId()
+        val registration = call.receive<DeviceRegistrationDTO>()
+        deviceService.register(userId, registration, getLocale())
+        logger.info {
+            "Device registered for user $userId " +
+                "(${registration.platform}, app ${registration.appVersion.ifBlank { "unknown" }})"
+        }
         call.respond(HttpStatusCode.Created)
     }
 
@@ -131,10 +150,12 @@ object NotificationController: Controller(NOTIFICATION_URL) {
      * between here and the client.
      */
     private fun Route.unregisterDevice() = post("/unregister") {
+        val userId = getSessionUserId()
         val token = call.receive<DeviceRegistrationDTO>().token
-        if (!deviceService.unregister(getSessionUserId(), token)) {
+        if (!deviceService.unregister(userId, token)) {
             call.respond(HttpStatusCode.NotFound)
         } else {
+            logger.info { "Device unregistered for user $userId" }
             call.respond(HttpStatusCode.OK)
         }
     }

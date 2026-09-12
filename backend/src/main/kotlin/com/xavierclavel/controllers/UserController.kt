@@ -11,6 +11,7 @@ import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getQuery
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.logger
 import shared.dto.PasswordDTO
 import shared.dto.SearchResult
 import shared.dto.UserDTO
@@ -77,6 +78,7 @@ object UserController: Controller(USER_URL) {
         val id = getSessionUserId()
         val userDTO = call.receive<UserDTO>()
         val response = userService.editUser(id, userDTO)
+        logger.info { "User $id (${response.username}) edited their profile" }
         call.respond(response)
     }
 
@@ -85,6 +87,7 @@ object UserController: Controller(USER_URL) {
         val user = userService.getUser(id)
         userService.deleteUserById(user.id)
         imageService.deleteImage(USERS_IMG_PATH, user.id, user.version)
+        logger.info { "User ${user.id} (${user.username}) deleted their account" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -96,6 +99,7 @@ object UserController: Controller(USER_URL) {
         }
         userService.updatePassword(id, passwordDTO.new)
         call.sessions.clear<UserSession>()
+        logger.info { "User $id changed their password" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -105,14 +109,19 @@ object UserController: Controller(USER_URL) {
 
     private fun Route.updateSettings() = put("/settings") {
         val settingsDTO = call.receive<UserSettingsDTO>()
-        userService.updateSettings(getSessionUserId(), settingsDTO)
+        val id = getSessionUserId()
+        userService.updateSettings(id, settingsDTO)
+        logger.info { "User $id updated their settings" }
         call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.setRole() = put("/{id}/role/{role}") {
         val role = UserRole.valueOf(call.parameters["role"]!!)
         val id = getPathId()
-        call.respond(userService.setRole(id, role))
+        val adminId = getSessionUserId()
+        val user = userService.setRole(id, role)
+        logger.info { "User $id given role $role by admin $adminId" }
+        call.respond(user)
     }
 
 

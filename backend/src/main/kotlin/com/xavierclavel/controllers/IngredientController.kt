@@ -1,5 +1,6 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getLocale
@@ -66,28 +67,37 @@ object IngredientController: Controller(INGREDIENT_URL) {
     }
 
     private fun Route.createIngredient() = post {
+        val adminId = getSessionUserId()
         val ingredientDTO = call.receive<IngredientDTO>()
-        call.respond(HttpStatusCode.Created, ingredientService.createIngredient(ingredientDTO))
+        val ingredient = ingredientService.createIngredient(ingredientDTO)
+        logger.info { "Ingredient ${ingredient.id} created by admin $adminId" }
+        call.respond(HttpStatusCode.Created, ingredient)
     }
 
     private fun Route.createIngredientsBatch() = post("/batch") {
+        val adminId = getSessionUserId()
         val ingredientsDTO = call.receive<List<IngredientDTO>>()
         for (ingredient in ingredientsDTO) {
             ingredientService.createIngredient(ingredient)
         }
+        logger.info { "${ingredientsDTO.size} ingredient(s) created in one batch by admin $adminId" }
         call.respond(HttpStatusCode.Created)
     }
 
     private fun Route.updateIngredient() = put("/{id}") {
         val id = getPathId()
+        val adminId = getSessionUserId()
         val ingredientDTO = call.receive<IngredientDTO>()
         val ingredient = ingredientService.updateIngredient(id, ingredientDTO)
+        logger.info { "Ingredient $id edited by admin $adminId" }
         call.respond(ingredient)
     }
 
     private fun Route.deleteIngredient() = delete("/{id}") {
         val id = getPathId()
+        val adminId = getSessionUserId()
         val result = ingredientService.deleteById(id)
+        if (result) logger.info { "Ingredient $id deleted by admin $adminId" }
         return@delete if (result) call.respond(HttpStatusCode.OK)
             else call.respond(HttpStatusCode.NotFound)
     }

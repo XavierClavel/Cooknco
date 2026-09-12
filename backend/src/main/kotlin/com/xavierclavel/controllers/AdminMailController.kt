@@ -1,9 +1,11 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.EmailTemplateService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getEnumPathParam
 import com.xavierclavel.utils.getPathVariable
+import com.xavierclavel.utils.logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -51,33 +53,49 @@ object AdminMailController: Controller("mails") {
 
     /** Adds a kind of the operator's own. Inert until backend code emits a mail under its key. */
     private fun Route.addTemplate() = post {
+        val adminId = getSessionUserId()
         val key = call.receive<EmailTemplateKeyDTO>().key.trim().lowercase()
-        call.respond(HttpStatusCode.Created, emailTemplateService.create(key))
+        val created = emailTemplateService.create(key)
+        logger.info { "Mail template '$key' added by admin $adminId" }
+        call.respond(HttpStatusCode.Created, created)
     }
 
     private fun Route.saveTemplate() = put("/{key}/{locale}") {
-        call.respond(
-            emailTemplateService.save(
-                key = key(),
-                locale = getEnumPathParam<Locale>("locale"),
-                dto = call.receive<EmailTemplateDTO>(),
-            )
+        val templateKey = key()
+        val locale = getEnumPathParam<Locale>("locale")
+        val adminId = getSessionUserId()
+        val saved = emailTemplateService.save(
+            key = templateKey,
+            locale = locale,
+            dto = call.receive<EmailTemplateDTO>(),
         )
+        logger.info { "Mail template '$templateKey' ($locale) saved by admin $adminId" }
+        call.respond(saved)
     }
 
     /** Drops the saved wording for one locale, putting the packaged one back in service. */
     private fun Route.restoreTemplate() = delete("/{key}/{locale}") {
-        if (!emailTemplateService.restore(key(), getEnumPathParam<Locale>("locale"))) {
+        val templateKey = key()
+        val locale = getEnumPathParam<Locale>("locale")
+        val adminId = getSessionUserId()
+        if (!emailTemplateService.restore(templateKey, locale)) {
             call.respond(HttpStatusCode.NotFound)
         } else {
-            call.respond(emailTemplateService.describe(key()))
+            logger.info { "Mail template '$templateKey' ($locale) restored to the packaged wording by admin $adminId" }
+            call.respond(emailTemplateService.describe(templateKey))
         }
     }
 
     /** Removes a kind an operator added, in every locale. Built-in kinds are refused. */
     private fun Route.deleteTemplate() = delete("/{key}") {
-        if (!emailTemplateService.delete(key())) call.respond(HttpStatusCode.NotFound)
-        else call.respond(HttpStatusCode.OK)
+        val templateKey = key()
+        val adminId = getSessionUserId()
+        if (!emailTemplateService.delete(templateKey)) {
+            call.respond(HttpStatusCode.NotFound)
+        } else {
+            logger.info { "Mail template '$templateKey' deleted by admin $adminId" }
+            call.respond(HttpStatusCode.OK)
+        }
     }
 
     /**
@@ -97,7 +115,11 @@ object AdminMailController: Controller("mails") {
      * the recipient's inbox can say it arrived.
      */
     private fun Route.sendTestMail() = post("/{key}/test") {
-        emailTemplateService.requestTest(key(), call.receive<EmailTestDTO>())
+        val templateKey = key()
+        val adminId = getSessionUserId()
+        val dto = call.receive<EmailTestDTO>()
+        emailTemplateService.requestTest(templateKey, dto)
+        logger.info { "Test mail '$templateKey' (${dto.locale}) queued to ${dto.recipient} by admin $adminId" }
         call.respond(HttpStatusCode.Accepted)
     }
 

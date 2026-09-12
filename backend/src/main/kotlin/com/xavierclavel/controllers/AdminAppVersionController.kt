@@ -1,9 +1,11 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.AppVersionService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getEnumPathParam
 import com.xavierclavel.utils.getStringQueryParam
+import com.xavierclavel.utils.logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -57,20 +59,25 @@ object AdminAppVersionController: Controller("app-versions") {
     }
 
     private fun Route.saveGate() = put("/{platform}") {
-        call.respond(
-            appVersionService.save(
-                platform = getEnumPathParam<AppPlatform>("platform"),
-                dto = call.receive<AppVersionDTO>(),
-            )
-        )
+        val platform = getEnumPathParam<AppPlatform>("platform")
+        val adminId = getSessionUserId()
+        val dto = call.receive<AppVersionDTO>()
+        val saved = appVersionService.save(platform = platform, dto = dto)
+        logger.info {
+            "$platform version gate set by admin $adminId to a minimum of ${dto.minimumVersion} " +
+                "(latest ${dto.latestVersion})"
+        }
+        call.respond(saved)
     }
 
     /** Removes the gate, which puts every build of that platform back in service. */
     private fun Route.clearGate() = delete("/{platform}") {
         val platform = getEnumPathParam<AppPlatform>("platform")
+        val adminId = getSessionUserId()
         if (!appVersionService.clear(platform)) {
             call.respond(HttpStatusCode.NotFound)
         } else {
+            logger.info { "$platform version gate cleared by admin $adminId: every build is back in service" }
             call.respond(appVersionService.describe(platform))
         }
     }

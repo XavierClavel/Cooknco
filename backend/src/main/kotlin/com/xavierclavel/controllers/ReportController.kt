@@ -3,6 +3,7 @@ package com.xavierclavel.controllers
 import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.ModerationService
 import com.xavierclavel.utils.Controller
+import com.xavierclavel.utils.logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -28,6 +29,9 @@ object ReportController: Controller(REPORT_URL) {
 
     private fun Route.createReport() = post {
         val reportDTO = call.receive<ReportDTO>()
-        call.respond(HttpStatusCode.Created, moderationService.createReport(getSessionUserId(), reportDTO))
+        val userId = getSessionUserId()
+        val report = moderationService.createReport(userId, reportDTO)
+        logger.info { "${reportDTO.targetType} ${reportDTO.targetId} reported by user $userId (${reportDTO.reason})" }
+        call.respond(HttpStatusCode.Created, report)
     }
 }

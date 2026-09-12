@@ -1,9 +1,11 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.logging.LogBuffer
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getStringQueryParam
+import com.xavierclavel.utils.logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -78,7 +80,9 @@ object AdminLogController: Controller("logs") {
 
     /** Empties the buffer, so an operator can watch a reproduction from a clean slate. */
     private fun Route.clearLogs() = delete {
+        val adminId = getSessionUserId()
         LogBuffer.clear()
+        logger.info { "Log buffer cleared by admin $adminId" }
         call.respond(HttpStatusCode.OK)
     }
 

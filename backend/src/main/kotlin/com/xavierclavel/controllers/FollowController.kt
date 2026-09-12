@@ -9,6 +9,7 @@ import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getIdPathVariable
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getPathId
+import com.xavierclavel.utils.logger
 import shared.utils.URL.FOLLOW_URL
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
@@ -38,18 +39,22 @@ object FollowController: Controller(FOLLOW_URL) {
     private fun Route.follow() = post("/{id}") {
         val (userId,followerId) = handleFollowRequest()
         if (followService.isFollowing(userId, followerId)) throw BadRequestException(BadRequestCause.USER_ALREADY_FOLLOWED)
-        call.respond(HttpStatusCode.Created, followService.createFollow(userId, followerId))
+        val follow = followService.createFollow(userId, followerId)
+        logger.info { "User $followerId now follows user $userId" }
+        call.respond(HttpStatusCode.Created, follow)
     }
 
     private fun Route.acceptFollow() = post("/{id}/request") {
         val (followerId,userId) = handleFollowRequest()
         followService.acceptFollowRequest(userId, followerId)
+        logger.info { "User $userId accepted the follow request from user $followerId" }
         call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.declineFollow() = delete("/{id}/request") {
         val (followerId,userId) = handleFollowRequest()
         followService.deleteFollow(userId, followerId)
+        logger.info { "User $userId declined the follow request from user $followerId" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -58,6 +63,7 @@ object FollowController: Controller(FOLLOW_URL) {
         if (!followService.isFollowing(userId, followerId)) throw BadRequestException(BadRequestCause.USER_NOT_FOLLOWED)
         val result = followService.deleteFollow(userId, followerId)
         if (!result) return@delete call.respond(HttpStatusCode.InternalServerError)
+        logger.info { "User $followerId no longer follows user $userId" }
         call.respond(HttpStatusCode.OK)
     }
 

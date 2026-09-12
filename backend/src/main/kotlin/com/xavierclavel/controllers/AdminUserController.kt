@@ -13,6 +13,7 @@ import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getStringQueryParam
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -65,37 +66,57 @@ object AdminUserController: Controller("users") {
     private fun Route.setRole() = put("/{id}/role/{role}") {
         val role = enumValueOfIgnoreCase<UserRole>(call.parameters["role"] ?: "")
         val id = getPathId()
+        val adminId = getSessionUserId()
         // Losing the last admin would lock the backoffice for everyone
         if (role != UserRole.ADMIN && userService.countAdmins() <= 1 && userService.getEntityById(id).role == UserRole.ADMIN) {
             throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_DEMOTE_LAST_ADMIN)
         }
         userService.setRole(id, role)
+        logger.info { "User $id given role $role by admin $adminId" }
         call.respond(adminService.getUser(id))
     }
 
     private fun Route.suspendUser() = post("/{id}/suspend") {
+        val id = getPathId()
+        val adminId = getSessionUserId()
         val dto = call.receive<SuspensionDTO>()
-        call.respond(moderationService.suspendUser(getPathId(), dto.days, dto.reason))
+        val user = moderationService.suspendUser(id, dto.days, dto.reason)
+        logger.info { "User $id suspended for ${dto.days} day(s) by admin $adminId (reason: ${dto.reason})" }
+        call.respond(user)
     }
 
     private fun Route.banUser() = post("/{id}/ban") {
+        val id = getPathId()
+        val adminId = getSessionUserId()
         val dto = call.receive<ModerationReasonDTO>()
-        call.respond(moderationService.banUser(getPathId(), dto.reason))
+        val user = moderationService.banUser(id, dto.reason)
+        logger.info { "User $id banned by admin $adminId (reason: ${dto.reason})" }
+        call.respond(user)
     }
 
     private fun Route.reinstateUser() = post("/{id}/reinstate") {
-        call.respond(moderationService.reinstateUser(getPathId()))
+        val id = getPathId()
+        val adminId = getSessionUserId()
+        val user = moderationService.reinstateUser(id)
+        logger.info { "User $id reinstated by admin $adminId" }
+        call.respond(user)
     }
 
     private fun Route.verifyUser() = post("/{id}/verify") {
-        call.respond(moderationService.verifyUser(getPathId()))
+        val id = getPathId()
+        val adminId = getSessionUserId()
+        val user = moderationService.verifyUser(id)
+        logger.info { "User $id verified by admin $adminId" }
+        call.respond(user)
     }
 
     private fun Route.deleteUser() = delete("/{id}") {
         val id = getPathId()
         // Deleting yourself here would leave the caller holding a dead session
-        if (id == getSessionUserId()) throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_MODERATE_ADMIN)
+        val adminId = getSessionUserId()
+        if (id == adminId) throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_MODERATE_ADMIN)
         moderationService.deleteUser(id)
+        logger.info { "User $id deleted by admin $adminId" }
         call.respond(HttpStatusCode.OK)
     }
 }

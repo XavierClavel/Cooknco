@@ -109,6 +109,7 @@ object AuthController: Controller(AUTH_URL) {
         reportedLocale()?.let { userService.adoptLocale(entity, it) }
         val sessionId = createSession(entity.toInfo())
         call.sessions.set(UserSession(sessionId))
+        logger.info { "User ${entity.id} (${entity.username}) signed in" }
         call.respond(SessionDto(sessionId))
     }
 
@@ -178,8 +179,12 @@ object AuthController: Controller(AUTH_URL) {
             // Same reporting as a password sign-in: a returning account with no language
             // takes the one its client came in with
             reported?.let { userService.adoptLocale(user, it) }
-            val sessionId = createSession(user.toInfo())
+            // Bound to a val: `user` is reassigned further down, so it does not smart-cast
+            // inside the logging lambda.
+            val account = user
+            val sessionId = createSession(account.toInfo())
             call.sessions.set(UserSession(sessionId))
+            logger.info { "User ${account.id} (${account.username}) signed in through Google Oauth" }
             return sessionId
         }
         if (userService.findEntityByMail(response.email) != null) {
@@ -212,6 +217,7 @@ object AuthController: Controller(AUTH_URL) {
     }
 
     private fun Route.logout() = post("/logout") {
+        val userId = getOptionalSessionId()
         val bearerToken = call.getBearerToken()
         if (bearerToken != null) {
             redisService.deleteSession(bearerToken)
@@ -221,14 +227,14 @@ object AuthController: Controller(AUTH_URL) {
             redisService.deleteSession(session.sessionId)
             call.sessions.clear<UserSession>()
         }
+        logger.info { "User ${userId ?: "unknown"} signed out" }
         call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.verifyUser() = post("/verify") {
         val token = call.queryParameters["token"] ?: throw BadRequestException(BadRequestCause.TOKEN_MISSING)
-        logger.info {"'$token'"}
         val user = userService.verifyUser(token)
-        logger.info {"Account verified : ${user.username}"}
+        logger.info { "Account verified : ${user.username}" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -248,7 +254,6 @@ object AuthController: Controller(AUTH_URL) {
     private fun Route.signup() = post("/signup") {
         val userDTO = call.receive(UserDTO::class)
         userDTO.username = userDTO.username.trim()
-        logger.info {userDTO}
         if (userService.existsByUsername(userDTO.username)) throw BadRequestException(BadRequestCause.USERNAME_ALREADY_USED)
         if (userService.existsByMail(userDTO.mail)) throw BadRequestException(BadRequestCause.MAIL_ALREADY_USED)
 
@@ -262,6 +267,7 @@ object AuthController: Controller(AUTH_URL) {
         val mail = call.parameters["mail"] ?: throw BadRequestException(BadRequestCause.MAIL_MISSING)
         try {
             val token = userService.requestPasswordReset(mail)
+            logger.info { "A password reset was requested for $mail" }
             call.respond(HttpStatusCode.OK)
         } catch (e: NotFoundException) {
             call.respond(HttpStatusCode.OK)
@@ -276,6 +282,7 @@ object AuthController: Controller(AUTH_URL) {
         val token = call.parameters["token"] ?: throw UnauthorizedException(UnauthorizedCause.INVALID_TOKEN)
         val password = call.queryParameters["password"] ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
         userService.resetPassword(token, password)
+        logger.info { "A password was reset through a reset token" }
         call.respond(HttpStatusCode.OK)
     }
 

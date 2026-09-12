@@ -527,10 +527,12 @@ object CookncoMcpServer {
         val changed = when {
             liked && !alreadyLiked -> {
                 likeService.createLike(recipeId, userId)
+                logger.info { "Recipe $recipeId liked by user $userId over MCP" }
                 true
             }
             !liked && alreadyLiked -> {
                 likeService.deleteLike(recipeId, userId)
+                logger.info { "Like on recipe $recipeId taken back by user $userId over MCP" }
                 // Purging is only for a recipe whose owner asked for deletion and which was kept
                 // alive by what still referenced it. The tag has to be checked here because
                 // tryDelete does not check it itself, so calling it unconditionally — as
@@ -587,6 +589,7 @@ object CookncoMcpServer {
             throw ForbiddenException(ForbiddenCause.NOT_MEMBER_OF_COOKBOOK)
         }
         cookbookService.addRecipeToCookbook(cookbookId, recipeId, userId)
+        logger.info { "Recipe $recipeId added to cookbook $cookbookId by user $userId over MCP" }
         return payload.encodeToString(
             CookbookAdditionResult(
                 cookbook = cookbookService.getCookbook(cookbookId, userId),

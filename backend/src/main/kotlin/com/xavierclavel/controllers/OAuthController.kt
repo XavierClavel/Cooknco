@@ -321,8 +321,10 @@ object OAuthController : Controller(OAUTH_URL) {
                     "grant_type must be authorization_code or refresh_token, got ${grantType ?: "nothing"}",
                 )
             }
-            // No-store, because this response is the credential itself.
+            // No-store, because this response is the credential itself. Nothing it carries is
+            // logged either, for the same reason: only who asked for it and under which grant.
             call.response.headers.append("Cache-Control", "no-store")
+            logger.info { "Issued MCP tokens to client ${form["client_id"]} (grant: ${form["grant_type"]})" }
             respondOAuth(
                 HttpStatusCode.OK,
                 TokenResponse(
@@ -334,6 +336,7 @@ object OAuthController : Controller(OAUTH_URL) {
             )
         } catch (e: InvalidTokenRequest) {
             val status = if (e.error == "unsupported_grant_type") HttpStatusCode.BadRequest else HttpStatusCode.BadRequest
+            logger.info { "Refused a token request from client ${form["client_id"]}: ${e.error}" }
             respondOAuth(status, OAuthError(e.error, e.description))
         }
     }

@@ -4,6 +4,7 @@ import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.NotificationService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getEnumQueryParam
+import com.xavierclavel.utils.logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -61,7 +62,12 @@ object AdminNotificationController: Controller("notifications") {
      * asks for one, so the caller has to have sent a body that says so.
      */
     private fun Route.sendAnnouncement() = post("/announce") {
-        call.respond(HttpStatusCode.Accepted, notificationService.announce(call.receive<AnnouncementDTO>()))
+        val adminId = getSessionUserId()
+        val dto = call.receive<AnnouncementDTO>()
+        val sent = notificationService.announce(dto)
+        val audience = if (dto.userIds.isEmpty()) "everybody" else "${dto.userIds.size} user(s)"
+        logger.info { "Announcement '${dto.title}' sent to $audience by admin $adminId" }
+        call.respond(HttpStatusCode.Accepted, sent)
     }
 
     /**
@@ -72,6 +78,9 @@ object AdminNotificationController: Controller("notifications") {
      * no audience preview.
      */
     private fun Route.sendTest() = post("/test") {
-        call.respond(notificationService.sendTest(getSessionUserId(), call.receive<NotificationTestDTO>()))
+        val adminId = getSessionUserId()
+        val sent = notificationService.sendTest(adminId, call.receive<NotificationTestDTO>())
+        logger.info { "Test notification sent by admin $adminId to their own devices" }
+        call.respond(sent)
     }
 }

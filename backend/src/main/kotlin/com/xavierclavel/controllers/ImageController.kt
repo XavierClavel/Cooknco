@@ -99,9 +99,11 @@ object ImageController: Controller(IMAGE_URL) {
 
     private fun Route.uploadRecipeImage() = post("/recipes/{id}") {
         val id = getPathId()
+        val actorId = getSessionUserId()
         checkRecipeEditionRights(recipeService.getRecipeOwner(id).id)
         val (image, metadata) = receiveImage()
         saveRecipeImage(id, image, metadata)
+        logger.info { "Recipe $id was given a picture by user $actorId" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -142,49 +144,59 @@ object ImageController: Controller(IMAGE_URL) {
 
     private fun Route.uploadCookbookImage() = post("/cookbooks/{id}") {
         val id = getPathId()
+        val actorId = getSessionUserId()
         val (image, metadata) = receiveImage()
         val cookbook = cookbookService.getEntityById(id)
         imageService.saveImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion + 1, ImageBucket.COOKBOOK.size, image, metadata)
         cookbook.increaseVersion()
         imageService.deleteImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion - 1)
+        logger.info { "Cookbook $id was given a picture by user $actorId" }
         call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.uploadUserIcon() = post("/users/{id}") {
         val id = getPathId()
+        val actorId = getSessionUserId()
         checkUserEditionRights(id)
         val (image, metadata) = receiveImage()
         val user = userService.getEntityById(id)
         imageService.saveImage(USERS_IMG_PATH, id, user.imageVersion + 1, ImageBucket.USER.size, image, metadata)
         user.increaseVersion()
         imageService.deleteImage(USERS_IMG_PATH, id, user.imageVersion - 1)
+        logger.info { "User $id was given an icon by user $actorId" }
         call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.deleteRecipeImage() = delete("/recipes/{id}") {
         val id = getPathId()
+        val actorId = getSessionUserId()
         val recipe = recipeService.getEntityById(id)
         checkRecipeEditionRights(recipeService.getRecipeOwner(id).id)
         imageService.deleteImage(RECIPES_IMG_PATH, id, recipe.imageVersion)
         recipe.increaseVersion()
+        logger.info { "Picture of recipe $id deleted by user $actorId" }
         call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.deleteCookbookImage() = delete("/cookbooks/{id}") {
         val id = getPathId()
+        val actorId = getSessionUserId()
         val cookbook = cookbookService.getEntityById(id)
-        if (!cookbookService.isAdminOfCookbook(id, getSessionUserId())) throw ForbiddenException(ForbiddenCause.MUST_BE_COOKBOOK_ADMINISTRATOR)
+        if (!cookbookService.isAdminOfCookbook(id, actorId)) throw ForbiddenException(ForbiddenCause.MUST_BE_COOKBOOK_ADMINISTRATOR)
         imageService.deleteImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion)
         cookbook.increaseVersion()
+        logger.info { "Picture of cookbook $id deleted by user $actorId" }
         call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.deleteUserImage() = delete("/users/{id}") {
         val id = getPathId()
+        val actorId = getSessionUserId()
         checkUserEditionRights(id)
         val user = userService.getEntityById(id)
         imageService.deleteImage(USERS_IMG_PATH, id, user.imageVersion)
         user.increaseVersion()
+        logger.info { "Icon of user $id deleted by user $actorId" }
         call.respond(HttpStatusCode.OK)
     }
 

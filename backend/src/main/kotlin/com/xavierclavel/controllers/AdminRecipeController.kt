@@ -1,5 +1,6 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.RecipeService
@@ -12,6 +13,7 @@ import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getSort
 import com.xavierclavel.utils.getStringQueryParam
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.logger
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -70,16 +72,27 @@ object AdminRecipeController: Controller("recipes") {
     }
 
     private fun Route.hideRecipe() = post("/{id}/hide") {
+        val id = getPathId()
+        val adminId = getSessionUserId()
         val dto = call.receive<ModerationReasonDTO>()
-        call.respond(moderationService.hideRecipe(getPathId(), dto.reason))
+        val recipe = moderationService.hideRecipe(id, dto.reason)
+        logger.info { "Recipe $id hidden by admin $adminId (reason: ${dto.reason})" }
+        call.respond(recipe)
     }
 
     private fun Route.unhideRecipe() = post("/{id}/unhide") {
-        call.respond(moderationService.unhideRecipe(getPathId()))
+        val id = getPathId()
+        val adminId = getSessionUserId()
+        val recipe = moderationService.unhideRecipe(id)
+        logger.info { "Recipe $id unhidden by admin $adminId" }
+        call.respond(recipe)
     }
 
     private fun Route.deleteRecipe() = delete("/{id}") {
-        moderationService.deleteRecipe(getPathId())
+        val id = getPathId()
+        val adminId = getSessionUserId()
+        moderationService.deleteRecipe(id)
+        logger.info { "Recipe $id deleted by admin $adminId" }
         call.respond(HttpStatusCode.OK)
     }
 }

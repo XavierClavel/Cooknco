@@ -7,6 +7,7 @@ import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getIdPathVariable
+import com.xavierclavel.utils.logger
 import shared.utils.URL.LIKE_URL
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
@@ -50,6 +51,7 @@ object LikeController: Controller(LIKE_URL) {
         val recipeId = getPathId()
         val userId = getSessionUserId()
         val userCreated = likeService.createLike(recipeId, userId)
+        logger.info { "Recipe $recipeId liked by user $userId" }
         call.respond(HttpStatusCode.Created, userCreated)
     }
 
@@ -58,6 +60,7 @@ object LikeController: Controller(LIKE_URL) {
         val userId = getSessionUserId()
         val result = likeService.deleteLike(recipeId, userId) ?: return@delete call.respond(HttpStatusCode.BadRequest)
         if (!result) return@delete call.respond(HttpStatusCode.BadRequest)
+        logger.info { "Like on recipe $recipeId taken back by user $userId" }
         // Purging is only for a recipe whose owner already asked for deletion and which was
         // kept alive by what still referenced it. tryDelete does not check the tag itself, so
         // calling it unconditionally erased a live recipe the moment its last like was taken

@@ -1,11 +1,13 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.ExportService
 import com.xavierclavel.services.PdfTemplateService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getEnumPathParam
 import com.xavierclavel.utils.getPathVariable
+import com.xavierclavel.utils.logger
 import com.xavierclavel.utils.respondPDF
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
@@ -49,21 +51,28 @@ object AdminPdfController: Controller("documents") {
     }
 
     private fun Route.saveTemplate() = put("/{key}/{locale}") {
-        call.respond(
-            pdfTemplateService.save(
-                key = key(),
-                locale = getEnumPathParam<Locale>("locale"),
-                dto = call.receive<PdfTemplateDTO>(),
-            )
+        val templateKey = key()
+        val locale = getEnumPathParam<Locale>("locale")
+        val adminId = getSessionUserId()
+        val saved = pdfTemplateService.save(
+            key = templateKey,
+            locale = locale,
+            dto = call.receive<PdfTemplateDTO>(),
         )
+        logger.info { "Document layout '$templateKey' ($locale) saved by admin $adminId" }
+        call.respond(saved)
     }
 
     /** Drops the saved layout for one locale, putting the packaged one back in service. */
     private fun Route.restoreTemplate() = delete("/{key}/{locale}") {
-        if (!pdfTemplateService.restore(key(), getEnumPathParam<Locale>("locale"))) {
+        val templateKey = key()
+        val locale = getEnumPathParam<Locale>("locale")
+        val adminId = getSessionUserId()
+        if (!pdfTemplateService.restore(templateKey, locale)) {
             call.respond(HttpStatusCode.NotFound)
         } else {
-            call.respond(pdfTemplateService.describe(key()))
+            logger.info { "Document layout '$templateKey' ($locale) restored to the packaged one by admin $adminId" }
+            call.respond(pdfTemplateService.describe(templateKey))
         }
     }
 
