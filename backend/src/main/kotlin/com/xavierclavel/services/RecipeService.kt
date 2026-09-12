@@ -228,6 +228,11 @@ class RecipeService: KoinComponent {
     /**
      * Puts a soft-deleted recipe back, with everything that was still attached to it.
      *
+     * Clears `taggedForDeletion` as well as the flag, and both halves matter. The tag is
+     * what `filterOutDeletion` hides an owner's own recipe by, so a recipe restored with it
+     * still set is invisible to the one person who asked for it back; and it is what
+     * `LikeController` reads before purging, so the next unlike would delete it again.
+     *
      * Not reachable from the API — there is no screen for it — but this is the whole point
      * of the flag, and the operator running it from a console should be running tested code
      * rather than inventing the `update` on the spot.
@@ -236,6 +241,7 @@ class RecipeService: KoinComponent {
         val recipe = QRecipe().setIncludeSoftDeletes().id.eq(id).findOne() ?: return false
         if (!recipe.deleted) return false
         recipe.deleted = false
+        recipe.taggedForDeletion = false
         recipe.update()
         logger.info { "Restored recipe ${recipe.id} (${recipe.title})" }
         return true
