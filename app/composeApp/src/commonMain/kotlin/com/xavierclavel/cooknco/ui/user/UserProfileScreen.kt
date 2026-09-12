@@ -247,102 +247,106 @@ private fun ProfileContent(
 
         // ── Edit profile / Share, or Follow-unfollow / Share ──────────────────
         item(span = { GridItemSpan(2) }) {
-            when {
-                isOwnProfile && onNavigateToEdit != null -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StickerCard(
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        shadowOffset = 4.dp,
-                        onClick = onNavigateToEdit,
-                    ) {
-                        Text(s.editProfile, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
-                    }
-                    StickerCard(
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        shadowOffset = 4.dp,
-                        onClick = onShare,
-                    ) {
-                        Text(s.share, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
-                    }
-                }
-
-                !isOwnProfile -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Tapping while following asks for confirmation first; tapping while not
-                    // following calls straight through — see the dialog above.
-                    val onFollowButtonClick: (() -> Unit)? = when {
-                        isFollowLoading -> null
-                        isFollowing -> { { showUnfollowConfirm = true } }
-                        else -> onToggleFollow
-                    }
-                    StickerCard(
-                        modifier = Modifier.weight(1f).height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        shadowOffset = 4.dp,
-                        fillColor = if (isFollowing) CookncoBackground else CookncoOrange,
-                        onClick = onFollowButtonClick,
-                    ) {
-                        if (isFollowLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp).align(Alignment.Center),
-                                strokeWidth = 2.dp,
-                                color = if (isFollowing) CookncoNavy else CookncoWhite,
-                            )
-                        } else if (isFollowing) {
-                            // "✓ Following" rather than "Unfollow": the button says what is
-                            // true, not what pressing it would do. What it does is behind a
-                            // confirmation anyway — see the dialog above.
-                            Row(
-                                modifier = Modifier.align(Alignment.Center),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text("✓", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = CookncoGreenDark)
-                                Text(
-                                    text = s.followingState,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = CookncoNavy,
-                                )
-                            }
-                        } else {
-                            Text(
-                                text = s.follow,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = CookncoWhite,
-                                modifier = Modifier.align(Alignment.Center),
-                            )
+            // A grid item's slot stacks what it is given, so the buttons and the line below
+            // them need a Column of their own — two children here draw on top of each other.
+            Column {
+                when {
+                    isOwnProfile && onNavigateToEdit != null -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StickerCard(
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            shadowOffset = 4.dp,
+                            onClick = onNavigateToEdit,
+                        ) {
+                            Text(s.editProfile, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
+                        }
+                        StickerCard(
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            shadowOffset = 4.dp,
+                            onClick = onShare,
+                        ) {
+                            Text(s.share, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
                         }
                     }
-                    StickerIconButton(onClick = onShare, size = 52.dp, shape = RoundedCornerShape(14.dp), shadowOffset = 4.dp) {
-                        Icon(Icons.Outlined.Share, contentDescription = s.shareProfile)
+
+                    !isOwnProfile -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // Tapping while following asks for confirmation first; tapping while not
+                        // following calls straight through — see the dialog above.
+                        val onFollowButtonClick: (() -> Unit)? = when {
+                            isFollowLoading -> null
+                            isFollowing -> { { showUnfollowConfirm = true } }
+                            else -> onToggleFollow
+                        }
+                        StickerCard(
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            shadowOffset = 4.dp,
+                            fillColor = if (isFollowing) CookncoBackground else CookncoOrange,
+                            onClick = onFollowButtonClick,
+                        ) {
+                            if (isFollowLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp).align(Alignment.Center),
+                                    strokeWidth = 2.dp,
+                                    color = if (isFollowing) CookncoNavy else CookncoWhite,
+                                )
+                            } else if (isFollowing) {
+                                // "✓ Following" rather than "Unfollow": the button says what is
+                                // true, not what pressing it would do. What it does is behind a
+                                // confirmation anyway — see the dialog above.
+                                Row(
+                                    modifier = Modifier.align(Alignment.Center),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text("✓", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = CookncoGreenDark)
+                                    Text(
+                                        text = s.followingState,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                        color = CookncoNavy,
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = s.follow,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = CookncoWhite,
+                                    modifier = Modifier.align(Alignment.Center),
+                                )
+                            }
+                        }
+                        StickerIconButton(onClick = onShare, size = 52.dp, shape = RoundedCornerShape(14.dp), shadowOffset = 4.dp) {
+                            Icon(Icons.Outlined.Share, contentDescription = s.shareProfile)
+                        }
                     }
                 }
-            }
 
-            // Only when they follow back, and only on someone else's profile: it explains
-            // why their recipes turn up in the feed, which is the one thing about the
-            // relationship that changes what the app does.
-            if (!isOwnProfile && followsMe) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(CookncoGreenLight)
-                            .border(1.5.dp, CookncoNavy, CircleShape),
-                    )
-                    Text(
-                        text = s.followsYouBack,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CookncoNavy,
-                    )
+                // Only when they follow back, and only on someone else's profile: it explains
+                // why their recipes turn up in the feed, which is the one thing about the
+                // relationship that changes what the app does.
+                if (!isOwnProfile && followsMe) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(CookncoGreenLight)
+                                .border(1.5.dp, CookncoNavy, CircleShape),
+                        )
+                        Text(
+                            text = s.followsYouBack,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = CookncoNavy,
+                        )
+                    }
                 }
             }
         }
