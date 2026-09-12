@@ -127,7 +127,30 @@ private fun CookModeContent(
     val stepText = recipe.steps.getOrNull(currentStep) ?: ""
     val isLastStep = currentStep >= stepCount - 1
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            // On the whole screen, not on the list of steps.
+            //
+            // The list is only the middle band: the title bar and the progress segments are
+            // above it and the two buttons are below, and on a short step — one line, no
+            // timer — the text sits at the very top of that band, right under the strip of
+            // header that was not listening. Tapping beside what you are reading is the
+            // obvious thing to do, and it was landing in the one place that did nothing.
+            //
+            // Everything that should keep its own tap still does, because it consumes the
+            // release: close, the two step buttons, the timer's start.
+            .edgeTaps(currentStep, stepCount) { offset, width ->
+                val edge = width * EDGE_TAP_FRACTION
+                when {
+                    offset.x < edge -> onPreviousStep()
+                    // The middle is deliberately inert, and so is the right edge on the
+                    // last step: "Finish" closes the screen, which is not something to do
+                    // to somebody who tapped to read on.
+                    offset.x > width - edge && !isLastStep -> onNextStep()
+                }
+            },
+    ) {
         // ── Top bar: close, title ──────────────────────────────────────────────
         // The mockup also shows a "Screen on" toggle here — dropped for now, since
         // nothing in platform/ offers a wake-lock hook to back it with real behavior.
@@ -173,21 +196,6 @@ private fun CookModeContent(
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
-                // Tap the left or right edge of the step to move through the recipe — the
-                // point of cook mode is that a hand covered in flour can reach the next step
-                // without aiming at a button. Before the padding, so the 18dp gutters count
-                // as edge rather than as a dead strip down each side.
-                //
-                .edgeTaps(currentStep, stepCount) { offset, width ->
-                    val edge = width * EDGE_TAP_FRACTION
-                    when {
-                        offset.x < edge -> onPreviousStep()
-                        // The middle is deliberately inert, and so is the right edge on
-                        // the last step: "Finish" closes the screen, which is not
-                        // something to do to somebody who tapped to read on.
-                        offset.x > width - edge && !isLastStep -> onNextStep()
-                    }
-                }
                 .padding(horizontal = 18.dp),
             contentPadding = PaddingValues(bottom = 16.dp),
         ) {
