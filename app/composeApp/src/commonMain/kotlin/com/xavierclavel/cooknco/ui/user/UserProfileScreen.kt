@@ -66,6 +66,7 @@ import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
 import com.xavierclavel.cooknco.ui.theme.StickerConfirmDialog
+import com.xavierclavel.cooknco.ui.theme.StickerSegmentedControl
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 
 /**
@@ -101,7 +102,10 @@ fun UserProfileScreen(
 
             uiState.user != null -> ProfileContent(
                 user = uiState.user!!,
-                recipes = uiState.recipes,
+                recipes = uiState.shownRecipes,
+                tab = uiState.tab,
+                onTabSelected = viewModel::selectTab,
+                isLikedLoading = uiState.isLikedLoading,
                 isOwnProfile = viewModel.isOwnProfile,
                 isFollowing = uiState.isFollowing,
 
@@ -113,8 +117,8 @@ fun UserProfileScreen(
                 onNavigateToFollowers = onNavigateToFollowers,
                 onNavigateToFollowing = onNavigateToFollowing,
                 onShare = { clipboardManager.setText(AnnotatedString("cooknco.eu/user?id=${uiState.user!!.id}")) },
-                onLoadMore = { viewModel.loadMoreRecipes() },
-                allLoaded = uiState.allRecipesLoaded,
+                onLoadMore = { viewModel.loadMoreShown() },
+                allLoaded = if (uiState.tab == ProfileTab.LIKED) uiState.allLikedLoaded else uiState.allRecipesLoaded,
                 onRecipeClick = onNavigateToRecipe,
             )
         }
@@ -125,6 +129,9 @@ fun UserProfileScreen(
 private fun ProfileContent(
     user: UserInfo,
     recipes: List<RecipeOverview>,
+    tab: ProfileTab,
+    onTabSelected: (ProfileTab) -> Unit,
+    isLikedLoading: Boolean,
     isOwnProfile: Boolean,
     isFollowing: Boolean,
 
@@ -150,7 +157,9 @@ private fun ProfileContent(
             last >= info.totalItemsCount - 4
         }
     }
-    LaunchedEffect(reachedEnd) { if (reachedEnd && !allLoaded) onLoadMore() }
+    // Keyed on the tab as well: switching swaps the list under the grid, and a
+    // reachedEnd that was already true would otherwise never fire again.
+    LaunchedEffect(reachedEnd, tab) { if (reachedEnd && !allLoaded) onLoadMore() }
 
     // Following someone is reversible with no real consequence to warn about; unfollowing
     // drops an established relationship, so only that direction is gated behind the shared
@@ -326,18 +335,40 @@ private fun ProfileContent(
             }
         }
 
-        // ── Recipe grid ────────────────────────────────────────────────────────
-        if (recipes.isEmpty()) {
+        // ── Mine / Liked ──────────────────────────────────────────────────────
+        // Own profile only. Which recipes somebody else has liked is not this screen's to
+        // publish, and the backend filter is per-user rather than per-viewer.
+        if (isOwnProfile) {
             item(span = { GridItemSpan(2) }) {
+                StickerSegmentedControl(
+                    options = ProfileTab.entries,
+                    selected = tab,
+                    onSelect = onTabSelected,
+                    label = { if (it == ProfileTab.LIKED) s.liked else s.myRecipes },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
+            }
+        }
+
+        // ── Recipe grid ────────────────────────────────────────────────────────
+        when {
+            isLikedLoading && recipes.isEmpty() -> item(span = { GridItemSpan(2) }) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center,
+                ) { CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp) }
+            }
+
+            recipes.isEmpty() -> item(span = { GridItemSpan(2) }) {
                 Text(
-                    text = s.noRecipesYet,
+                    text = if (tab == ProfileTab.LIKED) s.noLikesYet else s.noRecipesYet,
                     color = CookncoNavy.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
                     textAlign = TextAlign.Center,
                 )
             }
-        } else {
-            items(recipes, key = { it.id }) { recipe ->
+
+            else -> items(recipes, key = { it.id }) { recipe ->
                 ProfileRecipeCard(recipe = recipe, onClick = { onRecipeClick(recipe.id) })
             }
         }
@@ -449,6 +480,9 @@ fun UserProfileOwnPreview() {
             ProfileContent(
                 user = previewUser,
                 recipes = previewRecipes,
+                tab = ProfileTab.RECIPES,
+                onTabSelected = {},
+                isLikedLoading = false,
                 isOwnProfile = true,
                 isFollowing = false,
                 isFollowLoading = false,
@@ -475,6 +509,9 @@ fun UserProfileOtherPreview() {
             ProfileContent(
                 user = previewUser,
                 recipes = previewRecipes,
+                tab = ProfileTab.RECIPES,
+                onTabSelected = {},
+                isLikedLoading = false,
                 isOwnProfile = false,
                 isFollowing = true,
                 isFollowLoading = false,

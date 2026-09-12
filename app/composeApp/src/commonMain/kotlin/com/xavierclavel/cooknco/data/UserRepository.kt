@@ -55,8 +55,12 @@ class UserRepository(
         userApi.declineFollowRequest(requireToken(), followerId)
     }
 
-    suspend fun getUserRecipes(profileUserId: Long, page: Int): Result<List<RecipeOverview>> = runCatching {
-        userApi.getUserRecipes(token(), profileUserId, page)
+    suspend fun getUserRecipes(
+        profileUserId: Long,
+        page: Int,
+        liked: Boolean = false,
+    ): Result<List<RecipeOverview>> = runCatching {
+        userApi.getUserRecipes(token(), profileUserId, page, liked = liked)
     }
 
     suspend fun getMcpClients(): Result<List<McpClientInfo>> = runCatching {

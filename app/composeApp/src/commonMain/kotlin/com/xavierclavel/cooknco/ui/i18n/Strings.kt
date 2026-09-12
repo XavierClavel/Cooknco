@@ -253,6 +253,9 @@ interface Strings {
     val peopleCaps: String
     val cookbooksCaps: String
     fun seeAll(count: Int, approximate: Boolean): String
+    val myRecipes: String
+    val liked: String
+    val noLikesYet: String
     val noRecipesYet: String
     val noUsersYet: String
     fun recipeCount(count: Int): String

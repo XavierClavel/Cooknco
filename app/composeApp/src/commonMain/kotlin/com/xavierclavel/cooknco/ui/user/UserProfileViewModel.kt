@@ -16,15 +16,33 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * Which grid the profile is showing.
+ *
+ * Two tabs on one screen rather than a second screen for likes: the back arrow would
+ * otherwise move between them, which is the thing that was wrong with followers and
+ * following before they were merged.
+ */
+enum class ProfileTab { RECIPES, LIKED }
+
 data class UserProfileUiState(
     val user: UserInfo? = null,
     val recipes: List<RecipeOverview> = emptyList(),
+    /** Recipes this cook has liked. Only ever loaded for their own profile. */
+    val liked: List<RecipeOverview> = emptyList(),
+    val tab: ProfileTab = ProfileTab.RECIPES,
     val isLoading: Boolean = true,
+    val isLikedLoading: Boolean = false,
     val isFollowing: Boolean = false,
     val isFollowLoading: Boolean = false,
     val allRecipesLoaded: Boolean = false,
+    val allLikedLoaded: Boolean = false,
     val error: String? = null,
-)
+) {
+    /** What the grid is actually drawing, which is all the screen needs to know. */
+    val shownRecipes: List<RecipeOverview>
+        get() = if (tab == ProfileTab.LIKED) liked else recipes
+}
 
 class UserProfileViewModel(
     private val userRepo: UserRepository,
@@ -39,6 +57,8 @@ class UserProfileViewModel(
 
     private var recipePage = 0
     private val recipes = mutableListOf<RecipeOverview>()
+    private var likedPage = 0
+    private val liked = mutableListOf<RecipeOverview>()
     private val pageSize = 20
 
     /**
@@ -51,6 +71,7 @@ class UserProfileViewModel(
      * the same key twice and threw.
      */
     private var isLoadingMore = false
+    private var isLoadingMoreLiked = false
 
     init {
         loadAll()
@@ -82,6 +103,65 @@ class UserProfileViewModel(
                 )
             }
         }
+    }
+
+    /**
+     * Switches the grid, loading the likes the first time they are asked for.
+     *
+     * Not loaded with the profile: most visits never open this tab, and the cost is a
+     * whole extra page of recipes on a screen that already fetches three things.
+     */
+    fun selectTab(tab: ProfileTab) {
+        if (_uiState.value.tab == tab) return
+        _uiState.update { it.copy(tab = tab) }
+        if (tab == ProfileTab.LIKED && liked.isEmpty() && !_uiState.value.allLikedLoaded) loadLiked()
+    }
+
+    private fun loadLiked() {
+        if (isLoadingMoreLiked) return
+        isLoadingMoreLiked = true
+        _uiState.update { it.copy(isLikedLoading = true) }
+        viewModelScope.launch {
+            userRepo.getUserRecipes(profileUserId, 0, liked = true)
+                .onSuccess { page ->
+                    liked.clear()
+                    liked.addAll(page)
+                    likedPage = 1
+                    _uiState.update {
+                        it.copy(
+                            liked = liked.toList(),
+                            isLikedLoading = false,
+                            allLikedLoaded = page.size < pageSize,
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    _uiState.update { it.copy(isLikedLoading = false, error = err.message) }
+                }
+        }.invokeOnCompletion { isLoadingMoreLiked = false }
+    }
+
+    /** Pages whichever grid is on screen; the two keep their own offset and their own guard. */
+    fun loadMoreShown() {
+        if (_uiState.value.tab == ProfileTab.LIKED) loadMoreLiked() else loadMoreRecipes()
+    }
+
+    private fun loadMoreLiked() {
+        val state = _uiState.value
+        if (state.isLikedLoading || state.allLikedLoaded || isLoadingMoreLiked) return
+        if (liked.isEmpty()) return
+        isLoadingMoreLiked = true
+        viewModelScope.launch {
+            userRepo.getUserRecipes(profileUserId, likedPage, liked = true)
+                .onSuccess { page ->
+                    val known = liked.mapTo(HashSet()) { it.id }
+                    liked.addAll(page.filterNot { it.id in known })
+                    likedPage++
+                    _uiState.update {
+                        it.copy(liked = liked.toList(), allLikedLoaded = page.size < pageSize)
+                    }
+                }
+        }.invokeOnCompletion { isLoadingMoreLiked = false }
     }
 
     fun loadMoreRecipes() {

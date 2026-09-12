@@ -172,10 +172,23 @@ class UserApi(private val client: HttpClient) {
         return response.body()
     }
 
-    suspend fun getUserRecipes(token: String?, profileUserId: Long, page: Int, size: Int = 20): List<com.xavierclavel.cooknco.network.dto.RecipeOverview> {
+    /**
+     * A cook's own recipes, or the ones they have liked.
+     *
+     * The same endpoint either way — `user` and `likedBy` are two filters on `GET /recipe`
+     * (`RecipeFilter`), not two lists — so this is one function with one parameter rather
+     * than a second copy of the paging.
+     */
+    suspend fun getUserRecipes(
+        token: String?,
+        profileUserId: Long,
+        page: Int,
+        size: Int = 20,
+        liked: Boolean = false,
+    ): List<com.xavierclavel.cooknco.network.dto.RecipeOverview> {
         val response = client.get("$base/recipe") {
             if (token != null) bearerAuth(token)
-            parameter("user", profileUserId)
+            parameter(if (liked) "likedBy" else "user", profileUserId)
             parameter("sort", "DATE_DESCENDING")
             parameter("page", page)
             parameter("size", size)
