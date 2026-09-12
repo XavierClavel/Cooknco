@@ -5,6 +5,7 @@ import com.xavierclavel.TestBuilderWrapper
 import io.ktor.client.HttpClient
 import com.xavierclavel.plugins.OAuthTokenData
 import com.xavierclavel.plugins.RedisService
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
@@ -30,6 +31,7 @@ import main.com.xavierclavel.utils.registerClientRaw
 import main.com.xavierclavel.utils.token
 import org.junit.jupiter.api.Test
 import org.koin.test.inject
+import shared.utils.URL.USER_URL
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -568,5 +570,19 @@ class OAuthControllerTest : ApplicationTest() {
         )
         assertEquals(HttpStatusCode.Unauthorized, response.status)
         assertContains(response.headers[HttpHeaders.WWWAuthenticate]!!, "resource_metadata")
+    }
+
+    /**
+     * An approval must not outlive the account, nor hold it hostage. `oauth_grants` points at
+     * `users` ON DELETE RESTRICT like every other table here, so nothing but the account
+     * owning the row (`User.oauthGrants`) lets the delete through — without it, connecting a
+     * client once is enough to make an account undeletable for good.
+     */
+    @Test
+    fun `an account that approved a client can still be deleted`() = runTest {
+        val http = signedIn()
+        http.completeOAuthFlow(resource = resourceUri)
+
+        assertEquals(HttpStatusCode.OK, http.delete(USER_URL).status)
     }
 }

@@ -14,6 +14,7 @@ import com.xavierclavel.models.query.QDietaryRestrictions
 import com.xavierclavel.models.query.QIngredient
 import com.xavierclavel.models.query.QNotification
 import com.xavierclavel.models.query.QOAuthClient
+import com.xavierclavel.models.query.QOAuthGrant
 import com.xavierclavel.models.query.QRecipe
 import com.xavierclavel.models.query.QReport
 import com.xavierclavel.models.query.QUser
@@ -46,6 +47,10 @@ object DatabaseManager {
         // (UserService.detachNotifications), so nothing clears it when that account goes
         QNotification(),
         QDevice(),
+        // MCP grants point at users the same way. The account owns them
+        // (User.oauthGrants) so they would go with it regardless; listed here so the
+        // wipe does not rest on that
+        QOAuthGrant(),
         QRecipe(),
         QRecipeIngredient(),
         QUser(),

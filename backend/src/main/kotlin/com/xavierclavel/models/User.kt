@@ -106,6 +106,16 @@ class User (
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     var notifications: Set<Notification> = setOf(),
 
+    /**
+     * The MCP clients this account has approved. Owned by the account the way its devices
+     * are: a grant is one person's approval and means nothing without them, so it ends with
+     * them. Mapping it here is also what makes the account deletable at all — `oauth_grants`
+     * points at `users` ON DELETE RESTRICT like every other table here does, and nothing
+     * else clears those rows.
+     */
+    @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var oauthGrants: Set<OAuthGrant> = setOf(),
+
     @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true)
     var dietaryRestrictions: DietaryRestrictions = DietaryRestrictions(),
 
