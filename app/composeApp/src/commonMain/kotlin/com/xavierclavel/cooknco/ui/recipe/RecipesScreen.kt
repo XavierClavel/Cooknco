@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.ui.recipe
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,7 +41,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +65,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserSummary
 import com.xavierclavel.cooknco.ui.components.CookbookImage
+import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -74,8 +78,10 @@ import com.xavierclavel.cooknco.ui.theme.CookncoOrangeDark
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerDropdownMenu
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 import com.xavierclavel.cooknco.ui.theme.StickerPill
+import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
 
 /**
  * Also embedded as the bottom nav's Search tab (see `MainScreen`), which has nowhere to
@@ -295,12 +301,22 @@ private fun ScopePillsRow(
         SearchScope.entries.forEach { s ->
             val selected = s == scope
             val count = counts[s]
+            val fill by animateColorAsState(
+                targetValue = if (selected) CookncoNavy else CookncoBackground,
+                animationSpec = stickerSwitchSpec(),
+                label = "scope_fill",
+            )
+            val content by animateColorAsState(
+                targetValue = if (selected) CookncoWhite else CookncoNavy,
+                animationSpec = stickerSwitchSpec(),
+                label = "scope_content",
+            )
             StickerPill(
                 height = 40.dp,
                 borderWidth = 2.dp,
                 shadowOffset = 0.dp,
-                fillColor = if (selected) CookncoNavy else CookncoBackground,
-                contentColor = if (selected) CookncoWhite else CookncoNavy,
+                fillColor = fill,
+                contentColor = content,
                 contentPadding = PaddingValues(horizontal = 13.dp),
                 onClick = { onScopeSelected(s) },
             ) {
@@ -467,17 +483,51 @@ private fun RecipesScopeContent(
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
         contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
     ) {
-        // ── Sort chips ────────────────────────────────────────────────────────
-        item {
+        // ── Result count, and the sort behind it ──────────────────────────────
+        // Only once there are results: "0 recipes" next to an order to sort them by, above
+        // an empty state that already says there is nothing, is three ways of saying it.
+        if (uiState.recipes.isNotEmpty()) item {
+            var sortExpanded by remember { mutableStateOf(false) }
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                val sortOptions = RecipeSort.entries.filter {
-                    it != RecipeSort.BEST_MATCH || query.isNotBlank()
-                }
-                sortOptions.forEach { sortOption ->
-                    SortChip(label = sortOption.label, selected = activeSort == sortOption, onClick = { onSortChange(sortOption) })
+                Text(
+                    text = "${uiState.recipes.size} recipe" + if (uiState.recipes.size == 1) "" else "s",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CookncoNavy,
+                    modifier = Modifier.weight(1f),
+                )
+                // The artboard puts the sort here as one line of type that opens a menu,
+                // not as a row of chips: three chips spent a whole line announcing orders
+                // nobody had asked for, above results that are the point of the screen.
+                StickerDropdownMenu(
+                    expanded = sortExpanded,
+                    onDismissRequest = { sortExpanded = false },
+                    items = RecipeSort.entries.filter { it != RecipeSort.BEST_MATCH || query.isNotBlank() },
+                    label = { it.label },
+                    selected = { it == activeSort },
+                    onSelect = { onSortChange(it); sortExpanded = false },
+                    alignEnd = true,
+                    width = 196.dp,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { sortExpanded = !sortExpanded }
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(activeSort.label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                        Text(
+                            text = if (sortExpanded) "\u25b4" else "\u25be",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                        )
+                    }
                 }
             }
         }
@@ -501,17 +551,8 @@ private fun RecipesScopeContent(
             }
         }
 
-        // ── Results count + result rows, one sticker card ────────────────────
+        // ── Result rows, one sticker card. The count lives on the sort line above. ──
         if (uiState.recipes.isNotEmpty()) {
-            item {
-                Text(
-                    text = "${uiState.recipes.size} recipe${if (uiState.recipes.size == 1) "" else "s"}",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = CookncoNavy,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
             item {
                 StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
                     Column {
@@ -530,26 +571,6 @@ private fun RecipesScopeContent(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SortChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50.dp))
-            .background(if (selected) CookncoNavy else CookncoBackground)
-            .border(2.dp, CookncoNavy, RoundedCornerShape(50.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            fontSize = 12.5.sp,
-            fontWeight = FontWeight.Bold,
-            color = if (selected) CookncoWhite else CookncoNavy,
-        )
     }
 }
 
@@ -579,7 +600,7 @@ private fun RecipeResultRow(recipe: RecipeOverview, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(text = "by ${recipe.owner.username}", fontSize = 12.5.sp, color = CookncoNavy.copy(alpha = 0.62f))
-            Text(text = "♥ ${recipe.likesCount}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CookncoOrangeDark)
+            LikeCount(count = recipe.likesCount, color = CookncoOrangeDark, fontSize = 12.sp)
         }
     }
 }

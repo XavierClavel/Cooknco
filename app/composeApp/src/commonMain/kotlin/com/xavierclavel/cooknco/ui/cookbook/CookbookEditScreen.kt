@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.ui.cookbook
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,41 +13,42 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,18 +56,22 @@ import com.xavierclavel.cooknco.network.dto.UserSummary
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
-import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
+import com.xavierclavel.cooknco.ui.theme.CookncoOrangeDark
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerDropdownMenu
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 import com.xavierclavel.cooknco.ui.theme.StickerPill
+import com.xavierclavel.cooknco.ui.theme.StickerSegmentedControl
+import com.xavierclavel.cooknco.ui.theme.StickerToggle
 import com.xavierclavel.cooknco.ui.theme.stickerShadow
+import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
 
 // ── Shared styling helpers (mirrors RecipeEditScreen's private equivalents) ──────
 
@@ -246,25 +252,16 @@ fun CookbookEditScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     FieldLabel("VISIBILITY", color = CookncoNavy)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .stickerShadow(RoundedCornerShape(20.dp))
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(CookncoBackground)
-                            .border(3.dp, CookncoNavy, RoundedCornerShape(20.dp))
-                            .padding(5.dp),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        visibilityOptions.forEach { (value, label) ->
-                            VisibilitySegment(
-                                label = label,
-                                selected = uiState.visibility == value,
-                                onClick = { viewModel.updateVisibility(value) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
+                    StickerSegmentedControl(
+                        options = visibilityOptions.map { it.first },
+                        selected = uiState.visibility,
+                        onSelect = viewModel::updateVisibility,
+                        label = { value -> visibilityOptions.first { it.first == value }.second },
+                        shape = RoundedCornerShape(20.dp),
+                        segmentShape = RoundedCornerShape(15.dp),
+                        spacing = 5.dp,
+                        shadowOffset = 6.dp,
+                    )
                 }
             }
 
@@ -380,26 +377,6 @@ private fun FieldLabel(text: String, modifier: Modifier = Modifier, color: Color
 }
 
 @Composable
-private fun VisibilitySegment(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(15.dp))
-            .background(if (selected) CookncoOrange else Color.Transparent)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = if (selected) CookncoWhite else CookncoNavy,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            fontSize = 13.5.sp,
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 private fun MemberEditRow(
     member: EditMember,
     onQueryChange: (String) -> Unit,
@@ -421,24 +398,45 @@ private fun MemberEditRow(
                     modifier = Modifier.size(40.dp).clip(CircleShape),
                 )
 
-                ExposedDropdownMenuBox(
+                StickerDropdownMenu(
                     expanded = member.showDropdown,
-                    onExpandedChange = { if (!it) onDismiss() },
+                    onDismissRequest = onDismiss,
+                    items = member.searchResults,
+                    label = { it.username },
+                    onSelect = onSelect,
                     modifier = Modifier.weight(1f),
                 ) {
-                    OutlinedTextField(
-                        value = member.searchQuery,
-                        onValueChange = onQueryChange,
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable).fillMaxWidth(),
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                        colors = editFieldColors(),
-                        shape = fieldShape,
+                    // The white 44dp field the "Cookbook — edit" artboard draws a member's
+                    // name in — it is the search box until a member has been picked, and it
+                    // keeps its own look once one has.
+                    var focused by remember { mutableStateOf(false) }
+                    val borderColor by animateColorAsState(
+                        targetValue = if (focused) CookncoOrange else CookncoNavy,
+                        animationSpec = stickerSwitchSpec(),
+                        label = "member_field_border",
                     )
-                    DropdownMenu(expanded = member.showDropdown, onDismissRequest = onDismiss) {
-                        member.searchResults.forEach { result ->
-                            DropdownMenuItem(text = { Text(result.username) }, onClick = { onSelect(result) })
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CookncoWhite)
+                            .border(2.dp, borderColor, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        val textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy)
+                        if (member.searchQuery.isEmpty()) {
+                            Text("Search a member", style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.35f)))
                         }
+                        BasicTextField(
+                            value = member.searchQuery,
+                            onValueChange = onQueryChange,
+                            singleLine = true,
+                            textStyle = textStyle,
+                            cursorBrush = SolidColor(CookncoOrange),
+                            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+                        )
                     }
                 }
 
@@ -449,7 +447,7 @@ private fun MemberEditRow(
                     Icon(
                         Icons.Outlined.Delete,
                         contentDescription = "Remove member",
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = CookncoOrangeDark,
                     )
                 }
             }
@@ -466,18 +464,7 @@ private fun MemberEditRow(
                     color = CookncoNavy,
                     modifier = Modifier.weight(1f),
                 )
-                Switch(
-                    checked = member.isAdmin,
-                    onCheckedChange = onRoleChange,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = CookncoWhite,
-                        checkedTrackColor = CookncoOrange,
-                        checkedBorderColor = CookncoNavy,
-                        uncheckedThumbColor = CookncoNavy,
-                        uncheckedTrackColor = CookncoBackground,
-                        uncheckedBorderColor = CookncoNavy,
-                    ),
-                )
+                StickerToggle(checked = member.isAdmin, onCheckedChange = onRoleChange)
             }
         }
     }

@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -378,14 +379,20 @@ private fun ProfileRecipeCard(recipe: RecipeOverview, onClick: () -> Unit) {
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
+                    // Always two lines of room, whether the title needs them or not: the
+                    // grid puts these side by side, and a one-line title next to a two-line
+                    // one leaves the shorter card stubby and the row ragged.
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 18.sp,
                 )
-                Text(
-                    text = "♥ ${recipe.likesCount}",
-                    fontSize = 11.5.sp,
+                LikeCount(
+                    count = recipe.likesCount,
                     color = CookncoNavy.copy(alpha = 0.6f),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    iconSize = 12.dp,
                     modifier = Modifier.padding(top = 3.dp),
                 )
             }

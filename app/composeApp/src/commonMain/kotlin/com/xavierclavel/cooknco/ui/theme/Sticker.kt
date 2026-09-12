@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -23,10 +26,15 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * The "sticker theme" primitives (see `Cooknco Mobile.dc.html`, turn 5 / option `5a`): a
@@ -159,5 +167,47 @@ fun StickerIconButton(
         contentAlignment = Alignment.Center,
     ) {
         CompositionLocalProvider(LocalContentColor provides contentColor, content = content)
+    }
+}
+
+/**
+ * A multi-line text area set straight onto the sticker surface behind it — no inner box,
+ * no outline, no floating label.
+ *
+ * The mockup never nests a field inside a card: an editable note, a step's text and the
+ * tips note are all type on cream, reading exactly as they will once saved. A Material
+ * [androidx.compose.material3.TextField] there draws a second filled, outlined rectangle
+ * inside the card's own outline, which is what makes those places read as a different app.
+ */
+@Composable
+fun StickerTextArea(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit = 14.5.sp,
+    lineHeight: TextUnit = 21.sp,
+    fontWeight: FontWeight = FontWeight.Medium,
+    textColor: Color = CookncoNavy,
+    placeholderColor: Color = CookncoGreenDark,
+    cursorColor: Color = CookncoOrange,
+) {
+    val textStyle = TextStyle(
+        fontSize = fontSize,
+        lineHeight = lineHeight,
+        fontWeight = fontWeight,
+        color = textColor,
+    )
+    Box(modifier = modifier) {
+        if (value.isEmpty()) {
+            Text(placeholder, style = textStyle.copy(color = placeholderColor))
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = textStyle,
+            cursorBrush = SolidColor(cursorColor),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
