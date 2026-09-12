@@ -25,18 +25,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -54,15 +50,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
@@ -71,15 +74,26 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerConfirmDialog
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
+import com.xavierclavel.cooknco.ui.theme.StickerPill
+import com.xavierclavel.cooknco.ui.theme.stickerShadow
 import kotlin.math.roundToInt
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.format.MonthNames
+import kotlinx.datetime.format.char
+import kotlinx.datetime.toLocalDateTime
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +116,19 @@ private fun scaleAmount(amount: Float?, selectedYield: Int, recipeYield: Int): S
     val scaled = amount * selectedYield.toFloat() / recipeYield.toFloat()
     return if (scaled == scaled.roundToInt().toFloat()) scaled.roundToInt().toString()
     else ((scaled * 100).roundToInt() / 100f).toString().trimEnd('0').trimEnd('.')
+}
+
+// Matches the day-of-month + full month name convention HomeViewModel already uses for
+// recipe dates, just without the year (the owner-actions sheet's "published 22 March").
+private val publishedDateFormat = LocalDate.Format {
+    day()
+    char(' ')
+    monthName(MonthNames.ENGLISH_FULL)
+}
+
+private fun publishedLabel(creationDate: Long): String {
+    val date = Instant.fromEpochSeconds(creationDate).toLocalDateTime(TimeZone.currentSystemDefault()).date
+    return "published ${publishedDateFormat.format(date)}"
 }
 
 private enum class RecipeTab { INGREDIENTS, STEPS, NOTES }
@@ -159,22 +186,15 @@ fun RecipeScreen(
         }
     }
 
-    if (uiState.showDeleteConfirm) {
-        AlertDialog(
+    if (uiState.showDeleteConfirm && recipe != null) {
+        StickerConfirmDialog(
+            icon = Icons.Outlined.Delete,
+            title = "Delete this recipe?",
+            message = "${recipe.title} will be removed for everyone. This cannot be undone.",
+            confirmText = "Delete recipe",
+            dismissText = "Keep it",
+            onConfirm = { viewModel.deleteRecipe() },
             onDismissRequest = { viewModel.dismissDeleteConfirm() },
-            title = { Text("Delete Recipe", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to delete this recipe? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.deleteRecipe() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text("Delete", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissDeleteConfirm() }) {
-                    Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f))
-                }
-            },
         )
     }
 }
@@ -209,7 +229,7 @@ private fun RecipeContent(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
     ) {
-        // ── Banner image with the back / like / more overlay ─────────────────
+        // ── Banner image, overlapped by the info card, with the back / like / more overlay ──
         item {
             Box(modifier = Modifier.fillMaxWidth()) {
                 RecipeImage(
@@ -234,32 +254,90 @@ private fun RecipeContent(
                             Icon(
                                 imageVector = if (uiState.isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                                 contentDescription = "Like",
-                                tint = CookncoWhite,
+                                tint = if (uiState.isLiked) CookncoOrange else CookncoNavy,
                             )
                         }
-                        Box {
-                            StickerIconButton(onClick = { showMenu = true }, shadowOffset = 3.dp) {
-                                Icon(Icons.Outlined.MoreHoriz, contentDescription = "More")
-                            }
-                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Share") },
-                                    leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
-                                    onClick = { showMenu = false; onShare() },
+                        StickerIconButton(
+                            onClick = { showMenu = true },
+                            shadowOffset = 3.dp,
+                            fillColor = if (showMenu) CookncoNavy else CookncoBackground,
+                            contentColor = if (showMenu) CookncoWhite else CookncoNavy,
+                        ) {
+                            Icon(Icons.Outlined.MoreHoriz, contentDescription = "More")
+                        }
+                    }
+                }
+
+                // Info card: dish class, title, description, author, meta — overlaps the
+                // banner's bottom edge by 30dp, per the mockup's `margin:-30px 18px 0`.
+                StickerCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, top = 250.dp),
+                    shape = RoundedCornerShape(20.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(11.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(percent = 50))
+                                    .background(CookncoGreen)
+                                    .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+                                    .padding(horizontal = 10.dp, vertical = 3.dp),
+                            ) {
+                                Text(
+                                    text = dishClassLabel(recipe.dishClass).uppercase(),
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CookncoWhite,
                                 )
-                                if (isOwner) {
-                                    DropdownMenuItem(
-                                        text = { Text("Edit") },
-                                        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                                        onClick = { showMenu = false; onEdit() },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                                        leadingIcon = {
-                                            Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                        },
-                                        onClick = { showMenu = false; onDelete() },
-                                    )
+                            }
+                        }
+                        Text(
+                            text = recipe.title,
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                            lineHeight = 35.sp,
+                        )
+                        if (recipe.description.isNotBlank()) {
+                            Text(
+                                text = recipe.description,
+                                fontSize = 14.sp,
+                                lineHeight = 21.sp,
+                                color = CookncoNavy.copy(alpha = 0.72f),
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AuthorChip(owner = recipe.owner, onClick = { onNavigateToUser(recipe.owner.id) })
+                            Spacer(Modifier.weight(1f))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(percent = 50))
+                                    .background(CookncoOrange)
+                                    .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                            ) {
+                                Text("♥ ${recipe.likesCount}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoWhite)
+                            }
+                        }
+                        val hasMeta = recipe.preparationTime != null || recipe.cookingTime != null || recipe.cookingTemperature != null
+                        if (hasMeta) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(2.dp)
+                                        .background(CookncoNavy.copy(alpha = 0.14f)),
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    recipe.preparationTime?.let { MetaStat(label = "PREP", value = "$it min", modifier = Modifier.weight(1f)) }
+                                    recipe.cookingTime?.let { MetaStat(label = "COOK", value = "$it min", modifier = Modifier.weight(1f)) }
+                                    recipe.cookingTemperature?.let { MetaStat(label = "OVEN", value = "$it °C", modifier = Modifier.weight(1f)) }
                                 }
                             }
                         }
@@ -268,72 +346,16 @@ private fun RecipeContent(
             }
         }
 
-        // ── Info card: dish class, title, description, author, meta ──────────
-        item {
-            StickerCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
-                shape = RoundedCornerShape(20.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(11.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(percent = 50))
-                                .background(CookncoGreen)
-                                .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
-                                .padding(horizontal = 10.dp, vertical = 3.dp),
-                        ) {
-                            Text(
-                                text = dishClassLabel(recipe.dishClass).uppercase(),
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CookncoWhite,
-                            )
-                        }
-                    }
-                    Text(
-                        text = recipe.title,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CookncoNavy,
-                        lineHeight = 35.sp,
-                    )
-                    if (recipe.description.isNotBlank()) {
-                        Text(
-                            text = recipe.description,
-                            fontSize = 14.sp,
-                            lineHeight = 21.sp,
-                            color = CookncoNavy.copy(alpha = 0.72f),
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AuthorChip(owner = recipe.owner, onClick = { onNavigateToUser(recipe.owner.id) })
-                        Spacer(Modifier.weight(1f))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(percent = 50))
-                                .background(CookncoOrange)
-                                .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                        ) {
-                            Text("♥ ${recipe.likesCount}", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoWhite)
-                        }
-                    }
-                    val hasMeta = recipe.preparationTime != null || recipe.cookingTime != null || recipe.cookingTemperature != null
-                    if (hasMeta) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            recipe.preparationTime?.let { MetaStat(label = "PREP", value = "$it min", modifier = Modifier.weight(1f)) }
-                            recipe.cookingTime?.let { MetaStat(label = "COOK", value = "$it min", modifier = Modifier.weight(1f)) }
-                            recipe.cookingTemperature?.let { MetaStat(label = "OVEN", value = "$it °C", modifier = Modifier.weight(1f)) }
-                        }
-                    }
-                }
+        if (showMenu) {
+            item {
+                RecipeActionSheet(
+                    recipe = recipe,
+                    isOwner = isOwner,
+                    onShare = onShare,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                    onDismissRequest = { showMenu = false },
+                )
             }
         }
 
@@ -342,7 +364,8 @@ private fun RecipeContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp)
+                    .padding(start = 18.dp, end = 18.dp, top = 18.dp)
+                    .stickerShadow(RoundedCornerShape(percent = 50), offsetX = 4.dp, offsetY = 4.dp)
                     .clip(RoundedCornerShape(percent = 50))
                     .background(CookncoBackground)
                     .border(3.dp, CookncoNavy, RoundedCornerShape(percent = 50))
@@ -371,6 +394,8 @@ private fun RecipeContent(
             RecipeTab.STEPS -> stepsTab(recipe = recipe)
             RecipeTab.NOTES -> item {
                 NotesCard(
+                    tips = recipe.tips,
+                    authorName = recipe.owner.username,
                     notes = uiState.notes,
                     remoteNotes = uiState.remoteNotes,
                     isEditing = uiState.isEditingNotes,
@@ -450,7 +475,7 @@ private fun LazyListScope.ingredientsTab(
     if (recipe.yield != null) {
         item {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Scaled for", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = CookncoNavy, modifier = Modifier.weight(1f))
@@ -461,9 +486,10 @@ private fun LazyListScope.ingredientsTab(
                         .border(3.dp, CookncoNavy, RoundedCornerShape(percent = 50))
                         .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     Box(
-                        modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onYieldMinus),
+                        modifier = Modifier.size(44.dp).clip(CircleShape).clickable(onClick = onYieldMinus),
                         contentAlignment = Alignment.Center,
                     ) { Icon(Icons.Outlined.Remove, contentDescription = "Decrease", tint = CookncoNavy) }
                     Text(
@@ -471,12 +497,12 @@ private fun LazyListScope.ingredientsTab(
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = CookncoNavy,
-                        modifier = Modifier.width(58.dp),
+                        modifier = Modifier.width(54.dp),
                         textAlign = TextAlign.Center,
                     )
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(CookncoOrange)
                             .clickable(onClick = onYieldPlus),
@@ -490,12 +516,17 @@ private fun LazyListScope.ingredientsTab(
     if (recipe.ingredients.isNotEmpty()) {
         item {
             StickerCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
                 shape = RoundedCornerShape(20.dp),
             ) {
                 Column {
-                    recipe.ingredients.forEach { ingredient ->
-                        IngredientRow(ingredient = ingredient, selectedYield = uiState.selectedYield, recipeYield = recipeYield)
+                    recipe.ingredients.forEachIndexed { index, ingredient ->
+                        IngredientRow(
+                            ingredient = ingredient,
+                            selectedYield = uiState.selectedYield,
+                            recipeYield = recipeYield,
+                            showDivider = index < recipe.ingredients.lastIndex,
+                        )
                     }
                 }
             }
@@ -514,8 +545,30 @@ private fun LazyListScope.stepsTab(recipe: RecipeInfo) {
         }
         return
     }
+    item {
+        val totalMinutes = listOfNotNull(recipe.preparationTime, recipe.cookingTime).sum()
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val stepsLabel = "${recipe.steps.size} step${if (recipe.steps.size == 1) "" else "s"}" +
+                if (totalMinutes > 0) " · about $totalMinutes min in total" else ""
+            Text(stepsLabel, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, modifier = Modifier.weight(1f))
+            recipe.cookingTemperature?.let { temperature ->
+                StickerPill(
+                    height = 36.dp,
+                    fillColor = CookncoGold,
+                    borderWidth = 2.dp,
+                    shadowOffset = 0.dp,
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                ) {
+                    Text("$temperature °C oven", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                }
+            }
+        }
+    }
     itemsIndexed(recipe.steps) { index, step ->
-        StepRow(index = index, step = step, modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp))
+        StepRow(index = index, step = step, modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp))
     }
 }
 
@@ -543,7 +596,7 @@ private fun RecipeTabItem(label: String, selected: Boolean, onClick: () -> Unit,
 @Composable
 private fun MetaStat(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
-        Text(label, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy.copy(alpha = 0.55f))
+        Text(label, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
         Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
     }
 }
@@ -556,7 +609,7 @@ private fun AuthorChip(owner: RecipeOwner, onClick: () -> Unit = {}, modifier: M
             .background(CookncoWhite)
             .border(2.dp, CookncoNavy, RoundedCornerShape(50.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 9.dp, vertical = 3.dp),
+            .padding(start = 3.dp, top = 3.dp, end = 10.dp, bottom = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -575,6 +628,7 @@ private fun IngredientRow(
     ingredient: RecipeIngredientInfo,
     selectedYield: Int,
     recipeYield: Int,
+    showDivider: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val amountStr = scaleAmount(ingredient.amount, selectedYield, recipeYield)
@@ -584,70 +638,79 @@ private fun IngredientRow(
         if (unitStr.isNotEmpty()) append(if (amountStr.isEmpty()) unitStr else " $unitStr")
     }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .border(2.5.dp, CookncoNavy, RoundedCornerShape(7.dp)),
-        )
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(CookncoGreenLight)
-                .border(2.dp, CookncoNavy, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (ingredient.type != null) {
-                AsyncImage(
-                    model = "${ApiClient.IMAGE_URL}/ingredients/${ingredient.type}.webp",
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)),
-                )
-            } else {
-                Text("🍽", fontSize = 15.sp)
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .border(2.5.dp, CookncoNavy, RoundedCornerShape(7.dp)),
+            )
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(CookncoGreenLight)
+                    .border(2.dp, CookncoNavy, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (ingredient.type != null) {
+                    AsyncImage(
+                        model = "${ApiClient.IMAGE_URL}/ingredients/${ingredient.type}.webp",
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)),
+                    )
+                } else {
+                    Text("🍽", fontSize = 15.sp)
+                }
+            }
+            Text(ingredient.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.weight(1f))
+            if (amountLabel.isNotBlank()) {
+                Text(amountLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy)
             }
         }
-        Text(ingredient.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.weight(1f))
-        if (amountLabel.isNotBlank()) {
-            Text(amountLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy)
+        if (showDivider) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp)
+                    .height(2.dp)
+                    .background(CookncoNavy.copy(alpha = 0.1f)),
+            )
         }
     }
 }
 
 @Composable
 private fun StepRow(index: Int, step: String, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxWidth()) {
-        StickerCard(
-            modifier = Modifier.fillMaxWidth().padding(start = 24.dp),
-            shape = RoundedCornerShape(14.dp),
-            shadowOffset = 4.dp,
-        ) {
+    StickerCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        shadowOffset = 5.dp,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
+            Text(
+                text = "STEP ${index + 1}",
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoGreenDark,
+                letterSpacing = 1.sp,
+            )
             Text(
                 text = step,
-                modifier = Modifier.padding(start = 30.dp, top = 14.dp, end = 14.dp, bottom = 14.dp),
+                modifier = Modifier.padding(top = 6.dp),
                 fontSize = 15.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.Medium,
                 color = CookncoNavy,
             )
-        }
-        Box(
-            modifier = Modifier
-                .size(46.dp)
-                .clip(CircleShape)
-                .background(CookncoGreen)
-                .border(2.dp, CookncoNavy, CircleShape)
-                .align(Alignment.CenterStart),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = (index + 1).toString(), color = CookncoWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }
@@ -655,6 +718,8 @@ private fun StepRow(index: Int, step: String, modifier: Modifier = Modifier) {
 @Composable
 private fun NotesCard(
     notes: String,
+    tips: String,
+    authorName: String,
     remoteNotes: String?,
     isEditing: Boolean,
     onStartEdit: () -> Unit,
@@ -663,61 +728,228 @@ private fun NotesCard(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    StickerCard(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text("Notes", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-
-            if (isEditing) {
-                TextField(
-                    value = notes,
-                    onValueChange = onNotesChange,
-                    placeholder = { Text("Write notes here!", color = CookncoNavy.copy(alpha = 0.4f)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 4,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = CookncoWhite,
-                        unfocusedContainerColor = CookncoWhite,
-                        focusedBorderColor = CookncoOrange,
-                        unfocusedBorderColor = CookncoNavy.copy(alpha = 0.5f),
-                        focusedTextColor = CookncoNavy,
-                        unfocusedTextColor = CookncoNavy,
-                        cursorColor = CookncoOrange,
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                )
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f)) }
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = onSave,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = CookncoOrange, contentColor = CookncoWhite),
-                    ) { Text("SAVE", fontWeight = FontWeight.Bold, letterSpacing = 1.sp) }
-                }
-            } else {
+    Column(modifier = modifier.fillMaxWidth()) {
+        // The author's own tip for the recipe, if they left one — read-only, everyone sees it.
+        if (tips.isNotBlank()) {
+            Text(
+                text = "FROM ${authorName.uppercase()}, THE AUTHOR",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoNavy,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+            StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), fillColor = CookncoGold) {
                 Text(
-                    text = if (remoteNotes != null) notes else "Write notes here!",
-                    color = if (remoteNotes != null) CookncoNavy else CookncoNavy.copy(alpha = 0.45f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(CookncoBackground)
-                        .border(2.dp, CookncoNavy, RoundedCornerShape(12.dp))
-                        .padding(12.dp),
+                    text = tips,
+                    modifier = Modifier.padding(16.dp),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = CookncoNavy,
                 )
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Button(
-                        onClick = onStartEdit,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = CookncoOrange, contentColor = CookncoWhite),
-                    ) { Text("EDIT", fontWeight = FontWeight.Bold, letterSpacing = 1.sp) }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = if (tips.isNotBlank()) 22.dp else 0.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "MY NOTES · ONLY YOU SEE THESE",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoNavy,
+                letterSpacing = 1.sp,
+                modifier = Modifier.weight(1f),
+            )
+            if (!isEditing) {
+                StickerPill(shadowOffset = 3.dp, onClick = onStartEdit) {
+                    Text("Edit", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                }
+            }
+        }
+
+        // The signed-in user's private note — editing, saved and empty states.
+        if (isEditing) {
+            TextField(
+                value = notes,
+                onValueChange = onNotesChange,
+                placeholder = { Text("Write notes here!", color = CookncoNavy.copy(alpha = 0.4f)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 4,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CookncoWhite,
+                    unfocusedContainerColor = CookncoWhite,
+                    focusedBorderColor = CookncoOrange,
+                    unfocusedBorderColor = CookncoNavy.copy(alpha = 0.5f),
+                    focusedTextColor = CookncoNavy,
+                    unfocusedTextColor = CookncoNavy,
+                    cursorColor = CookncoOrange,
+                ),
+                shape = RoundedCornerShape(12.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onCancel) { Text("Cancel", color = CookncoNavy.copy(alpha = 0.7f)) }
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = onSave,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = CookncoOrange, contentColor = CookncoWhite),
+                ) { Text("SAVE", fontWeight = FontWeight.Bold, letterSpacing = 1.sp) }
+            }
+        } else if (remoteNotes != null) {
+            StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                Text(
+                    text = notes,
+                    modifier = Modifier.padding(16.dp),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = CookncoNavy,
+                )
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .dashedNavyBorder(radius = 20.dp)
+                    .clickable(onClick = onStartEdit)
+                    .padding(16.dp),
+            ) {
+                Text(
+                    text = "Write a note here — it stays on this recipe, on every device.",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CookncoNavy,
+                )
+            }
+        }
+    }
+}
+
+/** A dashed navy rounded-rect outline — the notes tab's empty-state prompt (no filled equivalent
+ * exists in [com.xavierclavel.cooknco.ui.theme.Sticker], so it is drawn directly here). */
+private fun Modifier.dashedNavyBorder(radius: Dp): Modifier = drawWithContent {
+    drawContent()
+    val strokeWidthPx = 3.dp.toPx()
+    drawRoundRect(
+        color = CookncoNavy,
+        style = Stroke(
+            width = strokeWidthPx,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 7.dp.toPx())),
+        ),
+        cornerRadius = CornerRadius(radius.toPx()),
+        topLeft = androidx.compose.ui.geometry.Offset(strokeWidthPx / 2f, strokeWidthPx / 2f),
+        size = androidx.compose.ui.geometry.Size(size.width - strokeWidthPx, size.height - strokeWidthPx),
+    )
+}
+
+/**
+ * The "···" overflow menu, styled as a bottom action sheet (see `Cooknco Mobile.dc.html`,
+ * turn 5 / option `5a`, "Recipe — owner actions") rather than a Material [androidx.compose.material3.DropdownMenu] —
+ * the mockup shows a full-width sheet over a dark scrim, not a small anchored dropdown.
+ *
+ * "Add to a cookbook" appears in that mockup too, but this screen has no callback for it
+ * (no such navigation exists yet), so it is left out rather than wired to nothing.
+ */
+@Composable
+private fun RecipeActionSheet(
+    recipe: RecipeInfo,
+    isOwner: Boolean,
+    onShare: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDismissRequest: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(CookncoNavy.copy(alpha = 0.55f))
+                .clickable(onClick = onDismissRequest),
+        ) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp)
+                    .padding(bottom = 26.dp),
+            ) {
+                StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 12.dp)) {
+                            Text(recipe.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                            Text(
+                                text = if (isOwner) "Your recipe · ${publishedLabel(recipe.creationDate)}" else publishedLabel(recipe.creationDate).replaceFirstChar(Char::uppercase),
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = CookncoGreenDark,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                        ActionSheetDivider()
+                        ActionSheetRow(label = "Share link", onClick = { onDismissRequest(); onShare() })
+                        if (isOwner) {
+                            ActionSheetDivider()
+                            ActionSheetRow(label = "Edit recipe", onClick = { onDismissRequest(); onEdit() })
+                            ActionSheetDivider()
+                            ActionSheetRow(
+                                label = "Delete recipe",
+                                textColor = MaterialTheme.colorScheme.error,
+                                onClick = { onDismissRequest(); onDelete() },
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                StickerCard(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    shadowOffset = 4.dp,
+                    onClick = onDismissRequest,
+                ) {
+                    Text(
+                        text = "Cancel",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CookncoNavy,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ActionSheetRow(label: String, onClick: () -> Unit, textColor: Color = CookncoNavy) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = textColor)
+    }
+}
+
+@Composable
+private fun ActionSheetDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .background(CookncoNavy.copy(alpha = 0.12f)),
+    )
 }
 
 // ── Preview ──────────────────────────────────────────────────────────────────
