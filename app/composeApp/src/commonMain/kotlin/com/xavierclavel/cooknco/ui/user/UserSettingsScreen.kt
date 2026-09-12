@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,8 +42,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xavierclavel.cooknco.platform.appVersion
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
@@ -53,10 +54,19 @@ import com.xavierclavel.cooknco.ui.theme.StickerCard
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 
 /**
- * The account preferences [UserSettingsViewModel] already loads/saves, plus the log-out
- * action that used to sit directly behind [UserProfileScreen]'s gear icon (see
- * `MainScreen`'s former `showLogoutConfirm`). The confirm dialog now lives here instead,
- * local to this screen, since logging out is a settings action rather than a bare tap.
+ * Matches the mockup's "Settings" artboard (`Cooknco Mobile.dc.html`, turn 5 / option `5a`,
+ * lines 1221-1283): a PRIVACY card backed by [UserSettingsViewModel], an ACCOUNT card, and a
+ * standalone log-out row. The mockup has no Save button — each toggle applies immediately —
+ * and no confirmation-modal artwork for log out, so that dialog stays a plain
+ * [AlertDialog] rather than moving to [com.xavierclavel.cooknco.ui.theme.StickerConfirmDialog]
+ * (that shared component's mockup reference is "Delete recipe — confirmation", a different
+ * screen; nothing here shows the same treatment for logging out).
+ *
+ * The mockup's LANGUAGE, NOTIFICATIONS, and ACCOUNT "Change password" / "MCP access" rows are
+ * not reproduced: [UserSettingsViewModel] carries no state for them and none of those
+ * destinations exist yet elsewhere in the app, so rendering them here would be either a dead
+ * control (a language switch or notification toggle nothing backs) or a dead link. "App
+ * version" is included since it reads a real value ([appVersion]).
  */
 @Composable
 fun UserSettingsScreen(
@@ -81,7 +91,7 @@ fun UserSettingsScreen(
             StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
             }
-            Text("Settings", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            Text("Settings", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
         }
 
         if (uiState.isLoading) {
@@ -93,30 +103,41 @@ fun UserSettingsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp),
+                    .padding(top = 14.dp, start = 18.dp, end = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                Spacer(Modifier.height(2.dp))
-
-                // ── Account preferences ─────────────────────────────────────────
-                StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                        SettingsToggleRow(
-                            title = "Automatically accept follow requests",
-                            description = "Anyone can follow you without asking",
-                            checked = uiState.autoAcceptFollowRequests,
-                            onCheckedChange = { viewModel.toggleAutoAccept() },
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 14.dp),
-                            color = CookncoNavy.copy(alpha = 0.12f),
-                        )
-                        SettingsToggleRow(
-                            title = "Public account",
-                            description = "Your profile and recipes are visible to everyone",
-                            checked = uiState.isAccountPublic,
-                            onCheckedChange = { viewModel.toggleAccountPublic() },
-                        )
+                // ── Privacy ──────────────────────────────────────────────────────
+                Column {
+                    SettingsSectionLabel("PRIVACY")
+                    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            SettingsToggleRow(
+                                title = "Public account",
+                                description = "Anyone can see your recipes",
+                                checked = uiState.isAccountPublic,
+                                onCheckedChange = {
+                                    viewModel.toggleAccountPublic()
+                                    viewModel.save()
+                                },
+                                modifier = Modifier.padding(14.dp),
+                            )
+                            HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
+                            SettingsToggleRow(
+                                title = "Auto-accept follow requests",
+                                description = if (uiState.isAccountPublic) {
+                                    "Always on while your account is public"
+                                } else {
+                                    "Anyone can follow you without asking"
+                                },
+                                checked = uiState.isAccountPublic || uiState.autoAcceptFollowRequests,
+                                enabled = !uiState.isAccountPublic,
+                                onCheckedChange = {
+                                    viewModel.toggleAutoAccept()
+                                    viewModel.save()
+                                },
+                                modifier = Modifier.padding(14.dp),
+                            )
+                        }
                     }
                 }
 
@@ -130,49 +151,45 @@ fun UserSettingsScreen(
                     )
                 }
 
-                StickerCard(
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    fillColor = CookncoOrange,
-                    shadowOffset = 4.dp,
-                    onClick = viewModel::save,
-                ) {
-                    if (uiState.isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp).align(Alignment.Center),
-                            strokeWidth = 2.dp,
-                            color = CookncoWhite,
-                        )
-                    } else {
-                        Text(
-                            text = "Save",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = CookncoWhite,
-                            modifier = Modifier.align(Alignment.Center),
-                        )
+                // ── Account ──────────────────────────────────────────────────────
+                Column {
+                    SettingsSectionLabel("ACCOUNT")
+                    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 15.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "App version",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CookncoNavy,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = appVersion.ifBlank { "—" },
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = CookncoGreenDark,
+                            )
+                        }
                     }
                 }
 
                 // ── Log out ──────────────────────────────────────────────────────
-                Spacer(Modifier.height(4.dp))
-                HorizontalDivider(color = CookncoNavy.copy(alpha = 0.15f))
-                Spacer(Modifier.height(2.dp))
-
                 StickerCard(
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp),
                     shadowOffset = 4.dp,
                     onClick = { showLogoutConfirm = true },
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = CookncoNavy)
-                        Text("Log out", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = CookncoNavy)
-                    }
+                    Text(
+                        text = "Log out",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
                 }
 
                 Spacer(Modifier.height(24.dp))
@@ -216,6 +233,19 @@ fun UserSettingsScreen(
     }
 }
 
+/** An 11sp bold, letter-spaced caps label above a settings card — "PRIVACY", "ACCOUNT". */
+@Composable
+private fun SettingsSectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        color = CookncoNavy,
+        letterSpacing = 1.sp,
+        modifier = modifier.padding(start = 2.dp, bottom = 10.dp),
+    )
+}
+
 @Composable
 private fun settingsSwitchColors() = SwitchDefaults.colors(
     checkedThumbColor = CookncoWhite,
@@ -226,6 +256,16 @@ private fun settingsSwitchColors() = SwitchDefaults.colors(
     uncheckedTrackColor = CookncoBackground,
     uncheckedBorderColor = CookncoNavy.copy(alpha = 0.5f),
     uncheckedIconColor = CookncoBackground,
+    // The "forced on, locked" look auto-accept takes on while the account is public — a
+    // faded track/border rather than the normal orange, matching the mockup's greyed switch.
+    disabledCheckedThumbColor = CookncoBackground,
+    disabledCheckedTrackColor = CookncoNavy.copy(alpha = 0.12f),
+    disabledCheckedBorderColor = CookncoNavy.copy(alpha = 0.4f),
+    disabledCheckedIconColor = CookncoNavy.copy(alpha = 0.4f),
+    disabledUncheckedThumbColor = CookncoNavy.copy(alpha = 0.4f),
+    disabledUncheckedTrackColor = CookncoBackground,
+    disabledUncheckedBorderColor = CookncoNavy.copy(alpha = 0.3f),
+    disabledUncheckedIconColor = CookncoBackground,
 )
 
 @Composable
@@ -235,22 +275,30 @@ private fun SettingsToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
+    val textColor = if (enabled) CookncoNavy else CookncoNavy.copy(alpha = 0.5f)
+    val descriptionColor = if (enabled) CookncoGreenDark else CookncoNavy.copy(alpha = 0.5f)
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textColor)
             Text(
                 text = description,
-                fontSize = 12.5.sp,
-                color = CookncoNavy.copy(alpha = 0.6f),
-                modifier = Modifier.padding(top = 3.dp),
+                fontSize = 12.sp,
+                color = descriptionColor,
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = settingsSwitchColors())
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+            colors = settingsSwitchColors(),
+        )
     }
 }
 
@@ -269,25 +317,59 @@ fun UserSettingsScreenPreview() {
                 StickerIconButton(onClick = {}, shadowOffset = 3.dp) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                 }
-                Text("Settings", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
+                Text("Settings", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
             }
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                        SettingsToggleRow(
-                            title = "Automatically accept follow requests",
-                            description = "Anyone can follow you without asking",
-                            checked = true,
-                            onCheckedChange = {},
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp), color = CookncoNavy.copy(alpha = 0.12f))
-                        SettingsToggleRow(
-                            title = "Public account",
-                            description = "Your profile and recipes are visible to everyone",
-                            checked = false,
-                            onCheckedChange = {},
-                        )
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp, start = 18.dp, end = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Column {
+                    SettingsSectionLabel("PRIVACY")
+                    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            SettingsToggleRow(
+                                title = "Public account",
+                                description = "Anyone can see your recipes",
+                                checked = true,
+                                onCheckedChange = {},
+                                modifier = Modifier.padding(14.dp),
+                            )
+                            HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
+                            SettingsToggleRow(
+                                title = "Auto-accept follow requests",
+                                description = "Always on while your account is public",
+                                checked = true,
+                                enabled = false,
+                                onCheckedChange = {},
+                                modifier = Modifier.padding(14.dp),
+                            )
+                        }
                     }
+                }
+                Column {
+                    SettingsSectionLabel("ACCOUNT")
+                    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 15.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("App version", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, modifier = Modifier.weight(1f))
+                            Text("1.4.0", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = CookncoGreenDark)
+                        }
+                    }
+                }
+                StickerCard(
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    shadowOffset = 4.dp,
+                ) {
+                    Text(
+                        text = "Log out",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
                 }
             }
         }
