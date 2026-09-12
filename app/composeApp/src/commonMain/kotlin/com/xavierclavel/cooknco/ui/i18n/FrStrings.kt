@@ -95,7 +95,7 @@ object FrStrings : Strings {
     override val serves = "Pour"
 
     override fun fullDate(date: LocalDate) = "${weekday(date.dayOfWeek)} ${date.day} ${monthName(date.month)}"
-    override val whatsCooking = "On cuisine quoi ?"
+    override val whatsCooking = "Qu'est-ce que tu mijotes ?"
     override val yourProfile = "Votre profil"
     override fun newRecipesCount(count: Int) = if (count == 1) "1 nouvelle recette" else "$count nouvelles recettes"
     override fun weekday(day: DayOfWeek) = when (day) {

@@ -20,8 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.ExitToApp
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,6 +51,12 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.xavierclavel.cooknco.ui.components.SheetAction
+import com.xavierclavel.cooknco.ui.components.StickerActionSheet
+import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoBlueDark
@@ -165,11 +171,31 @@ private fun CookbookContent(
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
+    var showMenu by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
     ) {
-        // ── Banner image with the back / edit / delete overlay ───────────────
+        if (showMenu) {
+            item {
+                StickerActionSheet(
+                    title = cookbook.title,
+                    subtitle = s.recipeCount(recipes.size) + " · " + s.memberCount(members.size),
+                    actions = buildList {
+                        if (isAdmin) {
+                            add(SheetAction(label = s.editCookbook, onClick = onEdit))
+                        }
+                        add(SheetAction(label = s.leaveCookbook, onClick = onLeave, destructive = !isAdmin))
+                        if (isAdmin) {
+                            add(SheetAction(label = s.deleteCookbook, onClick = onDelete, destructive = true))
+                        }
+                    },
+                    onDismissRequest = { showMenu = false },
+                )
+            }
+        }
+
+        // ── Banner image with the back / "···" overlay ───────────────────────
         item {
             Box(modifier = Modifier.fillMaxWidth()) {
                 CookbookImage(
@@ -197,15 +223,23 @@ private fun CookbookContent(
                     StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
                     }
-                    if (isAdmin) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            StickerIconButton(onClick = onEdit, shadowOffset = 3.dp) {
-                                Icon(Icons.Outlined.Edit, contentDescription = s.edit)
-                            }
-                            StickerIconButton(onClick = onDelete, shadowOffset = 3.dp) {
-                                Icon(Icons.Outlined.Delete, contentDescription = s.delete, tint = MaterialTheme.colorScheme.error)
-                            }
-                        }
+                    val menuFill by animateColorAsState(
+                        targetValue = if (showMenu) CookncoNavy else CookncoBackground,
+                        animationSpec = stickerSwitchSpec(),
+                        label = "menu_fill",
+                    )
+                    val menuContent by animateColorAsState(
+                        targetValue = if (showMenu) CookncoWhite else CookncoNavy,
+                        animationSpec = stickerSwitchSpec(),
+                        label = "menu_content",
+                    )
+                    StickerIconButton(
+                        onClick = { showMenu = true },
+                        shadowOffset = 3.dp,
+                        fillColor = menuFill,
+                        contentColor = menuContent,
+                    ) {
+                        Icon(Icons.Outlined.MoreHoriz, contentDescription = s.more)
                     }
                 }
             }
@@ -291,25 +325,6 @@ private fun CookbookContent(
                             )
                         }
                     }
-                }
-            }
-        }
-
-        // ── Leave cookbook ───────────────────────────────────────────────────
-        item {
-            StickerCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp).height(50.dp),
-                shape = RoundedCornerShape(14.dp),
-                fillColor = CookncoGreenDark,
-                onClick = onLeave,
-            ) {
-                Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(Icons.Outlined.ExitToApp, contentDescription = null, tint = CookncoBackground, modifier = Modifier.size(18.dp))
-                    Text(s.leaveCookbook, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoBackground)
                 }
             }
         }

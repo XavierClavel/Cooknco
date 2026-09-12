@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -73,6 +74,8 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.components.SheetAction
+import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -536,7 +539,13 @@ private fun LazyListScope.ingredientsTab(
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = CookncoNavy,
-                        modifier = Modifier.width(54.dp),
+                        // A floor, not a width: "12 parts" does not fit 54dp and was
+                        // wrapping onto a second line inside the pill. The pill has the
+                        // room to grow — the label beside it carries the weight — so the
+                        // count takes what it needs and keeps to one line.
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.widthIn(min = 54.dp).padding(horizontal = 4.dp),
                         textAlign = TextAlign.Center,
                     )
                     Box(
@@ -873,11 +882,9 @@ private fun Modifier.dashedNavyBorder(radius: Dp): Modifier = drawWithContent {
 }
 
 /**
- * The "···" overflow menu, styled as a bottom action sheet (see `Cooknco Mobile.dc.html`,
- * turn 5 / option `5a`, "Recipe — owner actions") rather than a Material [androidx.compose.material3.DropdownMenu] —
- * the mockup shows a full-width sheet over a dark scrim, not a small anchored dropdown.
+ * The recipe's own "···" sheet: which actions it offers, on top of [StickerActionSheet].
  *
- * "Add to a cookbook" appears in that mockup too, but this screen has no callback for it
+ * "Add to a cookbook" appears in the mockup too, but this screen has no callback for it
  * (no such navigation exists yet), so it is left out rather than wired to nothing.
  */
 @Composable
@@ -890,91 +897,21 @@ private fun RecipeActionSheet(
     onDismissRequest: () -> Unit,
 ) {
     val s = strings()
-    Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(CookncoNavy.copy(alpha = 0.55f))
-                .clickable(onClick = onDismissRequest),
-        ) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp)
-                    .padding(bottom = 26.dp),
-            ) {
-                StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 12.dp)) {
-                            Text(recipe.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-                            Text(
-                                text = if (isOwner) {
-                                    s.yourRecipe + " · " + publishedLabel(recipe.creationDate, s)
-                                } else {
-                                    publishedLabel(recipe.creationDate, s).replaceFirstChar(Char::uppercase)
-                                },
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = CookncoGreenDark,
-                                modifier = Modifier.padding(top = 2.dp),
-                            )
-                        }
-                        ActionSheetDivider()
-                        ActionSheetRow(label = s.shareLink, onClick = { onDismissRequest(); onShare() })
-                        if (isOwner) {
-                            ActionSheetDivider()
-                            ActionSheetRow(label = s.editRecipe, onClick = { onDismissRequest(); onEdit() })
-                            ActionSheetDivider()
-                            ActionSheetRow(
-                                label = s.deleteRecipe,
-                                textColor = MaterialTheme.colorScheme.error,
-                                onClick = { onDismissRequest(); onDelete() },
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                StickerCard(
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    shadowOffset = 4.dp,
-                    onClick = onDismissRequest,
-                ) {
-                    Text(
-                        text = s.cancel,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CookncoNavy,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
-                }
+    StickerActionSheet(
+        title = recipe.title,
+        subtitle = if (isOwner) {
+            s.yourRecipe + " · " + publishedLabel(recipe.creationDate, s)
+        } else {
+            publishedLabel(recipe.creationDate, s).replaceFirstChar(Char::uppercase)
+        },
+        actions = buildList {
+            add(SheetAction(label = s.shareLink, onClick = onShare))
+            if (isOwner) {
+                add(SheetAction(label = s.editRecipe, onClick = onEdit))
+                add(SheetAction(label = s.deleteRecipe, onClick = onDelete, destructive = true))
             }
-        }
-    }
-}
-
-@Composable
-private fun ActionSheetRow(label: String, onClick: () -> Unit, textColor: Color = CookncoNavy) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text = label, fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = textColor)
-    }
-}
-
-@Composable
-private fun ActionSheetDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(2.dp)
-            .background(CookncoNavy.copy(alpha = 0.12f)),
+        },
+        onDismissRequest = onDismissRequest,
     )
 }
 
