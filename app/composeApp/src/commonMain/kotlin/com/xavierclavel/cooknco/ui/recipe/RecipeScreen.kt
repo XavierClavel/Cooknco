@@ -271,7 +271,7 @@ private fun RecipeContent(
                 // Info card: dish class, title, description, author, meta — overlaps the
                 // banner's bottom edge by 30dp, per the mockup's `margin:-30px 18px 0`.
                 StickerCard(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, top = 250.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 250.dp),
                     shape = RoundedCornerShape(20.dp),
                 ) {
                     Column(
