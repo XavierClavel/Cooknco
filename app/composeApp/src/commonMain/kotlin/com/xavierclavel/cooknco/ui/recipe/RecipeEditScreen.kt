@@ -100,6 +100,8 @@ import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoOrangeDark
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.swallowTaps
+import com.xavierclavel.cooknco.ui.theme.sheetScrim
 import com.xavierclavel.cooknco.ui.theme.StickerDropdownMenu
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 import com.xavierclavel.cooknco.ui.theme.StickerTextArea
@@ -707,10 +709,19 @@ private fun NumberPickerSheet(
 
     Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(
-            modifier = Modifier.fillMaxSize().background(CookncoNavy.copy(alpha = 0.55f)),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(CookncoNavy.copy(alpha = 0.55f))
+                // Nothing is written until "Set", so tapping away is simply cancelling.
+                .sheetScrim(onDismissRequest),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 26.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .swallowTaps()
+                    .padding(start = 14.dp, end = 14.dp, bottom = 26.dp),
+            ) {
                 StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), shadowOffset = 6.dp) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)) {

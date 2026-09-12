@@ -26,6 +26,8 @@ import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.swallowTaps
+import com.xavierclavel.cooknco.ui.theme.sheetScrim
 
 /**
  * One line of a [StickerActionSheet].
@@ -64,12 +66,13 @@ fun StickerActionSheet(
             modifier = Modifier
                 .fillMaxSize()
                 .background(CookncoNavy.copy(alpha = 0.55f))
-                .clickable(onClick = onDismissRequest),
+                .sheetScrim(onDismissRequest),
         ) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .swallowTaps()
                     .padding(horizontal = 14.dp)
                     .padding(bottom = 26.dp),
             ) {
