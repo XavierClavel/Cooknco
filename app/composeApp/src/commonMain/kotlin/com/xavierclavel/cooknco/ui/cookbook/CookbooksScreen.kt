@@ -86,7 +86,7 @@ private fun CookbooksScreenContent(
         ) {
             Text(s.cookbooks, fontSize = 27.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 33.sp)
             Text(
-                text = "${cookbooks.size} book${if (cookbooks.size == 1) "" else "s"}",
+                text = s.cookbookCount(cookbooks.size),
                 fontSize = 13.sp,
                 color = CookncoNavy,
                 modifier = Modifier.padding(top = 3.dp),

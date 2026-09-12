@@ -215,6 +215,7 @@ interface Strings {
     val shared: String
     val recipes: String
     val members: String
+    fun cookbookCount(count: Int): String
     fun memberCount(count: Int): String
     val leaveCookbook: String
     val leaveCookbookQuestion: String

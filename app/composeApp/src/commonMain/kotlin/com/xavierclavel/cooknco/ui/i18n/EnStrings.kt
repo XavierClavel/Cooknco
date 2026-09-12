@@ -222,6 +222,7 @@ object EnStrings : Strings {
     override val shared = "Shared"
     override val recipes = "Recipes"
     override val members = "Members"
+    override fun cookbookCount(count: Int) = if (count == 1) "1 book" else "$count books"
     override fun memberCount(count: Int) = if (count == 1) "1 member" else "$count members"
     override val leaveCookbook = "Leave cookbook"
     override val leaveCookbookQuestion = "Are you sure you want to leave this cookbook?"
