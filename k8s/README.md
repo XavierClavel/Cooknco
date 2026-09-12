@@ -15,6 +15,36 @@ k8s/
 └── migration/            one-time default -> cooknco runbook
 ```
 
+## Backups
+
+`base/backup.yaml` dumps both databases every night at 02:15 UTC onto the
+`database-backups` volume, keeping 14 days. `-Fc` is the custom format, so
+`pg_restore` can pull one table — or one row — out of a dump without replaying
+all of it.
+
+This is a copy on the same cluster as the thing it copies, which is not disaster
+recovery: a lost cluster loses the backups with it. What it does cover is the
+failure that actually happens — something deleted or corrupted that needs to come
+back — and there was nothing at all for that before, since the databases are plain
+`postgres:17.2` on a PVC with no WAL archiving.
+
+```sh
+# what is on the volume
+kubectl -n cooknco create job --from=cronjob/database-backup backup-now   # run one off-schedule
+kubectl -n cooknco run backup-shell --rm -it --restart=Never --image=postgres:17.2   --overrides='{"spec":{"containers":[{"name":"sh","image":"postgres:17.2","command":["sh"],"stdin":true,"tty":true,"volumeMounts":[{"name":"b","mountPath":"/backups"}]}],"volumes":[{"name":"b","persistentVolumeClaim":{"claimName":"database-backups"}}]}}'
+
+# copy one out of the cluster
+kubectl -n cooknco cp backup-shell:/backups/cooknco-20260912-021500.dump ./cooknco.dump
+
+# inspect it, then restore a single table into a scratch database
+pg_restore -l cooknco.dump | less
+pg_restore -h localhost -U postgres -d scratch -t recipes cooknco.dump
+```
+
+Restoring into the live database is deliberately not a one-liner here: pick the
+rows you need out of a scratch restore and insert them, rather than replaying a
+whole dump over a database that has moved on since.
+
 ## Rendering and applying
 
 ```sh

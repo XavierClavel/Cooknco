@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-backups
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      # Two dumps a night at a few tens of MB compressed, kept for 14 days, with
+      # room for the databases to grow several times over before this is tight.
+      storage: 10Gi
+---
+# A nightly `pg_dump` of both databases onto a volume of their own.
+#
+# There was nothing before this: the cluster runs plain `postgres:17.2` against a
+# PVC, with no WAL archiving and no snapshots the repo knows about, so anything
+# deleted or corrupted was gone. A dump on the same cluster is not a disaster-
+# recovery story — it shares a failure domain with what it backs up — but it is
+# the difference between "restore last night's copy" and "it is gone", which is
+# the failure that actually happens.
+#
+# `-Fc` (custom format) rather than plain SQL: it is compressed, and `pg_restore`
+# can pull a single table out of it, which is what restoring one mistakenly
+# deleted recipe needs.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+spec:
+  # 02:15 UTC — after the daily traffic trough, and off the hour so it does not
+  # start alongside every other cron on the cluster.
+  schedule: "15 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  # A missed window (a node reboot, a cluster upgrade) is a skipped backup, not a
+  # backlog to catch up on: the next night's dump supersedes it anyway.
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pg-dump
+              # Must match the server's major version: pg_dump refuses a server
+              # newer than itself, so this tracks the two database Deployments.
+              image: postgres:17.2
+              env:
+                - name: COOKNCO_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: cooknco-secrets
+                      key: postgres-db
+                - name: COOKNCO_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: cooknco-secrets
+                      key: postgres-user
+                - name: COOKNCO_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: cooknco-secrets
+                      key: postgres-password
+                - name: MAIL_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: mail-database-secrets
+                      key: POSTGRES_DB
+                - name: MAIL_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: mail-database-secrets
+                      key: POSTGRES_USER
+                - name: MAIL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: mail-database-secrets
+                      key: POSTGRES_PASSWORD
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  stamp=$(date -u +%Y%m%d-%H%M%S)
+
+                  dump() {
+                    host=$1; db=$2; user=$3; pass=$4; name=$5
+                    out="/backups/${name}-${stamp}.dump"
+                    echo "dumping ${name} -> ${out}"
+                    # Written to .part first and renamed on success, so a dump
+                    # killed halfway through can never be mistaken for a good one
+                    # by whoever is restoring at four in the morning.
+                    PGPASSWORD="$pass" pg_dump -h "$host" -U "$user" -d "$db" -Fc -f "${out}.part"
+                    [ -s "${out}.part" ] || { echo "empty dump for ${name}"; exit 1; }
+                    mv "${out}.part" "$out"
+                    ls -lh "$out"
+                  }
+
+                  dump cooknco-database "$COOKNCO_DB" "$COOKNCO_USER" "$COOKNCO_PASSWORD" cooknco
+                  dump mail-service-database "$MAIL_DB" "$MAIL_USER" "$MAIL_PASSWORD" mail-service
+
+                  # Retention runs after the new dumps are on disk, so a failed
+                  # night never leaves the volume emptier than it found it.
+                  find /backups -name '*.dump' -mtime +14 -print -delete
+                  find /backups -name '*.dump.part' -mtime +1 -print -delete
+                  echo "backups on disk:"
+                  ls -lh /backups
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: database-backups

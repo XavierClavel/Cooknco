@@ -12,6 +12,7 @@ resources:
   - frontend.yaml
   - mail-service-db.yaml
   - mail-service.yaml
+  - backup.yaml
   - certificate.yaml
   - ingress.yaml
 
