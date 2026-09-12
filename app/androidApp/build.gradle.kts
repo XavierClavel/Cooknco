@@ -42,6 +42,7 @@ android {
 dependencies {
     implementation(project(":composeApp"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
 
     // Push notifications. The service that receives one, and the code that draws it, have
     // to live in the application module — a manifest entry cannot come from a KMP library.

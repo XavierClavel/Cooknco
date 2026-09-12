@@ -22,7 +22,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class DateGroup(val label: String, val recipes: List<RecipeOverview>)
+/** What a day is called is the UI's business — see [DateGroupKey]. */
+data class DateGroup(val key: DateGroupKey, val recipes: List<RecipeOverview>)
+
+/** When a group of recipes was posted, before anybody has put it into words. */
+sealed interface DateGroupKey {
+    data object Today : DateGroupKey
+    data object Yesterday : DateGroupKey
+    data class Weekday(val dayOfWeek: DayOfWeek) : DateGroupKey
+    data class On(val date: LocalDate) : DateGroupKey
+}
 
 data class HomeUiState(
     val dateGroups: List<DateGroup> = emptyList(),
@@ -49,14 +58,19 @@ class HomeViewModel(
     fun loadMore() {
         val state = _uiState.value
         if (state.isLoading || state.allLoaded) return
+        // Marked before the coroutine starts: two scroll-triggered calls in the same frame
+        // would both pass the guard above and both append the same page otherwise.
+        _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
             recipeRepository.listRecipes(userId, currentPage)
                 .onSuccess { items ->
                     if (items.isEmpty()) {
                         _uiState.update { it.copy(isLoading = false, allLoaded = true) }
                     } else {
-                        allRecipes.addAll(items)
+                        // Offset paging over a list that changes repeats rows; the feed
+                        // keys its items by recipe id, and a repeat there is a crash.
+                        val known = allRecipes.mapTo(HashSet()) { it.id }
+                        allRecipes.addAll(items.filterNot { it.id in known })
                         currentPage++
                         _uiState.update { it.copy(
                             isLoading = false,
@@ -73,7 +87,7 @@ class HomeViewModel(
     private fun groupByDate(recipes: List<RecipeOverview>): List<DateGroup> {
         val timeZone = TimeZone.currentSystemDefault()
         val today = Clock.System.now().toLocalDateTime(timeZone).date
-        val groups = LinkedHashMap<String, MutableList<RecipeOverview>>()
+        val groups = LinkedHashMap<DateGroupKey, MutableList<RecipeOverview>>()
 
         for (recipe in recipes) {
             val recipeDay = Instant.fromEpochSeconds(recipe.creationDate)
@@ -81,38 +95,22 @@ class HomeViewModel(
                 .date
             val diffDays = today.toEpochDays() - recipeDay.toEpochDays()
 
-            val label = when {
-                diffDays == 0L -> "Today"
-                diffDays == 1L -> "Yesterday"
-                diffDays in 2L..6L -> dayName(recipeDay.dayOfWeek)
-                else -> fullDateFormat.format(recipeDay)
+            // A key, not a label: the feed is regrouped by *when*, and what that is
+            // called depends on a language that can change while the screen is open.
+            val key = when {
+                diffDays == 0L -> DateGroupKey.Today
+                diffDays == 1L -> DateGroupKey.Yesterday
+                diffDays in 2L..6L -> DateGroupKey.Weekday(recipeDay.dayOfWeek)
+                else -> DateGroupKey.On(recipeDay)
             }
 
-            groups.getOrPut(label) { mutableListOf() }.add(recipe)
+            groups.getOrPut(key) { mutableListOf() }.add(recipe)
         }
 
-        return groups.map { (label, list) -> DateGroup(label, list) }
-    }
-
-    private fun dayName(dayOfWeek: DayOfWeek) = when (dayOfWeek) {
-        DayOfWeek.MONDAY -> "Monday"
-        DayOfWeek.TUESDAY -> "Tuesday"
-        DayOfWeek.WEDNESDAY -> "Wednesday"
-        DayOfWeek.THURSDAY -> "Thursday"
-        DayOfWeek.FRIDAY -> "Friday"
-        DayOfWeek.SATURDAY -> "Saturday"
-        else -> "Sunday"
+        return groups.map { (key, list) -> DateGroup(key, list) }
     }
 
     companion object {
-        private val fullDateFormat = LocalDate.Format {
-            day()
-            char(' ')
-            monthName(MonthNames.ENGLISH_FULL)
-            char(' ')
-            year()
-        }
-
         fun factory(userId: Long): ViewModelProvider.Factory = viewModelFactory {
             initializer { HomeViewModel(AppGraph.recipeRepository, userId) }
         }

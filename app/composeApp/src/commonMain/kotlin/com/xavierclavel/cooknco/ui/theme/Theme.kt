@@ -33,7 +33,7 @@ private val LightColorScheme = lightColorScheme(
 fun CookncoTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = LightColorScheme,
-        typography = Typography,
+        typography = cookncoTypography(cookncoFontFamily()),
         content = content,
     )
 }

@@ -1,6 +1,5 @@
 package com.xavierclavel.cooknco.ui.home
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,14 +14,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,8 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,14 +43,23 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.EnStrings
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
+import com.xavierclavel.cooknco.ui.theme.StickerCard
+import kotlin.time.Clock
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+
 
 @Composable
 fun HomeScreen(
@@ -60,14 +67,21 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onRecipeClick: (Long) -> Unit = {},
     onUserClick: (Long) -> Unit = {},
+    /**
+     * Where the greeting's avatar goes. Not [onUserClick] with your own id: that pushes
+     * the other-people's-profile route, which carries a back arrow and no settings gear,
+     * so it opened a second, lesser copy of a screen the bottom bar already holds.
+     */
+    onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val listState = rememberLazyListState()
+    val s = strings()
+    val gridState = rememberLazyGridState()
 
     val reachedEnd by remember {
         derivedStateOf {
-            val info = listState.layoutInfo
+            val info = gridState.layoutInfo
             val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
             last >= info.totalItemsCount - 3
         }
@@ -76,124 +90,125 @@ fun HomeScreen(
         if (reachedEnd && !uiState.allLoaded) viewModel.loadMore()
     }
 
-    val timelineColor = CookncoNavy.copy(alpha = 0.2f)
+    Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
+        HomeHeader(user = user, onAvatarClick = onProfileClick)
 
-    LazyColumn(
-        state = listState,
-        modifier = modifier
-            .fillMaxSize()
-            .drawBehind {
-                // Vertical timeline line, aligned to the center of the date-group circles
-                val lineX = 44.dp.toPx()
-                drawLine(
-                    color = timelineColor,
-                    start = Offset(lineX, 0f),
-                    end = Offset(lineX, size.height),
-                    strokeWidth = 2.dp.toPx(),
-                )
-            },
-        contentPadding = PaddingValues(bottom = 32.dp),
-    ) {
-        // Welcome header
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 78.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
-            ) {
-                Text(
-                    text = "Welcome, ${user.username}! ✨",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = CookncoNavy,
-                )
-                Text(
-                    text = "What's cooking, good looking?",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = CookncoNavy.copy(alpha = 0.55f),
-                    fontWeight = FontWeight.Light,
-                )
-            }
-        }
-
-        uiState.dateGroups.forEach { group ->
-            item(key = "header_${group.label}") {
-                DateGroupHeader(label = group.label, count = group.recipes.size)
-            }
-            items(group.recipes, key = { it.id }) { recipe ->
-                RecipeCard(
-                    recipe = recipe,
-                    onClick = { onRecipeClick(recipe.id) },
-                    onUserClick = onUserClick,
-                    modifier = Modifier.padding(
-                        start = 78.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = 4.dp,
-                    ),
-                )
-            }
-            item(key = "spacer_${group.label}") {
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-
-        if (uiState.isLoading) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            state = gridState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            uiState.dateGroups.forEach { group ->
+                // A date is a heading over the rows beneath it, not a cell beside one.
+                item(key = "header_${group.key}", span = { GridItemSpan(2) }) {
+                    DateGroupHeader(label = s.dateGroup(group.key), count = group.recipes.size)
+                }
+                items(group.recipes, key = { it.id }) { recipe ->
+                    RecipeCard(
+                        recipe = recipe,
+                        onClick = { onRecipeClick(recipe.id) },
+                        onUserClick = onUserClick,
+                    )
                 }
             }
-        }
 
-        if (uiState.error != null) {
-            item {
-                Text(
-                    text = uiState.error!!,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(16.dp),
-                )
+            if (uiState.isLoading) {
+                item(span = { GridItemSpan(2) }) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
+                    }
+                }
             }
+
+            if (uiState.error != null) {
+                item(span = { GridItemSpan(2) }) {
+                    Text(
+                        text = uiState.error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+
+            item(span = { GridItemSpan(2) }) { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
 
 @Composable
+private fun HomeHeader(user: UserInfo, onAvatarClick: () -> Unit, modifier: Modifier = Modifier) {
+    val s = strings()
+    val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()) }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 14.dp),
+        // Top, not Bottom: the greeting runs to two lines in some languages, and an
+        // avatar hung off the bottom of a block that tall sits well below the date it is
+        // meant to be level with.
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = s.fullDate(today.date).uppercase(),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoNavy,
+                letterSpacing = 0.5.sp,
+            )
+            Text(
+                text = s.whatsCooking,
+                fontSize = 27.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoNavy,
+                lineHeight = 34.sp,
+            )
+        }
+        UserAvatar(
+            userId = user.id,
+            version = user.version,
+            contentDescription = s.yourProfile,
+            modifier = Modifier
+                .size(46.dp)
+                .clip(CircleShape)
+                .border(2.5.dp, CookncoNavy, CircleShape)
+                .clickable(onClick = onAvatarClick),
+        )
+    }
+}
+
+@Composable
 private fun DateGroupHeader(label: String, count: Int) {
+    val s = strings()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+            .padding(top = 14.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // Orange count circle — centered on the timeline line (x = 44dp = 20 + 24 radius)
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(CookncoOrange)
-                .border(2.dp, CookncoNavy, CircleShape),
-            contentAlignment = Alignment.Center,
+                .clip(RoundedCornerShape(percent = 50))
+                .background(CookncoBackground)
+                .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+                .padding(horizontal = 13.dp, vertical = 5.dp),
         ) {
-            Text(
-                text = count.toString(),
-                color = CookncoWhite,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
         }
         Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            text = s.newRecipesCount(count),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
             color = CookncoNavy,
-            fontSize = 17.sp,
         )
     }
 }
@@ -205,39 +220,62 @@ private fun RecipeCard(
     onUserClick: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        onClick = onClick,
+    StickerCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = CookncoGreen),
-        border = BorderStroke(1.5.dp, CookncoNavy),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(18.dp),
+        shadowOffset = 5.dp,
+        onClick = onClick,
     ) {
         Column {
-            // Recipe photo
             RecipeImage(
                 recipeId = recipe.id,
                 version = recipe.version,
                 contentDescription = recipe.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp),
+                // An aspect rather than a fixed height, so the picture is the same shape in
+                // both columns however wide the handset is.
+                modifier = Modifier.fillMaxWidth().aspectRatio(1.15f),
             )
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(CookncoNavy))
 
-            // Green footer: title + author chip
             Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = recipe.title,
-                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = CookncoNavy,
+                    // Two lines of room whether the title needs them or not: side by side, a
+                    // one-line title next to a two-line one leaves the row ragged and the
+                    // shorter card stubby.
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    lineHeight = 19.sp,
                 )
-                AuthorChip(owner = recipe.owner, onClick = { onUserClick(recipe.owner.id) })
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    // The author is what makes this a feed rather than a list of recipes, so
+                    // it stays. It yields its width rather than taking it: a long username
+                    // ellipsises instead of pushing the likes off the card.
+                    AuthorChip(
+                        owner = recipe.owner,
+                        onClick = { onUserClick(recipe.owner.id) },
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(CookncoOrange)
+                            .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = 7.dp, vertical = 3.dp),
+                    ) {
+                        LikeCount(count = recipe.likesCount, color = CookncoWhite, fontSize = 11.5.sp, iconSize = 12.dp)
+                    }
+                }
             }
         }
     }
@@ -249,24 +287,24 @@ private fun AuthorChip(owner: RecipeOwner, onClick: () -> Unit = {}, modifier: M
         modifier = modifier
             .clip(RoundedCornerShape(50.dp))
             .background(CookncoWhite)
-            .border(1.5.dp, CookncoNavy, RoundedCornerShape(50.dp))
+            .border(2.dp, CookncoNavy, RoundedCornerShape(50.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         UserAvatar(
             userId = owner.id,
             version = owner.version,
             contentDescription = null,
             modifier = Modifier
-                .size(28.dp)
+                .size(18.dp)
                 .clip(CircleShape),
         )
         Text(
             text = owner.username,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
             color = CookncoNavy,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -291,100 +329,29 @@ private val previewRecipes = listOf(
 )
 
 private val previewGroups = listOf(
-    DateGroup("March 22, 2026", previewRecipes.take(1)),
-    DateGroup("February 28, 2026", previewRecipes.drop(1)),
+    DateGroup(DateGroupKey.Today, previewRecipes.take(1)),
+    DateGroup(DateGroupKey.Yesterday, previewRecipes.drop(1)),
 )
-
-private val previewState = HomeUiState(dateGroups = previewGroups)
 
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
     CookncoTheme {
-        // Standalone preview — renders the layout without a real ViewModel
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(CookncoBackground),
-        ) {
-            HomeScreenContent(
-                user = previewUser,
-                uiState = previewState,
-                onRecipeClick = {},
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Home - Loading")
-@Composable
-fun HomeScreenLoadingPreview() {
-    CookncoTheme {
-        Box(modifier = Modifier.fillMaxSize().background(CookncoBackground)) {
-            HomeScreenContent(user = previewUser, uiState = HomeUiState(isLoading = true), onRecipeClick = {})
-        }
-    }
-}
-
-/**
- * Stateless version used for previews (no ViewModel dependency).
- */
-@Composable
-private fun HomeScreenContent(
-    user: UserInfo,
-    uiState: HomeUiState,
-    onRecipeClick: (Long) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val timelineColor = CookncoNavy.copy(alpha = 0.2f)
-
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .drawBehind {
-                val lineX = 44.dp.toPx()
-                drawLine(timelineColor, Offset(lineX, 0f), Offset(lineX, size.height), 2.dp.toPx())
-            },
-        contentPadding = PaddingValues(bottom = 32.dp),
-    ) {
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 78.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
+        Column(modifier = Modifier.fillMaxSize().background(CookncoGreen)) {
+            HomeHeader(user = previewUser, onAvatarClick = {})
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text(
-                    "Welcome, ${user.username}! ✨",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = CookncoNavy,
-                )
-                Text(
-                    "What's cooking, good looking?",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = CookncoNavy.copy(alpha = 0.55f),
-                    fontWeight = FontWeight.Light,
-                )
-            }
-        }
-
-        uiState.dateGroups.forEach { group ->
-            item { DateGroupHeader(label = group.label, count = group.recipes.size) }
-            items(group.recipes, key = { it.id }) { recipe ->
-                RecipeCard(
-                    recipe = recipe,
-                    onClick = { onRecipeClick(recipe.id) },
-                    onUserClick = {},
-                    modifier = Modifier.padding(start = 78.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
-                )
-            }
-            item { Spacer(Modifier.height(16.dp)) }
-        }
-
-        if (uiState.isLoading) {
-            item {
-                Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) {
-                    CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp)
+                previewGroups.forEach { group ->
+                    item(span = { GridItemSpan(2) }) {
+                        DateGroupHeader(label = EnStrings.dateGroup(group.key), count = group.recipes.size)
+                    }
+                    items(group.recipes, key = { it.id }) { recipe ->
+                        RecipeCard(recipe = recipe, onClick = {})
+                    }
                 }
             }
         }

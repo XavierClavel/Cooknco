@@ -6,6 +6,7 @@ import com.xavierclavel.utils.getLocale
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getQuery
+import com.xavierclavel.utils.getSort
 import com.xavierclavel.utils.json
 import com.xavierclavel.utils.logger
 import shared.dto.AbsorbCustomIngredientDTO
@@ -15,6 +16,7 @@ import shared.dto.SearchResult
 import shared.infodto.CustomIngredientUsage
 import shared.infodto.IngredientInfo
 import shared.utils.URL.INGREDIENT_URL
+import shared.enums.Sort
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -95,7 +97,8 @@ object IngredientController: Controller(INGREDIENT_URL) {
     private fun Route.searchIngredients() = get {
         val searchString = getQuery()
         val paging = getPaging()
-        val ingredients = ingredientService.search(searchString, paging, getLocale())
+        val sort = getSort().takeUnless { it == Sort.NONE } ?: Sort.BEST_MATCH
+        val ingredients = ingredientService.search(searchString, paging, getLocale(), sort)
         val result = SearchResult(ingredients.first, paging.pageIndex(), paging.pageSize(), ingredients.second)
         call.respond(json.encodeToString(SearchResult.serializer(IngredientInfo.serializer()), result))
     }

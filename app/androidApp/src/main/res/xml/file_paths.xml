@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the FileProvider is allowed to share, which is exactly one directory: the staging
+  files a camera capture is written to before it is uploaded. A grant is per-URI and
+  read-only by default, so a camera app is handed the one file it is about to fill in and
+  nothing else.
+-->
+<paths>
+    <cache-path name="captures" path="captures/" />
+</paths>

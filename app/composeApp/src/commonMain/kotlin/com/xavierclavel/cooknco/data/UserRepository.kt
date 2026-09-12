@@ -1,8 +1,10 @@
 package com.xavierclavel.cooknco.data
 
 import com.xavierclavel.cooknco.network.UserApi
+import com.xavierclavel.cooknco.network.dto.FollowInfoDto
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.network.dto.McpClientInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
 import kotlinx.coroutines.flow.first
 
@@ -25,8 +27,8 @@ class UserRepository(
         userApi.uploadProfileImage(requireToken(), userId, imageBytes, mimeType)
     }
 
-    suspend fun isFollowing(userId: Long): Result<Boolean> = runCatching {
-        userApi.isFollowing(requireToken(), userId)
+    suspend fun isFollowing(userId: Long, currentUserId: Long): Result<Boolean> = runCatching {
+        userApi.isFollowing(requireToken(), userId, currentUserId)
     }
 
     suspend fun follow(userId: Long): Result<Unit> = runCatching {
@@ -37,8 +39,40 @@ class UserRepository(
         userApi.unfollow(requireToken(), userId)
     }
 
-    suspend fun getUserRecipes(profileUserId: Long, page: Int): Result<List<RecipeOverview>> = runCatching {
-        userApi.getUserRecipes(token(), profileUserId, page)
+    suspend fun getFollowers(userId: Long, page: Int): Result<List<FollowInfoDto>> = runCatching {
+        userApi.getFollowers(token(), userId, page)
+    }
+
+    suspend fun getFollows(userId: Long, page: Int): Result<List<FollowInfoDto>> = runCatching {
+        userApi.getFollows(token(), userId, page)
+    }
+
+    suspend fun acceptFollowRequest(followerId: Long): Result<Unit> = runCatching {
+        userApi.acceptFollowRequest(requireToken(), followerId)
+    }
+
+    suspend fun declineFollowRequest(followerId: Long): Result<Unit> = runCatching {
+        userApi.declineFollowRequest(requireToken(), followerId)
+    }
+
+    suspend fun getUserRecipes(
+        profileUserId: Long,
+        page: Int,
+        liked: Boolean = false,
+    ): Result<List<RecipeOverview>> = runCatching {
+        userApi.getUserRecipes(token(), profileUserId, page, liked = liked)
+    }
+
+    suspend fun getMcpClients(): Result<List<McpClientInfo>> = runCatching {
+        userApi.getMcpClients(requireToken())
+    }
+
+    suspend fun revokeMcpClient(clientId: String): Result<Unit> = runCatching {
+        userApi.revokeMcpClient(requireToken(), clientId)
+    }
+
+    suspend fun updatePassword(old: String, new: String): Result<Unit> = runCatching {
+        userApi.updatePassword(requireToken(), old, new)
     }
 
     suspend fun getSettings(): Result<UserSettingsDTO> = runCatching {

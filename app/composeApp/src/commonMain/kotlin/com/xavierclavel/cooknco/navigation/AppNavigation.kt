@@ -1,14 +1,9 @@
 package com.xavierclavel.cooknco.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -19,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.xavierclavel.cooknco.PushNotifications
 import com.xavierclavel.cooknco.di.AppGraph
+import kotlinx.coroutines.flow.first
 import com.xavierclavel.cooknco.ui.auth.AuthState
 import com.xavierclavel.cooknco.ui.auth.AuthViewModel
 import com.xavierclavel.cooknco.platform.EnsureNotificationPermission
@@ -31,16 +27,29 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbookEditViewModel
 import com.xavierclavel.cooknco.ui.cookbook.CookbookScreen
 import com.xavierclavel.cooknco.ui.cookbook.CookbookViewModel
 import com.xavierclavel.cooknco.ui.main.MainScreen
+import com.xavierclavel.cooknco.ui.recipe.CookModeScreen
+import com.xavierclavel.cooknco.ui.recipe.IngredientScreen
+import com.xavierclavel.cooknco.ui.recipe.IngredientViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditScreen
+import com.xavierclavel.cooknco.ui.user.ChangePasswordScreen
+import com.xavierclavel.cooknco.ui.user.ChangePasswordViewModel
+import com.xavierclavel.cooknco.ui.user.FollowListScreen
+import com.xavierclavel.cooknco.ui.user.FollowListViewModel
+import com.xavierclavel.cooknco.ui.user.McpClientsScreen
+import com.xavierclavel.cooknco.ui.user.McpClientsViewModel
+import com.xavierclavel.cooknco.ui.user.FollowTab
 import com.xavierclavel.cooknco.ui.user.UserEditScreen
 import com.xavierclavel.cooknco.ui.user.UserEditViewModel
 import com.xavierclavel.cooknco.ui.user.UserProfileScreen
 import com.xavierclavel.cooknco.ui.user.UserProfileViewModel
+import com.xavierclavel.cooknco.ui.user.UserSettingsScreen
+import com.xavierclavel.cooknco.ui.user.UserSettingsViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeEditViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipesScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipesViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipeViewModel
+import com.xavierclavel.cooknco.ui.splash.SplashScreen
 
 private object Routes {
     const val SPLASH = "splash"
@@ -51,12 +60,19 @@ private object Routes {
     const val RECIPE = "recipe/{recipeId}"
     const val RECIPE_EDIT = "recipe/{recipeId}/edit"
     const val RECIPE_CREATE = "recipe/create"
+    const val RECIPE_COOK_MODE = "recipe/{recipeId}/cook"
     const val COOKBOOK = "cookbook/{cookbookId}"
     const val COOKBOOK_EDIT = "cookbook/{cookbookId}/edit"
     const val COOKBOOK_CREATE = "cookbook/create"
     const val USER = "user/{userId}"
     const val USER_EDIT = "user/{userId}/edit"
+    const val USER_FOLLOWERS = "user/{userId}/followers"
+    const val USER_FOLLOWING = "user/{userId}/following"
     const val RECIPES = "recipes"
+    const val SETTINGS = "settings"
+    const val PASSWORD = "settings/password"
+    const val MCP_CLIENTS = "settings/mcp-clients"
+    const val INGREDIENT = "ingredient/{ingredientId}"
 }
 
 @Composable
@@ -69,11 +85,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
         startDestination = Routes.SPLASH,
         modifier = modifier,
     ) {
-        composable(Routes.SPLASH) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        }
+        composable(Routes.SPLASH) { SplashScreen() }
 
         composable(Routes.LOGIN) {
             val state by viewModel.loginState.collectAsState()
@@ -130,14 +142,13 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
 
         composable(Routes.MAIN) {
             val user = (authState as? AuthState.Authenticated)?.user ?: return@composable
-            val isLoggingOut by viewModel.isLoggingOut.collectAsState()
             MainScreen(
                 user = user,
-                onLogout = viewModel::logout,
-                isLoggingOut = isLoggingOut,
-                onNavigateToSearch = { navController.navigate(Routes.RECIPES) },
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 onNavigateToEditProfile = { navController.navigate("user/${user.id}/edit") },
+                onNavigateToFollowers = { navController.navigate("user/${user.id}/followers") },
+                onNavigateToFollowing = { navController.navigate("user/${user.id}/following") },
                 onNavigateToRecipe = { recipeId ->
                     navController.navigate("recipe/$recipeId")
                 },
@@ -148,6 +159,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                         navController.navigate(Routes.RECIPE_CREATE)
                     }
                 },
+                onNavigateToIngredient = { navController.navigate("ingredient/$it") },
                 onNavigateToCookbook = { id ->
                     navController.navigate("cookbook/$id")
                 },
@@ -177,6 +189,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateToEdit = { id -> navController.navigate("recipe/$id/edit") },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
+                onNavigateToCookMode = { id -> navController.navigate("recipe/$id/cook") },
                 viewModel = recipeViewModel,
             )
         }
@@ -220,6 +233,17 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                     }
                 },
                 viewModel = createViewModel,
+            )
+        }
+
+        composable(
+            route = Routes.RECIPE_COOK_MODE,
+            arguments = listOf(navArgument("recipeId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val recipeId = backStackEntry.arguments?.read { getLongOrNull("recipeId") } ?: return@composable
+            CookModeScreen(
+                recipeId = recipeId,
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 
@@ -320,7 +344,33 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToEdit = { navController.navigate("user/$userId/edit") },
                 onNavigateToRecipe = { recipeId -> navController.navigate("recipe/$recipeId") },
+                onNavigateToSettings = null,
+                onNavigateToFollowers = { navController.navigate("user/$userId/followers") },
+                onNavigateToFollowing = { navController.navigate("user/$userId/following") },
             )
+        }
+
+        // Followers and Following are one screen with a switch (see FollowListScreen), so
+        // both routes land on it and only differ in which tab opens.
+        listOf(
+            Routes.USER_FOLLOWERS to FollowTab.FOLLOWERS,
+            Routes.USER_FOLLOWING to FollowTab.FOLLOWING,
+        ).forEach { (route, initialTab) ->
+            composable(
+                route = route,
+                arguments = listOf(navArgument("userId") { type = NavType.LongType }),
+            ) { backStackEntry ->
+                val userId = backStackEntry.arguments?.read { getLongOrNull("userId") } ?: return@composable
+                val followListViewModel: FollowListViewModel = viewModel(
+                    key = "follow_list_$userId",
+                    factory = FollowListViewModel.factory(userId, initialTab),
+                )
+                FollowListScreen(
+                    viewModel = followListViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToUser = { navController.navigate("user/$it") },
+                )
+            }
         }
 
         composable(
@@ -334,6 +384,52 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             )
             UserEditScreen(
                 viewModel = editViewModel,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            val isLoggingOut by viewModel.isLoggingOut.collectAsState()
+            val settingsViewModel: UserSettingsViewModel = viewModel(factory = UserSettingsViewModel.factory())
+            UserSettingsScreen(
+                viewModel = settingsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToPassword = { navController.navigate(Routes.PASSWORD) },
+                onNavigateToMcpClients = { navController.navigate(Routes.MCP_CLIENTS) },
+                onLogout = viewModel::logout,
+                isLoggingOut = isLoggingOut,
+            )
+        }
+
+        composable(
+            route = Routes.INGREDIENT,
+            arguments = listOf(navArgument("ingredientId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val ingredientId = backStackEntry.arguments?.read { getLongOrNull("ingredientId") } ?: return@composable
+            val currentUserId = (authState as? AuthState.Authenticated)?.user?.id ?: 0L
+            val ingredientViewModel: IngredientViewModel = viewModel(
+                key = "ingredient_$ingredientId",
+                factory = IngredientViewModel.factory(ingredientId, currentUserId),
+            )
+            IngredientScreen(
+                viewModel = ingredientViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onRecipeClick = { navController.navigate("recipe/$it") },
+            )
+        }
+
+        composable(Routes.MCP_CLIENTS) {
+            val mcpViewModel: McpClientsViewModel = viewModel(factory = McpClientsViewModel.factory())
+            McpClientsScreen(
+                viewModel = mcpViewModel,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.PASSWORD) {
+            val passwordViewModel: ChangePasswordViewModel = viewModel(factory = ChangePasswordViewModel.factory())
+            ChangePasswordScreen(
+                viewModel = passwordViewModel,
                 onNavigateBack = { navController.popBackStack() },
             )
         }
@@ -371,7 +467,11 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
      */
     val signedIn = authState is AuthState.Authenticated
     LaunchedEffect(signedIn) {
-        if (signedIn) AppGraph.pushRepository.registerCurrentDevice()
+        // Skipped when push is switched off for this handset (settings): registration runs
+        // on every launch, so without this it would undo the switch the next morning.
+        if (signedIn && AppGraph.devicePreferences.pushEnabled.first()) {
+            AppGraph.pushRepository.registerCurrentDevice()
+        }
     }
 
     /**

@@ -12,6 +12,8 @@ import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientSaveDto
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.dto.UnitInfo
+import com.xavierclavel.cooknco.network.dto.displayName
+import com.xavierclavel.cooknco.platform.PickedImage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,6 +55,7 @@ data class RecipeEditUiState(
     val units: List<UnitInfo> = emptyList(),
     val steps: List<StepItem> = emptyList(),
     val tips: String = "",
+    val pendingImage: PickedImage? = null,
     val error: String? = null,
     val recipeId: Long? = null,
     val recipeVersion: Long? = null,
@@ -138,6 +141,7 @@ class RecipeEditViewModel(
     fun updateCookTime(value: String) = _uiState.update { it.copy(cookTime = value) }
     fun updateCookTemp(value: String) = _uiState.update { it.copy(cookTemp = value) }
     fun updateTips(value: String) = _uiState.update { it.copy(tips = value) }
+    fun setPendingImage(image: PickedImage?) = _uiState.update { it.copy(pendingImage = image) }
 
     // Ingredient operations
     fun addIngredient() {
@@ -195,7 +199,7 @@ class RecipeEditViewModel(
     }
 
     fun selectIngredient(index: Int, summary: IngredientSummary) {
-        val name = summary.name["EN"] ?: summary.name.values.firstOrNull() ?: ""
+        val name = summary.displayName()
         _uiState.update { state ->
             val list = state.ingredients.toMutableList()
             if (index < list.size) {
@@ -325,7 +329,24 @@ class RecipeEditViewModel(
             }
             result
                 .onSuccess { recipe ->
-                    _uiState.update { it.copy(isSaving = false, saved = true, recipeId = recipe.id) }
+                    // The image needs a recipe id to upload against, which a brand-new
+                    // recipe only gets from this save — the opposite order from a profile
+                    // edit, where the id already exists going in. A failed upload here is
+                    // best-effort: the recipe's own content already saved, so it doesn't
+                    // block navigating on; the user can just add a photo again from Edit.
+                    // Clearing it only on success keeps a later "Save draft" tap from
+                    // re-uploading (and re-bumping the image version for) the same picture.
+                    val imageUploaded = state.pendingImage?.let { image ->
+                        repo.uploadRecipeImage(recipe.id, image.bytes, image.mimeType).isSuccess
+                    } ?: false
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            saved = true,
+                            recipeId = recipe.id,
+                            pendingImage = if (imageUploaded) null else it.pendingImage,
+                        )
+                    }
                 }
                 .onFailure { error ->
                     _uiState.update { it.copy(isSaving = false, error = error.message) }

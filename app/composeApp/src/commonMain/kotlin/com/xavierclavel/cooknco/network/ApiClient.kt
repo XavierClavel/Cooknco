@@ -2,6 +2,8 @@ package com.xavierclavel.cooknco.network
 
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
@@ -12,13 +14,16 @@ object ApiClient {
     /**
      * The locale the app asks the API for *content* in — ingredient names, recipe exports.
      *
-     * Still a constant: the app's own copy is English-only, so asking for French ingredient
-     * names inside an English screen would read worse than not. What the phone is actually
-     * set to is [com.xavierclavel.cooknco.platform.deviceLocale], which is a different
-     * question — it is what the backend writes *to* the user in, and it is reported rather
-     * than assumed.
+     * Written by [com.xavierclavel.cooknco.data.AppLanguage], which resolves it from the
+     * account's language and the handset's. It was a constant `EN` for as long as the app's
+     * own copy was English only: asking for French ingredient names inside an English screen
+     * would have read worse than not. Now that the screens speak both, the two agree.
+     *
+     * A plain `var`: it is written from the main thread when the language resolves and read
+     * from request threads, and a reference assignment is atomic — the worst a reader can
+     * see is the language from a moment ago, on a request it is about to repeat anyway.
      */
-    const val LOCALE = "EN"
+    var locale: String = "EN"
 
     val json = Json {
         ignoreUnknownKeys = true
@@ -34,3 +39,17 @@ object ApiClient {
         expectSuccess = false
     }
 }
+
+/**
+ * Reads a JSON body the API serves as `text/plain`.
+ *
+ * `GET /user` and `GET /ingredient` answer a generic `SearchResult<T>`, which has no
+ * serializer Ktor can find by type alone, so those two controllers encode it themselves
+ * and `call.respond` a plain String — which goes out as `text/plain`. ContentNegotiation
+ * only converts the content types it registered, so `body()` throws
+ * `NoTransformationFoundException` on them however well-formed the JSON is. Decoding the
+ * text ourselves ignores the content type, and keeps working if the backend ever labels
+ * those responses correctly.
+ */
+suspend inline fun <reified T> HttpResponse.decodeJsonText(): T =
+    ApiClient.json.decodeFromString(bodyAsText())

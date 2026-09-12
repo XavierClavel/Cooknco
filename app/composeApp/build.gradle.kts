@@ -8,6 +8,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Compose Multiplatform's resource accessors (Res.drawable.*, Res.font.*) are generated
+// under this package rather than one derived from the (unset) Gradle project group.
+compose.resources {
+    packageOfResClass = "com.xavierclavel.cooknco.resources"
+}
+
 kotlin {
     android {
         namespace = "com.xavierclavel.cooknco.shared"
@@ -20,6 +26,16 @@ kotlin {
 
         // Runs commonTest on the JVM.
         withHostTest {}
+
+        // Off by default for this plugin (com.android.kotlin.multiplatform.library) as of
+        // AGP 9 — without it, Compose Multiplatform's generated resources (composeResources,
+        // used by ui.theme.CookncoFont and the auth screens' Res.drawable.*) compile fine but
+        // never get copied into :androidApp's assets, so painterResource()/Font() throw
+        // MissingResourceException the moment anything using them actually renders. See
+        // https://youtrack.jetbrains.com/issue/CMP-9547.
+        androidResources {
+            enable = true
+        }
     }
 
     // Compose Multiplatform 1.11 no longer publishes iosX64 (Intel simulator).
@@ -42,6 +58,7 @@ kotlin {
             implementation(libs.compose.ui)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.compose.material.icons.extended)
+            implementation(libs.compose.components.resources)
 
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.viewmodel.compose)

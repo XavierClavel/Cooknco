@@ -6,7 +6,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.AuthRepository
+import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.di.AppGraph
+import com.xavierclavel.cooknco.ui.i18n.Strings
+import com.xavierclavel.cooknco.ui.i18n.stringsFor
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.ApiException
 import com.xavierclavel.cooknco.network.dto.UserInfo
@@ -81,7 +84,7 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     fun login() {
         val state = _loginState.value
         if (state.email.isBlank() || state.password.isBlank()) {
-            _loginState.update { it.copy(error = "Please fill in all fields") }
+            _loginState.update { it.copy(error = copy().fillInAllFields) }
             return
         }
         viewModelScope.launch {
@@ -101,11 +104,11 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         val state = _signupState.value
         when {
             state.username.isBlank() || state.email.isBlank() || state.password.isBlank() ->
-                _signupState.update { it.copy(error = "Please fill in all fields") }
+                _signupState.update { it.copy(error = copy().fillInAllFields) }
             state.password.length < 8 ->
-                _signupState.update { it.copy(error = "Password must be at least 8 characters") }
+                _signupState.update { it.copy(error = copy().passwordMinEight) }
             state.password != state.confirmPassword ->
-                _signupState.update { it.copy(error = "Passwords do not match") }
+                _signupState.update { it.copy(error = copy().passwordsDoNotMatch) }
             else -> viewModelScope.launch {
                 _signupState.update { it.copy(isLoading = true, error = null) }
                 authRepository.signup(state.username.trim(), state.email.trim(), state.password)
@@ -159,14 +162,27 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
     fun resetSignupSuccess() { _signupSuccess.value = false }
 
+    /**
+     * The copy for the language the app is in right now.
+     *
+     * A view model has no composition to read [com.xavierclavel.cooknco.ui.i18n.LocalStrings]
+     * from, so it asks [AppLanguage] directly. Read at the moment the message is produced
+     * rather than held: an error written before a language change keeps the words it was
+     * written in, which is the right answer for something the user is looking at.
+     */
+    private fun copy(): Strings = stringsFor(AppLanguage.current.value)
+
     private fun parseError(throwable: Throwable): String {
-        val body = (throwable as? ApiException)?.body ?: throwable.message ?: "An error occurred"
+        val s = copy()
+        val body = (throwable as? ApiException)?.body ?: throwable.message ?: s.anErrorOccurred
+        // The backend answers with a cause rather than a sentence, which is what makes this
+        // translatable at all — anything unrecognised is passed through as it came.
         return when {
-            "INVALID_MAIL_OR_PASSWORD" in body -> "Invalid email or password"
-            "USER_NOT_VERIFIED" in body -> "Please verify your email before logging in"
-            "USERNAME_ALREADY_USED" in body -> "Username already taken"
-            "MAIL_ALREADY_USED" in body -> "Email already registered"
-            "OAUTH_ONLY" in body -> "This account uses Google Sign-In. Use the Google button to log in."
+            "INVALID_MAIL_OR_PASSWORD" in body -> s.invalidEmailOrPassword
+            "USER_NOT_VERIFIED" in body -> s.verifyEmailFirst
+            "USERNAME_ALREADY_USED" in body -> s.usernameAlreadyTaken
+            "MAIL_ALREADY_USED" in body -> s.emailAlreadyRegistered
+            "OAUTH_ONLY" in body -> s.accountUsesGoogle
             else -> body
         }
     }

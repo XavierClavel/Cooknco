@@ -1,56 +1,103 @@
 package com.xavierclavel.cooknco.ui.cookbook
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.decodeToImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import androidx.compose.ui.unit.sp
+import com.xavierclavel.cooknco.network.dto.UserSummary
+import com.xavierclavel.cooknco.platform.rememberImagePicker
+import com.xavierclavel.cooknco.ui.components.CookbookImage
+import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.i18n.Strings
+import com.xavierclavel.cooknco.ui.i18n.strings
+import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
-import com.xavierclavel.cooknco.network.dto.UserSummary
-import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.theme.CookncoOrangeDark
+import com.xavierclavel.cooknco.ui.theme.CookncoWhite
+import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerDropdownMenu
+import com.xavierclavel.cooknco.ui.theme.StickerIconButton
+import com.xavierclavel.cooknco.ui.theme.StickerPill
+import com.xavierclavel.cooknco.ui.theme.StickerSegmentedControl
+import com.xavierclavel.cooknco.ui.theme.StickerToggle
+import com.xavierclavel.cooknco.ui.theme.stickerShadow
+import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
+
+// ── Shared styling helpers (mirrors RecipeEditScreen's private equivalents) ──────
+
+private val fieldShape = RoundedCornerShape(12.dp)
+
+@Composable
+private fun editFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = CookncoWhite,
+    unfocusedContainerColor = CookncoWhite,
+    focusedBorderColor = CookncoOrange,
+    unfocusedBorderColor = CookncoNavy,
+    focusedTextColor = CookncoNavy,
+    unfocusedTextColor = CookncoNavy,
+    focusedLabelColor = CookncoOrange,
+    unfocusedLabelColor = CookncoNavy.copy(alpha = 0.6f),
+    cursorColor = CookncoOrange,
+)
+
+/** The stored value and the word for it; the word comes from the catalogue. */
+private fun visibilityOptions(s: Strings) = listOf(
+    "PRIVATE" to s.visibilityPrivate,
+    "PROTECTED" to s.visibilityProtected,
+    "PUBLIC" to s.visibilityPublic,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +110,9 @@ fun CookbookEditScreen(
     viewModel: CookbookEditViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     val uiState by viewModel.uiState.collectAsState()
+    val imagePicker = rememberImagePicker(onPicked = viewModel::setPendingImage)
 
     LaunchedEffect(uiState.saved) {
         if (uiState.saved) {
@@ -72,196 +121,271 @@ fun CookbookEditScreen(
         }
     }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = if (cookbookId == null) "New Cookbook" else "Edit Cookbook",
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+    Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
+        // ── Top bar ────────────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
+            }
+            Text(
+                text = if (cookbookId == null) s.newCookbook else s.editCookbook,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoNavy,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        if (uiState.isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
+            }
+            return@Column
+        }
+
+        val pickedImage = uiState.pendingImage
+        val pickedBitmap = pickedImage?.let { picked ->
+            remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
+        }
+        // A version of 0 means the cookbook is still on the backend's default placeholder —
+        // CookbookInfo.version doubles as the image version (see ImageController on the backend).
+        val hasExistingPhoto = uiState.cookbookId != null && (uiState.cookbookVersion ?: 0) > 0
+
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            // ── Photo ─────────────────────────────────────────────────────────
+            item {
+                val hasAnyPhoto = pickedBitmap != null || hasExistingPhoto
+                val photoShape = RoundedCornerShape(20.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp)
+                        .stickerShadow(photoShape)
+                        .clip(photoShape)
+                        .background(CookncoGreenLight)
+                        .border(3.dp, CookncoNavy, photoShape)
+                        .clickable { imagePicker.launch() },
+                ) {
+                    when {
+                        pickedBitmap != null -> Image(
+                            bitmap = pickedBitmap,
+                            contentDescription = s.cookbookPhoto,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        hasExistingPhoto -> CookbookImage(
+                            cookbookId = uiState.cookbookId!!,
+                            version = uiState.cookbookVersion!!,
+                            contentDescription = s.cookbookPhoto,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        else -> Icon(
+                            Icons.Outlined.CameraAlt,
+                            contentDescription = null,
+                            tint = CookncoNavy.copy(alpha = 0.4f),
+                            modifier = Modifier.padding(start = 12.dp).size(24.dp).align(Alignment.CenterStart),
+                        )
                     }
-                },
-                actions = {
-                    IconButton(
+                    StickerPill(
+                        modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+                        onClick = { imagePicker.launch() },
+                        height = 44.dp,
+                        shadowOffset = 0.dp,
+                    ) {
+                        Text(
+                            text = if (hasAnyPhoto) s.changeCover else s.addCover,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                        )
+                    }
+                }
+            }
+            if (pickedImage != null) {
+                item {
+                    Text(
+                        text = s.uploadedWhenYouSave,
+                        color = CookncoNavy.copy(alpha = 0.6f),
+                        fontSize = 11.5.sp,
+                    )
+                }
+            }
+
+            // ── Basics ────────────────────────────────────────────────────────
+            item {
+                StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        Column {
+                            FieldLabel(s.titleRequiredCaps, modifier = Modifier.padding(bottom = 7.dp))
+                            OutlinedTextField(
+                                value = uiState.title,
+                                onValueChange = viewModel::updateTitle,
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                isError = uiState.error?.contains("Title") == true,
+                                colors = editFieldColors(),
+                                shape = fieldShape,
+                            )
+                        }
+                        Column {
+                            FieldLabel(s.descriptionCaps, modifier = Modifier.padding(bottom = 7.dp))
+                            OutlinedTextField(
+                                value = uiState.description,
+                                onValueChange = viewModel::updateDescription,
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 3,
+                                colors = editFieldColors(),
+                                shape = fieldShape,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Visibility ────────────────────────────────────────────────────
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FieldLabel(s.visibilityCaps, color = CookncoNavy)
+                    StickerSegmentedControl(
+                        options = visibilityOptions(s).map { it.first },
+                        selected = uiState.visibility,
+                        onSelect = viewModel::updateVisibility,
+                        label = { value -> visibilityOptions(s).first { it.first == value }.second },
+                        shape = RoundedCornerShape(20.dp),
+                        segmentShape = RoundedCornerShape(15.dp),
+                        spacing = 5.dp,
+                        shadowOffset = 6.dp,
+                    )
+                }
+            }
+
+            // ── Members ───────────────────────────────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FieldLabel(s.membersCaps, modifier = Modifier.weight(1f), color = CookncoNavy)
+                    StickerPill(
+                        onClick = viewModel::addMember,
+                        height = 44.dp,
+                        fillColor = CookncoGold,
+                        shadowOffset = 3.dp,
+                    ) {
+                        Icon(Icons.Outlined.Add, contentDescription = null, tint = CookncoNavy, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = s.addMember,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
+                    }
+                }
+            }
+            uiState.members.forEachIndexed { index, member ->
+                item(key = "member_$index") {
+                    MemberEditRow(
+                        member = member,
+                        onQueryChange = { viewModel.updateMemberQuery(index, it) },
+                        onSelect = { viewModel.selectMember(index, it) },
+                        onDismiss = { viewModel.dismissMemberDropdown(index) },
+                        onRoleChange = { viewModel.updateMemberRole(index, it) },
+                        onRemove = { viewModel.removeMember(index) },
+                    )
+                }
+            }
+
+            // ── Error ─────────────────────────────────────────────────────────
+            if (uiState.error != null) {
+                item {
+                    Text(
+                        text = uiState.error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+
+            // ── Bottom actions ───────────────────────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    StickerCard(
+                        modifier = Modifier.size(width = 100.dp, height = 56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        shadowOffset = 4.dp,
+                        onClick = onNavigateBack,
+                    ) {
+                        Text(
+                            text = s.cancel,
+                            color = CookncoNavy,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
+                    StickerCard(
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        fillColor = CookncoOrange,
+                        shadowOffset = 4.dp,
                         onClick = { viewModel.save() },
-                        enabled = !uiState.isSaving,
                     ) {
                         if (uiState.isSaving) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(20.dp).align(Alignment.Center),
                                 strokeWidth = 2.dp,
-                                color = CookncoNavy,
+                                color = CookncoWhite,
                             )
                         } else {
-                            Icon(Icons.Outlined.Check, contentDescription = "Save")
+                            Text(
+                                text = s.saveCaps,
+                                color = CookncoWhite,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.align(Alignment.Center),
+                            )
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = CookncoGreen,
-                    titleContentColor = CookncoNavy,
-                    navigationIconContentColor = CookncoNavy,
-                    actionIconContentColor = CookncoNavy,
-                ),
-            )
-        },
-        containerColor = CookncoBackground,
-    ) { innerPadding ->
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(color = CookncoOrange, strokeWidth = 3.dp)
-            }
-            return@Scaffold
-        }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(innerPadding)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item { Spacer(Modifier.height(8.dp)) }
-
-        // Title
-        item {
-            OutlinedTextField(
-                value = uiState.title,
-                onValueChange = { viewModel.updateTitle(it) },
-                label = { Text("Title *") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                isError = uiState.error?.contains("Title") == true,
-            )
-        }
-
-        // Description
-        item {
-            OutlinedTextField(
-                value = uiState.description,
-                onValueChange = { viewModel.updateDescription(it) },
-                label = { Text("Description") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-            )
-        }
-
-        // Visibility
-        item {
-            Text(
-                text = "Visibility",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-            )
-            Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("PRIVATE" to "Private", "PROTECTED" to "Protected", "PUBLIC" to "Public").forEach { (value, label) ->
-                    FilterChip(
-                        selected = uiState.visibility == value,
-                        onClick = { viewModel.updateVisibility(value) },
-                        label = { Text(label) },
-                    )
                 }
             }
         }
-
-        // Members header
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Members",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                IconButton(onClick = { viewModel.addMember() }) {
-                    Icon(Icons.Outlined.Add, contentDescription = "Add member")
-                }
-            }
-        }
-
-        // Member rows
-        val members = uiState.members
-        members.forEachIndexed { index, member ->
-            item(key = "member_$index") {
-                MemberEditRow(
-                    index = index,
-                    member = member,
-                    onQueryChange = { viewModel.updateMemberQuery(index, it) },
-                    onSelect = { viewModel.selectMember(index, it) },
-                    onDismiss = { viewModel.dismissMemberDropdown(index) },
-                    onRoleChange = { viewModel.updateMemberRole(index, it) },
-                    onRemove = { viewModel.removeMember(index) },
-                )
-            }
-        }
-
-        // Error
-        if (uiState.error != null) {
-            item {
-                Text(
-                    text = uiState.error!!,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-
-        // Buttons
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Cancel")
-                }
-                Button(
-                    onClick = { viewModel.save() },
-                    modifier = Modifier.weight(1f),
-                    enabled = !uiState.isSaving,
-                ) {
-                    if (uiState.isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .height(18.dp)
-                                .width(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    } else {
-                        Text("Save")
-                    }
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(32.dp)) }
-    }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FieldLabel(text: String, modifier: Modifier = Modifier, color: Color = CookncoGreenDark) {
+    Text(
+        text = text,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        color = color,
+        letterSpacing = 0.7.sp,
+        modifier = modifier,
+    )
+}
+
 @Composable
 private fun MemberEditRow(
-    index: Int,
     member: EditMember,
     onQueryChange: (String) -> Unit,
     onSelect: (UserSummary) -> Unit,
@@ -269,81 +393,88 @@ private fun MemberEditRow(
     onRoleChange: (Boolean) -> Unit,
     onRemove: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val s = strings()
+    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowOffset = 5.dp) {
+        Column(
+            modifier = Modifier.padding(top = 10.dp, bottom = 10.dp, start = 12.dp, end = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            UserAvatar(
-                userId = member.userId,
-                version = 1L,
-                contentDescription = member.username,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-            )
-
-            // Username search field with autocomplete
-            ExposedDropdownMenuBox(
-                expanded = member.showDropdown,
-                onExpandedChange = { if (!it) onDismiss() },
-                modifier = Modifier.weight(1f),
-            ) {
-                OutlinedTextField(
-                    value = member.searchQuery,
-                    onValueChange = onQueryChange,
-                    label = { Text("Username") },
-                    modifier = Modifier
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
-                        .fillMaxWidth(),
-                    singleLine = true,
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = member.showDropdown)
-                    },
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                UserAvatar(
+                    userId = member.userId,
+                    version = 1L,
+                    contentDescription = member.username,
+                    modifier = Modifier.size(40.dp).clip(CircleShape),
                 )
-                ExposedDropdownMenu(
+
+                StickerDropdownMenu(
                     expanded = member.showDropdown,
                     onDismissRequest = onDismiss,
+                    items = member.searchResults,
+                    label = { it.username },
+                    onSelect = onSelect,
+                    modifier = Modifier.weight(1f),
                 ) {
-                    member.searchResults.forEach { result ->
-                        DropdownMenuItem(
-                            text = { Text(result.username) },
-                            onClick = { onSelect(result) },
+                    // The white 44dp field the "Cookbook — edit" artboard draws a member's
+                    // name in — it is the search box until a member has been picked, and it
+                    // keeps its own look once one has.
+                    var focused by remember { mutableStateOf(false) }
+                    val borderColor by animateColorAsState(
+                        targetValue = if (focused) CookncoOrange else CookncoNavy,
+                        animationSpec = stickerSwitchSpec(),
+                        label = "member_field_border",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CookncoWhite)
+                            .border(2.dp, borderColor, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        val textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy)
+                        if (member.searchQuery.isEmpty()) {
+                            Text(s.searchAMember, style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.35f)))
+                        }
+                        BasicTextField(
+                            value = member.searchQuery,
+                            onValueChange = onQueryChange,
+                            singleLine = true,
+                            textStyle = textStyle,
+                            cursorBrush = SolidColor(CookncoOrange),
+                            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
                         )
                     }
                 }
+
+                Box(
+                    modifier = Modifier.size(44.dp).clickable(onClick = onRemove),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        contentDescription = s.removeMember,
+                        tint = CookncoOrangeDark,
+                    )
+                }
             }
 
-            // Remove button
-            IconButton(onClick = onRemove) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = "Remove member",
-                    tint = MaterialTheme.colorScheme.error,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = s.admin,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = CookncoNavy,
+                    modifier = Modifier.weight(1f),
                 )
+                StickerToggle(checked = member.isAdmin, onCheckedChange = onRoleChange)
             }
-        }
-
-        // Admin toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = "Admin",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            Switch(
-                checked = member.isAdmin,
-                onCheckedChange = onRoleChange,
-            )
         }
     }
 }

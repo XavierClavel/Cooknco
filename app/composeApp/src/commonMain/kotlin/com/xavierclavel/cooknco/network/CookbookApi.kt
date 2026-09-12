@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.network
 
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeInfo
+import com.xavierclavel.cooknco.network.dto.CookbookRecipeStatus
 import com.xavierclavel.cooknco.network.dto.CookbookSaveDto
 import com.xavierclavel.cooknco.network.dto.CookbookUserInfo
 import com.xavierclavel.cooknco.network.dto.CookbookUserSaveDto
@@ -10,6 +11,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
@@ -17,6 +20,8 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 
@@ -69,6 +74,20 @@ class CookbookApi(private val client: HttpClient) {
         return response.body()
     }
 
+    /** Images live outside the api: POST {IMAGE_URL}/cookbooks/{id}, answering with an empty body. */
+    suspend fun uploadCookbookImage(token: String, cookbookId: Long, imageBytes: ByteArray, mimeType: String) {
+        val response = client.post("${ApiClient.IMAGE_URL}/cookbooks/$cookbookId") {
+            bearerAuth(token)
+            setBody(MultiPartFormDataContent(formData {
+                append("file", imageBytes, Headers.build {
+                    append(HttpHeaders.ContentType, mimeType)
+                    append(HttpHeaders.ContentDisposition, "filename=cookbook.webp")
+                })
+            }))
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
     suspend fun deleteCookbook(id: Long, token: String) {
         val response = client.delete("$base/cookbook/$id") {
             bearerAuth(token)
@@ -118,6 +137,36 @@ class CookbookApi(private val client: HttpClient) {
         }
     }
 
+    /** Every cookbook this cook can add to, flagged with whether it already holds [recipeId]. */
+    suspend fun recipeStatusInCookbooks(recipeId: Long, token: String): List<CookbookRecipeStatus> {
+        val response = client.get("$base/cookbook/recipeStatus") {
+            bearerAuth(token)
+            parameter("recipe", recipeId)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    suspend fun addRecipeToCookbook(cookbookId: Long, recipeId: Long, token: String) {
+        val response = client.post("$base/cookbook/$cookbookId/recipe/$recipeId") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+    }
+
+    suspend fun removeRecipeFromCookbook(cookbookId: Long, recipeId: Long, token: String) {
+        val response = client.delete("$base/cookbook/$cookbookId/recipe/$recipeId") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+    }
+
     suspend fun getCookbookRecipes(id: Long, token: String? = null): List<CookbookRecipeInfo> {
         val response = client.get("$base/cookbook/$id/recipes") {
             if (token != null) bearerAuth(token)
@@ -128,8 +177,27 @@ class CookbookApi(private val client: HttpClient) {
         return response.body()
     }
 
+    /** Served as `text/plain` — see [decodeJsonText]. */
     suspend fun searchUsers(query: String, token: String? = null): UserSearchResult {
         val response = client.get("$base/user") {
+            if (token != null) bearerAuth(token)
+            parameter("query", query)
+            parameter("page", 0)
+            parameter("size", 20)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+        return response.decodeJsonText()
+    }
+
+    /**
+     * `GET /cookbook` answers a plain list with no total count (unlike `/user` and
+     * `/ingredient`, which wrap in [shared.dto.SearchResult]) — see `CookbookService.listCookbooks`.
+     * Callers stand in with the loaded page size where a count is needed.
+     */
+    suspend fun searchCookbooks(query: String, token: String? = null): List<CookbookInfo> {
+        val response = client.get("$base/cookbook") {
             if (token != null) bearerAuth(token)
             parameter("query", query)
             parameter("page", 0)

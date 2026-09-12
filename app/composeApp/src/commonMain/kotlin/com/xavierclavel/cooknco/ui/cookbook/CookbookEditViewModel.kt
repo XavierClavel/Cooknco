@@ -10,6 +10,7 @@ import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.dto.CookbookSaveDto
 import com.xavierclavel.cooknco.network.dto.CookbookUserSaveDto
 import com.xavierclavel.cooknco.network.dto.UserSummary
+import com.xavierclavel.cooknco.platform.PickedImage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +36,7 @@ data class CookbookEditUiState(
     val description: String = "",
     val visibility: String = "PUBLIC",
     val members: List<EditMember> = emptyList(),
+    val pendingImage: PickedImage? = null,
     val error: String? = null,
     val cookbookId: Long? = null,
     val cookbookVersion: Long? = null,
@@ -109,6 +111,7 @@ class CookbookEditViewModel(
     fun updateTitle(value: String) = _uiState.update { it.copy(title = value, error = null) }
     fun updateDescription(value: String) = _uiState.update { it.copy(description = value) }
     fun updateVisibility(value: String) = _uiState.update { it.copy(visibility = value) }
+    fun setPendingImage(image: PickedImage?) = _uiState.update { it.copy(pendingImage = image) }
 
     fun addMember() {
         _uiState.update { it.copy(members = it.members + EditMember(userId = 0L, username = "", isAdmin = false)) }
@@ -224,11 +227,20 @@ class CookbookEditViewModel(
             cookbookResult
                 .onSuccess { savedCookbook ->
                     repo.setCookbookUsers(savedCookbook.id, userDtos)
+                    // The image needs a cookbook id to upload against, which a brand-new
+                    // cookbook only gets from this save. A failed upload here is best-effort:
+                    // the cookbook's own content already saved, so it doesn't block navigating
+                    // on. Clearing it only on success keeps a later save from re-uploading
+                    // (and re-bumping the image version for) the same picture.
+                    val imageUploaded = state.pendingImage?.let { image ->
+                        repo.uploadCookbookImage(savedCookbook.id, image.bytes, image.mimeType).isSuccess
+                    } ?: false
                     _uiState.update {
                         it.copy(
                             isSaving = false,
                             saved = true,
                             cookbookId = savedCookbook.id,
+                            pendingImage = if (imageUploaded) null else it.pendingImage,
                         )
                     }
                 }

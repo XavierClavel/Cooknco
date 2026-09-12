@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The themed-icon layer, for the launchers that recolour every icon to the wallpaper.
+
+  The same two paths as the foreground with the colour taken out: the system tints this
+  whole drawable one colour, so a fill and a stroke that differ would come back identical
+  and the outline would simply vanish. What is left is the silhouette, which is what a
+  monochrome layer is meant to be.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2.5"
+        android:scaleY="2.5"
+        android:translateX="-30.2"
+        android:translateY="19.56">
+        <path
+            android:fillColor="#000000"
+            android:strokeColor="#000000"
+            android:strokeWidth="2"
+            android:strokeLineJoin="round"
+            android:pathData="M42.44,16.5c0,4.59 -3.92,8.16 -8.76,7.97s-8.76,-4.06 -8.76,-8.65 3.92,-8.16 8.76,-7.97 8.76,4.06 8.76,8.65Z" />
+        <group
+            android:translateX="4.74"
+            android:translateY="-12.4"
+            android:rotation="20.38">
+            <path
+                android:fillColor="#000000"
+                android:strokeColor="#000000"
+                android:strokeWidth="2"
+                android:strokeLineJoin="round"
+                android:pathData="M34.96,4.75h0c0.75,0 1.36,0.61 1.36,1.36v1.91c0,1.18 -0.96,2.14 -2.14,2.14h0c-1.18,0 -2.14,-0.96 -2.14,-2.14v-0.36c0,-1.61 1.31,-2.92 2.92,-2.92Z" />
+        </group>
+    </group>
+</vector>

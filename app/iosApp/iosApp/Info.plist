@@ -18,8 +18,18 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- The launch screen is a background colour and the mark, described rather than laid
+	     out: UILaunchScreen has no nib and cannot run code, which is the point. It matches
+	     what Android's Theme.Cooknco.Splash paints, and what SplashScreen draws after it. -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>LaunchLogo</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<true/>
+	</dict>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -37,6 +47,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Cook&amp;co needs access to your camera so you can photograph a dish.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Cook&amp;co needs access to your photos so you can set a profile picture.</string>
 </dict>

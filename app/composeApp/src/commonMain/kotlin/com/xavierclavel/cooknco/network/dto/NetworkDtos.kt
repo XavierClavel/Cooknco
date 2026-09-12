@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.network.dto
 
+import com.xavierclavel.cooknco.network.ApiClient
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -119,6 +120,34 @@ data class IngredientSummary(
     val defaultUnit: String? = null,
 )
 
+/**
+ * The name in the language the app is in.
+ *
+ * The backend answers with every translation it has, keyed by locale, so which one is
+ * shown is the client's decision — and it was being made three different ways: the
+ * ingredient page asked for the current locale, while the editor's search results and the
+ * row it wrote on picking one both asked for "EN" outright, which is why searching for an
+ * ingredient in French answered in English.
+ *
+ * The fallbacks matter as much as the first choice: a catalogue entry that has not been
+ * translated yet still has to appear under some name, or it reads as an empty row.
+ */
+fun IngredientSummary.displayName(): String =
+    name[ApiClient.locale] ?: name["EN"] ?: name.values.firstOrNull() ?: ""
+
+/**
+ * One of the signed-in cook's cookbooks, and whether a given recipe is already in it.
+ *
+ * Answered by `GET /cookbook/recipeStatus?recipe=`, which exists so that a picker can be
+ * drawn in one request rather than listing the cookbooks and then asking after each.
+ */
+@Serializable
+data class CookbookRecipeStatus(
+    val id: Long,
+    val title: String,
+    val hasRecipe: Boolean,
+)
+
 @Serializable
 data class UnitInfo(
     val name: String,
@@ -188,10 +217,58 @@ data class RecipeSearchResult(
     val items: List<RecipeOverview>,
 )
 
+/**
+ * An MCP client this account has approved (`GET /user/mcp-clients` — `shared.infodto.McpClientInfo`).
+ *
+ * [clientName] is whatever the client called itself when it registered, so it is untrusted
+ * text: it is shown next to [redirectUris], the part a client cannot lie about, for the same
+ * reason the consent page does.
+ */
+@Serializable
+data class McpClientInfo(
+    val clientId: String,
+    val clientName: String,
+    val redirectUris: List<String> = emptyList(),
+    val grantedAt: Long,
+    val lastUsedAt: Long,
+)
+
+/** Body of `PUT /user/password` — `shared.dto.PasswordDTO`. */
+@Serializable
+data class PasswordDTO(
+    val old: String,
+    val new: String,
+)
+
 @Serializable
 data class UserSettingsDTO(
     val autoAcceptFollowRequests: Boolean = false,
     val isAccountPublic: Boolean = false,
+    /**
+     * The language the backend writes to this account in ("FR"/"EN"), or null.
+     *
+     * Null on the way out means nothing has ever told it; null on the way *in* means
+     * "leave it alone" — see `shared.dto.UserSettingsDTO`. Both nullable fields here rely
+     * on kotlinx omitting a property that still holds its default, so a save from a screen
+     * that does not know about one of them cannot wipe it.
+     */
+    val locale: String? = null,
+    /** Mails about what the people you follow are up to. Null means "leave it alone". */
+    val mailNotificationsEnabled: Boolean? = null,
+)
+
+/**
+ * One row of a followers/following list (`FollowController.getFollowers`/`getFollows`):
+ * [user] is whichever side of the relationship the endpoint is listing (the follower on
+ * `/followers`, the followed account on `/follows` — see `Follow.toFollowersInfo`/
+ * `toFollowsInfo` server-side), and [pending] is why both screens show requested and
+ * accepted rows together rather than needing a separate pending-only endpoint.
+ */
+@Serializable
+data class FollowInfoDto(
+    val user: UserSummary,
+    val followedSince: Long,
+    val pending: Boolean,
 )
 
 // ------------------------------------------------------------- notifications

@@ -1,5 +1,8 @@
 package com.xavierclavel.cooknco.network
 
+import com.xavierclavel.cooknco.network.dto.FollowInfoDto
+import com.xavierclavel.cooknco.network.dto.McpClientInfo
+import com.xavierclavel.cooknco.network.dto.PasswordDTO
 import com.xavierclavel.cooknco.network.dto.UserDTO
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
@@ -56,8 +59,16 @@ class UserApi(private val client: HttpClient) {
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }
 
-    suspend fun isFollowing(token: String, userId: Long): Boolean {
-        val response = client.get("$base/follow/$userId") {
+    /**
+     * Whether [currentUserId] follows [userId].
+     *
+     * `/follow/{id}/followedBy/{targetId}` asks whether {targetId} follows {id}, so the
+     * account being looked at is the path id and the signed-in one is the target. This used
+     * to call `GET /follow/{id}`, which no route answers — the request failed, the failure
+     * was swallowed into `false`, and a profile you follow said "Follow" forever.
+     */
+    suspend fun isFollowing(token: String, userId: Long, currentUserId: Long): Boolean {
+        val response = client.get("$base/follow/$userId/followedBy/$currentUserId") {
             bearerAuth(token)
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
@@ -74,6 +85,71 @@ class UserApi(private val client: HttpClient) {
     suspend fun unfollow(token: String, userId: Long) {
         val response = client.delete("$base/follow/$userId") {
             bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    /** Both pending and accepted followers come back together — see [FollowInfoDto]. */
+    suspend fun getFollowers(token: String?, userId: Long, page: Int, size: Int = 20): List<FollowInfoDto> {
+        val response = client.get("$base/follow/$userId/followers") {
+            if (token != null) bearerAuth(token)
+            parameter("page", page)
+            parameter("size", size)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
+    /** Both requested and accepted follows come back together — see [FollowInfoDto]. */
+    suspend fun getFollows(token: String?, userId: Long, page: Int, size: Int = 20): List<FollowInfoDto> {
+        val response = client.get("$base/follow/$userId/follows") {
+            if (token != null) bearerAuth(token)
+            parameter("page", page)
+            parameter("size", size)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
+    /** Accepts a pending request *from* [followerId] — call while authenticated as the followed account. */
+    suspend fun acceptFollowRequest(token: String, followerId: Long) {
+        val response = client.post("$base/follow/$followerId/request") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    /** Declines a pending request *from* [followerId] — call while authenticated as the followed account. */
+    suspend fun declineFollowRequest(token: String, followerId: Long) {
+        val response = client.delete("$base/follow/$followerId/request") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    /** The MCP clients this account has approved, newest first. */
+    suspend fun getMcpClients(token: String): List<McpClientInfo> {
+        val response = client.get("$base/user/mcp-clients") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
+    /** Withdraws one. 404 means it was already gone — see `UserController.revokeMcpClient`. */
+    suspend fun revokeMcpClient(token: String, clientId: String) {
+        val response = client.delete("$base/user/mcp-clients/$clientId") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    /** `PUT /user/password` — the backend checks [old] itself and answers 401 if it is wrong. */
+    suspend fun updatePassword(token: String, old: String, new: String) {
+        val response = client.put("$base/user/password") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(PasswordDTO(old = old, new = new))
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }
@@ -96,10 +172,23 @@ class UserApi(private val client: HttpClient) {
         return response.body()
     }
 
-    suspend fun getUserRecipes(token: String?, profileUserId: Long, page: Int, size: Int = 20): List<com.xavierclavel.cooknco.network.dto.RecipeOverview> {
+    /**
+     * A cook's own recipes, or the ones they have liked.
+     *
+     * The same endpoint either way — `user` and `likedBy` are two filters on `GET /recipe`
+     * (`RecipeFilter`), not two lists — so this is one function with one parameter rather
+     * than a second copy of the paging.
+     */
+    suspend fun getUserRecipes(
+        token: String?,
+        profileUserId: Long,
+        page: Int,
+        size: Int = 20,
+        liked: Boolean = false,
+    ): List<com.xavierclavel.cooknco.network.dto.RecipeOverview> {
         val response = client.get("$base/recipe") {
             if (token != null) bearerAuth(token)
-            parameter("user", profileUserId)
+            parameter(if (liked) "likedBy" else "user", profileUserId)
             parameter("sort", "DATE_DESCENDING")
             parameter("page", page)
             parameter("size", size)

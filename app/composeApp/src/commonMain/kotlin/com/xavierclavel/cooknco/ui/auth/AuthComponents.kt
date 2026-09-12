@@ -1,9 +1,13 @@
 package com.xavierclavel.cooknco.ui.auth
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,16 +27,71 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xavierclavel.cooknco.ui.theme.CookncoBackground
+import com.xavierclavel.cooknco.resources.Res
+import com.xavierclavel.cooknco.resources.google_logo
+import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
+import com.xavierclavel.cooknco.ui.theme.StickerCard
+import org.jetbrains.compose.resources.painterResource
+
+/**
+ * The cream, hard-shadow card every auth screen (login/signup/email-sent) sits its form
+ * in, on the green ground — see `Cooknco Mobile.dc.html`, turn 5 / option `5a`, "Sign in".
+ */
+@Composable
+fun AuthCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    StickerCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+fun GoogleButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = CookncoWhite,
+            contentColor = CookncoNavy,
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, CookncoNavy),
+    ) {
+        Image(
+            painter = painterResource(Res.drawable.google_logo),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = text,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(start = 10.dp),
+        )
+    }
+}
 
 @Composable
 fun AuthTextField(
@@ -76,14 +135,14 @@ fun AuthTextField(
         } else null,
         visualTransformation = if (isPassword && !isPasswordVisible) PasswordVisualTransformation() else VisualTransformation.None,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = CookncoBackground,
-            unfocusedContainerColor = CookncoBackground,
+            focusedContainerColor = CookncoWhite,
+            unfocusedContainerColor = CookncoWhite,
             focusedBorderColor = CookncoOrange,
-            unfocusedBorderColor = CookncoNavy.copy(alpha = 0.6f),
+            unfocusedBorderColor = CookncoNavy,
             focusedTextColor = CookncoNavy,
             unfocusedTextColor = CookncoNavy,
             cursorColor = CookncoOrange,
-            errorContainerColor = CookncoBackground,
+            errorContainerColor = CookncoWhite,
             errorBorderColor = Color(0xFFB3261E),
         ),
         shape = RoundedCornerShape(12.dp),
@@ -104,7 +163,7 @@ fun OrDivider(modifier: Modifier = Modifier) {
             color = CookncoNavy.copy(alpha = 0.4f),
         )
         Text(
-            text = "  or  ",
+            text = "  ${strings().or}  ",
             color = CookncoNavy.copy(alpha = 0.7f),
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
@@ -131,7 +190,7 @@ fun AuthButton(
         enabled = enabled && !isLoading,
         modifier = modifier
             .fillMaxWidth()
-            .height(52.dp),
+            .height(54.dp),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
@@ -139,7 +198,8 @@ fun AuthButton(
             disabledContainerColor = containerColor.copy(alpha = 0.6f),
             disabledContentColor = CookncoWhite.copy(alpha = 0.7f),
         ),
-        border = BorderStroke(1.5.dp, CookncoNavy),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+        border = BorderStroke(2.dp, CookncoNavy),
     ) {
         if (isLoading) {
             CircularProgressIndicator(
@@ -159,8 +219,8 @@ fun AuthButton(
             Text(
                 text = text,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                letterSpacing = 0.5.sp,
+                fontSize = 17.sp,
+                letterSpacing = 0.3.sp,
                 modifier = textModifier,
             )
         }
