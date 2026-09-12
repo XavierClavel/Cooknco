@@ -214,6 +214,10 @@ object EnStrings : Strings {
     override val decline = "Decline"
 
     override val newCookbook = "New cookbook"
+    override val addToCookbookHint = "Tap a cookbook to put this recipe in it"
+    override val inThisCookbook = "In this cookbook"
+    override val noCookbooksYet = "You have no cookbooks yet. Create one from the Books tab."
+    override val done = "Done"
     override val editCookbook = "Edit cookbook"
     override val shared = "Shared"
     override val recipes = "Recipes"

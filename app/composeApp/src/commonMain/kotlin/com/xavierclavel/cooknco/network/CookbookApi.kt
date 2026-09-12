@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.network
 
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeInfo
+import com.xavierclavel.cooknco.network.dto.CookbookRecipeStatus
 import com.xavierclavel.cooknco.network.dto.CookbookSaveDto
 import com.xavierclavel.cooknco.network.dto.CookbookUserInfo
 import com.xavierclavel.cooknco.network.dto.CookbookUserSaveDto
@@ -130,6 +131,36 @@ class CookbookApi(private val client: HttpClient) {
             bearerAuth(token)
             contentType(ContentType.Application.Json)
             setBody(users)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+    }
+
+    /** Every cookbook this cook can add to, flagged with whether it already holds [recipeId]. */
+    suspend fun recipeStatusInCookbooks(recipeId: Long, token: String): List<CookbookRecipeStatus> {
+        val response = client.get("$base/cookbook/recipeStatus") {
+            bearerAuth(token)
+            parameter("recipe", recipeId)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    suspend fun addRecipeToCookbook(cookbookId: Long, recipeId: Long, token: String) {
+        val response = client.post("$base/cookbook/$cookbookId/recipe/$recipeId") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+    }
+
+    suspend fun removeRecipeFromCookbook(cookbookId: Long, recipeId: Long, token: String) {
+        val response = client.delete("$base/cookbook/$cookbookId/recipe/$recipeId") {
+            bearerAuth(token)
         }
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())

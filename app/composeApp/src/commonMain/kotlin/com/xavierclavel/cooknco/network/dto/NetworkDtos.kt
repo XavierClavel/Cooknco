@@ -135,6 +135,19 @@ data class IngredientSummary(
 fun IngredientSummary.displayName(): String =
     name[ApiClient.locale] ?: name["EN"] ?: name.values.firstOrNull() ?: ""
 
+/**
+ * One of the signed-in cook's cookbooks, and whether a given recipe is already in it.
+ *
+ * Answered by `GET /cookbook/recipeStatus?recipe=`, which exists so that a picker can be
+ * drawn in one request rather than listing the cookbooks and then asking after each.
+ */
+@Serializable
+data class CookbookRecipeStatus(
+    val id: Long,
+    val title: String,
+    val hasRecipe: Boolean,
+)
+
 @Serializable
 data class UnitInfo(
     val name: String,

@@ -207,6 +207,10 @@ interface Strings {
 
     // ── Cookbooks ─────────────────────────────────────────────────────────────
     val newCookbook: String
+    val addToCookbookHint: String
+    val inThisCookbook: String
+    val noCookbooksYet: String
+    val done: String
     val editCookbook: String
     val shared: String
     val recipes: String

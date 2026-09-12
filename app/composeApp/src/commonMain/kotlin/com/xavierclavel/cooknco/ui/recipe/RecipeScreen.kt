@@ -74,6 +74,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.cookbook.AddToCookbookSheet
 import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.ui.i18n.Strings
@@ -179,6 +180,7 @@ fun RecipeScreen(
                 onToggleLike = viewModel::toggleLike,
                 onShare = { clipboardManager.setText(AnnotatedString("cooknco.eu/recipe?id=${recipe.id}")) },
                 onEdit = { onNavigateToEdit(recipe.id) },
+                onAddToCookbook = viewModel::openCookbookPicker,
                 onDelete = viewModel::confirmDelete,
                 onYieldMinus = { viewModel.setYield(uiState.selectedYield - 1) },
                 onYieldPlus = { viewModel.setYield(uiState.selectedYield + 1) },
@@ -191,6 +193,16 @@ fun RecipeScreen(
                 onStartCooking = { onNavigateToCookMode(recipe.id) },
             )
         }
+    }
+
+    // Mounted here rather than inside the list: it is a dialog, and the list it would sit
+    // in is the one the sheet's toggles can send the recipe in and out of.
+    uiState.cookbookPicker?.let { picker ->
+        AddToCookbookSheet(
+            state = picker,
+            onToggle = viewModel::toggleCookbook,
+            onDismissRequest = viewModel::closeCookbookPicker,
+        )
     }
 
     if (uiState.showDeleteConfirm && recipe != null) {
@@ -216,6 +228,7 @@ private fun RecipeContent(
     onToggleLike: () -> Unit,
     onShare: () -> Unit,
     onEdit: () -> Unit,
+    onAddToCookbook: () -> Unit,
     onDelete: () -> Unit,
     onYieldMinus: () -> Unit,
     onYieldPlus: () -> Unit,
@@ -404,6 +417,7 @@ private fun RecipeContent(
                     isOwner = isOwner,
                     onShare = onShare,
                     onEdit = onEdit,
+                    onAddToCookbook = onAddToCookbook,
                     onDelete = onDelete,
                     onDismissRequest = { showMenu = false },
                 )
@@ -893,6 +907,7 @@ private fun RecipeActionSheet(
     isOwner: Boolean,
     onShare: () -> Unit,
     onEdit: () -> Unit,
+    onAddToCookbook: () -> Unit,
     onDelete: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
@@ -906,6 +921,9 @@ private fun RecipeActionSheet(
         },
         actions = buildList {
             add(SheetAction(label = s.shareLink, onClick = onShare))
+            // Not gated on ownership: filing someone else's recipe in your own cookbook
+            // is most of what a cookbook is for.
+            add(SheetAction(label = s.addToCookbook, onClick = onAddToCookbook))
             if (isOwner) {
                 add(SheetAction(label = s.editRecipe, onClick = onEdit))
                 add(SheetAction(label = s.deleteRecipe, onClick = onDelete, destructive = true))
@@ -954,6 +972,7 @@ fun RecipeScreenPreview() {
                 onToggleLike = {},
                 onShare = {},
                 onEdit = {},
+                onAddToCookbook = {},
                 onDelete = {},
                 onYieldMinus = {},
                 onYieldPlus = {},

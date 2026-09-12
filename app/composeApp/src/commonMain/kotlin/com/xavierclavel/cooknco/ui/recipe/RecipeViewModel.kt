@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.di.AppGraph
+import com.xavierclavel.cooknco.network.dto.CookbookRecipeStatus
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,10 +28,28 @@ data class RecipeUiState(
     val isEditingNotes: Boolean = false,
     val showDeleteConfirm: Boolean = false,
     val deleted: Boolean = false,
+    val cookbookPicker: CookbookPickerState? = null,
+)
+
+/**
+ * The "Add to a cookbook" sheet, while it is open. Null means closed — the list is thrown
+ * away with it rather than kept, since a cookbook can be created or left from elsewhere
+ * and a stale list would offer a cookbook that is no longer there.
+ *
+ * [busy] holds the cookbooks with a request in flight. A row is shown in its *new* state
+ * immediately and reverted if the request fails, so tapping several in a row does not mean
+ * waiting for each: this is a list of checkboxes, not a form.
+ */
+data class CookbookPickerState(
+    val cookbooks: List<CookbookRecipeStatus> = emptyList(),
+    val isLoading: Boolean = true,
+    val busy: Set<Long> = emptySet(),
+    val error: String? = null,
 )
 
 class RecipeViewModel(
     private val repo: RecipeRepository,
+    private val cookbookRepo: CookbookRepository,
     private val recipeId: Long,
     private val currentUserId: Long,
 ) : ViewModel() {
@@ -135,6 +155,76 @@ class RecipeViewModel(
         }
     }
 
+    // ── Add to a cookbook ────────────────────────────────────────────────────
+
+    fun openCookbookPicker() {
+        _uiState.update { it.copy(cookbookPicker = CookbookPickerState()) }
+        viewModelScope.launch {
+            cookbookRepo.recipeStatusInCookbooks(recipeId)
+                .onSuccess { cookbooks ->
+                    _uiState.update {
+                        // Dropped if the sheet was closed while the request was out:
+                        // reopening starts a fresh load, and this one is answering a
+                        // question nobody is asking any more.
+                        if (it.cookbookPicker == null) it
+                        else it.copy(cookbookPicker = CookbookPickerState(cookbooks = cookbooks, isLoading = false))
+                    }
+                }
+                .onFailure { err ->
+                    _uiState.update {
+                        if (it.cookbookPicker == null) it
+                        else it.copy(cookbookPicker = it.cookbookPicker.copy(isLoading = false, error = err.message))
+                    }
+                }
+        }
+    }
+
+    fun closeCookbookPicker() {
+        _uiState.update { it.copy(cookbookPicker = null) }
+    }
+
+    /**
+     * Puts the recipe in the cookbook, or takes it out.
+     *
+     * Taking it out can be refused where putting it in cannot — the backend lets an admin,
+     * or whoever added it, remove a recipe and nobody else — so the row goes back to where
+     * it was and says why.
+     */
+    fun toggleCookbook(cookbookId: Long) {
+        val picker = _uiState.value.cookbookPicker ?: return
+        if (cookbookId in picker.busy) return
+        val current = picker.cookbooks.firstOrNull { it.id == cookbookId } ?: return
+        val target = !current.hasRecipe
+
+        updatePicker { it.copy(busy = it.busy + cookbookId, error = null) }
+        setMembership(cookbookId, target)
+
+        viewModelScope.launch {
+            val result =
+                if (target) cookbookRepo.addRecipeToCookbook(cookbookId, recipeId)
+                else cookbookRepo.removeRecipeFromCookbook(cookbookId, recipeId)
+            result.onFailure { err ->
+                setMembership(cookbookId, !target)
+                updatePicker { it.copy(error = err.message) }
+            }
+            updatePicker { it.copy(busy = it.busy - cookbookId) }
+        }
+    }
+
+    private fun setMembership(cookbookId: Long, hasRecipe: Boolean) = updatePicker { picker ->
+        picker.copy(
+            cookbooks = picker.cookbooks.map {
+                if (it.id == cookbookId) it.copy(hasRecipe = hasRecipe) else it
+            },
+        )
+    }
+
+    private fun updatePicker(block: (CookbookPickerState) -> CookbookPickerState) {
+        _uiState.update { state ->
+            state.cookbookPicker?.let { state.copy(cookbookPicker = block(it)) } ?: state
+        }
+    }
+
     fun confirmDelete() {
         _uiState.update { it.copy(showDeleteConfirm = true) }
     }
@@ -157,7 +247,9 @@ class RecipeViewModel(
 
     companion object {
         fun factory(recipeId: Long, userId: Long): ViewModelProvider.Factory = viewModelFactory {
-            initializer { RecipeViewModel(AppGraph.recipeRepository, recipeId, userId) }
+            initializer {
+                RecipeViewModel(AppGraph.recipeRepository, AppGraph.cookbookRepository, recipeId, userId)
+            }
         }
     }
 }

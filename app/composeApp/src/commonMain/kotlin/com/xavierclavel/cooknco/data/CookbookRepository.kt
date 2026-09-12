@@ -3,6 +3,7 @@ package com.xavierclavel.cooknco.data
 import com.xavierclavel.cooknco.network.CookbookApi
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeInfo
+import com.xavierclavel.cooknco.network.dto.CookbookRecipeStatus
 import com.xavierclavel.cooknco.network.dto.CookbookSaveDto
 import com.xavierclavel.cooknco.network.dto.CookbookUserInfo
 import com.xavierclavel.cooknco.network.dto.CookbookUserSaveDto
@@ -61,6 +62,21 @@ class CookbookRepository(
     suspend fun setCookbookUsers(id: Long, users: List<CookbookUserSaveDto>): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         cookbookApi.setCookbookUsers(id, token, users)
+    }
+
+    suspend fun recipeStatusInCookbooks(recipeId: Long): Result<List<CookbookRecipeStatus>> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        cookbookApi.recipeStatusInCookbooks(recipeId, token)
+    }
+
+    suspend fun addRecipeToCookbook(cookbookId: Long, recipeId: Long): Result<Unit> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        cookbookApi.addRecipeToCookbook(cookbookId, recipeId, token)
+    }
+
+    suspend fun removeRecipeFromCookbook(cookbookId: Long, recipeId: Long): Result<Unit> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        cookbookApi.removeRecipeFromCookbook(cookbookId, recipeId, token)
     }
 
     suspend fun getCookbookRecipes(id: Long): Result<List<CookbookRecipeInfo>> = runCatching {

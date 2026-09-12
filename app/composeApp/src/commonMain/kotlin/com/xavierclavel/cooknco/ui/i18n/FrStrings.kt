@@ -222,6 +222,10 @@ object FrStrings : Strings {
     override val decline = "Refuser"
 
     override val newCookbook = "Nouveau carnet"
+    override val addToCookbookHint = "Touchez un carnet pour y ranger cette recette"
+    override val inThisCookbook = "Dans ce carnet"
+    override val noCookbooksYet = "Vous n'avez pas encore de carnet. Créez-en un depuis l'onglet Carnets."
+    override val done = "Terminé"
     override val editCookbook = "Modifier le carnet"
     override val shared = "Partagé"
     override val recipes = "Recettes"
