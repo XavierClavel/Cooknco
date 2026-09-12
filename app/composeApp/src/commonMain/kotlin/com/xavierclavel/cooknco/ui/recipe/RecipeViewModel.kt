@@ -28,20 +28,33 @@ data class RecipeUiState(
     val isEditingNotes: Boolean = false,
     val showDeleteConfirm: Boolean = false,
     val deleted: Boolean = false,
+    /**
+     * This cook's cookbooks and whether each already holds the recipe.
+     *
+     * Loaded with the recipe rather than when the sheet opens, because the bookmark in the
+     * banner is drawn from it: a bookmark that only knows whether it is filled once you
+     * have opened the thing it opens is not telling you anything.
+     */
+    val cookbooks: List<CookbookRecipeStatus> = emptyList(),
     val cookbookPicker: CookbookPickerState? = null,
-)
+) {
+    /** Whether the recipe is filed anywhere, which is what the bookmark shows. */
+    val isBookmarked: Boolean get() = cookbooks.any { it.hasRecipe }
+}
 
 /**
- * The "Add to a cookbook" sheet, while it is open. Null means closed — the list is thrown
- * away with it rather than kept, since a cookbook can be created or left from elsewhere
- * and a stale list would offer a cookbook that is no longer there.
+ * The "Add to a cookbook" sheet, while it is open. Null means closed.
  *
- * [busy] holds the cookbooks with a request in flight. A row is shown in its *new* state
- * immediately and reverted if the request fails, so tapping several in a row does not mean
- * waiting for each: this is a list of checkboxes, not a form.
+ * It holds no cookbooks of its own — those live in [RecipeUiState.cookbooks], since the
+ * banner's bookmark reads them too. What is here is only true while the sheet is up:
+ * whether the list is being refreshed, which rows have a request in flight, and what went
+ * wrong.
+ *
+ * A row is shown in its *new* state immediately and reverted if the request fails, so
+ * tapping several in a row does not mean waiting for each: this is a list of checkboxes,
+ * not a form.
  */
 data class CookbookPickerState(
-    val cookbooks: List<CookbookRecipeStatus> = emptyList(),
     val isLoading: Boolean = true,
     val busy: Set<Long> = emptySet(),
     val error: String? = null,
@@ -71,10 +84,15 @@ class RecipeViewModel(
             val recipeDeferred = async { repo.getRecipe(recipeId) }
             val likedDeferred = async { repo.isLiked(recipeId) }
             val notesDeferred = async { repo.getNotes(recipeId) }
+            // Failure is silent and means "filed nowhere": signed out, or offline. The
+            // bookmark is then hollow and opening it says what went wrong, which beats an
+            // error banner over a recipe that otherwise loaded.
+            val cookbooksDeferred = async { cookbookRepo.recipeStatusInCookbooks(recipeId) }
 
             val recipeResult = recipeDeferred.await()
             val likedResult = likedDeferred.await()
             val notesResult = notesDeferred.await()
+            val cookbooks = cookbooksDeferred.await().getOrDefault(emptyList())
 
             recipeResult
                 .onSuccess { recipe ->
@@ -97,6 +115,8 @@ class RecipeViewModel(
             notesResult.onSuccess { notes ->
                 _uiState.update { it.copy(notes = notes ?: "", remoteNotes = notes) }
             }
+
+            _uiState.update { it.copy(cookbooks = cookbooks) }
         }
     }
 
@@ -158,16 +178,21 @@ class RecipeViewModel(
     // ── Add to a cookbook ────────────────────────────────────────────────────
 
     fun openCookbookPicker() {
-        _uiState.update { it.copy(cookbookPicker = CookbookPickerState()) }
+        // Opens on what was loaded with the recipe and refreshes underneath: a cookbook can
+        // have been created or left since, but showing the list a moment stale beats showing
+        // a spinner over one that is almost certainly right.
+        val known = _uiState.value.cookbooks
+        _uiState.update { it.copy(cookbookPicker = CookbookPickerState(isLoading = known.isEmpty())) }
         viewModelScope.launch {
             cookbookRepo.recipeStatusInCookbooks(recipeId)
                 .onSuccess { cookbooks ->
                     _uiState.update {
-                        // Dropped if the sheet was closed while the request was out:
-                        // reopening starts a fresh load, and this one is answering a
-                        // question nobody is asking any more.
-                        if (it.cookbookPicker == null) it
-                        else it.copy(cookbookPicker = CookbookPickerState(cookbooks = cookbooks, isLoading = false))
+                        // The list is kept either way — the bookmark reads it — but the
+                        // sheet's own state is not resurrected if it has been closed.
+                        it.copy(
+                            cookbooks = cookbooks,
+                            cookbookPicker = it.cookbookPicker?.copy(isLoading = false),
+                        )
                     }
                 }
                 .onFailure { err ->
@@ -191,9 +216,10 @@ class RecipeViewModel(
      * it was and says why.
      */
     fun toggleCookbook(cookbookId: Long) {
-        val picker = _uiState.value.cookbookPicker ?: return
+        val state = _uiState.value
+        val picker = state.cookbookPicker ?: return
         if (cookbookId in picker.busy) return
-        val current = picker.cookbooks.firstOrNull { it.id == cookbookId } ?: return
+        val current = state.cookbooks.firstOrNull { it.id == cookbookId } ?: return
         val target = !current.hasRecipe
 
         updatePicker { it.copy(busy = it.busy + cookbookId, error = null) }
@@ -211,12 +237,14 @@ class RecipeViewModel(
         }
     }
 
-    private fun setMembership(cookbookId: Long, hasRecipe: Boolean) = updatePicker { picker ->
-        picker.copy(
-            cookbooks = picker.cookbooks.map {
-                if (it.id == cookbookId) it.copy(hasRecipe = hasRecipe) else it
-            },
-        )
+    private fun setMembership(cookbookId: Long, hasRecipe: Boolean) {
+        _uiState.update { state ->
+            state.copy(
+                cookbooks = state.cookbooks.map {
+                    if (it.id == cookbookId) it.copy(hasRecipe = hasRecipe) else it
+                },
+            )
+        }
     }
 
     private fun updatePicker(block: (CookbookPickerState) -> CookbookPickerState) {

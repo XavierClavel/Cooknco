@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.xavierclavel.cooknco.network.dto.CookbookRecipeStatus
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.recipe.CookbookPickerState
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -58,6 +59,7 @@ import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
  */
 @Composable
 fun AddToCookbookSheet(
+    cookbooks: List<CookbookRecipeStatus>,
     state: CookbookPickerState,
     onToggle: (Long) -> Unit,
     onDismissRequest: () -> Unit,
@@ -97,7 +99,7 @@ fun AddToCookbookSheet(
                                 contentAlignment = Alignment.Center,
                             ) { CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp) }
 
-                            state.cookbooks.isEmpty() -> Text(
+                            cookbooks.isEmpty() -> Text(
                                 text = s.noCookbooksYet,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -110,7 +112,7 @@ fun AddToCookbookSheet(
                                 // sheet rather than one that runs off the top of the screen.
                                 modifier = Modifier.fillMaxWidth().heightIn(max = 340.dp),
                             ) {
-                                items(state.cookbooks, key = { it.id }) { cookbook ->
+                                items(cookbooks, key = { it.id }) { cookbook ->
                                     CookbookToggleRow(
                                         title = cookbook.title,
                                         checked = cookbook.hasRecipe,

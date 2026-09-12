@@ -26,8 +26,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Remove
@@ -199,6 +201,7 @@ fun RecipeScreen(
     // in is the one the sheet's toggles can send the recipe in and out of.
     uiState.cookbookPicker?.let { picker ->
         AddToCookbookSheet(
+            cookbooks = uiState.cookbooks,
             state = picker,
             onToggle = viewModel::toggleCookbook,
             onDismissRequest = viewModel::closeCookbookPicker,
@@ -311,6 +314,30 @@ private fun RecipeContent(
                                 tint = likeContent,
                             )
                         }
+                        // Filled when the recipe is in at least one cookbook: the same
+                        // coral-fill treatment the heart beside it gets, so the two read as
+                        // one pair of states rather than two unrelated buttons.
+                        val bookmarkFill by animateColorAsState(
+                            targetValue = if (uiState.isBookmarked) CookncoGold else CookncoBackground,
+                            animationSpec = stickerSwitchSpec(),
+                            label = "bookmark_fill",
+                        )
+                        StickerIconButton(
+                            onClick = onAddToCookbook,
+                            shadowOffset = 3.dp,
+                            fillColor = bookmarkFill,
+                            contentColor = CookncoNavy,
+                        ) {
+                            Icon(
+                                // Gold rather than the heart's coral, and navy on top of it
+                                // either way: gold is the colour this app already uses for
+                                // "put away for later", on the Create button and the tips
+                                // card, and it keeps liked and saved from looking alike.
+                                imageVector = if (uiState.isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = s.addToCookbook,
+                                tint = CookncoNavy,
+                            )
+                        }
                         val menuFill by animateColorAsState(
                             targetValue = if (showMenu) CookncoNavy else CookncoBackground,
                             animationSpec = stickerSwitchSpec(),
@@ -417,7 +444,6 @@ private fun RecipeContent(
                     isOwner = isOwner,
                     onShare = onShare,
                     onEdit = onEdit,
-                    onAddToCookbook = onAddToCookbook,
                     onDelete = onDelete,
                     onDismissRequest = { showMenu = false },
                 )
@@ -907,7 +933,6 @@ private fun RecipeActionSheet(
     isOwner: Boolean,
     onShare: () -> Unit,
     onEdit: () -> Unit,
-    onAddToCookbook: () -> Unit,
     onDelete: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
@@ -921,9 +946,6 @@ private fun RecipeActionSheet(
         },
         actions = buildList {
             add(SheetAction(label = s.shareLink, onClick = onShare))
-            // Not gated on ownership: filing someone else's recipe in your own cookbook
-            // is most of what a cookbook is for.
-            add(SheetAction(label = s.addToCookbook, onClick = onAddToCookbook))
             if (isOwner) {
                 add(SheetAction(label = s.editRecipe, onClick = onEdit))
                 add(SheetAction(label = s.deleteRecipe, onClick = onDelete, destructive = true))
