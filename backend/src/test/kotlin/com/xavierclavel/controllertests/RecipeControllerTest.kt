@@ -554,15 +554,26 @@ class RecipeControllerTest : ApplicationTest() {
      * all, after `DELETE /like/{id}` spent a release erasing recipes nobody meant to delete.
      */
     @Test
-    fun `a deleted recipe keeps its row and its ingredients`() = runTestAsAdmin {
-        val recipe = client.createRecipe(recipeDTO)
-        val ingredientsBefore = countRows("recipe_ingredient", recipe.id)
+    fun `a deleted recipe keeps its row and everything hanging off it`() = runTestAsAdmin {
+        val ingredient = client.createIngredient()
+        val recipe = client.createRecipe(
+            RecipeDTO(
+                title = "My recipe",
+                steps = mutableListOf("cut", "cook"),
+                ingredients = mutableListOf(
+                    RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = AmountUnit.GRAM, amount = 1f),
+                ),
+            )
+        )
+        assertEquals(1, countRows("recipe_ingredients", recipe.id), "the recipe should have started with an ingredient")
+        assertEquals(2, countRows("recipes_steps", recipe.id), "and with its two steps")
 
         client.deleteRecipe(recipe.id)
 
         client.assertRecipeDoesNotExist(recipe.id)
         assertEquals(1, countRows("recipes", recipe.id), "the recipe row should still be there")
-        assertEquals(ingredientsBefore, countRows("recipe_ingredient", recipe.id), "its ingredients should still be there")
+        assertEquals(1, countRows("recipe_ingredients", recipe.id), "its ingredient should still be there")
+        assertEquals(2, countRows("recipes_steps", recipe.id), "and so should its steps")
     }
 
     /** And putting the flag back brings the recipe back, whole. */
@@ -579,9 +590,19 @@ class RecipeControllerTest : ApplicationTest() {
         assertEquals(recipe.ingredients.size, restored.ingredients.size)
     }
 
-    /** Counts rows a soft delete must not have removed — raw SQL, since Ebean hides them. */
+    /**
+     * Counts rows a soft delete must not have removed — raw SQL, since Ebean hides them.
+     *
+     * The column differs per table because Ebean names them differently: an element
+     * collection is keyed by `<table>_id` (`recipes_steps.recipes_id`) and a join table by
+     * the association (`recipe_ingredients.recipe_id`).
+     */
     private fun countRows(table: String, recipeId: Long): Int {
-        val column = if (table == "recipes") "id" else "recipe_id"
+        val column = when (table) {
+            "recipes" -> "id"
+            "recipes_steps" -> "recipes_id"
+            else -> "recipe_id"
+        }
         return DB.sqlQuery("select count(*) as c from $table where $column = :id")
             .setParameter("id", recipeId)
             .findOne()
