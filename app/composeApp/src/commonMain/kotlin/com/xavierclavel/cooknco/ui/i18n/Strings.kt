@@ -6,6 +6,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.xavierclavel.cooknco.data.AppLocale
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
+import com.xavierclavel.cooknco.network.IngredientSort
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
@@ -237,6 +238,8 @@ interface Strings {
     fun recipeCount(count: Int): String
     fun userCount(count: Int): String
 
+    fun ingredientCount(count: Int): String
+    fun ingredientSortName(sort: IngredientSort): String
     // ── Profile ───────────────────────────────────────────────────────────────
     val editProfile: String
     val shareProfile: String

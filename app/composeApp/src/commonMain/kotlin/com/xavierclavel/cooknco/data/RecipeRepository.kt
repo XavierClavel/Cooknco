@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.data
 
+import com.xavierclavel.cooknco.network.IngredientSort
 import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.RecipeSort
@@ -85,8 +86,11 @@ class RecipeRepository(
         )
     }
 
-    suspend fun searchIngredients(query: String): Result<IngredientSearchResult> = runCatching {
+    suspend fun searchIngredients(
+        query: String,
+        sort: IngredientSort = IngredientSort.BEST_MATCH,
+    ): Result<IngredientSearchResult> = runCatching {
         val token = tokenDataStore.tokenFlow.first()
-        recipeApi.searchIngredients(query, token)
+        recipeApi.searchIngredients(query, token, sort)
     }
 }

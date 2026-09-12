@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.ui.i18n
 
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
+import com.xavierclavel.cooknco.network.IngredientSort
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
@@ -236,6 +237,12 @@ object FrStrings : Strings {
     override val noUsersYet = "Aucun utilisateur"
     override fun recipeCount(count: Int) = if (count == 1) "1 recette" else "$count recettes"
     override fun userCount(count: Int) = if (count == 1) "1 utilisateur" else "$count utilisateurs"
+
+    override fun ingredientCount(count: Int) = if (count == 1) "1 ingrédient" else "$count ingrédients"
+    override fun ingredientSortName(sort: IngredientSort) = when (sort) {
+        IngredientSort.BEST_MATCH -> "Pertinence"
+        IngredientSort.NAME -> "A-Z"
+    }
 
     override val editProfile = "Modifier le profil"
     override val shareProfile = "Partager le profil"

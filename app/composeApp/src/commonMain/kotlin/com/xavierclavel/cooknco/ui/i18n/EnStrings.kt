@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.ui.i18n
 
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
+import com.xavierclavel.cooknco.network.IngredientSort
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
@@ -236,6 +237,12 @@ object EnStrings : Strings {
     override val noUsersYet = "No users yet"
     override fun recipeCount(count: Int) = if (count == 1) "1 recipe" else "$count recipes"
     override fun userCount(count: Int) = if (count == 1) "1 user" else "$count users"
+
+    override fun ingredientCount(count: Int) = if (count == 1) "1 ingredient" else "$count ingredients"
+    override fun ingredientSortName(sort: IngredientSort) = when (sort) {
+        IngredientSort.BEST_MATCH -> "Best match"
+        IngredientSort.NAME -> "A-Z"
+    }
 
     override val editProfile = "Edit profile"
     override val shareProfile = "Share profile"

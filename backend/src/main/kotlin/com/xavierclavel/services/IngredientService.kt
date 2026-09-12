@@ -21,6 +21,7 @@ import com.xavierclavel.utils.DbTransaction.updateAndGet
 import com.xavierclavel.utils.sqlStringLiteral
 import shared.enums.AmountUnit
 import shared.enums.Locale
+import shared.enums.Sort
 import shared.infodto.IngredientInfo
 
 class IngredientService: KoinComponent {
@@ -174,7 +175,20 @@ class IngredientService: KoinComponent {
         QIngredient().id.eq(ingredientId).findOne()?.deleteAndGet() != null
 
 
-    fun search(searchString: String, paging: Paging, locale: Locale): Pair<Int,List<IngredientInfo>> {
+    /**
+     * Ingredients matching [searchString], in the order [sort] asks for.
+     *
+     * `BEST_MATCH` is the default and the only order that makes sense while someone is
+     * typing — it is what the trigram similarity already computed to decide what matches at
+     * all. It is also meaningless without a term to be similar *to*, so a blank search falls
+     * back to alphabetical rather than ordering by similarity to nothing.
+     */
+    fun search(
+        searchString: String,
+        paging: Paging,
+        locale: Locale,
+        sort: Sort = Sort.BEST_MATCH,
+    ): Pair<Int,List<IngredientInfo>> {
         val query = QIngredient()
             .apply {
                 if (searchString.isBlank()) return@apply
@@ -185,9 +199,18 @@ class IngredientService: KoinComponent {
             }
             .query()
 
-        // Ebean copies orderBy strings into SQL verbatim (no parameter binding),
-        // so the search term is inlined as an injection-proof hex literal
-        query.orderBy("word_similarity(unaccent(${sqlStringLiteral(searchString)}), unaccent(${QIngredient.Alias.translations.name})) desc")
+        val effectiveSort = if (sort == Sort.BEST_MATCH && searchString.isBlank()) Sort.NAME_ASCENDING else sort
+        when (effectiveSort) {
+            // Ebean copies orderBy strings into SQL verbatim (no parameter binding),
+            // so the search term is inlined as an injection-proof hex literal
+            Sort.BEST_MATCH -> query.orderBy(
+                "word_similarity(unaccent(${sqlStringLiteral(searchString)}), unaccent(${QIngredient.Alias.translations.name})) desc"
+            )
+            // The name lives on the translation rows, so ordering by it needs the locale's
+            // row picked out — the same predicate the search itself filters on.
+            Sort.NAME_DESCENDING -> query.orderBy("${QIngredient.Alias.translations.name} desc")
+            else -> query.orderBy("${QIngredient.Alias.translations.name} asc")
+        }
 
         return Pair(query.findCount(), query.setPaging(paging).findList().map{it.toInfo()})
     }

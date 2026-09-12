@@ -9,6 +9,7 @@ import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.TokenDataStore
 import com.xavierclavel.cooknco.di.AppGraph
+import com.xavierclavel.cooknco.network.IngredientSort
 import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.RecipeSort
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -76,6 +78,9 @@ class RecipesViewModel(
     val query = MutableStateFlow(initialQuery)
     val scope = MutableStateFlow(SearchScope.RECIPES)
 
+    /** The order the Food scope is listed in; best match until somebody says otherwise. */
+    val ingredientSort = MutableStateFlow(IngredientSort.BEST_MATCH)
+
     /** Sort explicitly picked from the chips, null while the default applies. */
     private val pickedSort = MutableStateFlow<RecipeSort?>(null)
 
@@ -125,6 +130,12 @@ class RecipesViewModel(
                 launch { loadCookbooks(q) }
                 launch { loadIngredients(q) }
             }
+        }
+
+        // Its own collector: changing the order re-asks for the same query rather than
+        // waiting for the next keystroke, and the debounce above has nothing to do with it.
+        viewModelScope.launch {
+            ingredientSort.drop(1).collectLatest { loadIngredients(query.value) }
         }
     }
 
@@ -198,9 +209,13 @@ class RecipesViewModel(
             }
     }
 
+    fun onIngredientSortPicked(sort: IngredientSort) {
+        ingredientSort.value = sort
+    }
+
     private suspend fun loadIngredients(q: String) {
         _ingredientsState.update { it.copy(isLoading = true) }
-        recipeRepository.searchIngredients(q)
+        recipeRepository.searchIngredients(q, ingredientSort.value)
             .onSuccess { result ->
                 _ingredientsState.update { it.copy(items = result.items, count = result.count, isLoading = false, error = null) }
             }

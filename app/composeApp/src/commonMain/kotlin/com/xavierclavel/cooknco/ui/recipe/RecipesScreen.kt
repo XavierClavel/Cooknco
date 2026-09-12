@@ -59,6 +59,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.ApiClient
+import com.xavierclavel.cooknco.network.IngredientSort
 import com.xavierclavel.cooknco.network.RecipeSort
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
@@ -108,6 +109,7 @@ fun RecipesScreen(
     val s = strings()
     val query by viewModel.query.collectAsState()
     val sort by viewModel.sort.collectAsState()
+    val ingredientSort by viewModel.ingredientSort.collectAsState()
     val scope by viewModel.scope.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val usersState by viewModel.usersState.collectAsState()
@@ -189,6 +191,8 @@ fun RecipesScreen(
                 state = ingredientsState,
                 query = query,
                 onIngredientClick = onIngredientClick,
+                activeSort = ingredientSort,
+                onSortChange = viewModel::onIngredientSortPicked,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -772,8 +776,11 @@ private fun IngredientsScopeContent(
     state: SimpleListUiState<IngredientSummary>,
     query: String,
     onIngredientClick: (Long) -> Unit,
+    activeSort: IngredientSort,
+    onSortChange: (IngredientSort) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = strings()
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
         contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
@@ -783,13 +790,51 @@ private fun IngredientsScopeContent(
         }
         if (state.items.isNotEmpty()) {
             item {
-                Text(
-                    text = "${state.count} ingredient${if (state.count == 1) "" else "s"}",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = CookncoNavy,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
+                var sortExpanded by remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = s.ingredientCount(state.count),
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CookncoNavy,
+                        modifier = Modifier.weight(1f),
+                    )
+                    StickerDropdownMenu(
+                        expanded = sortExpanded,
+                        onDismissRequest = { sortExpanded = false },
+                        items = IngredientSort.entries,
+                        label = { s.ingredientSortName(it) },
+                        selected = { it == activeSort },
+                        onSelect = { onSortChange(it); sortExpanded = false },
+                        alignEnd = true,
+                        width = 196.dp,
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { sortExpanded = !sortExpanded }
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = s.ingredientSortName(activeSort),
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CookncoNavy,
+                            )
+                            Text(
+                                text = if (sortExpanded) "\u25b4" else "\u25be",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CookncoNavy,
+                            )
+                        }
+                    }
+                }
             }
             item {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

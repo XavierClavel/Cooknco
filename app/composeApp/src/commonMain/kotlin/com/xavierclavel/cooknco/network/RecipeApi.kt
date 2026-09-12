@@ -25,6 +25,19 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 
+/**
+ * What order a list of ingredients comes back in.
+ *
+ * Best match is the default and the only one that means anything while someone is typing —
+ * it is the trigram similarity the search already computed to decide what matches at all.
+ * With no search term the backend falls back to A-Z on its own, since there is nothing to
+ * be similar to.
+ */
+enum class IngredientSort(val value: String) {
+    BEST_MATCH("BEST_MATCH"),
+    NAME("NAME_ASCENDING"),
+}
+
 enum class RecipeSort(val value: String, val label: String) {
     RECENT("DATE_DESCENDING", "Recent"),
     BEST_MATCH("BEST_MATCH", "Best match"),
@@ -229,10 +242,15 @@ class RecipeApi(private val client: HttpClient) {
     }
 
     /** Served as `text/plain` — see [decodeJsonText]. */
-    suspend fun searchIngredients(query: String, token: String? = null): IngredientSearchResult {
+    suspend fun searchIngredients(
+        query: String,
+        token: String? = null,
+        sort: IngredientSort = IngredientSort.BEST_MATCH,
+    ): IngredientSearchResult {
         val response = client.get("$base/ingredient") {
             if (token != null) bearerAuth(token)
             parameter("query", query)
+            parameter("sort", sort.value)
             parameter("page", 0)
             parameter("size", 20)
             parameter("locale", ApiClient.locale)
