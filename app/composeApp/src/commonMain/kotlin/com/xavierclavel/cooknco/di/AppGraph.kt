@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import com.xavierclavel.cooknco.data.AppVersionRepository
 import com.xavierclavel.cooknco.data.AuthRepository
 import com.xavierclavel.cooknco.data.CookbookRepository
+import com.xavierclavel.cooknco.data.DevicePreferences
 import com.xavierclavel.cooknco.data.PushRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.TokenDataStore
@@ -36,12 +37,21 @@ object AppGraph {
         }
     }
 
-    val tokenDataStore: TokenDataStore by lazy {
+    /**
+     * The one preferences store, shared by everything that keeps something on the device —
+     * DataStore refuses a second instance over the same file, so this is created once here
+     * rather than per consumer.
+     */
+    private val preferences: DataStore<Preferences> by lazy {
         val factory = checkNotNull(dataStoreFactory) {
             "AppGraph.init() must be called before the object graph is used"
         }
-        TokenDataStore(factory())
+        factory()
     }
+
+    val tokenDataStore: TokenDataStore by lazy { TokenDataStore(preferences) }
+
+    val devicePreferences: DevicePreferences by lazy { DevicePreferences(preferences) }
 
     private val appVersionApi by lazy { AppVersionApi(ApiClient.httpClient) }
     private val authApi by lazy { AuthApi(ApiClient.httpClient) }
