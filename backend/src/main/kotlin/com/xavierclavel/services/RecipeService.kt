@@ -6,9 +6,13 @@ import com.xavierclavel.exceptions.ForbiddenException
 import com.xavierclavel.exceptions.NotFoundCause
 import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.models.Recipe
+import com.xavierclavel.models.RecipeStep
 import com.xavierclavel.models.User
 import com.xavierclavel.models.jointables.query.QCookbookRecipe
 import com.xavierclavel.models.query.QRecipe
+import io.ebean.DB
+import com.xavierclavel.models.jointables.query.QRecipeStepIngredient
+import com.xavierclavel.models.query.QRecipeStep
 import com.xavierclavel.models.query.QUser
 import com.xavierclavel.utils.DbTransaction.insertAndGet
 import com.xavierclavel.utils.DbTransaction.updateAndGet
@@ -178,16 +182,61 @@ class RecipeService: KoinComponent {
         getEntityById(recipeId).owner
             ?: throw NotFoundException(NotFoundCause.RECIPE_NOT_FOUND)
 
-    fun createRecipe(recipeDTO: RecipeDTO, owner: User): RecipeInfo =
-        Recipe()
-            .mergeDTO(recipeDTO)
-            .setOwner(owner)
-            .insertAndGet()
-            .toInfo(Locale.EN)
+    fun createRecipe(recipeDTO: RecipeDTO, owner: User): RecipeInfo {
+        val recipe = Recipe().mergeDTO(recipeDTO).setOwner(owner).insertAndGet()
+        saveSteps(recipe.id, recipeDTO.steps)
+        return getEntityById(recipe.id).toInfo(Locale.EN)
+    }
 
+    fun updateRecipe(id: Long, recipeDTO: RecipeDTO): RecipeInfo {
+        getEntityById(id).mergeDTO(recipeDTO).update()
+        saveSteps(id, recipeDTO.steps)
+        return getEntityById(id).toInfo(Locale.EN)
+    }
 
-    fun updateRecipe(id: Long, recipeDTO: RecipeDTO): RecipeInfo =
-        getEntityById(id).mergeDTO(recipeDTO).updateAndGet().toInfo(Locale.EN)
+    /**
+     * Brings a recipe's steps in line with what was sent, keeping the rows that are still
+     * there.
+     *
+     * A step used to be rewritten on every save - a habit inherited from when steps were an
+     * `@ElementCollection` of strings, which has no row identity to keep. Once a step is a row
+     * other rows point at, that is a foreign key waiting to be tripped, and it leaves nothing
+     * that can be hung off a step by id. So a step the client names by id is updated where it
+     * is, one it does not is inserted, and one it has stopped mentioning is deleted.
+     *
+     * An id this recipe does not have is treated as a new step. It can only come from a client
+     * working from a stale copy, and the alternatives are worse: refusing would fail a save
+     * over something the cook cannot see, and honouring it would let one recipe write over
+     * another's step.
+     *
+     * The links to ingredients go before the steps they hang off do - `recipe_step_ingredients`
+     * restricts deletes at both ends, and the rows being deleted here are exactly the ones
+     * still pointed at.
+     */
+    fun saveSteps(recipeId: Long, steps: List<RecipeDTO.RecipeStepDTO>) {
+        val existing = QRecipeStep().recipe.id.eq(recipeId).findList().associateBy { it.id }
+        val recipe = getEntityById(recipeId)
+
+        DB.beginTransaction().use { transaction ->
+            val kept = mutableSetOf<Long>()
+            steps.forEachIndexed { index, dto ->
+                val row = dto.id?.let { existing[it] }
+                if (row == null) {
+                    RecipeStep.of(dto, index).also { it.recipe = recipe }.insert()
+                } else {
+                    kept += row.id
+                    row.mergeDto(dto, index).update()
+                }
+            }
+
+            val removed = existing.keys - kept
+            if (removed.isNotEmpty()) {
+                QRecipeStepIngredient().step.id.`in`(removed).delete()
+                QRecipeStep().id.`in`(removed).delete()
+            }
+            transaction.commit()
+        }
+    }
 
     fun deleteRecipe(id: Long) {
         QRecipe().id.eq(id).delete()

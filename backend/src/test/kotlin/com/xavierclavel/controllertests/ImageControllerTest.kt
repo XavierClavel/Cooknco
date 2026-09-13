@@ -11,12 +11,15 @@ import main.com.xavierclavel.utils.createRecipe
 import main.com.xavierclavel.utils.getRecipe
 import main.com.xavierclavel.utils.callToolOk
 import main.com.xavierclavel.utils.mcpToken
+import main.com.xavierclavel.utils.deleteStepImage
 import main.com.xavierclavel.utils.uploadRecipeImage
+import main.com.xavierclavel.utils.uploadStepImage
 import main.com.xavierclavel.utils.uploadToTicketUrl
 import org.junit.jupiter.api.Test
 import shared.dto.RecipeDTO
 import shared.utils.URL.IMAGE_URL
 import shared.utils.Filepath.RECIPES_IMG_PATH
+import shared.utils.Filepath.RECIPE_STEPS_IMG_PATH
 import shared.utils.Filepath.RECIPES_THUMBNAIL_PATH
 import kotlin.io.path.Path
 import kotlin.io.path.exists
@@ -52,6 +55,81 @@ class ImageControllerTest : ApplicationTest() {
         assertImageExists(RECIPES_IMG_PATH, recipe.id, 2)
         // the replaced version is cleaned up
         assertTrue(!Path("$RECIPES_IMG_PATH/${recipe.id}-v1.webp").exists())
+    }
+
+    // ── A step's own picture ────────────────────────────────────────────────────
+    //
+    // Addressed by the step's row, not by the recipe's - which is what the steps having ids
+    // of their own bought. Rights still come from the recipe: a step is not something anybody
+    // owns on its own.
+
+    @Test
+    fun `upload a picture on a step that has none`() = runTestAsAdmin {
+        val recipe = client.createRecipe(RecipeDTO(title = "Crepes", steps = mutableListOf(
+            RecipeDTO.RecipeStepDTO(text = "Melt the butter"),
+        )))
+        val step = recipe.steps.single()
+        assertEquals(0, step.imageVersion)
+
+        val response = client.uploadStepImage(step.id!!)
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        assertEquals(1, client.getRecipe(recipe.id).steps.single().imageVersion)
+        assertImageExists(RECIPE_STEPS_IMG_PATH, step.id!!, 1)
+        // No thumbnail: a step picture is drawn at one size, so a second file would be one
+        // more thing to keep in step with the first for nobody to look at.
+        assertTrue(!Path("$RECIPE_STEPS_IMG_PATH/${step.id}-v1-thumbnail.webp").exists())
+    }
+
+    @Test
+    fun `a second picture replaces the first`() = runTestAsAdmin {
+        val recipe = client.createRecipe(RecipeDTO(title = "Crepes", steps = mutableListOf(
+            RecipeDTO.RecipeStepDTO(text = "Melt the butter"),
+        )))
+        val stepId = recipe.steps.single().id!!
+        client.uploadStepImage(stepId)
+
+        assertEquals(HttpStatusCode.OK, client.uploadStepImage(stepId).status)
+
+        assertEquals(2, client.getRecipe(recipe.id).steps.single().imageVersion)
+        assertImageExists(RECIPE_STEPS_IMG_PATH, stepId, 2)
+        assertTrue(!Path("$RECIPE_STEPS_IMG_PATH/$stepId-v1.webp").exists())
+    }
+
+    /**
+     * Back to zero, where the other buckets bump. They can afford to bump: a recipe whose
+     * picture is gone falls back to the default this controller serves. A step has no default
+     * - it shows nothing rather than a stand-in - so a version left pointing at a deleted file
+     * would be a broken image for every reader of the recipe.
+     */
+    @Test
+    fun `deleting a step's picture takes its version back to zero`() = runTestAsAdmin {
+        val recipe = client.createRecipe(RecipeDTO(title = "Crepes", steps = mutableListOf(
+            RecipeDTO.RecipeStepDTO(text = "Melt the butter"),
+        )))
+        val stepId = recipe.steps.single().id!!
+        client.uploadStepImage(stepId)
+
+        assertEquals(HttpStatusCode.OK, client.deleteStepImage(stepId).status)
+
+        assertEquals(0, client.getRecipe(recipe.id).steps.single().imageVersion)
+        assertTrue(!Path("$RECIPE_STEPS_IMG_PATH/$stepId-v1.webp").exists())
+    }
+
+    /** The recipe's author, or nobody: the step itself has no owner to ask. */
+    @Test
+    fun `a step's picture may only be set by the recipe's author`() = runTest {
+        var stepId = 0L
+        runAsUser1 {
+            val recipe = client.createRecipe(RecipeDTO(title = "Crepes", steps = mutableListOf(
+                RecipeDTO.RecipeStepDTO(text = "Melt the butter"),
+            )))
+            stepId = recipe.steps.single().id!!
+        }
+        runAsUser2 {
+            assertEquals(HttpStatusCode.Forbidden, client.uploadStepImage(stepId).status)
+            assertEquals(HttpStatusCode.Forbidden, client.deleteStepImage(stepId).status)
+        }
     }
 
     // The upload endpoint a ticket unlocks. What a ticket is worth, and the round trip through

@@ -1,6 +1,7 @@
 package shared.enums
 
 import shared.utils.Filepath.COOKBOOKS_IMG_PATH
+import shared.utils.Filepath.RECIPE_STEPS_IMG_PATH
 import shared.utils.Filepath.RECIPES_IMG_PATH
 import shared.utils.Filepath.RECIPES_THUMBNAIL_PATH
 import shared.utils.Filepath.USERS_IMG_PATH
@@ -21,6 +22,15 @@ enum class ImageBucket(val path: String, val dir: String, val width: Int, val he
     RECIPE_THUMBNAIL(RECIPES_THUMBNAIL_PATH, "recipes-thumbnails", 480, 360),
     USER(USERS_IMG_PATH, "users", 400, 400),
     COOKBOOK(COOKBOOKS_IMG_PATH, "cookbooks", 500, 500),
+
+    /**
+     * A picture of one step.
+     *
+     * Smaller than a recipe's own photograph on purpose: it is glanced at from across a
+     * worktop while both hands are busy, not studied, and it is drawn at the width of a card
+     * rather than as a banner.
+     */
+    RECIPE_STEP(RECIPE_STEPS_IMG_PATH, "recipe-steps", 1000, 750),
     ;
 
     val size: Pair<Int, Int> get() = Pair(width, height)

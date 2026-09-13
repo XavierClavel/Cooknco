@@ -135,6 +135,32 @@ class RecipeApi(private val client: HttpClient) {
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }
 
+    /**
+     * A picture for one step, posted once the recipe is saved.
+     *
+     * A step has no id before then, which is why this cannot ride along with the save - the
+     * same order the recipe's own photograph follows.
+     */
+    suspend fun uploadStepImage(token: String, stepId: Long, imageBytes: ByteArray, mimeType: String) {
+        val response = client.post("${ApiClient.IMAGE_URL}/recipe-steps/$stepId") {
+            bearerAuth(token)
+            setBody(MultiPartFormDataContent(formData {
+                append("file", imageBytes, Headers.build {
+                    append(HttpHeaders.ContentType, mimeType)
+                    append(HttpHeaders.ContentDisposition, "filename=step.webp")
+                })
+            }))
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
+    suspend fun deleteStepImage(token: String, stepId: Long) {
+        val response = client.delete("${ApiClient.IMAGE_URL}/recipe-steps/$stepId") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
     suspend fun deleteRecipe(id: Long, token: String) {
         val response = client.delete("$base/recipe/$id") {
             bearerAuth(token)

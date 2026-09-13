@@ -72,6 +72,15 @@ enum class StepAttachment {
 
     /** Which of the recipe's ingredients the step uses. Held in [StepItem.ingredients]. */
     INGREDIENTS,
+
+    /**
+     * A picture of what the step should look like. Held in [StepItem.pendingImage] until it
+     * is saved, and in [StepItem.imageVersion] once it is.
+     *
+     * The only attachment that is not saved with the recipe: a picture is posted to the
+     * step's own row, which does not exist until the save that creates it has answered.
+     */
+    PHOTO,
 }
 
 /**
@@ -94,6 +103,14 @@ data class StepItem(
     val id: String,
     val text: String,
     /**
+     * The row this step is saved as, or null for one that has never been saved.
+     *
+     * Distinct from [id], which is made up here and only ever names a row in this list: it
+     * is what keeps a card from being rebuilt as the list is edited, and means nothing to
+     * the server. [serverId] is what a picture is posted against.
+     */
+    val serverId: Long? = null,
+    /**
      * What this step carries beyond its text, and the one source of truth for whether the
      * card shows it.
      *
@@ -106,6 +123,15 @@ data class StepItem(
     val durationSeconds: Int? = null,
     /** Which of the recipe's ingredients this step uses, and how much of each. */
     val ingredients: List<StepIngredientDraft> = emptyList(),
+    /**
+     * A picture chosen but not yet sent, or null when there is none waiting.
+     *
+     * It cannot be sent as it is picked: a step that has never been saved has nothing to
+     * post it against. See [RecipeEditViewModel.syncStepImages].
+     */
+    val pendingImage: PickedImage? = null,
+    /** Which version of the saved picture to show. Zero while the step has none. */
+    val imageVersion: Long = 0,
     /**
      * Whether the cook has taken the timer over from the text.
      *
@@ -210,9 +236,12 @@ class RecipeEditViewModel(
                                 StepItem(
                                     id = newStepId(),
                                     text = step.text,
+                                    serverId = step.id,
+                                    imageVersion = step.imageVersion,
                                     attachments = setOfNotNull(
                                         StepAttachment.TIMER.takeIf { duration != null },
                                         StepAttachment.INGREDIENTS.takeIf { step.ingredients.isNotEmpty() },
+                                        StepAttachment.PHOTO.takeIf { step.imageVersion > 0 },
                                     ),
                                     ingredients = step.ingredients.map { used ->
                                         StepIngredientDraft(
@@ -435,6 +464,9 @@ class RecipeEditViewModel(
                     // Nothing picked yet: the list of the recipe's ingredients appears and the
                     // cook ticks what the step uses.
                     StepAttachment.INGREDIENTS -> step.copy(attachments = step.attachments + attachment)
+                    // Just the empty frame, which opens the picker when tapped. Asking for a
+                    // photo and choosing one are two taps in a row, not one.
+                    StepAttachment.PHOTO -> step.copy(attachments = step.attachments + attachment)
                 }
             },
         )
@@ -455,7 +487,32 @@ class RecipeEditViewModel(
                         attachments = step.attachments - attachment,
                         ingredients = emptyList(),
                     )
+                    // A picture already on the server is not deleted here: the row is only
+                    // removed by the save, so that a photo taken off and put back before
+                    // saving costs nothing. [syncStepImages] is what notices it has gone.
+                    StepAttachment.PHOTO -> step.copy(
+                        attachments = step.attachments - attachment,
+                        pendingImage = null,
+                    )
                 }
+            },
+        )
+    }
+
+    /**
+     * Stages a picture for a step. It replaces whatever was chosen before, and whatever is
+     * already saved - the old file goes when the new one is posted, at the next save.
+     */
+    fun setStepImage(id: String, image: PickedImage) = _uiState.update { s ->
+        s.copy(
+            steps = s.steps.map { step ->
+                if (step.id != id) step
+                else step.copy(
+                    pendingImage = image,
+                    // Picking one from the camera roll without having asked for a photo
+                    // first is possible from the recipe card; either way it is attached now.
+                    attachments = step.attachments + StepAttachment.PHOTO,
+                )
             },
         )
     }
@@ -520,6 +577,11 @@ class RecipeEditViewModel(
             return
         }
 
+        // Held onto, because what comes back has to be matched to it: the server answers
+        // with the steps it was sent, in the order it was sent them, and that is how a
+        // step being written learns the id its picture is posted against.
+        val written = state.steps.filter { it.text.isNotBlank() }
+
         val dto = RecipeSaveDto(
             title = state.title.trim(),
             description = state.description.trim(),
@@ -539,11 +601,13 @@ class RecipeEditViewModel(
                     complement = ing.complement.ifBlank { null },
                 )
             },
-            steps = state.steps
-                .filter { it.text.isNotBlank() }
+            steps = written
                 .map { step ->
                     RecipeStepInfo(
                         text = step.text.trim(),
+                        // What the server matches this step to the row it already has by.
+                        // Null for a step written since the last save, which is an insert.
+                        id = step.serverId,
                         // A timer that was added and left blank is no timer: nothing is saved
                         // for an attachment holding nothing.
                         durationSeconds = step.durationSeconds
@@ -584,12 +648,25 @@ class RecipeEditViewModel(
                     val imageUploaded = state.pendingImage?.let { image ->
                         repo.uploadRecipeImage(recipe.id, image.bytes, image.mimeType).isSuccess
                     } ?: false
-                    _uiState.update {
-                        it.copy(
+                    val stepVersions = syncStepImages(written, recipe.steps)
+                    _uiState.update { current ->
+                        current.copy(
                             isSaving = false,
                             saved = true,
                             recipeId = recipe.id,
-                            pendingImage = if (imageUploaded) null else it.pendingImage,
+                            pendingImage = if (imageUploaded) null else current.pendingImage,
+                            // Matched by the card's own id rather than by position: the cook
+                            // may have added or reordered steps while the save was in flight.
+                            steps = current.steps.map { item ->
+                                val row = recipe.steps.getOrNull(written.indexOfFirst { it.id == item.id })
+                                    ?: return@map item
+                                item.copy(
+                                    serverId = row.id,
+                                    imageVersion = stepVersions[item.id] ?: row.imageVersion,
+                                    pendingImage =
+                                        if (item.id in stepVersions) null else item.pendingImage,
+                                )
+                            },
                         )
                     }
                 }
@@ -597,6 +674,42 @@ class RecipeEditViewModel(
                     _uiState.update { it.copy(isSaving = false, error = error.message) }
                 }
         }
+    }
+
+    /**
+     * Puts each step's picture where the save has just made room for it, and returns the
+     * version every step that changed one is now on.
+     *
+     * Two lists arrive: the steps as they were sent, and the rows the server answered with.
+     * They line up one for one, because a save returns what it was given in the order it was
+     * given it - that is the whole reason a step carries an id of its own now.
+     *
+     * Best-effort, like the recipe's own photograph: the words are saved by the time this
+     * runs, so a failed upload leaves the picture staged rather than failing the save. One
+     * that did upload is cleared, so a second Save does not send it - and bump its version -
+     * all over again.
+     */
+    private suspend fun syncStepImages(
+        written: List<StepItem>,
+        saved: List<RecipeStepInfo>,
+    ): Map<String, Long> {
+        val versions = mutableMapOf<String, Long>()
+        written.forEachIndexed { index, step ->
+            val row = saved.getOrNull(index) ?: return@forEachIndexed
+            val stepId = row.id ?: return@forEachIndexed
+            val picked = step.pendingImage
+            when {
+                picked != null ->
+                    if (repo.uploadStepImage(stepId, picked.bytes, picked.mimeType).isSuccess) {
+                        versions[step.id] = row.imageVersion + 1
+                    }
+                // The cook took the photo off. Saving the words does not touch the file, so
+                // it is removed by hand - and the row is still there to remove it from.
+                StepAttachment.PHOTO !in step.attachments && row.imageVersion > 0 ->
+                    if (repo.deleteStepImage(stepId).isSuccess) versions[step.id] = 0
+            }
+        }
+        return versions
     }
 
     companion object {

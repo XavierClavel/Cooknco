@@ -80,10 +80,17 @@ class StorageService: KoinComponent {
         ImageBucket.RECIPE, ImageBucket.RECIPE_THUMBNAIL -> "recipes"
         ImageBucket.USER -> "users"
         ImageBucket.COOKBOOK -> "cookbooks"
+        // Reconciled like any other owner, because a step is a row with a stable id and an
+        // image_version of its own. It only became one for this: until steps were diffed on
+        // save they were deleted and re-inserted every time a recipe was touched, and a file
+        // named after a step id would have been orphaned by an edit to the title.
+        ImageBucket.RECIPE_STEP -> "recipe_steps"
     }
 
     private val ImageBucket.labelColumn: String get() = when (this) {
         ImageBucket.USER -> "username"
+        // A step has no title; its words are the only thing that names it in a storage report.
+        ImageBucket.RECIPE_STEP -> "text"
         else -> "title"
     }
 
