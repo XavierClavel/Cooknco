@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
@@ -183,11 +185,25 @@ private fun CookbookContent(
                     subtitle = s.recipeCount(recipes.size) + " · " + s.memberCount(members.size),
                     actions = buildList {
                         if (isAdmin) {
-                            add(SheetAction(label = s.editCookbook, onClick = onEdit))
+                            add(SheetAction(label = s.editCookbook, onClick = onEdit, icon = Icons.Outlined.Edit))
                         }
-                        add(SheetAction(label = s.leaveCookbook, onClick = onLeave, destructive = !isAdmin))
+                        add(
+                            SheetAction(
+                                label = s.leaveCookbook,
+                                onClick = onLeave,
+                                destructive = !isAdmin,
+                                icon = Icons.AutoMirrored.Outlined.Logout,
+                            )
+                        )
                         if (isAdmin) {
-                            add(SheetAction(label = s.deleteCookbook, onClick = onDelete, destructive = true))
+                            add(
+                                SheetAction(
+                                    label = s.deleteCookbook,
+                                    onClick = onDelete,
+                                    destructive = true,
+                                    icon = Icons.Outlined.Delete,
+                                )
+                            )
                         }
                     },
                     onDismissRequest = { showMenu = false },

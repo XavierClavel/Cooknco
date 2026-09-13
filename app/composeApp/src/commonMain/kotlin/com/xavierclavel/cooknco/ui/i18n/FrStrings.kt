@@ -443,13 +443,32 @@ object FrStrings : Strings {
     override val inYourRecipes = "DANS VOS RECETTES"
     override val popularWithThis = "POPULAIRES AVEC ÇA"
     override val nothingCookedWithThis = "Rien n'a encore été cuisiné avec. Ajoutez-le à une recette et il apparaîtra ici."
-    override fun ingredientType(type: String) = type.lowercase().replaceFirstChar { it.uppercase() }
 
     override fun stepOf(step: Int, total: Int) = "ÉTAPE $step SUR $total"
     override val nextStep = "Étape suivante"
     override val finish = "Terminer"
     override fun nextIs(step: String) = "Ensuite : $step"
-    override val timerFromThisStep = "Minuteur pour cette étape"
+    override val timerLabel = "Minuteur"
+    override val stepTimerPlaceholder = "--"
+    override val addToStep = "Ajouter"
+    override val removeStepTimer = "Supprimer le minuteur"
+    override val minutesShort = "min"
     override val start = "Démarrer"
     override val pause = "Pause"
+    override val resume = "Reprendre"
+    override val stopTimer = "Arrêter"
+    override val timerPaused = "En pause"
+    override val timerTimeIsUp = "C'est prêt !"
+    override val timerRingOnTimeTitle = "Sonner à l'heure"
+    override val timerRingOnTimeMessage =
+        "Android n'autorise une application à sonner à l'heure exacte qu'avec votre " +
+            "permission. Sans elle, ce minuteur peut sonner avec plusieurs minutes de " +
+            "retard quand le téléphone est en veille."
+    override val timerRingOnTimeConfirm = "Ouvrir les réglages"
+    override val timerRingOnTimeDismiss = "Plus tard"
+
+    override val timerChannelName = "Minuteur de cuisson"
+    override val timerChannelDescription = "Le décompte d'un minuteur lancé en mode cuisson."
+    override val timerDoneChannelName = "Sonnerie du minuteur"
+    override val timerDoneChannelDescription = "Sonne quand un minuteur du mode cuisson arrive à zéro."
 }

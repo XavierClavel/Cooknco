@@ -162,14 +162,21 @@ class UserApi(private val client: HttpClient) {
         return response.body()
     }
 
-    suspend fun updateSettings(token: String, settings: UserSettingsDTO): UserSettingsDTO {
+    /**
+     * Saves the settings, and reads nothing back.
+     *
+     * The endpoint answers with a bare 200 and no body (`UserController.updateSettings`), so
+     * asking Ktor for a [UserSettingsDTO] here threw "expected UserSettingsDTO, got
+     * ByteReadChannel" on every save - which is what changing the language used to do.
+     * Nothing wanted the value anyway: what was sent is what was stored.
+     */
+    suspend fun updateSettings(token: String, settings: UserSettingsDTO) {
         val response = client.put("$base/user/settings") {
             bearerAuth(token)
             contentType(ContentType.Application.Json)
             setBody(settings)
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
-        return response.body()
     }
 
     /**

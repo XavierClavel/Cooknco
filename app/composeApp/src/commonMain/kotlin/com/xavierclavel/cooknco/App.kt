@@ -26,6 +26,10 @@ fun App() {
     val language by AppLanguage.current.collectAsState()
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { AppLanguage.restore(AppGraph.devicePreferences, scope) }
+    // A timer started in an earlier process is still counting — its deadline outlived it.
+    // Read back here, before cook mode is reachable, so the screen opens on the real one
+    // rather than on its step's default. See [CookTimer].
+    LaunchedEffect(Unit) { AppGraph.cookTimer.restore() }
 
     CompositionLocalProvider(LocalStrings provides stringsFor(language)) {
     CookncoTheme {

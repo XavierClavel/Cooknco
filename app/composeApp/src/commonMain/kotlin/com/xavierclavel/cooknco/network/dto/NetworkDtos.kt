@@ -82,10 +82,26 @@ data class RecipeInfo(
     val cookingTime: Int? = null,
     val cookingTemperature: Int? = null,
     val ingredients: List<RecipeIngredientInfo> = emptyList(),
-    val steps: List<String> = emptyList(),
+    val steps: List<RecipeStepInfo> = emptyList(),
     val tips: String = "",
     val creationDate: Long,
     val likesCount: Int,
+)
+
+/**
+ * One step, and how long it takes.
+ *
+ * [durationSeconds] is null on nearly every step and means "no timer" rather than "zero": a
+ * zero would be a timer that has already run out. Seconds, because that is what cook mode
+ * counts down — the editors offer minutes, which is how a recipe talks.
+ *
+ * The same shape goes back to the server (`RecipeSaveDto.steps`), so this one type is the
+ * step in both directions, as it is on the backend's side of the wire.
+ */
+@Serializable
+data class RecipeStepInfo(
+    val text: String = "",
+    val durationSeconds: Int? = null,
 )
 
 @Serializable
@@ -98,7 +114,7 @@ data class RecipeSaveDto(
     val cookingTime: Int? = null,
     val cookingTemperature: Int? = null,
     val ingredients: List<RecipeIngredientSaveDto>,
-    val steps: List<String>,
+    val steps: List<RecipeStepInfo>,
     val tips: String,
 )
 

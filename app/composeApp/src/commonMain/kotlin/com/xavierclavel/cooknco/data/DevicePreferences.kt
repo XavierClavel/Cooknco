@@ -24,12 +24,26 @@ import kotlinx.coroutines.flow.map
 class DevicePreferences(private val dataStore: DataStore<Preferences>) {
 
     private val pushEnabledKey = booleanPreferencesKey("push_enabled")
+    private val exactAlarmsAskedKey = booleanPreferencesKey("exact_alarms_asked")
     private val languageKey = stringPreferencesKey("app_language")
 
     val pushEnabled: Flow<Boolean> = dataStore.data.map { it[pushEnabledKey] ?: true }
 
     suspend fun setPushEnabled(enabled: Boolean) {
         dataStore.edit { it[pushEnabledKey] = enabled }
+    }
+
+    /**
+     * Whether the cook has already been asked to let the timer ring on time.
+     *
+     * Kept so they are asked once rather than every time a timer is started. It is a device
+     * property like [pushEnabled] — the permission it is about belongs to this install, not
+     * to the account, and a tablet that has never run a timer should get its own asking.
+     */
+    val exactAlarmsAsked: Flow<Boolean> = dataStore.data.map { it[exactAlarmsAskedKey] ?: false }
+
+    suspend fun setExactAlarmsAsked() {
+        dataStore.edit { it[exactAlarmsAskedKey] = true }
     }
 
     /**

@@ -18,9 +18,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,9 +43,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xavierclavel.cooknco.data.CookTimerState
+import com.xavierclavel.cooknco.data.formatCookTimer
+import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
+import com.xavierclavel.cooknco.platform.rememberExactTimerConsent
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
@@ -52,6 +59,7 @@ import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerConfirmDialog
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 
 /**
@@ -61,6 +69,11 @@ import com.xavierclavel.cooknco.ui.theme.StickerIconButton
  *
  * The mockup's "Screen on" toggle is left out: nothing in `platform/` offers a wake-lock
  * hook, and a toggle that doesn't actually keep the screen on is worse than none.
+ *
+ * A timer belongs to the step that started it, and the card is shown on that step only. It
+ * goes on counting while the cook reads ahead — see `CookTimer` — but what says so then is
+ * the notification, not a card that would otherwise follow them onto every step and claim a
+ * timer each one does not have.
  */
 @Composable
 fun CookModeScreen(
@@ -88,13 +101,35 @@ fun CookModeScreen(
             uiState.recipe != null -> CookModeContent(
                 recipe = uiState.recipe!!,
                 currentStep = uiState.currentStep,
-                timerTotalSeconds = uiState.timerTotalSeconds,
+                stepDurationSeconds = uiState.stepDurationSeconds,
+                timer = uiState.stepTimer,
                 timerRemainingSeconds = uiState.timerRemainingSeconds,
-                timerRunning = uiState.timerRunning,
                 onToggleTimer = viewModel::toggleTimer,
+                onStopTimer = viewModel::stopTimer,
                 onPreviousStep = viewModel::previousStep,
                 onNextStep = viewModel::nextStep,
                 onClose = onNavigateBack,
+            )
+        }
+
+        if (uiState.askToRingOnTime) {
+            val s = strings()
+            val consent = rememberExactTimerConsent()
+            // Not a destructive confirmation, so it borrows the shape and not the colour:
+            // gold, like the timer card it is about, rather than the error red.
+            StickerConfirmDialog(
+                icon = Icons.Outlined.Alarm,
+                title = s.timerRingOnTimeTitle,
+                message = s.timerRingOnTimeMessage,
+                confirmText = s.timerRingOnTimeConfirm,
+                dismissText = s.timerRingOnTimeDismiss,
+                iconColor = CookncoGold,
+                confirmColor = CookncoOrange,
+                onConfirm = {
+                    consent.request()
+                    viewModel.dismissRingOnTimeAsk()
+                },
+                onDismissRequest = viewModel::dismissRingOnTimeAsk,
             )
         }
     }
@@ -113,10 +148,11 @@ private const val EDGE_TAP_FRACTION = 0.38f
 private fun CookModeContent(
     recipe: RecipeInfo,
     currentStep: Int,
-    timerTotalSeconds: Int?,
-    timerRemainingSeconds: Int?,
-    timerRunning: Boolean,
+    stepDurationSeconds: Int?,
+    timer: CookTimerState?,
+    timerRemainingSeconds: Int,
     onToggleTimer: () -> Unit,
+    onStopTimer: () -> Unit,
     onPreviousStep: () -> Unit,
     onNextStep: () -> Unit,
     onClose: () -> Unit,
@@ -124,7 +160,7 @@ private fun CookModeContent(
 ) {
     val s = strings()
     val stepCount = recipe.steps.size
-    val stepText = recipe.steps.getOrNull(currentStep) ?: ""
+    val stepText = recipe.steps.getOrNull(currentStep)?.text ?: ""
     val isLastStep = currentStep >= stepCount - 1
 
     Column(
@@ -219,58 +255,23 @@ private fun CookModeContent(
                 }
             }
 
-            if (timerTotalSeconds != null) {
+            if (timer != null || stepDurationSeconds != null) {
                 item {
-                    val remaining = timerRemainingSeconds ?: timerTotalSeconds
-                    StickerCard(
+                    CookTimerCard(
+                        timer = timer,
+                        stepDurationSeconds = stepDurationSeconds,
+                        remainingSeconds = timerRemainingSeconds,
+                        onToggle = onToggleTimer,
+                        onStop = onStopTimer,
                         modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        fillColor = CookncoGold,
-                        shadowOffset = 5.dp,
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Text(
-                                text = formatTimer(remaining),
-                                color = CookncoNavy,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 26.sp,
-                            )
-                            Text(
-                                text = s.timerFromThisStep,
-                                color = CookncoNavy,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(percent = 50))
-                                    .background(CookncoNavy)
-                                    .clickable(onClick = onToggleTimer)
-                                    .padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = if (timerRunning) s.pause else s.start,
-                                    color = CookncoWhite,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                )
-                            }
-                        }
-                    }
+                    )
                 }
             }
 
             if (!isLastStep) {
                 item {
                     Text(
-                        text = s.nextIs(recipe.steps[currentStep + 1]),
+                        text = s.nextIs(recipe.steps[currentStep + 1].text),
                         color = CookncoWhite,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(top = 16.dp),
@@ -312,6 +313,106 @@ private fun CookModeContent(
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
                     modifier = Modifier.align(Alignment.Center),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The timer, in whichever of its four states it is in: not started, running, paused, rung.
+ *
+ * [timer] is this step's, or null when it has none started — in which case the card offers
+ * whatever duration the step's text mentions ([stepDurationSeconds]). The button says what
+ * tapping it does rather than what the timer is doing, which are opposites.
+ *
+ * Rung turns it orange. Nothing else on this screen is, so it reads across a kitchen from
+ * the shape alone — which matters for the one state the cook is not holding the phone for.
+ */
+@Composable
+private fun CookTimerCard(
+    timer: CookTimerState?,
+    stepDurationSeconds: Int?,
+    remainingSeconds: Int,
+    onToggle: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val s = strings()
+    val seconds = if (timer != null) remainingSeconds else stepDurationSeconds ?: return
+    val label = when {
+        timer == null || timer.running -> s.timerLabel
+        timer.finished -> s.timerTimeIsUp
+        else -> s.timerPaused
+    }
+    val action = when {
+        timer == null || timer.finished -> s.start
+        timer.running -> s.pause
+        else -> s.resume
+    }
+
+    StickerCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        fillColor = if (timer?.finished == true) CookncoOrange else CookncoGold,
+        shadowOffset = 5.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = formatCookTimer(seconds),
+                color = CookncoNavy,
+                fontWeight = FontWeight.Bold,
+                fontSize = 26.sp,
+                // Tabular figures. Without them the glyphs are proportional, so "28:11" is
+                // narrower than "28:00" and the label beside it twitches left and right once
+                // a second — on the one element of this screen nobody is meant to have to
+                // watch closely. Copied from the ambient style rather than built fresh, so
+                // the theme's typeface survives.
+                style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
+            )
+            Text(
+                text = label,
+                color = CookncoNavy,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                modifier = Modifier.weight(1f),
+            )
+            if (timer != null) {
+                // Only once there is something to stop. Dropping the timer is also the only
+                // way back to the step in front of the cook having its own card again.
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+                        .clickable(onClick = onStop),
+                ) {
+                    Icon(
+                        Icons.Outlined.Stop,
+                        contentDescription = s.stopTimer,
+                        tint = CookncoNavy,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(CookncoNavy)
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = action,
+                    color = CookncoWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
                 )
             }
         }
@@ -367,12 +468,6 @@ private fun Modifier.edgeTaps(
     }
 }
 
-private fun formatTimer(totalSeconds: Int): String {
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0')
-}
-
 private val previewOwner = RecipeOwner(id = 1L, version = 1L, username = "Aya Amayri")
 private val previewRecipe = RecipeInfo(
     id = 1L, version = 1L, title = "Harcha", dishClass = "MAIN_DISH", owner = previewOwner,
@@ -381,11 +476,11 @@ private val previewRecipe = RecipeInfo(
         RecipeIngredientInfo(id = 2L, name = "Beurre végétal", amount = 100f, unit = "GRAM"),
     ),
     steps = listOf(
-        "Faire fondre le beurre végétal",
-        "Ajouter tous les ingrédients dans un saladier",
-        "Laisser reposer la pâte 30 mn",
-        "Étaler la pâte et former des petits ronds",
-        "Cuire chaque côté 5 minutes",
+        RecipeStepInfo("Faire fondre le beurre végétal"),
+        RecipeStepInfo("Ajouter tous les ingrédients dans un saladier"),
+        RecipeStepInfo("Laisser reposer la pâte 30 mn", durationSeconds = 1800),
+        RecipeStepInfo("Étaler la pâte et former des petits ronds"),
+        RecipeStepInfo("Cuire chaque côté 5 minutes", durationSeconds = 300),
     ),
     creationDate = 0L, likesCount = 8,
 )
@@ -397,10 +492,11 @@ fun CookModeScreenPreview() {
         CookModeContent(
             recipe = previewRecipe,
             currentStep = 2,
-            timerTotalSeconds = 1800,
-            timerRemainingSeconds = null,
-            timerRunning = false,
+            stepDurationSeconds = 1800,
+            timer = null,
+            timerRemainingSeconds = 0,
             onToggleTimer = {},
+            onStopTimer = {},
             onPreviousStep = {},
             onNextStep = {},
             onClose = {},

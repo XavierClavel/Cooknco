@@ -79,7 +79,8 @@ class UserRepository(
         userApi.getSettings(requireToken())
     }
 
-    suspend fun updateSettings(settings: UserSettingsDTO): Result<UserSettingsDTO> = runCatching {
+    /** The server answers with nothing, so neither does this. See [UserApi.updateSettings]. */
+    suspend fun updateSettings(settings: UserSettingsDTO): Result<Unit> = runCatching {
         userApi.updateSettings(requireToken(), settings)
     }
 }

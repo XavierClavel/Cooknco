@@ -15,6 +15,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.di.initFor
+import com.xavierclavel.cooknco.platform.NOTIFICATION_LINK_EXTRA
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,8 +52,13 @@ class CookncoMessagingService : FirebaseMessagingService() {
          */
         const val CHANNEL_ID = "cooknco_default"
 
-        /** Where a tapped notification's target is put on [MainActivity]'s intent. */
-        const val EXTRA_LINK = "cooknco.notification.link"
+        /**
+         * Where a tapped notification's target is put on [MainActivity]'s intent.
+         *
+         * Defined in `:composeApp` because the cook timer's notification is built there and
+         * carries the same extra — one name, so the two cannot drift apart.
+         */
+        const val EXTRA_LINK = NOTIFICATION_LINK_EXTRA
 
         /**
          * Creates the channel.
