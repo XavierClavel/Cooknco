@@ -12,10 +12,11 @@ package shared.utils
  * Both units are added when both appear, so "1h30" is ninety minutes rather than one hour.
  * Seconds out, because seconds are what a countdown counts.
  *
- * **There are three copies of this rule**, and they are meant to agree: here, for the
- * backend and anything writing recipes through `/mcp`; `StepDurations` in the mobile app,
- * which has its own DTOs and does not depend on this module; and `stepDurationSeconds` in
- * the web app. A change to the wording it understands belongs in all three.
+ * **There are two copies of this rule**, and they are meant to agree: here, for the backend
+ * and anything writing recipes through `/mcp`; and `StepDurations` in the mobile app, which
+ * has its own DTOs and does not depend on this module. A change to the wording it
+ * understands belongs in both. The web editor has no copy — it neither shows nor sets a
+ * step's timer, it only carries one that is already there.
  */
 object StepDurations {
 
