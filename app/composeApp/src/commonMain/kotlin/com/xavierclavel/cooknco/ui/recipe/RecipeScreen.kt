@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.ui.recipe
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
@@ -70,6 +72,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.network.ApiClient
+import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
@@ -104,6 +107,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.format.MonthNames
 import kotlinx.datetime.format.char
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.compose.resources.painterResource
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -151,6 +155,7 @@ fun RecipeScreen(
     onNavigateBack: () -> Unit,
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateToCookMode: (Long) -> Unit = {},
+    onNavigateToIngredient: (Long) -> Unit = {},
     viewModel: RecipeViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -192,6 +197,7 @@ fun RecipeScreen(
                 onNavigateToUser = onNavigateToUser,
                 onNavigateBack = onNavigateBack,
                 onStartCooking = { onNavigateToCookMode(recipe.id) },
+                onNavigateToIngredient = onNavigateToIngredient,
             )
         }
     }
@@ -241,6 +247,7 @@ private fun RecipeContent(
     onStartCooking: () -> Unit,
     onNavigateToUser: (Long) -> Unit = {},
     onNavigateBack: () -> Unit = {},
+    onNavigateToIngredient: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
@@ -469,6 +476,7 @@ private fun RecipeContent(
                 s = s,
                 onYieldMinus = onYieldMinus,
                 onYieldPlus = onYieldPlus,
+                onNavigateToIngredient = onNavigateToIngredient,
             )
             RecipeTab.STEPS -> stepsTab(recipe = recipe, s = s)
             RecipeTab.NOTES -> item {
@@ -571,6 +579,7 @@ private fun LazyListScope.ingredientsTab(
     s: Strings,
     onYieldMinus: () -> Unit,
     onYieldPlus: () -> Unit,
+    onNavigateToIngredient: (Long) -> Unit,
 ) {
     if (recipe.yield != null) {
         item {
@@ -632,6 +641,10 @@ private fun LazyListScope.ingredientsTab(
                             selectedYield = uiState.selectedYield,
                             recipeYield = recipeYield,
                             showDivider = index < recipe.ingredients.lastIndex,
+                            // Only the ones with an entry in the catalogue to open. A custom
+                            // ingredient is a name somebody typed on this recipe and nothing
+                            // more - there is no page behind it.
+                            onClick = ingredient.id?.let { id -> { onNavigateToIngredient(id) } },
                         )
                     }
                 }
@@ -674,7 +687,7 @@ private fun LazyListScope.stepsTab(recipe: RecipeInfo, s: Strings) {
         }
     }
     itemsIndexed(recipe.steps) { index, step ->
-        StepRow(index = index, step = step, modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp))
+        StepRow(index = index, step = step.text, modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp))
     }
 }
 
@@ -716,6 +729,8 @@ private fun IngredientRow(
     selectedYield: Int,
     recipeYield: Int,
     showDivider: Boolean,
+    /** Null for a custom ingredient, which has no page to open. */
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
@@ -730,6 +745,7 @@ private fun IngredientRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -742,18 +758,28 @@ private fun IngredientRow(
                     .border(2.dp, CookncoNavy, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                if (ingredient.type != null) {
-                    AsyncImage(
-                        model = "${ApiClient.IMAGE_URL}/ingredients/${ingredient.type}.webp",
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)),
+                Image(
+                    painter = painterResource(ingredientIcon(ingredient.type)),
+                    contentDescription = null,
+                    modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).padding(6.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(ingredient.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = CookncoNavy)
+                // The note the cook wrote on this line - "finely chopped", "for the crumble".
+                // It was being saved and shown in the editor but never here, which is the one
+                // place it is actually meant to be read: with the pan already on.
+                ingredient.complement?.takeIf { it.isNotBlank() }?.let { note ->
+                    Text(
+                        text = note,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = CookncoGreenDark,
+                        lineHeight = 15.sp,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
-                } else {
-                    Text("🍽", fontSize = 15.sp)
                 }
             }
-            Text(ingredient.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.weight(1f))
             if (amountLabel.isNotBlank()) {
                 Text(amountLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy)
             }
@@ -964,10 +990,17 @@ private fun RecipeActionSheet(
             publishedLabel(recipe.creationDate, s).replaceFirstChar(Char::uppercase)
         },
         actions = buildList {
-            add(SheetAction(label = s.shareLink, onClick = onShare))
+            add(SheetAction(label = s.shareLink, onClick = onShare, icon = Icons.Outlined.Share))
             if (isOwner) {
-                add(SheetAction(label = s.editRecipe, onClick = onEdit))
-                add(SheetAction(label = s.deleteRecipe, onClick = onDelete, destructive = true))
+                add(SheetAction(label = s.editRecipe, onClick = onEdit, icon = Icons.Outlined.Edit))
+                add(
+                    SheetAction(
+                        label = s.deleteRecipe,
+                        onClick = onDelete,
+                        destructive = true,
+                        icon = Icons.Outlined.Delete,
+                    )
+                )
             }
         },
         onDismissRequest = onDismissRequest,
@@ -992,9 +1025,9 @@ private val previewRecipe = RecipeInfo(
         RecipeIngredientInfo(id = null, name = "Beurre végétal", amount = 100f, unit = "GRAM", complement = null, allowedTypes = listOf("NONE", "AMOUNT", "WEIGHT", "VOLUME")),
     ),
     steps = listOf(
-        "Faire fondre le beurre végétal",
-        "Ajouter tous les ingrédients dans un saladier, mélanger à la main jusqu'à la formation d'une pâte homogène",
-        "Laisser reposer la pâte 30 mn",
+        RecipeStepInfo("Faire fondre le beurre végétal"),
+        RecipeStepInfo("Ajouter tous les ingrédients dans un saladier, mélanger à la main jusqu'à la formation d'une pâte homogène"),
+        RecipeStepInfo("Laisser reposer la pâte 30 mn", durationSeconds = 1800),
     ),
     tips = "",
     creationDate = 1742601600000L,

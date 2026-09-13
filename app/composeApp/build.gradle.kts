@@ -80,6 +80,10 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.browser)
+            // NotificationCompat, for the cook timer's own notification. Unlike a push, it is
+            // drawn from here: nothing about it needs a manifest entry except the receiver
+            // its buttons are addressed to.
+            implementation(libs.androidx.core)
             implementation(libs.ktor.client.okhttp)
             // Only for the push token: the notification itself is drawn by :androidApp,
             // which is where the service that receives one has to be declared.

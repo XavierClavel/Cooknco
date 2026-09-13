@@ -47,6 +47,10 @@ object PushNotifications {
 
         return when (parsed.encodedPath.trimEnd('/')) {
             "/recipe/view" -> parsed.parameters["id"]?.let { "recipe/$it" }
+            // Not a path the backend ever stores — this one is minted by the cook timer's
+            // own notification, which goes through here so that a tap lands on a route
+            // rather than on a screen this file does not know about.
+            "/recipe/cook" -> parsed.parameters["id"]?.let { "recipe/$it/cook" }
             "/user/view" -> parsed.parameters["user"]?.let { "user/$it" }
             "/cookbook/view" -> parsed.parameters["id"]?.let { "cookbook/$it" }
             else -> null

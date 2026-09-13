@@ -190,6 +190,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
                 onNavigateToCookMode = { id -> navController.navigate("recipe/$id/cook") },
+                onNavigateToIngredient = { id -> navController.navigate("ingredient/$id") },
                 viewModel = recipeViewModel,
             )
         }

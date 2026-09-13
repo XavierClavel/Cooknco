@@ -435,13 +435,31 @@ object EnStrings : Strings {
     override val inYourRecipes = "IN YOUR RECIPES"
     override val popularWithThis = "POPULAR WITH THIS"
     override val nothingCookedWithThis = "Nothing has been cooked with this yet. Add it to a recipe and it shows up here."
-    override fun ingredientType(type: String) = type.lowercase().replaceFirstChar { it.uppercase() }
 
     override fun stepOf(step: Int, total: Int) = "STEP $step OF $total"
     override val nextStep = "Next step"
     override val finish = "Finish"
     override fun nextIs(step: String) = "Next: $step"
-    override val timerFromThisStep = "Timer from this step"
+    override val timerLabel = "Timer"
+    override val stepTimerPlaceholder = "--"
+    override val addToStep = "Add"
+    override val removeStepTimer = "Remove timer"
+    override val minutesShort = "min"
     override val start = "Start"
     override val pause = "Pause"
+    override val resume = "Resume"
+    override val stopTimer = "Stop"
+    override val timerPaused = "Paused"
+    override val timerTimeIsUp = "Time's up"
+    override val timerRingOnTimeTitle = "Let the timer ring on time"
+    override val timerRingOnTimeMessage =
+        "Android only lets an app ring at an exact time with your permission. Without it, " +
+            "this timer can go off several minutes late when your phone is asleep."
+    override val timerRingOnTimeConfirm = "Open settings"
+    override val timerRingOnTimeDismiss = "Not now"
+
+    override val timerChannelName = "Cook timer"
+    override val timerChannelDescription = "The countdown of a timer you started in cook mode."
+    override val timerDoneChannelName = "Cook timer ringing"
+    override val timerDoneChannelDescription = "Rings when a cook mode timer runs out."
 }

@@ -22,8 +22,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Share
@@ -52,6 +54,8 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.StickerActionSheet
+import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
@@ -166,6 +170,10 @@ private fun ProfileContent(
     // destructive-confirmation dialog (see `StickerConfirmDialog`).
     var showUnfollowConfirm by remember { mutableStateOf(false) }
 
+    // Everything this profile can have done to it that is not "follow", behind the same
+    // "..." the recipe and cookbook screens put their own actions behind.
+    var showActions by remember { mutableStateOf(false) }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         state = gridState,
@@ -174,7 +182,7 @@ private fun ProfileContent(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // ── Top bar: back (if any) + gear (own profile only) ──────────────────
+        // ── Top bar: back (if any) + gear (own profile only) + "..." ──────────
         item(span = { GridItemSpan(2) }) {
             Row(
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 6.dp),
@@ -185,9 +193,16 @@ private fun ProfileContent(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
                     }
                 }
-                if (isOwnProfile && onNavigateToSettings != null) {
-                    StickerIconButton(onClick = onNavigateToSettings, shadowOffset = 3.dp) {
-                        Icon(Icons.Outlined.Settings, contentDescription = s.settings)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Settings stays a button of its own: it is not something done to this
+                    // profile, it is the way out of the account entirely.
+                    if (isOwnProfile && onNavigateToSettings != null) {
+                        StickerIconButton(onClick = onNavigateToSettings, shadowOffset = 3.dp) {
+                            Icon(Icons.Outlined.Settings, contentDescription = s.settings)
+                        }
+                    }
+                    StickerIconButton(onClick = { showActions = true }, shadowOffset = 3.dp) {
+                        Icon(Icons.Outlined.MoreHoriz, contentDescription = s.more)
                     }
                 }
             }
@@ -254,31 +269,18 @@ private fun ProfileContent(
             }
         }
 
-        // ── Edit profile / Share, or Follow-unfollow / Share ──────────────────
+        // ── Follow / unfollow ─────────────────────────────────────────────────
+        //
+        // Editing and sharing used to sit here as a pair of buttons on your own profile,
+        // and sharing as an icon beside Follow on everybody else's. Both are in the "..."
+        // now, which leaves this row to the one action that is worth a button: following
+        // somebody, which is the whole reason to be looking at a profile that is not yours.
+        // Your own profile no longer has a button row at all.
         item(span = { GridItemSpan(2) }) {
             // A grid item's slot stacks what it is given, so the buttons and the line below
             // them need a Column of their own — two children here draw on top of each other.
             Column {
                 when {
-                    isOwnProfile && onNavigateToEdit != null -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StickerCard(
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            shadowOffset = 4.dp,
-                            onClick = onNavigateToEdit,
-                        ) {
-                            Text(s.editProfile, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
-                        }
-                        StickerCard(
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            shadowOffset = 4.dp,
-                            onClick = onShare,
-                        ) {
-                            Text(s.share, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = CookncoNavy, modifier = Modifier.align(Alignment.Center))
-                        }
-                    }
-
                     !isOwnProfile -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         // Tapping while following asks for confirmation first; tapping while not
                         // following calls straight through — see the dialog above.
@@ -327,9 +329,6 @@ private fun ProfileContent(
                                 )
                             }
                         }
-                        StickerIconButton(onClick = onShare, size = 52.dp, shape = RoundedCornerShape(14.dp), shadowOffset = 4.dp) {
-                            Icon(Icons.Outlined.Share, contentDescription = s.shareProfile)
-                        }
                     }
                 }
             }
@@ -372,6 +371,28 @@ private fun ProfileContent(
                 ProfileRecipeCard(recipe = recipe, onClick = { onRecipeClick(recipe.id) })
             }
         }
+    }
+
+    // Outside the grid, with the other dialogs.
+    //
+    // As a grid item it cost a row: the sheet draws in a window of its own, but the item it
+    // was declared in still takes a slot, and this grid arranges its slots with
+    // spacedBy(16.dp) - so opening the menu pushed everything below it down by 16dp and
+    // closing it pulled them back. A lazy item is also the wrong place for something that
+    // must appear regardless of where the grid happens to be scrolled.
+    if (showActions) {
+        StickerActionSheet(
+            title = user.username,
+            actions = buildList {
+                // Edit first: on your own profile it is what the "..." is for, and sharing
+                // is the afterthought. On anybody else's there is only one.
+                if (isOwnProfile && onNavigateToEdit != null) {
+                    add(SheetAction(label = s.editProfile, onClick = onNavigateToEdit, icon = Icons.Outlined.Edit))
+                }
+                add(SheetAction(label = s.shareProfile, onClick = onShare, icon = Icons.Outlined.Share))
+            },
+            onDismissRequest = { showActions = false },
+        )
     }
 
     if (showUnfollowConfirm) {

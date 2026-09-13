@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.ui.recipe
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -56,6 +57,7 @@ import com.xavierclavel.cooknco.ui.theme.CookncoOrangeDark
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * One ingredient (`Cooknco Mobile.dc.html`, "Ingredient"): what it is, what it is measured
@@ -163,16 +165,12 @@ private fun IngredientCard(ingredient: IngredientSummary, s: Strings) {
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             val shape = RoundedCornerShape(22.dp)
-            if (ingredient.type.isNotEmpty()) {
-                AsyncImage(
-                    model = "${ApiClient.IMAGE_URL}/ingredients/${ingredient.type}.webp",
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(76.dp).clip(shape).background(CookncoGreenLight).border(3.dp, CookncoNavy, shape),
-                )
-            } else {
-                Box(modifier = Modifier.size(76.dp).clip(shape).background(CookncoGreenLight).border(3.dp, CookncoNavy, shape))
-            }
+            Image(
+                painter = painterResource(ingredientIcon(ingredient.type)),
+                contentDescription = null,
+                modifier = Modifier.size(76.dp).clip(shape).background(CookncoGreenLight)
+                    .border(3.dp, CookncoNavy, shape).padding(14.dp),
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = ingredient.displayName(),
@@ -191,7 +189,12 @@ private fun IngredientCard(ingredient: IngredientSummary, s: Strings) {
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     ) {
                         Text(
-                            text = s.ingredientType(ingredient.type),
+                            // ingredientTypeName, not ingredientType: the latter only
+                            // lowercased the enum, so every kind showed in English - most of
+                            // them happen to read the same in French, which is why only
+                            // MISCELLANEOUS made it obvious.
+                            text = s.ingredientTypeName(ingredient.type)
+                                .replaceFirstChar { it.uppercase() },
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = CookncoNavy,

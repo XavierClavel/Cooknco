@@ -4,6 +4,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.xavierclavel.cooknco.data.AppVersionRepository
 import com.xavierclavel.cooknco.data.AuthRepository
+import com.xavierclavel.cooknco.data.CookTimer
+import com.xavierclavel.cooknco.data.CookTimerStore
 import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.DevicePreferences
 import com.xavierclavel.cooknco.data.PushRepository
@@ -52,6 +54,13 @@ object AppGraph {
     val tokenDataStore: TokenDataStore by lazy { TokenDataStore(preferences) }
 
     val devicePreferences: DevicePreferences by lazy { DevicePreferences(preferences) }
+
+    /**
+     * The cook mode timer. Lives here rather than in a view model because it outlives every
+     * screen: it is still counting with cook mode closed, and it is reached from a
+     * notification action arriving on a process that has no screens at all.
+     */
+    val cookTimer: CookTimer by lazy { CookTimer(CookTimerStore(preferences)) }
 
     private val appVersionApi by lazy { AppVersionApi(ApiClient.httpClient) }
     private val authApi by lazy { AuthApi(ApiClient.httpClient) }

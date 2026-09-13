@@ -5,6 +5,18 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 13+. Asked for once signed in: see EnsureNotificationPermission. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The cook timer's ring. Requested rather than assumed: from Android 14 this is denied
+         until the user grants it, and the alternative that is granted without asking
+         (USE_EXACT_ALARM) is reserved for apps whose purpose is alarms. Without it the alarm
+         is merely approximate — see CookTimerNotifier.android.kt. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- The cook timer's ring. A notification's sound plays once, so a timer that goes on
+         sounding is an app playing audio, and an app playing audio with the screen off is a
+         foreground service. shortService because that is what it is — see
+         CookTimerRingService — which also means no specialUse declaration. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
 
     <application
         android:allowBackup="true"
@@ -57,6 +69,33 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- The cook timer's Pause/Stop buttons, and the alarm that ends it. Exported
+             false: everything addressed to it is sent by this app, with setPackage. The
+             intents themselves are built in :composeApp — see CookTimerNotifier.android.kt,
+             which cannot declare this because a manifest entry cannot come from a KMP
+             library. -->
+        <receiver
+            android:name=".CookTimerReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.xavierclavel.cooknco.COOK_TIMER_TOGGLE" />
+                <action android:name="com.xavierclavel.cooknco.COOK_TIMER_STOP" />
+                <action android:name="com.xavierclavel.cooknco.COOK_TIMER_FIRE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Rings until stopped. Addressed by action rather than by name: the intents are
+             built in :composeApp, which resolves this component at run time because a
+             service intent must be explicit. -->
+        <service
+            android:name=".CookTimerRingService"
+            android:exported="false"
+            android:foregroundServiceType="shortService">
+            <intent-filter>
+                <action android:name="com.xavierclavel.cooknco.COOK_TIMER_RING" />
             </intent-filter>
         </service>
 

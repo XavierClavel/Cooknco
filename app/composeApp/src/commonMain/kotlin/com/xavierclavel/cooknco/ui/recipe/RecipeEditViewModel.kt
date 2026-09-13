@@ -5,9 +5,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.xavierclavel.cooknco.data.StepDurations
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.di.AppGraph
+import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientSaveDto
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
@@ -38,7 +40,64 @@ data class EditIngredient(
     val showDropdown: Boolean = false,
 )
 
-data class StepItem(val id: String, val text: String)
+/**
+ * One step being written, and the timer the cook may want on it.
+ *
+ * [durationSeconds] is null for a step with no timer, which is most of them.
+ *
+ * [durationTouched] is the whole of the auto-detection rule. A step's wording usually says
+ * how long it takes — "laisser reposer 30 mn" — so the duration is read out of the text as
+ * it is typed ([StepDurations]) and offered without being asked for. The moment the cook
+ * sets or clears it by hand, that stops: an author who typed "simmer for 20 min" and then
+ * set the timer to 25 is not to be argued with on the next keystroke.
+ *
+ * It is not persisted — a step loaded for editing arrives with whatever was saved, and is
+ * touched by definition.
+ */
+/**
+ * Something a cook can attach to a step besides its words.
+ *
+ * One case so far. It is an enum rather than a boolean on [StepItem] because it is not going
+ * to stay one case, and because everything that has to be generic over "what can a step
+ * carry" - the menu behind the add button, what it offers, what it hides once it is added -
+ * is then generic over `entries` instead of over a list somebody has to remember to extend.
+ *
+ * Adding one is: a case here, a field on [StepItem] for whatever it holds, a row in the step
+ * card that shows it, and a branch in [RecipeEditViewModel.attachToStep].
+ */
+enum class StepAttachment {
+    /** How long the step takes, which cook mode counts down. Held in [StepItem.durationSeconds]. */
+    TIMER,
+}
+
+data class StepItem(
+    val id: String,
+    val text: String,
+    /**
+     * What this step carries beyond its text, and the one source of truth for whether the
+     * card shows it.
+     *
+     * A timer is *attached* the moment it is added, before a number has been typed into it,
+     * which is why this is a set of its own rather than being inferred from
+     * [durationSeconds] being non-null. An attached timer left empty is simply no timer by
+     * the time it is saved.
+     */
+    val attachments: Set<StepAttachment> = emptySet(),
+    val durationSeconds: Int? = null,
+    /**
+     * Whether the cook has taken the timer over from the text.
+     *
+     * A step's wording usually says how long it takes - "laisser reposer 30 mn" - so a timer
+     * is read out of the text as it is typed and attached without being asked for. The moment
+     * the cook edits or removes it by hand, that stops: an author who typed "simmer for 20
+     * min" and then set 25, or took the timer off altogether, is not to be argued with on the
+     * next keystroke.
+     *
+     * Not persisted - a step loaded for editing arrives with whatever was saved, and is
+     * touched by definition.
+     */
+    val durationTouched: Boolean = false,
+)
 
 data class RecipeEditUiState(
     val isLoading: Boolean = false,
@@ -120,7 +179,24 @@ class RecipeEditViewModel(
                             cookTime = recipe.cookingTime?.toString() ?: "",
                             cookTemp = recipe.cookingTemperature?.toString() ?: "",
                             ingredients = editIngredients,
-                            steps = recipe.steps.map { text -> StepItem(newStepId(), text) },
+                            steps = recipe.steps.map { step ->
+                                // Recipes written before steps had a duration have none saved.
+                                // Reading it out of the wording here is what gives them one, on
+                                // the screen where it can be seen and corrected before saving.
+                                val duration = step.durationSeconds
+                                    ?: StepDurations.parseSeconds(step.text)
+                                StepItem(
+                                    id = newStepId(),
+                                    text = step.text,
+                                    attachments = setOfNotNull(
+                                        StepAttachment.TIMER.takeIf { duration != null },
+                                    ),
+                                    durationSeconds = duration,
+                                    // Anything that came off the server is a decision already
+                                    // taken; only what is typed from here on is detected.
+                                    durationTouched = true,
+                                )
+                            },
                             tips = recipe.tips,
                             recipeId = recipe.id,
                             recipeVersion = recipe.version,
@@ -282,8 +358,85 @@ class RecipeEditViewModel(
         s.copy(steps = s.steps.filter { it.id != id })
     }
 
+    /**
+     * Rewrites a step, and re-reads its duration from the new text unless the cook has taken
+     * that over. See [StepItem.durationTouched].
+     */
     fun updateStep(id: String, text: String) = _uiState.update { s ->
-        s.copy(steps = s.steps.map { if (it.id == id) it.copy(text = text) else it })
+        s.copy(
+            steps = s.steps.map { step ->
+                when {
+                    step.id != id -> step
+                    step.durationTouched -> step.copy(text = text)
+                    else -> {
+                        val detected = StepDurations.parseSeconds(text)
+                        step.copy(
+                            text = text,
+                            // Reading a duration out of the words is also what attaches the
+                            // timer: until there is one, there is nothing to show.
+                            attachments =
+                                if (detected == null) step.attachments - StepAttachment.TIMER
+                                else step.attachments + StepAttachment.TIMER,
+                            durationSeconds = detected,
+                        )
+                    }
+                }
+            }
+        )
+    }
+
+    /** Gives a step something to carry. Adding a timer is what makes its field appear. */
+    fun attachToStep(id: String, attachment: StepAttachment) = _uiState.update { s ->
+        s.copy(
+            steps = s.steps.map { step ->
+                if (step.id != id) step
+                else when (attachment) {
+                    // Empty, rather than a made-up five minutes: the cook asked for a timer,
+                    // not for a duration we invented. Touched, because asking for one is a
+                    // decision, and the next keystroke must not overwrite what they are
+                    // about to type into it.
+                    StepAttachment.TIMER -> step.copy(
+                        attachments = step.attachments + attachment,
+                        durationSeconds = null,
+                        durationTouched = true,
+                    )
+                }
+            },
+        )
+    }
+
+    /** Takes it away again, and whatever it was holding with it. */
+    fun detachFromStep(id: String, attachment: StepAttachment) = _uiState.update { s ->
+        s.copy(
+            steps = s.steps.map { step ->
+                if (step.id != id) step
+                else when (attachment) {
+                    StepAttachment.TIMER -> step.copy(
+                        attachments = step.attachments - attachment,
+                        durationSeconds = null,
+                        durationTouched = true,
+                    )
+                }
+            },
+        )
+    }
+
+    /**
+     * Sets a step's timer by hand, in minutes, and stops detecting one for it.
+     *
+     * Null clears it — and still counts as being taken over, so a cook who deliberately
+     * removes the timer a step's wording implies does not get it back on the next keystroke.
+     */
+    fun updateStepDuration(id: String, minutes: Int?) = _uiState.update { s ->
+        s.copy(
+            steps = s.steps.map { step ->
+                if (step.id != id) step
+                else step.copy(
+                    durationSeconds = minutes?.takeIf { it > 0 }?.times(60),
+                    durationTouched = true,
+                )
+            }
+        )
     }
 
     fun reorderStep(from: Int, to: Int) = _uiState.update { s ->
@@ -316,7 +469,17 @@ class RecipeEditViewModel(
                     complement = ing.complement.ifBlank { null },
                 )
             },
-            steps = state.steps.filter { it.text.isNotBlank() }.map { it.text },
+            steps = state.steps
+                .filter { it.text.isNotBlank() }
+                .map { step ->
+                    RecipeStepInfo(
+                        text = step.text.trim(),
+                        // A timer that was added and left blank is no timer: nothing is saved
+                        // for an attachment holding nothing.
+                        durationSeconds = step.durationSeconds
+                            ?.takeIf { StepAttachment.TIMER in step.attachments },
+                    )
+                },
             tips = state.tips.trim(),
         )
 

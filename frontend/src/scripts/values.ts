@@ -81,54 +81,54 @@ const visibilityOptions = ref([
 const ingredientTypes = ref([
   {
     value: "VEGETABLE",
-    image: "vegetable.png",
+    image: "vegetable.svg",
   },
   {
     value: "FRUIT",
-    image: "vegetable.png",
+    image: "fruit.svg",
   },
   {
     value: "GRAIN",
-    image: "vegetable.png",
+    image: "grain.svg",
   },
   {
     value: "NUT",
-    image: "vegetable.png",
+    image: "nut.svg",
   },
   {
     value: "DAIRY",
-    image: "vegetable.png",
+    image: "dairy.svg",
   },
   {
     value: "FISH",
-    image: "vegetable.png",
+    image: "fish.svg",
   },
   {
     value: "MEAT",
-    image: "vegetable.png",
+    image: "meat.svg",
   },
   {
     value: "CONDIMENT",
-    image: "vegetable.png",
+    image: "condiment.svg",
   },
   {
     value: "OIL",
-    image: "vegetable.png",
+    image: "oil.svg",
   },
   {
     value: "BAKERY",
-    image: "vegetable.png",
+    image: "bakery.svg",
   },
   {
     value: "BEVERAGE_INGREDIENT",
-    image: "vegetable.png",
+    image: "beverage_ingredient.svg",
   },
   {
     value: "ALCOHOL",
-    image: "vegetable.png",
+    image: "alcohol.svg",
   },
   {
     value: "MISCELLANEOUS",
-    image: "vegetable.png",
+    image: "miscellaneous.svg",
   },
 ])

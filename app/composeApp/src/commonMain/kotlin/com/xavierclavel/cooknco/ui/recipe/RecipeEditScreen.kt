@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.ui.recipe
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +32,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Close
@@ -42,6 +44,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,6 +54,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,6 +72,7 @@ import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -108,6 +114,7 @@ import com.xavierclavel.cooknco.ui.theme.StickerTextArea
 import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyColumnState
+import org.jetbrains.compose.resources.painterResource
 
 /** The values the API stores; what each is called comes from the catalogue. */
 private val dishClasses = listOf("ENTREE", "MAIN_DISH", "DESERT", "SALTY_SNACK", "SUGARY_SNACK", "DRINK", "OTHER")
@@ -132,15 +139,15 @@ private fun unitSectionLabel(type: String, s: Strings): String? = when (type) {
 /**
  * What the note line says before anything has been written on it.
  *
- * It used to name the catalogue — "catalogue", "catalogue · grain" — which told the cook
- * where the app had looked the ingredient up rather than anything about the ingredient.
- * What is left is the kind, for the entries that have one, and nothing at all for the rest.
+ * Only that an ingredient was typed by hand rather than picked from the catalogue, which is
+ * the one thing about it that nothing else on the row shows.
+ *
+ * It used to name the kind as well — "grain", "dairy" — but the thumbnail beside it is
+ * already drawn from exactly that, so the words were a second copy of the icon in the one
+ * place a cook might otherwise write something of their own.
  */
-private fun EditIngredient.originLabel(s: Strings): String? = when {
-    ingredientId == null -> s.custom
-    type.isNotEmpty() -> s.ingredientTypeName(type)
-    else -> null
-}
+private fun EditIngredient.originLabel(s: Strings): String? =
+    if (ingredientId == null) s.custom else null
 
 private enum class EditorStep {
     BASICS,
@@ -1102,20 +1109,16 @@ private fun IngredientSearchResults(
     }
 }
 
-/** The catalogue picture for an ingredient type, or an empty tile for a custom one. */
+/** The picture for an ingredient's kind. Bundled - see [ingredientIcon]. */
 @Composable
 private fun IngredientThumb(type: String, size: Dp, radius: Dp) {
     val shape = RoundedCornerShape(radius)
-    if (type.isNotEmpty()) {
-        AsyncImage(
-            model = "${ApiClient.IMAGE_URL}/ingredients/$type.webp",
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(size).clip(shape).background(CookncoGreenLight).border(2.dp, CookncoNavy, shape),
-        )
-    } else {
-        Box(modifier = Modifier.size(size).clip(shape).background(CookncoGreenLight).border(2.dp, CookncoNavy, shape))
-    }
+    Image(
+        painter = painterResource(ingredientIcon(type)),
+        contentDescription = null,
+        modifier = Modifier.size(size).clip(shape).background(CookncoGreenLight).border(2.dp, CookncoNavy, shape)
+            .padding(size / 6),
+    )
 }
 
 /**
@@ -1146,7 +1149,41 @@ private fun AddedIngredientCard(
         ) {
             IngredientThumb(type = ingredient.type, size = 38.dp, radius = 10.dp)
 
-            Column(modifier = Modifier.weight(1f)) {
+            // The note line is only here when it has something to say. An empty one still
+            // took a line, which pushed the name a half-line above the thumbnail beside it
+            // and above the amount and unit controls - on the row of a plain ingredient,
+            // which is most of them, that was the whole of what the column held.
+            //
+            // What replaces it as a way in is the name itself: tapping the column opens the
+            // note and puts the cursor in it, and leaving it empty closes it again. Nothing
+            // is hidden that was not blank.
+            val origin = ingredient.originLabel(s)
+            var noteOpen by remember { mutableStateOf(false) }
+            // Whether the field has ever actually held focus. Without it the line closes the
+            // instant it opens: onFocusChanged fires as the field attaches, reporting *not*
+            // focused, which is a frame before anything has had the chance to focus it.
+            var noteWasFocused by remember { mutableStateOf(false) }
+            val noteFocus = remember { FocusRequester() }
+            val keyboard = LocalSoftwareKeyboardController.current
+            val showNote = noteOpen || origin != null || ingredient.complement.isNotEmpty()
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    // A single line of text is a 20dp tap target, which is half of what a
+                    // finger needs. The minimum makes the whole middle of the row tappable
+                    // without moving the name, which stays centred inside it either way.
+                    .heightIn(min = 40.dp)
+                    .then(
+                        if (showNote) Modifier
+                        else Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { noteOpen = true },
+                        )
+                    ),
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Text(
                     text = ingredient.ingredientName,
                     fontSize = 15.sp,
@@ -1155,20 +1192,50 @@ private fun AddedIngredientCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Box {
-                    val noteStyle = TextStyle(fontSize = 11.5.sp, fontWeight = FontWeight.Medium, color = CookncoGreenDark)
-                    ingredient.originLabel(s)?.takeIf { ingredient.complement.isEmpty() }?.let { origin ->
-                        Text(origin, style = noteStyle.copy(color = CookncoGreenDark.copy(alpha = 0.75f)))
+                if (showNote) {
+                    Box {
+                        val noteStyle = TextStyle(fontSize = 11.5.sp, fontWeight = FontWeight.Medium, color = CookncoGreenDark)
+                        origin?.takeIf { ingredient.complement.isEmpty() }?.let { label ->
+                            Text(label, style = noteStyle.copy(color = CookncoGreenDark.copy(alpha = 0.75f)))
+                        }
+                        BasicTextField(
+                            value = ingredient.complement,
+                            onValueChange = onComplementChange,
+                            singleLine = true,
+                            textStyle = noteStyle,
+                            cursorBrush = SolidColor(CookncoOrange),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(noteFocus)
+                                // Closes behind itself: a note opened by accident and left
+                                // blank must not keep the name off-centre for good. Only once
+                                // it has been focused, though - see [noteWasFocused].
+                                .onFocusChanged { focus ->
+                                    if (focus.isFocused) {
+                                        noteWasFocused = true
+                                    } else if (noteWasFocused && ingredient.complement.isEmpty()) {
+                                        noteWasFocused = false
+                                        noteOpen = false
+                                    }
+                                },
+                        )
                     }
-                    BasicTextField(
-                        value = ingredient.complement,
-                        onValueChange = onComplementChange,
-                        singleLine = true,
-                        textStyle = noteStyle,
-                        cursorBrush = SolidColor(CookncoOrange),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
+            }
+
+            // Only when the cook asked for it - not when the line is there because the
+            // ingredient is custom, or already carries a note.
+            //
+            // The wait is the whole of it. This effect runs as soon as the composition that
+            // revealed the field is applied, which is before that field has been laid out and
+            // attached - and a FocusRequester whose node is not attached yet throws rather
+            // than queuing. One frame is enough for it to exist. The keyboard is then asked
+            // for explicitly: focus alone opens it on most devices, not all of them.
+            LaunchedEffect(noteOpen) {
+                if (!noteOpen) return@LaunchedEffect
+                withFrameNanos { }
+                runCatching { noteFocus.requestFocus() }
+                keyboard?.show()
             }
 
             if (showAmount) {
@@ -1275,6 +1342,9 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
                             onDragStopped = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                         ),
                         onStepChange = { viewModel.updateStep(step.id, it) },
+                        onDurationChange = { viewModel.updateStepDuration(step.id, it) },
+                        onAttach = { viewModel.attachToStep(step.id, it) },
+                        onDetach = { viewModel.detachFromStep(step.id, it) },
                         onRemove = { viewModel.removeStep(step.id) },
                     )
                 }
@@ -1323,6 +1393,168 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
 // inside the card, and drag + delete stack in a column on the right. (Turn 7 offered four
 // other treatments for the number — this screen shipped 7b's gold column for a while; 5a
 // is what the rest of the app is measured against, so it is what this follows.)
+/**
+ * What a step carries beyond its words, and the one way to give it more.
+ *
+ * The button is generic on purpose: a timer is the first thing a step can carry and will not
+ * be the last, so what it offers is [StepAttachment.entries] minus whatever the step already
+ * has, and it disappears when there is nothing left to add. A second kind of attachment is a
+ * case in that enum and a row below, not another button.
+ *
+ * Each attachment renders itself and owns its own removal, so nothing here has to know what
+ * a timer is beyond where to put it.
+ */
+@Composable
+private fun StepAttachments(
+    step: StepItem,
+    onDurationChange: (Int?) -> Unit,
+    onAttach: (StepAttachment) -> Unit,
+    onDetach: (StepAttachment) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val s = strings()
+    val available = StepAttachment.entries.filter { it !in step.attachments }
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Driven off entries rather than off the set, so attachments always stack in the
+        // order they are declared in. Iterating the set would order them by whatever the cook
+        // happened to add first, which nobody chose and nothing guarantees to stay stable.
+        StepAttachment.entries.filter { it in step.attachments }.forEach { attachment ->
+            when (attachment) {
+                StepAttachment.TIMER -> StepTimerField(
+                    durationSeconds = step.durationSeconds,
+                    onDurationChange = onDurationChange,
+                    onRemove = { onDetach(StepAttachment.TIMER) },
+                )
+            }
+        }
+
+        if (available.isNotEmpty()) {
+            var open by remember { mutableStateOf(false) }
+            // The app's own dropdown, the one the unit picker opens - a cream card on a hard
+            // navy shadow. Material's would be the single piece of chrome on this screen that
+            // the sticker theme cannot absorb. See [StickerDropdownMenu].
+            StickerDropdownMenu(
+                expanded = open,
+                onDismissRequest = { open = false },
+                items = available,
+                label = { it.label(s) },
+                onSelect = {
+                    open = false
+                    onAttach(it)
+                },
+                width = 196.dp,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .dashedBorder(CookncoGreenDark, RoundedCornerShape(10.dp))
+                        .clickable { open = !open }
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text("+", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+                    Text(
+                        text = s.addToStep,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CookncoGreenDark,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** How a step's attachment names itself in the menu. */
+private fun StepAttachment.label(s: Strings) = when (this) {
+    StepAttachment.TIMER -> s.timerLabel
+}
+
+/**
+ * The timer attachment: how long this step takes.
+ *
+ * Blank is allowed and means the timer has been added but not set yet - it saves as no timer
+ * at all. Minutes, because that is the unit a recipe is written in; the seconds it is stored
+ * in are cook mode's business.
+ *
+ * It arrives filled in on its own for a step whose wording says how long it takes - see
+ * [StepItem.durationTouched] for why typing over it, or removing it, ends that.
+ */
+@Composable
+private fun StepTimerField(
+    durationSeconds: Int?,
+    onDurationChange: (Int?) -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val s = strings()
+    val minutes = durationSeconds?.let { (it + 59) / 60 }
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            Icons.Outlined.Timer,
+            contentDescription = null,
+            tint = if (minutes == null) CookncoGreenDark else CookncoNavy,
+            modifier = Modifier.size(18.dp),
+        )
+        Box(
+            modifier = Modifier
+                .width(64.dp)
+                .height(38.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(CookncoWhite)
+                .border(2.dp, CookncoNavy, RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (minutes == null) {
+                Text(
+                    text = s.stepTimerPlaceholder,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = CookncoGreenDark,
+                )
+            }
+            BasicTextField(
+                value = minutes?.toString().orEmpty(),
+                onValueChange = { text ->
+                    // Four digits is over three days. Anything that is not a number at all
+                    // clears the timer, which is how a step stops having one.
+                    onDurationChange(text.filter { it.isDigit() }.take(4).toIntOrNull())
+                },
+                singleLine = true,
+                textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                cursorBrush = SolidColor(CookncoOrange),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Text(
+            text = s.minutesShort,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = CookncoGreenDark,
+        )
+        Box(
+            modifier = Modifier.size(32.dp).clickable(onClick = onRemove),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.Close,
+                contentDescription = s.removeStepTimer,
+                tint = CookncoGreenDark,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun StepEditCard(
     index: Int,
@@ -1330,6 +1562,9 @@ private fun StepEditCard(
     elevation: Dp = 0.dp,
     dragHandleModifier: Modifier = Modifier,
     onStepChange: (String) -> Unit,
+    onDurationChange: (Int?) -> Unit,
+    onAttach: (StepAttachment) -> Unit,
+    onDetach: (StepAttachment) -> Unit,
     onRemove: () -> Unit,
 ) {
     val s = strings()
@@ -1356,6 +1591,13 @@ private fun StepEditCard(
                     onValueChange = onStepChange,
                     placeholder = s.describeThisStep,
                     modifier = Modifier.padding(top = 5.dp),
+                )
+                StepAttachments(
+                    step = step,
+                    onDurationChange = onDurationChange,
+                    onAttach = onAttach,
+                    onDetach = onDetach,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {

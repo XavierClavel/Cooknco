@@ -167,8 +167,10 @@ const defaultImageRecipeThumbnail = `${import.meta.env.VITE_IMG_URL}/recipes-thu
 const defaultImageCookbook = `${import.meta.env.VITE_IMG_URL}/cookbooks/default.webp`
 
 // Bundled, unlike the ones above: this is the placeholder for an ingredient type with no
-// picture of its own, and the type pictures it stands in for ship with the app too.
-const defaultImageIngredient = '/ingredients/vegetable.png'
+// picture of its own, and the type pictures it stands in for ship with the app too. The bowl
+// rather than the carrot, now that every type has a picture of its own - standing in for an
+// unknown kind with a picture of a vegetable was a guess dressed up as an answer.
+const defaultImageIngredient = '/ingredients/miscellaneous.svg'
 
 const getUserIconUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/users/${id}-v${version}.webp` : defaultImageUser
 const getCookbookIconUrl = (id, version) => id && version ? `${import.meta.env.VITE_IMG_URL}/cookbooks/${id}-v${version}.webp` : defaultImageCookbook

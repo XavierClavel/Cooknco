@@ -361,16 +361,33 @@ interface Strings {
     val inYourRecipes: String
     val popularWithThis: String
     val nothingCookedWithThis: String
-    fun ingredientType(type: String): String
 
     // ── Cook mode ─────────────────────────────────────────────────────────────
     fun stepOf(step: Int, total: Int): String
     val nextStep: String
     val finish: String
     fun nextIs(step: String): String
-    val timerFromThisStep: String
+    val timerLabel: String
+    val stepTimerPlaceholder: String
+    val addToStep: String
+    val removeStepTimer: String
+    val minutesShort: String
     val start: String
     val pause: String
+    val resume: String
+    val stopTimer: String
+    val timerPaused: String
+    val timerTimeIsUp: String
+    val timerRingOnTimeTitle: String
+    val timerRingOnTimeMessage: String
+    val timerRingOnTimeConfirm: String
+    val timerRingOnTimeDismiss: String
+
+    // ── The cook timer, as Android's notification settings list it ────────────
+    val timerChannelName: String
+    val timerChannelDescription: String
+    val timerDoneChannelName: String
+    val timerDoneChannelDescription: String
 }
 
 /**
