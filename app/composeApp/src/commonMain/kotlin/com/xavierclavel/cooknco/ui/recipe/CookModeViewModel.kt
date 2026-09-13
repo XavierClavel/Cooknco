@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.xavierclavel.cooknco.network.dto.RecipeStepIngredientInfo
+import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.data.StepDurations
 import com.xavierclavel.cooknco.data.CookTimer
@@ -33,6 +35,25 @@ data class CookModeUiState(
     val timer: CookTimerState? = null,
     /** What that timer's clock reads right now. */
     val timerRemainingSeconds: Int = 0,
+    /**
+     * How many portions the cook is cooking, which every amount on this screen is scaled to.
+     * Carried from the recipe screen, and the recipe's own yield when it says nothing.
+     */
+    val servings: Int = 0,
+    /**
+     * What has been ticked off, by step and then by ingredient position.
+     *
+     * Kept per step rather than per ingredient because the same ingredient can be used by two
+     * steps — 60 g of the butter now and 40 g later is two separate things to do, and ticking
+     * the first must not cross the second off a step the cook has not reached.
+     *
+     * It survives moving between steps: reading ahead and coming back is the ordinary way to
+     * use this screen, and losing the ticks for it would make them useless.
+     *
+     * Not saved anywhere, though. It is a checklist for one pass at one pan, and opening a
+     * recipe tomorrow with today's ticks on it would be worse than starting clean.
+     */
+    val checkedIngredients: Map<Int, Set<Int>> = emptyMap(),
     /** Whether to ask, right now, for the permission that makes the timer punctual. */
     val askToRingOnTime: Boolean = false,
 ) {
@@ -67,9 +88,11 @@ class CookModeViewModel(
     private val cookTimer: CookTimer,
     private val devicePreferences: DevicePreferences,
     private val recipeId: Long,
+    servings: Int,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CookModeUiState())
+    // Seeded with the portions the cook already chose on the recipe screen, if they did.
+    private val _uiState = MutableStateFlow(CookModeUiState(servings = servings.coerceAtLeast(0)))
     val uiState: StateFlow<CookModeUiState> = _uiState.asStateFlow()
 
     /**
@@ -99,6 +122,10 @@ class CookModeViewModel(
                         it.copy(
                             recipe = recipe,
                             isLoading = false,
+                            // The recipe's own yield unless the cook already picked a number
+                            // on the recipe screen and brought it here.
+                            servings = it.servings.takeIf { chosen -> chosen > 0 }
+                                ?: recipe.yield?.takeIf { y -> y > 0 } ?: 1,
                             currentStep = step,
                             stepDurationSeconds = stepDurationSeconds(recipe.steps.getOrNull(step)),
                         )
@@ -147,6 +174,36 @@ class CookModeViewModel(
                 }
             }
         }
+    }
+
+    /**
+     * The ingredients this step uses, paired with the recipe line each one refers to.
+     *
+     * A position that names no line is dropped: an ingredient can be deleted from a recipe
+     * after a step was told to use it, and the server drops those links on the next save
+     * rather than refusing the save.
+     */
+    fun stepIngredients(state: CookModeUiState): List<Pair<RecipeStepIngredientInfo, RecipeIngredientInfo>> {
+        val recipe = state.recipe ?: return emptyList()
+        val step = recipe.steps.getOrNull(state.currentStep) ?: return emptyList()
+        // Blanks resolved here, over the whole recipe - see [RecipeInfo.blankStepAmounts].
+        val blanks = recipe.blankStepAmounts()
+        return step.ingredients.mapNotNull { used ->
+            recipe.ingredients.getOrNull(used.index)?.let {
+                used.copy(amount = used.amount ?: blanks[used.index]) to it
+            }
+        }
+    }
+
+    /** Ticks an ingredient of the step in front of the cook off, or back on. */
+    fun toggleIngredientChecked(index: Int) = _uiState.update { state ->
+        val step = state.currentStep
+        val ticked = state.checkedIngredients[step].orEmpty()
+        state.copy(
+            checkedIngredients = state.checkedIngredients + (
+                step to (if (index in ticked) ticked - index else ticked + index)
+                ),
+        )
     }
 
     fun nextStep() {
@@ -239,13 +296,14 @@ class CookModeViewModel(
         internal fun stepDurationSeconds(step: RecipeStepInfo?): Int? =
             step?.durationSeconds ?: StepDurations.parseSeconds(step?.text)
 
-        fun factory(recipeId: Long): ViewModelProvider.Factory = viewModelFactory {
+        fun factory(recipeId: Long, servings: Int): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 CookModeViewModel(
                     repo = AppGraph.recipeRepository,
                     cookTimer = AppGraph.cookTimer,
                     devicePreferences = AppGraph.devicePreferences,
                     recipeId = recipeId,
+                    servings = servings,
                 )
             }
         }

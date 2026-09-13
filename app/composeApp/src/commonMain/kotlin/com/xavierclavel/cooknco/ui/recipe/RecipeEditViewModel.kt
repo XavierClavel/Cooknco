@@ -9,6 +9,7 @@ import com.xavierclavel.cooknco.data.StepDurations
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.di.AppGraph
+import com.xavierclavel.cooknco.network.dto.RecipeStepIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientSaveDto
@@ -68,7 +69,26 @@ data class EditIngredient(
 enum class StepAttachment {
     /** How long the step takes, which cook mode counts down. Held in [StepItem.durationSeconds]. */
     TIMER,
+
+    /** Which of the recipe's ingredients the step uses. Held in [StepItem.ingredients]. */
+    INGREDIENTS,
 }
+
+/**
+ * One of the recipe's ingredients, used by a step being written.
+ *
+ * [index] is the ingredient's position in the recipe, which is how the server matches the two
+ * lists up — see `RecipeStepIngredientInfo`. It moves when the ingredients are reordered, so
+ * it is resolved against the list as it stands rather than remembered.
+ *
+ * [amount] is text while it is being typed, and blank is meaningful: it says "the rest of it",
+ * which is the whole line when no other step names an amount. The server works out what that
+ * comes to, so nothing here has to do the subtraction.
+ */
+data class StepIngredientDraft(
+    val index: Int,
+    val amount: String = "",
+)
 
 data class StepItem(
     val id: String,
@@ -84,6 +104,8 @@ data class StepItem(
      */
     val attachments: Set<StepAttachment> = emptySet(),
     val durationSeconds: Int? = null,
+    /** Which of the recipe's ingredients this step uses, and how much of each. */
+    val ingredients: List<StepIngredientDraft> = emptyList(),
     /**
      * Whether the cook has taken the timer over from the text.
      *
@@ -190,7 +212,17 @@ class RecipeEditViewModel(
                                     text = step.text,
                                     attachments = setOfNotNull(
                                         StepAttachment.TIMER.takeIf { duration != null },
+                                        StepAttachment.INGREDIENTS.takeIf { step.ingredients.isNotEmpty() },
                                     ),
+                                    ingredients = step.ingredients.map { used ->
+                                        StepIngredientDraft(
+                                            index = used.index,
+                                            // What the author said, not what it works out to.
+                                            // Prefilling from the worked-out value would write
+                                            // it back on the next save and freeze the blank.
+                                            amount = used.amount?.let { formatAmount(it) }.orEmpty(),
+                                        )
+                                    },
                                     durationSeconds = duration,
                                     // Anything that came off the server is a decision already
                                     // taken; only what is typed from here on is detected.
@@ -400,6 +432,9 @@ class RecipeEditViewModel(
                         durationSeconds = null,
                         durationTouched = true,
                     )
+                    // Nothing picked yet: the list of the recipe's ingredients appears and the
+                    // cook ticks what the step uses.
+                    StepAttachment.INGREDIENTS -> step.copy(attachments = step.attachments + attachment)
                 }
             },
         )
@@ -416,7 +451,42 @@ class RecipeEditViewModel(
                         durationSeconds = null,
                         durationTouched = true,
                     )
+                    StepAttachment.INGREDIENTS -> step.copy(
+                        attachments = step.attachments - attachment,
+                        ingredients = emptyList(),
+                    )
                 }
+            },
+        )
+    }
+
+    /** Ticks or unticks one of the recipe's ingredients for a step. */
+    fun toggleStepIngredient(id: String, index: Int) = _uiState.update { s ->
+        s.copy(
+            steps = s.steps.map { step ->
+                if (step.id != id) step
+                else if (step.ingredients.any { it.index == index }) {
+                    step.copy(ingredients = step.ingredients.filterNot { it.index == index })
+                } else {
+                    // Appended rather than sorted: the cook ticks them in the order the step
+                    // uses them, and the recipe's own order is what the reader gets anyway.
+                    step.copy(ingredients = step.ingredients + StepIngredientDraft(index))
+                }
+            },
+        )
+    }
+
+    /** How much of a ticked ingredient this step uses. Blank means the rest of it. */
+    fun updateStepIngredientAmount(id: String, index: Int, amount: String) = _uiState.update { s ->
+        s.copy(
+            steps = s.steps.map { step ->
+                if (step.id != id) step
+                else step.copy(
+                    ingredients = step.ingredients.map {
+                        if (it.index == index) it.copy(amount = amount.filter { c -> c.isDigit() || c == '.' })
+                        else it
+                    },
+                )
             },
         )
     }
@@ -478,6 +548,18 @@ class RecipeEditViewModel(
                         // for an attachment holding nothing.
                         durationSeconds = step.durationSeconds
                             ?.takeIf { StepAttachment.TIMER in step.attachments },
+                        ingredients = if (StepAttachment.INGREDIENTS !in step.attachments) emptyList()
+                        else step.ingredients
+                            // An ingredient deleted since it was ticked leaves a position
+                            // pointing at nothing. The server drops those, but not sending
+                            // them keeps the amounts it checks honest.
+                            .filter { it.index in state.ingredients.indices }
+                            .map { used ->
+                                RecipeStepIngredientInfo(
+                                    index = used.index,
+                                    amount = used.amount.toFloatOrNull()?.takeIf { it > 0f },
+                                )
+                            },
                     )
                 },
             tips = state.tips.trim(),

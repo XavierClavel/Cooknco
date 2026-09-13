@@ -60,14 +60,17 @@ data class RecipeDTO (
      * request. The server turns them into rows once both lists exist and back into positions
      * on the way out, so a client never sees the join table.
      *
-     * [amount] is in the ingredient's own unit — there is no unit of its own, because "200 g
-     * of the 500 g of flour" is the only sensible reading and a step measuring the same
-     * ingredient in a different unit would be a conversion nobody asked for.
+     * [amount] is what the author said, in the ingredient's own unit, and null when they said
+     * nothing. There is no unit of its own, because "200 g of the 500 g of flour" is the only
+     * sensible reading and a step measuring the same ingredient in a different unit would be a
+     * conversion nobody asked for.
      *
-     * Null means *all of it*, which is what one step using an ingredient means and is why
-     * attaching an ingredient to a single step needs no number typed. Split it across two
-     * steps and the amounts stop adding up, which is refused rather than rounded: see
-     * `RecipeIngredientService.validateStepIngredients`.
+     * Null is not resolved to a number anywhere on the way through. What a blank comes to
+     * depends on what the recipe's other steps said about the same ingredient, and every
+     * reader already holds the whole recipe — so it is worked out where it is displayed, and
+     * the wire carries only what was actually stated. A second, derived field here would be
+     * one that must never be written back, which is a trap a client falls into by doing the
+     * obvious thing: read the recipe, put the numbers in the boxes, save.
      */
     @Serializable
     data class RecipeStepIngredientDTO (

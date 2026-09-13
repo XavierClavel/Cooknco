@@ -368,8 +368,12 @@ interface Strings {
     val finish: String
     fun nextIs(step: String): String
     val timerLabel: String
+    val usedInThisStep: String
     val stepTimerPlaceholder: String
     val addToStep: String
+    val stepIngredientsLabel: String
+    val removeStepIngredients: String
+    val noIngredientsToPickYet: String
     val removeStepTimer: String
     val minutesShort: String
     val start: String

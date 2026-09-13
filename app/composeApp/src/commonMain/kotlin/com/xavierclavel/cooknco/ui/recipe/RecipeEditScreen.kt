@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
@@ -1342,7 +1343,12 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
                             onDragStopped = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                         ),
                         onStepChange = { viewModel.updateStep(step.id, it) },
+                        recipeIngredients = uiState.ingredients,
                         onDurationChange = { viewModel.updateStepDuration(step.id, it) },
+                        onToggleIngredient = { viewModel.toggleStepIngredient(step.id, it) },
+                        onIngredientAmountChange = { index, amount ->
+                            viewModel.updateStepIngredientAmount(step.id, index, amount)
+                        },
                         onAttach = { viewModel.attachToStep(step.id, it) },
                         onDetach = { viewModel.detachFromStep(step.id, it) },
                         onRemove = { viewModel.removeStep(step.id) },
@@ -1407,7 +1413,10 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
 @Composable
 private fun StepAttachments(
     step: StepItem,
+    recipeIngredients: List<EditIngredient>,
     onDurationChange: (Int?) -> Unit,
+    onToggleIngredient: (Int) -> Unit,
+    onIngredientAmountChange: (Int, String) -> Unit,
     onAttach: (StepAttachment) -> Unit,
     onDetach: (StepAttachment) -> Unit,
     modifier: Modifier = Modifier,
@@ -1425,6 +1434,14 @@ private fun StepAttachments(
                     durationSeconds = step.durationSeconds,
                     onDurationChange = onDurationChange,
                     onRemove = { onDetach(StepAttachment.TIMER) },
+                )
+
+                StepAttachment.INGREDIENTS -> StepIngredientPicker(
+                    step = step,
+                    ingredients = recipeIngredients,
+                    onToggle = onToggleIngredient,
+                    onAmountChange = onIngredientAmountChange,
+                    onRemove = { onDetach(StepAttachment.INGREDIENTS) },
                 )
             }
         }
@@ -1471,6 +1488,139 @@ private fun StepAttachments(
 /** How a step's attachment names itself in the menu. */
 private fun StepAttachment.label(s: Strings) = when (this) {
     StepAttachment.TIMER -> s.timerLabel
+    StepAttachment.INGREDIENTS -> s.stepIngredientsLabel
+}
+
+/**
+ * Which of the recipe's ingredients this step uses, and how much of each.
+ *
+ * The whole ingredient list, ticked rather than searched: a recipe has a handful of lines and
+ * the cook is choosing among the ones they have just written, so a picker that made them
+ * search would be asking them to remember what they can see.
+ *
+ * An amount is only offered once a line is ticked, and blank means "the rest of it" — the
+ * whole line when no other step names an amount, the remainder when one does. The server
+ * works that out (`Recipe.blankStepAmounts`), which is why nothing here adds anything up.
+ */
+@Composable
+private fun StepIngredientPicker(
+    step: StepItem,
+    ingredients: List<EditIngredient>,
+    onToggle: (Int) -> Unit,
+    onAmountChange: (Int, String) -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val s = strings()
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = s.stepIngredientsLabel,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoGreenDark,
+                letterSpacing = 1.2.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                modifier = Modifier.size(28.dp).clickable(onClick = onRemove),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = s.removeStepIngredients,
+                    tint = CookncoGreenDark,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+        }
+
+        if (ingredients.none { it.ingredientName.isNotBlank() }) {
+            // Nothing to tick yet. Said out loud rather than shown as an empty box, since the
+            // fix is on a different step of the editor entirely.
+            Text(
+                text = s.noIngredientsToPickYet,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = CookncoGreenDark,
+            )
+            return@Column
+        }
+
+        ingredients.forEachIndexed { index, ingredient ->
+            if (ingredient.ingredientName.isBlank()) return@forEachIndexed
+            val used = step.ingredients.firstOrNull { it.index == index }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(if (used != null) CookncoOrange else CookncoWhite)
+                        .border(2.dp, CookncoNavy, RoundedCornerShape(7.dp))
+                        .clickable { onToggle(index) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (used != null) {
+                        Icon(
+                            Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = CookncoWhite,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = ingredient.ingredientName,
+                    fontSize = 13.5.sp,
+                    fontWeight = if (used != null) FontWeight.Bold else FontWeight.Medium,
+                    color = if (used != null) CookncoNavy else CookncoGreenDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (used != null && ingredient.amount != null) {
+                    Box(
+                        modifier = Modifier
+                            .width(52.dp)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(CookncoWhite)
+                            .border(2.dp, CookncoNavy, RoundedCornerShape(9.dp))
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        if (used.amount.isEmpty()) {
+                            Text(
+                                text = s.stepTimerPlaceholder,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = CookncoGreenDark,
+                            )
+                        }
+                        BasicTextField(
+                            value = used.amount,
+                            onValueChange = { onAmountChange(index, it) },
+                            singleLine = true,
+                            textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoNavy),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            cursorBrush = SolidColor(CookncoOrange),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    Text(
+                        text = if (ingredient.unit == "NONE") "" else s.unitName(ingredient.unit),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CookncoGreenDark,
+                    )
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -1561,8 +1711,11 @@ private fun StepEditCard(
     step: StepItem,
     elevation: Dp = 0.dp,
     dragHandleModifier: Modifier = Modifier,
+    recipeIngredients: List<EditIngredient>,
     onStepChange: (String) -> Unit,
     onDurationChange: (Int?) -> Unit,
+    onToggleIngredient: (Int) -> Unit,
+    onIngredientAmountChange: (Int, String) -> Unit,
     onAttach: (StepAttachment) -> Unit,
     onDetach: (StepAttachment) -> Unit,
     onRemove: () -> Unit,
@@ -1594,7 +1747,10 @@ private fun StepEditCard(
                 )
                 StepAttachments(
                     step = step,
+                    recipeIngredients = recipeIngredients,
                     onDurationChange = onDurationChange,
+                    onToggleIngredient = onToggleIngredient,
+                    onIngredientAmountChange = onIngredientAmountChange,
                     onAttach = onAttach,
                     onDetach = onDetach,
                     modifier = Modifier.padding(top = 8.dp),

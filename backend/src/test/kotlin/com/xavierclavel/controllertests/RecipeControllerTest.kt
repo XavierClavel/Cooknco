@@ -548,11 +548,12 @@ class RecipeControllerTest : ApplicationTest() {
             )
         )
 
+        // What the author said. The flour and the salt were named without a number, and come
+        // back without one - a blank has to survive the round trip, or an editor prefilled
+        // from it would write the worked-out value back and freeze it.
         val expected = listOf(
             listOf(0 to 60f),
-            // The flour is a single blank of a 200 g line, so it works out to all of it; the
-            // salt has no amount to work anything out from.
-            listOf(1 to 200f, 2 to null),
+            listOf(1 to null, 2 to null),
             listOf(0 to 40f),
             emptyList(),
         )
@@ -563,55 +564,47 @@ class RecipeControllerTest : ApplicationTest() {
     }
 
     /**
-     * What a blank is worth depends on what the recipe's other steps said about the same
-     * ingredient, so these four cases are the whole of the rule.
+     * A blank comes back a blank.
+     *
+     * The server stores and returns what was stated, and nothing else — which is what lets an
+     * editor prefill its boxes from the reply and save without turning "unspecified" into a
+     * number. What a blank works out to is the reader's arithmetic (`StepAmountsTest` in the
+     * app), over a recipe it already holds.
      */
     @Test
-    fun `a blank step amount is worked out from what the other steps spell out`() = runTestAsAdmin {
-        suspend fun shapeOf(steps: List<RecipeDTO.RecipeStepDTO>) =
-            client.createRecipe(
-                RecipeDTO(title = "My recipe", ingredients = mutableListOf(butter()), steps = steps.toMutableList())
-            ).steps.map { step -> step.ingredients.map { it.amount } }
-
-        // One blank, nothing else spelled out: the whole line.
-        assertEquals(
-            listOf(listOf(100f)),
-            shapeOf(listOf(RecipeDTO.RecipeStepDTO("Melt it", ingredients = listOf(used(0))))),
-        )
-
-        // One blank beside an amount: the remainder, without anyone subtracting.
-        assertEquals(
-            listOf(listOf(60f), listOf(40f)),
-            shapeOf(
-                listOf(
-                    RecipeDTO.RecipeStepDTO("Melt most", ingredients = listOf(used(0, 60f))),
-                    RecipeDTO.RecipeStepDTO("Brush with the rest", ingredients = listOf(used(0))),
-                )
-            ),
-        )
-
-        // Two blanks: a remainder nothing says how to divide, so no number is shown at all.
-        assertEquals(
-            listOf(listOf(null), listOf(null)),
-            shapeOf(
-                listOf(
-                    RecipeDTO.RecipeStepDTO("Melt some", ingredients = listOf(used(0))),
-                    RecipeDTO.RecipeStepDTO("Brush with some", ingredients = listOf(used(0))),
-                )
-            ),
-        )
-
-        // Two blanks beside an amount: the amount stands, the blanks stay blank.
-        assertEquals(
-            listOf(listOf(30f), listOf(null), listOf(null)),
-            shapeOf(
-                listOf(
+    fun `a blank amount survives a round trip`() = runTestAsAdmin {
+        val created = client.createRecipe(
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(butter()),
+                steps = mutableListOf(
                     RecipeDTO.RecipeStepDTO("Melt 30", ingredients = listOf(used(0, 30f))),
-                    RecipeDTO.RecipeStepDTO("Some here", ingredients = listOf(used(0))),
-                    RecipeDTO.RecipeStepDTO("Some there", ingredients = listOf(used(0))),
-                )
-            ),
+                    RecipeDTO.RecipeStepDTO("The rest", ingredients = listOf(used(0))),
+                ),
+            )
         )
+
+        fun RecipeInfo.said() = steps.map { step -> step.ingredients.map { it.amount } }
+        assertEquals(listOf(listOf(30f), listOf(null)), created.said())
+        assertEquals(listOf(listOf(30f), listOf(null)), client.getRecipe(created.id).said())
+
+        // Saving back exactly what was read, which is what an editor does, leaves it alone.
+        val resaved = client.updateRecipe(
+            created.id,
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(butter()),
+                steps = created.steps
+                    .map { step ->
+                        RecipeDTO.RecipeStepDTO(
+                            text = step.text,
+                            ingredients = step.ingredients.map { used(it.index, it.amount) },
+                        )
+                    }
+                    .toMutableList(),
+            )
+        )
+        assertEquals(listOf(listOf(30f), listOf(null)), resaved.said())
     }
 
     /**
@@ -655,7 +648,10 @@ class RecipeControllerTest : ApplicationTest() {
                 ),
             )
         )
-        assertEquals(listOf(listOf(30f), listOf(70f)), ok.steps.map { step -> step.ingredients.map { it.amount } })
+        assertEquals(
+            listOf(listOf(30f), listOf(null)),
+            ok.steps.map { step -> step.ingredients.map { it.amount } },
+        )
     }
 
     /** "Salt, to taste" has no amount to divide, so a step cannot claim a share of it. */

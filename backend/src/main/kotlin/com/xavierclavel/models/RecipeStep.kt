@@ -74,25 +74,19 @@ class RecipeStep(
 
 ) : Model() {
 
-    /**
-     * [blankAmounts] is what a link that names no amount works out to, by ingredient position
-     * — see `Recipe.blankStepAmounts`, which is the only thing that can compute it, since it
-     * depends on every *other* step too.
-     */
-    fun toDto(blankAmounts: Map<Int, Float?> = emptyMap()) = RecipeDTO.RecipeStepDTO(
+    fun toDto() = RecipeDTO.RecipeStepDTO(
         text = text,
         durationSeconds = durationSeconds,
         // Back to positions on the way out. sortOrder *is* the position the client sent, so
-        // this is a projection rather than a lookup - and sorted, so a step's ingredients
-        // read in the order the recipe lists them rather than the order they were linked.
+        // this is a projection rather than a lookup - and sorted, so a step's ingredients read
+        // in the order the recipe lists them rather than the order they were linked.
+        //
+        // Amounts go back exactly as they came, blanks included. What a blank works out to is
+        // the reader's to compute: it depends on the recipe's other steps, which every reader
+        // already has.
         ingredients = ingredientLinks
             .mapNotNull { link ->
-                link.ingredient?.let { ingredient ->
-                    RecipeDTO.RecipeStepIngredientDTO(
-                        index = ingredient.sortOrder,
-                        amount = link.amount ?: blankAmounts[ingredient.sortOrder],
-                    )
-                }
+                link.ingredient?.let { RecipeDTO.RecipeStepIngredientDTO(it.sortOrder, link.amount) }
             }
             .sortedBy { it.index },
     )

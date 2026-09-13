@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.ui.recipe
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Stop
@@ -38,19 +40,23 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.jetbrains.compose.resources.painterResource
 import com.xavierclavel.cooknco.data.CookTimerState
 import com.xavierclavel.cooknco.data.formatCookTimer
+import com.xavierclavel.cooknco.network.dto.RecipeStepIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.platform.rememberExactTimerConsent
 import com.xavierclavel.cooknco.ui.i18n.strings
+import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
@@ -78,10 +84,12 @@ import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 @Composable
 fun CookModeScreen(
     recipeId: Long,
+    /** Portions the cook picked on the recipe screen; 0 to use the recipe's own yield. */
+    servings: Int = 0,
     onNavigateBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: CookModeViewModel = viewModel(factory = CookModeViewModel.factory(recipeId))
+    val viewModel: CookModeViewModel = viewModel(factory = CookModeViewModel.factory(recipeId, servings))
     val uiState by viewModel.uiState.collectAsState()
 
     Box(modifier = modifier.fillMaxSize().background(CookncoGreenDark)) {
@@ -101,6 +109,10 @@ fun CookModeScreen(
             uiState.recipe != null -> CookModeContent(
                 recipe = uiState.recipe!!,
                 currentStep = uiState.currentStep,
+                stepIngredients = viewModel.stepIngredients(uiState),
+                checkedIngredients = uiState.checkedIngredients[uiState.currentStep].orEmpty(),
+                servings = uiState.servings,
+                onToggleIngredient = viewModel::toggleIngredientChecked,
                 stepDurationSeconds = uiState.stepDurationSeconds,
                 timer = uiState.stepTimer,
                 timerRemainingSeconds = uiState.timerRemainingSeconds,
@@ -148,6 +160,10 @@ private const val EDGE_TAP_FRACTION = 0.38f
 private fun CookModeContent(
     recipe: RecipeInfo,
     currentStep: Int,
+    stepIngredients: List<Pair<RecipeStepIngredientInfo, RecipeIngredientInfo>> = emptyList(),
+    checkedIngredients: Set<Int> = emptySet(),
+    servings: Int = 0,
+    onToggleIngredient: (Int) -> Unit = {},
     stepDurationSeconds: Int?,
     timer: CookTimerState?,
     timerRemainingSeconds: Int,
@@ -255,6 +271,39 @@ private fun CookModeContent(
                 }
             }
 
+            if (stepIngredients.isNotEmpty()) {
+                item {
+                    Text(
+                        text = s.usedInThisStep,
+                        color = CookncoWhite,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.7.sp,
+                        modifier = Modifier.padding(top = 24.dp),
+                    )
+                    StickerCard(
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        shadowOffset = 6.dp,
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            stepIngredients.forEachIndexed { position, (used, ingredient) ->
+                                StepIngredientRow(
+                                    ingredient = ingredient,
+                                    // Already resolved by the view model.
+                                    amount = used.amount,
+                                    servings = servings,
+                                    recipeYield = recipe.yield ?: 1,
+                                    checked = used.index in checkedIngredients,
+                                    onToggle = { onToggleIngredient(used.index) },
+                                    showDivider = position < stepIngredients.lastIndex,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             if (timer != null || stepDurationSeconds != null) {
                 item {
                     CookTimerCard(
@@ -315,6 +364,101 @@ private fun CookModeContent(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
+        }
+    }
+}
+
+/**
+ * One ingredient this step uses, to be ticked off as it goes in.
+ *
+ * The row is the artboard's — the ingredient's picture, its name, and its amount at the
+ * trailing edge, on a cream card with hairline dividers between rows. What the artboard does
+ * not have is the tick box, which is the point of showing the list here at all: hands are
+ * busy and a cook looks back having forgotten whether the butter went in. It sits at the
+ * leading edge and takes the whole row as its target, so it can be hit without looking.
+ *
+ * The amount is scaled to the portions being cooked, like every amount in the product, and is
+ * simply absent when the server had nothing to work it out from: two steps sharing an
+ * ingredient without saying how it divides are worth no number each, and inventing an even
+ * split would be inventing a measurement.
+ */
+@Composable
+private fun StepIngredientRow(
+    ingredient: RecipeIngredientInfo,
+    amount: Float?,
+    servings: Int,
+    recipeYield: Int,
+    checked: Boolean,
+    onToggle: () -> Unit,
+    showDivider: Boolean,
+) {
+    val s = strings()
+    val scaled = scaleAmount(amount, servings, recipeYield)
+    val unit = if (ingredient.unit == "NONE" || ingredient.unit == "UNIT") "" else s.unitName(ingredient.unit)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(if (checked) CookncoOrange else CookncoWhite)
+                    .border(2.dp, CookncoNavy, RoundedCornerShape(7.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (checked) {
+                    Icon(
+                        Icons.Outlined.Check,
+                        contentDescription = null,
+                        tint = CookncoWhite,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+            }
+            Image(
+                painter = painterResource(ingredientIcon(ingredient.type)),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(CookncoGreenLight)
+                    .border(2.dp, CookncoNavy, RoundedCornerShape(9.dp))
+                    .padding(5.dp),
+            )
+            Text(
+                text = ingredient.name,
+                color = if (checked) CookncoGreenDark.copy(alpha = 0.55f) else CookncoNavy,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                textDecoration = if (checked) TextDecoration.LineThrough else null,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (scaled.isNotEmpty()) {
+                Text(
+                    text = if (unit.isEmpty()) scaled else "$scaled $unit",
+                    color = if (checked) CookncoGreenDark.copy(alpha = 0.55f) else CookncoNavy,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
+                )
+            }
+        }
+        if (showDivider) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(CookncoNavy.copy(alpha = 0.1f)),
+            )
         }
     }
 }

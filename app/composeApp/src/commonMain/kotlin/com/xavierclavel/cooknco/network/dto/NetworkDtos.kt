@@ -102,6 +102,28 @@ data class RecipeInfo(
 data class RecipeStepInfo(
     val text: String = "",
     val durationSeconds: Int? = null,
+    /** The recipe's own ingredients this step uses. Empty for most steps. */
+    val ingredients: List<RecipeStepIngredientInfo> = emptyList(),
+)
+
+/**
+ * One of the recipe's ingredients, used by one step.
+ *
+ * [index] is a position in `RecipeInfo.ingredients`, not an id — on the way *in* an
+ * ingredient row has no identity to point at, because a save replaces the whole list. The
+ * server resolves positions to rows and back, so this is all a client ever deals in.
+ *
+ * [amount] is what the author said, in the ingredient's own unit, and null when they said
+ * nothing — which is most of the time. It is stored and returned exactly as given, so an
+ * editor prefilled from it keeps a blank blank.
+ *
+ * What a blank comes to is worked out where it is shown, from the whole recipe: see
+ * `RecipeInfo.blankStepAmounts`.
+ */
+@Serializable
+data class RecipeStepIngredientInfo(
+    val index: Int,
+    val amount: Float? = null,
 )
 
 @Serializable
