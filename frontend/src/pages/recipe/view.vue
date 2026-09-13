@@ -196,7 +196,7 @@
         <v-list v-for="(step, index) in recipe.steps">
           <v-card color="background" rounded="lg">
             <v-list-item>
-              <v-card-text class="text-wrap">{{step}}</v-card-text>
+              <v-card-text class="text-wrap">{{ step.text }}</v-card-text>
               <template v-slot:prepend>
                 <v-avatar color="surface">
                   {{index + 1}}
@@ -372,7 +372,7 @@ const selectedYield = ref(null)
 const coefficient = computed(() =>  selectedYield.value / recipe.value.yield)
 
 const recipe = ref<object>({
-  steps: [''],
+  steps: [],
   ingredients: [],
   owner: {}
 })

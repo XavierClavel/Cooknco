@@ -138,7 +138,7 @@
         </div>
         <div v-if="detail.steps?.length">
           <h4>{{ $t('steps') }}</h4>
-          <ol><li v-for="(s, n) in detail.steps" :key="n">{{ s }}</li></ol>
+          <ol><li v-for="(s, n) in detail.steps" :key="n">{{ s.text }}</li></ol>
         </div>
         <div v-if="detail.tips">
           <h4>{{ $t('tips') }}</h4>
