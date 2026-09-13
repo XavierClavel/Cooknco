@@ -394,10 +394,25 @@ object CookncoMcpServer {
      * a step that mentions its own time in the text ("laisser reposer 30 mn") has it read
      * out server-side, exactly as the editors do.
      */
+    private val stepIngredientArg = objectArg(
+        "One ingredient this step uses, by its position in the recipe's ingredient list.",
+        "ingredient_index" to intArg("0 for the first ingredient of the recipe, 1 for the second, and so on."),
+        "amount" to numberArg(
+            "How much of it this step uses, in that ingredient's own unit. Omit unless the " +
+                "recipe splits the ingredient across steps: omitted means the rest of it.",
+        ),
+    )
+
     private val stepRowArg = objectArg(
-        "One step. Give text; duration_minutes only when the step is a wait worth timing.",
+        "One step. Give text; the rest only when the step calls for it.",
         "text" to stringArg("What to do at this step."),
         "duration_minutes" to intArg("How long this step takes, when it is worth a timer. Omit otherwise."),
+        "ingredients" to arrayArg(
+            "The recipe's own ingredients this step uses. Omit for a step that uses none. " +
+                "Amounts spelled out across steps must not exceed what the recipe lists for " +
+                "that ingredient, and if every step names an amount they must add up to it.",
+            stepIngredientArg,
+        ),
     )
 
     private val recipeFields = arrayOf(
@@ -727,6 +742,13 @@ object CookncoMcpServer {
     private fun JsonObject.toStepRow(): RecipeDTO.RecipeStepDTO {
         val text = optionalString("text").orEmpty()
         return RecipeDTO.RecipeStepDTO(
+            ingredients = optionalObjectList("ingredients")
+                ?.mapNotNull { row ->
+                    row.optionalInt("ingredient_index")?.let {
+                        RecipeDTO.RecipeStepIngredientDTO(index = it, amount = row.optionalFloat("amount"))
+                    }
+                }
+                .orEmpty(),
             text = text,
             // Minutes on the way in because that is how a recipe talks, seconds on the way
             // through because that is what counts down. Falling back to the text's own

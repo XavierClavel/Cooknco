@@ -33,14 +33,27 @@ data class RecipeInfo (
     val isHidden: Boolean = false,
 
     ) {
+    /**
+     * Whether the server stored what it was sent.
+     *
+     * Steps are compared on what a client *states* — the words, the timer, and which
+     * ingredients the step uses — and not on the amounts of those ingredients, because an
+     * amount is not always something the client stated. A step that names an ingredient
+     * without a number is saying "unspecified", and the reply works out what that comes to
+     * from what the recipe's other steps spelled out (`Recipe.blankStepAmounts`). Comparing
+     * it would be asserting that the server failed to do its job.
+     */
     fun compareToDTO(dto: RecipeDTO): Boolean {
+        fun RecipeDTO.RecipeStepDTO.stated() =
+            Triple(text, durationSeconds, ingredients.map { it.index }.sorted())
+
         return title == dto.title &&
                 description == dto.description &&
                 yield == dto.yield &&
                 preparationTime == dto.preparationTime &&
                 cookingTime == dto.cookingTime &&
                 cookingTemperature == dto.cookingTemperature &&
-                steps == dto.steps
+                steps.map { it.stated() } == dto.steps.map { it.stated() }
     }
 
     fun toOverview() = RecipeOverview(

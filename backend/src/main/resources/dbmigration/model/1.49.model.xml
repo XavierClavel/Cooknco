@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="recipe_step_ingredients" identityType="identity" pkName="pk_recipe_step_ingredients">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="step_id" type="bigint" references="recipe_steps.id" foreignKeyName="fk_recipe_step_ingredients_step_id" foreignKeyIndex="ix_recipe_step_ingredients_step_id"/>
+            <column name="ingredient_id" type="bigint" references="recipe_ingredients.id" foreignKeyName="fk_recipe_step_ingredients_ingredient_id" foreignKeyIndex="ix_recipe_step_ingredients_ingredient_id"/>
+            <column name="amount" type="float"/>
+        </createTable>
+    </changeSet>
+</migration>

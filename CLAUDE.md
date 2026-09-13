@@ -366,6 +366,22 @@ Tests build the schema from the entity model (`ddlMode: dropCreate`), so they ne
 `backend/src/main/resources/dbmigration`. After changing entities or writing a migration, run
 `scripts/verify-migrations.sh` to exercise the SQL and backfills against a throwaway Postgres.
 
+### A new table goes in `DatabaseManager.getTables()`
+
+That list is what wipes the database between tests (`ApplicationTest.cleanDb`), and **it is
+ordered by foreign key, by hand**. A table missing from it is not cleared, so its rows survive
+into the next test and the wipe then fails on whatever they still point at — Ebean generates
+`on delete restrict` for every FK it writes.
+
+The failure is spectacular and reads as somebody else's fault: the first test to insert such a
+row passes, and every test after it dies in `@BeforeEach` on a constraint that has nothing to
+do with what it was testing. When a change adds one table and thirty tests go red at once, this
+is why. Run one of them alone — it will pass.
+
+A join table needs listing *before* both tables it references. Soft-deleted rows make that
+sharper than it looks: `Recipe.delete()` is a soft delete, so a recipe's steps and their links
+outlive the recipe row and nothing reaches them by cascade.
+
 ## Frontend
 
 ```bash

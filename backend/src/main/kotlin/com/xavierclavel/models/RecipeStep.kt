@@ -7,8 +7,12 @@ import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.CascadeType
+import jakarta.persistence.FetchType
 import jakarta.persistence.ManyToOne
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
+import com.xavierclavel.models.jointables.RecipeStepIngredient
 import shared.dto.RecipeDTO
 
 /**
@@ -49,9 +53,49 @@ class RecipeStep(
     @DbDefault("0")
     var sortOrder: Int = 0,
 
+    /**
+     * The recipe's own ingredients that this step uses.
+     *
+     * Links rather than ingredients: each [RecipeStepIngredient] is one step and one
+     * ingredient, and is a row with an identity so that it can carry what the pairing itself
+     * is worth — a per-step quantity, when that is wanted. Reading it as a plain set of
+     * ingredients is what this deliberately is not.
+     *
+     * An ingredient can be used by several steps: butter in the first and again in the
+     * fourth. Most ingredients are used by no step at all, and a step that says nothing about
+     * ingredients is the normal case.
+     *
+     * Positions are how the two lists are matched up inside one request
+     * ([RecipeDTO.RecipeStepDTO.ingredients]); rows are what is stored, because nothing
+     * stops a stored position from pointing past the end of a list somebody has shortened.
+     */
+    @OneToMany(mappedBy = "step", fetch = FetchType.EAGER, cascade = [CascadeType.ALL], orphanRemoval = true)
+    var ingredientLinks: MutableList<RecipeStepIngredient> = mutableListOf(),
+
 ) : Model() {
 
-    fun toDto() = RecipeDTO.RecipeStepDTO(text = text, durationSeconds = durationSeconds)
+    /**
+     * [blankAmounts] is what a link that names no amount works out to, by ingredient position
+     * — see `Recipe.blankStepAmounts`, which is the only thing that can compute it, since it
+     * depends on every *other* step too.
+     */
+    fun toDto(blankAmounts: Map<Int, Float?> = emptyMap()) = RecipeDTO.RecipeStepDTO(
+        text = text,
+        durationSeconds = durationSeconds,
+        // Back to positions on the way out. sortOrder *is* the position the client sent, so
+        // this is a projection rather than a lookup - and sorted, so a step's ingredients
+        // read in the order the recipe lists them rather than the order they were linked.
+        ingredients = ingredientLinks
+            .mapNotNull { link ->
+                link.ingredient?.let { ingredient ->
+                    RecipeDTO.RecipeStepIngredientDTO(
+                        index = ingredient.sortOrder,
+                        amount = link.amount ?: blankAmounts[ingredient.sortOrder],
+                    )
+                }
+            }
+            .sortedBy { it.index },
+    )
 
     companion object {
         fun of(dto: RecipeDTO.RecipeStepDTO, sortOrder: Int) = RecipeStep(
