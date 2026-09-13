@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -61,6 +64,15 @@ fun <T> StickerDropdownMenu(
     selected: (T) -> Boolean = { false },
     /** The caps heading a row sits under, or null for an ungrouped list. */
     sectionOf: (T) -> String? = { null },
+    /**
+     * The icon a row leads with, or null for one that reads as words alone.
+     *
+     * Null by default, and per row rather than per menu: a list of units or of dish classes
+     * is a set of words with nothing to picture, while a list of *things to do* reads faster
+     * with one. A menu where only some rows have an icon would look broken, so a caller
+     * either gives every row one or gives none.
+     */
+    iconOf: (T) -> ImageVector? = { null },
     alignEnd: Boolean = false,
     /** Null means "as wide as the anchor". */
     width: Dp? = null,
@@ -106,6 +118,7 @@ fun <T> StickerDropdownMenu(
                             StickerDropdownRow(
                                 label = label(item),
                                 selected = selected(item),
+                                icon = iconOf(item),
                                 onClick = { onSelect(item) },
                             )
                             if (index != items.lastIndex) {
@@ -132,7 +145,12 @@ private fun StickerDropdownSection(text: String) {
 }
 
 @Composable
-private fun StickerDropdownRow(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun StickerDropdownRow(
+    label: String,
+    selected: Boolean,
+    icon: ImageVector?,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -143,6 +161,14 @@ private fun StickerDropdownRow(label: String, selected: Boolean, onClick: () -> 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) CookncoWhite else CookncoGreenDark,
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Text(
             text = label,
             fontSize = 14.5.sp,

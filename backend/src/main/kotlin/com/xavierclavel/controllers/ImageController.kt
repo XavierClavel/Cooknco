@@ -10,6 +10,7 @@ import com.xavierclavel.services.DefaultImageService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.ImageUploadTicketService
 import com.xavierclavel.services.RecipeService
+import com.xavierclavel.services.RecipeStepService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.checkRecipeEditionRights
@@ -21,6 +22,7 @@ import shared.enums.ImageBucket
 import shared.utils.Filepath.COOKBOOKS_IMG_PATH
 import shared.utils.Filepath.DEFAULT_IMAGE
 import shared.utils.Filepath.RECIPES_IMG_PATH
+import shared.utils.Filepath.RECIPE_STEPS_IMG_PATH
 import shared.utils.Filepath.RECIPES_THUMBNAIL_PATH
 import shared.utils.Filepath.USERS_IMG_PATH
 import shared.utils.URL.IMAGE_URL
@@ -46,6 +48,7 @@ object ImageController: Controller(IMAGE_URL) {
     val imageService : ImageService by inject(ImageService::class.java)
     val defaultImageService: DefaultImageService by inject(DefaultImageService::class.java)
     val recipeService: RecipeService by inject(RecipeService::class.java)
+    val recipeStepService: RecipeStepService by inject(RecipeStepService::class.java)
     val cookbookService: CookbookService by inject(CookbookService::class.java)
     val userService: UserService by inject(UserService::class.java)
     val imageUploadTicketService: ImageUploadTicketService by inject(ImageUploadTicketService::class.java)
@@ -61,9 +64,11 @@ object ImageController: Controller(IMAGE_URL) {
 
         authenticate("auth-session", "bearer-auth") {
             uploadRecipeImage()
+            uploadRecipeStepImage()
             uploadCookbookImage()
             uploadUserIcon()
             deleteRecipeImage()
+            deleteRecipeStepImage()
             deleteCookbookImage()
             deleteUserImage()
         }
@@ -158,6 +163,49 @@ object ImageController: Controller(IMAGE_URL) {
         imageService.saveImage(USERS_IMG_PATH, id, user.imageVersion + 1, ImageBucket.USER.size, image, metadata)
         user.increaseVersion()
         imageService.deleteImage(USERS_IMG_PATH, id, user.imageVersion - 1)
+        call.respond(HttpStatusCode.OK)
+    }
+
+    /**
+     * A picture for one step.
+     *
+     * Rights come from the recipe, not the step: a step is not something anybody owns on its
+     * own, and the only person who may put a picture on one is the person who may edit the
+     * recipe it belongs to.
+     *
+     * No thumbnail. A step picture is drawn at one size, in the step, and a second file would
+     * be one more thing to keep in step with the first for no one to look at.
+     */
+    private fun Route.uploadRecipeStepImage() = post("/recipe-steps/{id}") {
+        val id = getPathId()
+        val step = recipeStepService.getEntityById(id)
+        checkRecipeEditionRights(recipeService.getRecipeOwner(step.recipe!!.id).id)
+
+        val (image, metadata) = receiveImage()
+        imageService.saveImage(
+            RECIPE_STEPS_IMG_PATH, id, step.imageVersion + 1, ImageBucket.RECIPE_STEP.size, image, metadata,
+        )
+        step.increaseImageVersion()
+        imageService.deleteImage(RECIPE_STEPS_IMG_PATH, id, step.imageVersion - 1)
+        call.respond(HttpStatusCode.OK)
+    }
+
+    private fun Route.deleteRecipeStepImage() = delete("/recipe-steps/{id}") {
+        val id = getPathId()
+        val step = recipeStepService.getEntityById(id)
+        checkRecipeEditionRights(recipeService.getRecipeOwner(step.recipe!!.id).id)
+        imageService.deleteImage(RECIPE_STEPS_IMG_PATH, id, step.imageVersion)
+        // Back to zero, unlike every other bucket here, which bumps. Zero is the only way
+        // this column has of saying "no picture", and clients read it that way: a step draws
+        // a frame when the version is above zero and nothing at all when it is not. Leaving a
+        // version behind would leave every reader showing a frame for a file that is gone -
+        // filled, by the static handler's fallback, with the bucket's default picture, which
+        // is not this step's and is exactly what a step is meant never to show.
+        //
+        // What that costs: the next picture uploaded is v1 again, so a reader that cached the
+        // first one under that name keeps showing it until the entry is evicted. One stale
+        // thumbnail on one device, against a wrong picture on all of them.
+        step.clearImageVersion()
         call.respond(HttpStatusCode.OK)
     }
 

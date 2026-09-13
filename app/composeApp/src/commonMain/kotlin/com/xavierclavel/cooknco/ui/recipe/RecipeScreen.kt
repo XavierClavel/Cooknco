@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -81,6 +82,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.platform.rememberLinkSharer
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
+import com.xavierclavel.cooknco.ui.components.StepImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.cookbook.AddToCookbookSheet
 import com.xavierclavel.cooknco.ui.components.PdfExportHost
@@ -708,7 +710,7 @@ private fun LazyListScope.stepsTab(recipe: RecipeInfo, s: Strings) {
         }
     }
     itemsIndexed(recipe.steps) { index, step ->
-        StepRow(index = index, step = step.text, modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp))
+        StepRow(index = index, step = step, modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp))
     }
 }
 
@@ -826,7 +828,7 @@ private fun IngredientRow(
 }
 
 @Composable
-private fun StepRow(index: Int, step: String, modifier: Modifier = Modifier) {
+private fun StepRow(index: Int, step: RecipeStepInfo, modifier: Modifier = Modifier) {
     val s = strings()
     StickerCard(
         modifier = modifier.fillMaxWidth(),
@@ -842,13 +844,29 @@ private fun StepRow(index: Int, step: String, modifier: Modifier = Modifier) {
                 letterSpacing = 1.sp,
             )
             Text(
-                text = step,
+                text = step.text,
                 modifier = Modifier.padding(top = 6.dp),
                 fontSize = 15.sp,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight.Medium,
                 color = CookncoNavy,
             )
+            // Under the words rather than beside them: it illustrates what was just read,
+            // and a step without a picture keeps the card it has always had.
+            val imageId = step.id
+            if (imageId != null && step.imageVersion > 0) {
+                StepImage(
+                    stepId = imageId,
+                    version = step.imageVersion,
+                    contentDescription = s.recipeStepPhoto,
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .fillMaxWidth()
+                        .aspectRatio(4f / 3f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(2.dp, CookncoNavy, RoundedCornerShape(12.dp)),
+                )
+            }
         }
     }
 }

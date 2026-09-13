@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DocumentScanner
@@ -65,6 +66,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -93,6 +96,7 @@ import com.xavierclavel.cooknco.platform.rememberRecipeScanner
 import kotlinx.coroutines.delay
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.RecipeImage
+import com.xavierclavel.cooknco.ui.components.StepImage
 import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -1407,6 +1411,7 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
                         onIngredientAmountChange = { index, amount ->
                             viewModel.updateStepIngredientAmount(step.id, index, amount)
                         },
+                        onImagePicked = { viewModel.setStepImage(step.id, it) },
                         onAttach = { viewModel.attachToStep(step.id, it) },
                         onDetach = { viewModel.detachFromStep(step.id, it) },
                         onRemove = { viewModel.removeStep(step.id) },
@@ -1467,6 +1472,7 @@ private fun StepAttachments(
     onDurationChange: (Int?) -> Unit,
     onToggleIngredient: (Int) -> Unit,
     onIngredientAmountChange: (Int, String) -> Unit,
+    onImagePicked: (PickedImage) -> Unit,
     onAttach: (StepAttachment) -> Unit,
     onDetach: (StepAttachment) -> Unit,
     modifier: Modifier = Modifier,
@@ -1493,6 +1499,12 @@ private fun StepAttachments(
                     onAmountChange = onIngredientAmountChange,
                     onRemove = { onDetach(StepAttachment.INGREDIENTS) },
                 )
+
+                StepAttachment.PHOTO -> StepPhotoField(
+                    step = step,
+                    onPicked = onImagePicked,
+                    onRemove = { onDetach(StepAttachment.PHOTO) },
+                )
             }
         }
 
@@ -1506,6 +1518,7 @@ private fun StepAttachments(
                 onDismissRequest = { open = false },
                 items = available,
                 label = { it.label(s) },
+                iconOf = { it.icon() },
                 onSelect = {
                     open = false
                     onAttach(it)
@@ -1539,6 +1552,132 @@ private fun StepAttachments(
 private fun StepAttachment.label(s: Strings) = when (this) {
     StepAttachment.TIMER -> s.timerLabel
     StepAttachment.INGREDIENTS -> s.stepIngredientsLabel
+    StepAttachment.PHOTO -> s.stepPhotoLabel
+}
+
+/**
+ * And what it looks like there.
+ *
+ * The menu is a list of things to add rather than a list of words to read, and the three
+ * read alike at a glance without one - all short nouns in the same weight. The icon is what
+ * the eye lands on; the word confirms it.
+ */
+private fun StepAttachment.icon(): ImageVector = when (this) {
+    StepAttachment.TIMER -> Icons.Outlined.Timer
+    StepAttachment.INGREDIENTS -> Icons.Outlined.Checklist
+    StepAttachment.PHOTO -> Icons.Outlined.CameraAlt
+}
+
+/**
+ * A picture of what the step should come out looking like.
+ *
+ * Staged, not sent: a step that has never been saved has no row to post a picture against,
+ * so the bytes wait here and go up with the save - which is also why the line underneath
+ * says so. A step that already has one shows what is on the server until a new one is
+ * chosen, and choosing replaces it.
+ *
+ * The frame opens the camera roll, and the button in its corner opens the camera - the same
+ * two ways in as the recipe's own photograph, in the room a step card has for them.
+ */
+@Composable
+private fun StepPhotoField(
+    step: StepItem,
+    onPicked: (PickedImage) -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val s = strings()
+    val imagePicker = rememberImagePicker(onPicked = onPicked)
+    val cameraCapture = rememberCameraCapture(onPicked = onPicked)
+    val picked = step.pendingImage
+    val pickedBitmap = picked?.let { image ->
+        remember(image) { runCatching { image.bytes.decodeToImageBitmap() }.getOrNull() }
+    }
+
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = s.stepPhotoLabel,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoGreenDark,
+                letterSpacing = 1.2.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                modifier = Modifier.size(28.dp).clickable(onClick = onRemove),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = s.removeStepPhoto,
+                    tint = CookncoGreenDark,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(116.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(CookncoGreenLight)
+                .border(2.dp, CookncoNavy, RoundedCornerShape(12.dp))
+                .clickable { imagePicker.launch() },
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                pickedBitmap != null -> Image(
+                    bitmap = pickedBitmap,
+                    contentDescription = s.recipeStepPhoto,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                step.serverId != null && step.imageVersion > 0 -> StepImage(
+                    stepId = step.serverId,
+                    version = step.imageVersion,
+                    contentDescription = s.recipeStepPhoto,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                else -> Text(
+                    text = s.tapToAddPhoto,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = CookncoNavy.copy(alpha = 0.6f),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(CookncoWhite)
+                    .border(2.dp, CookncoNavy, CircleShape)
+                    .clickable { cameraCapture.launch() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.CameraAlt,
+                    contentDescription = s.takeAPhoto,
+                    tint = CookncoNavy,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+
+        if (picked != null) {
+            Text(
+                text = s.uploadedWhenYouSave,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = CookncoGreenDark,
+            )
+        }
+    }
 }
 
 /**
@@ -1766,6 +1905,7 @@ private fun StepEditCard(
     onDurationChange: (Int?) -> Unit,
     onToggleIngredient: (Int) -> Unit,
     onIngredientAmountChange: (Int, String) -> Unit,
+    onImagePicked: (PickedImage) -> Unit,
     onAttach: (StepAttachment) -> Unit,
     onDetach: (StepAttachment) -> Unit,
     onRemove: () -> Unit,
@@ -1801,6 +1941,7 @@ private fun StepEditCard(
                     onDurationChange = onDurationChange,
                     onToggleIngredient = onToggleIngredient,
                     onIngredientAmountChange = onIngredientAmountChange,
+                    onImagePicked = onImagePicked,
                     onAttach = onAttach,
                     onDetach = onDetach,
                     modifier = Modifier.padding(top = 8.dp),

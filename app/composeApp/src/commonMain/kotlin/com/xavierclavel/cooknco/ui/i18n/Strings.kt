@@ -392,6 +392,9 @@ interface Strings {
     val removeStepIngredients: String
     val noIngredientsToPickYet: String
     val removeStepTimer: String
+    val stepPhotoLabel: String
+    val removeStepPhoto: String
+    val recipeStepPhoto: String
     val minutesShort: String
     val start: String
     val pause: String

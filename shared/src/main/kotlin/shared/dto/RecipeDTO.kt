@@ -41,6 +41,30 @@ data class RecipeDTO (
     @Serializable
     data class RecipeStepDTO (
         val text: String = "",
+        /**
+         * The step's own id, or null for one that has just been written.
+         *
+         * A step used to have no identity a client could name, so a save could only delete
+         * every row and insert the list again. That was inherited from when steps were an
+         * `@ElementCollection` of strings, which has no row identity by design — and it
+         * outlived the reason: once anything points *at* a step, rewriting its row every time
+         * the recipe is touched is a foreign key waiting to be tripped, and anything hung off
+         * the row by id — a picture, say — is orphaned by an edit to the title.
+         *
+         * Sent back as it was received. An id belonging to another recipe, or to a step that
+         * has since gone, is treated as a new step rather than refused: it can only come from
+         * a client working from a stale copy, and losing the id costs an insert where the cook
+         * expected an edit, while honouring it would let one recipe write over another's step.
+         */
+        val id: Long? = null,
+        /**
+         * Which version of this step's picture to ask for, or 0 when it has none.
+         *
+         * Read-only, like every other image version in the product: a picture is uploaded to
+         * its own endpoint rather than carried through a recipe save, and the number moves
+         * when it does.
+         */
+        val imageVersion: Long = 0,
         val durationSeconds: Int? = null,
         /**
          * Which of the recipe's own ingredients this step uses, and how much of each.

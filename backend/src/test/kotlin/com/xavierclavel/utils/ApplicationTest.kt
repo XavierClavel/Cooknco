@@ -30,6 +30,7 @@ import com.xavierclavel.services.PdfTemplateService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
+import com.xavierclavel.services.RecipeStepService
 import com.xavierclavel.services.StorageService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Configuration
@@ -111,6 +112,7 @@ abstract class ApplicationTest: KoinTest {
                 single { CookbookService() }
                 single { DashboardService() }
                 single { RecipeIngredientService() }
+                single { RecipeStepService() }
                 single { FollowService() }
                 single { RecipeNotesService() }
                 single { ModerationService() }

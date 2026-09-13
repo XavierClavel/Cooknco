@@ -18,6 +18,24 @@ import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 
 @Composable
+fun StepImage(
+    stepId: Long,
+    version: Long,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    // No thumbnail and no placeholder: a step picture is drawn at one size, and a step
+    // without one shows nothing rather than a stand-in for something that was never there.
+    // Callers check [RecipeStepInfo.imageVersion] before asking for it.
+    AsyncImage(
+        model = "${ApiClient.IMAGE_URL}/recipe-steps/$stepId-v$version.webp",
+        contentDescription = contentDescription,
+        contentScale = ContentScale.Crop,
+        modifier = modifier,
+    )
+}
+
+@Composable
 fun RecipeImage(
     recipeId: Long,
     version: Long,

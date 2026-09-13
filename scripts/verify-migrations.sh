@@ -13,11 +13,23 @@ cleanup() { docker rm -f $CT >/dev/null 2>&1 || true; }
 cleanup
 
 docker run -d --name $CT -e POSTGRES_PASSWORD=test -e POSTGRES_DB=verify -p $PORT:5432 postgres:17.2 >/dev/null
-# Waited for inside the container, not out here. The host's sleep is not always available -
-# some shells this is run from block it - and without it the loop spins through its sixty
-# turns in milliseconds and psql then talks to a server that has not finished starting. The
-# error it gives blames a missing socket, which reads like Docker is broken rather than like
-# a race.
+# Two waits, and both are needed. The image starts a *temporary* server to run its init
+# scripts, on the same socket the real one will use, and then stops it - so pg_isready on its
+# own can answer yes to the server that is about to go away, leaving psql talking to a socket
+# that no longer exists. The error that gives blames a missing socket, which reads like Docker
+# is broken rather than like a race. So: wait for the entrypoint to say init is done, and only
+# then wait for the server that starts after it.
+#
+# Every sleep happens inside the container. The host's is not always available - some shells
+# this is run from block it - and without one a loop spins through its sixty turns in
+# milliseconds and waits for nothing at all.
+ready=
+for i in $(seq 1 60); do
+  if docker logs $CT 2>&1 | grep -q 'init process complete'; then ready=1; break; fi
+  docker exec $CT sleep 1 >/dev/null 2>&1 || true
+done
+if [ -z "$ready" ]; then echo "postgres did not finish initialising"; exit 1; fi
+
 if ! docker exec $CT bash -c 'for i in $(seq 1 60); do pg_isready -U postgres -d verify >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1'; then
   echo "postgres did not come up"; exit 1
 fi
@@ -156,6 +168,10 @@ begin
   -- the column did not exist before 1.48, so nothing may arrive with a timer already set
   select count(*) into n from recipe_steps where duration_seconds is not null;
   if n <> 0 then raise exception '% migrated steps came out with a duration', n; end if;
+
+  -- 1.50: every step that predates step pictures has none, and says so with a zero
+  select count(*) into n from recipe_steps where image_version <> 0;
+  if n <> 0 then raise exception '% migrated steps came out with a picture', n; end if;
 
   -- the old table is left standing on purpose: until its drop migration, this is undoable
   select count(*) into n from recipes_steps;
