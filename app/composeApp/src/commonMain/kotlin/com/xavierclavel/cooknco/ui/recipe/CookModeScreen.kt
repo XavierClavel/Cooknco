@@ -290,6 +290,7 @@ private fun CookModeContent(
                             stepIngredients.forEachIndexed { position, (used, ingredient) ->
                                 StepIngredientRow(
                                     ingredient = ingredient,
+                                    // Already resolved by the view model.
                                     amount = used.amount,
                                     servings = servings,
                                     recipeYield = recipe.yield ?: 1,

@@ -131,48 +131,13 @@ class Recipe (
         this.imageVersion = 0
     }.update()
 
-    /**
-     * What a step's ingredient works out to when it names no amount, by ingredient position.
-     *
-     * A blank means "unspecified", not "all of it", and what it is worth depends on what the
-     * recipe's *other* steps say about the same ingredient — which is why this is computed
-     * here, over every step at once, rather than by a step that can only see its own links.
-     *
-     * One blank is the remainder: the line's amount less whatever the other steps spelled
-     * out. With nothing spelled out that is the whole line, which is why a single step using
-     * an ingredient needs no number typed; with 60 g of the 100 g named elsewhere it is 40 g,
-     * without anyone having to do the subtraction.
-     *
-     * Two or more blanks share a remainder that nothing says how to divide, so they are worth
-     * no number at all and a null is returned for them. Guessing an even split would be
-     * inventing a measurement, and refusing would make "butter in these two steps, roughly"
-     * unsayable — which is a normal thing for a recipe to mean.
-     */
-    private fun blankStepAmounts(): Map<Int, Float?> {
-        val links = steps.flatMap { it.ingredientLinks }
-        if (links.isEmpty()) return emptyMap()
-        val listed = ingredients.associate { it.sortOrder to it.amount }
-
-        return links.groupBy { it.ingredient?.sortOrder }
-            .mapNotNull { (position, forIngredient) ->
-                if (position == null) return@mapNotNull null
-                if (forIngredient.count { it.amount == null } != 1) return@mapNotNull position to null
-                val total = listed[position] ?: return@mapNotNull position to null
-                val spelledOut = forIngredient.mapNotNull { it.amount }.sum()
-                position to (total - spelledOut).takeIf { it > 0f }
-            }
-            .toMap()
-    }
-
     fun toInfo(locale: Locale) = RecipeInfo(
         id = this.id,
         version = this.imageVersion,
         title = title,
         description = description,
         dishClass = dishClass,
-        steps = blankStepAmounts().let { blanks ->
-            steps.sortedBy { it.sortOrder }.map { it.toDto(blanks) }
-        },
+        steps = steps.sortedBy { it.sortOrder }.map { it.toDto() },
         ingredients = ingredients.sortedBy { it.sortOrder }.map { it.toInfo(locale) },
 
         owner = this.owner!!.toOverview(),

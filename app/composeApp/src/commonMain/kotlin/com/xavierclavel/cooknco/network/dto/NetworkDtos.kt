@@ -113,10 +113,12 @@ data class RecipeStepInfo(
  * ingredient row has no identity to point at, because a save replaces the whole list. The
  * server resolves positions to rows and back, so this is all a client ever deals in.
  *
- * [amount] is in the ingredient's own unit, for the recipe's own yield — scaling it for a
- * different number of portions is the reader's job, the same as for the ingredient list.
- * Null means the server had nothing to work it out from: two steps sharing an ingredient
- * with no amounts spelled out between them are worth no number each, so none is shown.
+ * [amount] is what the author said, in the ingredient's own unit, and null when they said
+ * nothing — which is most of the time. It is stored and returned exactly as given, so an
+ * editor prefilled from it keeps a blank blank.
+ *
+ * What a blank comes to is worked out where it is shown, from the whole recipe: see
+ * `RecipeInfo.blankStepAmounts`.
  */
 @Serializable
 data class RecipeStepIngredientInfo(

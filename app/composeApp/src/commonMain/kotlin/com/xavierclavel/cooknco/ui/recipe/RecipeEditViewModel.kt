@@ -217,9 +217,9 @@ class RecipeEditViewModel(
                                     ingredients = step.ingredients.map { used ->
                                         StepIngredientDraft(
                                             index = used.index,
-                                            // What the server worked out is shown as a number
-                                            // to edit. Blank stays blank, so a step that never
-                                            // said how much still does not.
+                                            // What the author said, not what it works out to.
+                                            // Prefilling from the worked-out value would write
+                                            // it back on the next save and freeze the blank.
                                             amount = used.amount?.let { formatAmount(it) }.orEmpty(),
                                         )
                                     },

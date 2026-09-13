@@ -86,8 +86,8 @@ class RecipeIngredientService: KoinComponent {
      * Refuses the two things a recipe's steps can say about an ingredient that cannot be true.
      *
      * A blank means "unspecified", not "all of it", so most of what looks like a disagreement
-     * is only a gap, and a gap is worked out on the way out rather than rejected here — see
-     * `Recipe.blankStepAmounts`. What is left is:
+     * is only a gap, and a gap is worked out by whoever displays the recipe rather than
+     * rejected here. What is left is:
      *
      * - **spelling out more than the line has.** 60 g and 60 g of a 100 g line is wrong
      *   whatever the blanks say, and with one blank it would leave a negative remainder.

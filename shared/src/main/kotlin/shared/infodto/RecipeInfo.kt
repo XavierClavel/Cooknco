@@ -36,16 +36,16 @@ data class RecipeInfo (
     /**
      * Whether the server stored what it was sent.
      *
-     * Steps are compared on what a client *states* — the words, the timer, and which
-     * ingredients the step uses — and not on the amounts of those ingredients, because an
-     * amount is not always something the client stated. A step that names an ingredient
-     * without a number is saying "unspecified", and the reply works out what that comes to
-     * from what the recipe's other steps spelled out (`Recipe.blankStepAmounts`). Comparing
-     * it would be asserting that the server failed to do its job.
+     * Steps are compared field by field rather than by equality on the list, because a step's
+     * ingredients come back in the recipe's order whatever order they were sent in, and a
+     * position naming no ingredient is dropped rather than refused.
      */
     fun compareToDTO(dto: RecipeDTO): Boolean {
-        fun RecipeDTO.RecipeStepDTO.stated() =
-            Triple(text, durationSeconds, ingredients.map { it.index }.sorted())
+        fun RecipeDTO.RecipeStepDTO.stated() = Triple(
+            text,
+            durationSeconds,
+            ingredients.map { it.index to it.amount }.sortedBy { it.first },
+        )
 
         return title == dto.title &&
                 description == dto.description &&

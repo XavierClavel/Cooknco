@@ -186,8 +186,12 @@ class CookModeViewModel(
     fun stepIngredients(state: CookModeUiState): List<Pair<RecipeStepIngredientInfo, RecipeIngredientInfo>> {
         val recipe = state.recipe ?: return emptyList()
         val step = recipe.steps.getOrNull(state.currentStep) ?: return emptyList()
+        // Blanks resolved here, over the whole recipe - see [RecipeInfo.blankStepAmounts].
+        val blanks = recipe.blankStepAmounts()
         return step.ingredients.mapNotNull { used ->
-            recipe.ingredients.getOrNull(used.index)?.let { used to it }
+            recipe.ingredients.getOrNull(used.index)?.let {
+                used.copy(amount = used.amount ?: blanks[used.index]) to it
+            }
         }
     }
 
