@@ -1,5 +1,7 @@
 package main.com.xavierclavel.controllertests
 
+import com.xavierclavel.utils.stepsOf
+import com.xavierclavel.utils.texts
 import com.xavierclavel.ApplicationTest
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -331,7 +333,7 @@ class McpControllerTest : ApplicationTest() {
                 RecipeDTO(
                     title = "Ratatouille",
                     description = "Slowly",
-                    steps = mutableListOf("cut", "cook"),
+                    steps = stepsOf("cut", "cook"),
                     ingredients = mutableListOf(
                         RecipeDTO.RecipeIngredientDTO(id = ingredientId, amount = 2f, unit = AmountUnit.UNIT),
                         RecipeDTO.RecipeIngredientDTO(customName = "thyme", complement = "a sprig"),
@@ -345,7 +347,10 @@ class McpControllerTest : ApplicationTest() {
                 buildJsonObject { put("recipe_id", recipe.id) },
             )
             assertEquals("Ratatouille", result["title"]!!.jsonPrimitive.content)
-            assertEquals(listOf("cut", "cook"), result["steps"]!!.jsonArray.map { it.jsonPrimitive.content })
+            assertEquals(
+                listOf("cut", "cook"),
+                result["steps"]!!.jsonArray.map { it.jsonObject["text"]!!.jsonPrimitive.content },
+            )
             val ingredients = result["ingredients"]!!.jsonArray.map { it.jsonObject }
             assertEquals(listOf("aubergine", "thyme"), ingredients.map { it["name"]!!.jsonPrimitive.content })
             assertEquals(2f, ingredients.first()["amount"]!!.jsonPrimitive.float)
@@ -479,8 +484,10 @@ class McpControllerTest : ApplicationTest() {
                     put("dish_class", "ENTREE")
                     put("yield", 4)
                     putJsonArray("steps") {
-                        add("chop")
-                        add("simmer")
+                        add(buildJsonObject { put("text", "chop") })
+                        // Minutes in, seconds out — and the second step says its own time,
+                        // which the server reads when nothing is declared.
+                        add(buildJsonObject { put("text", "simmer 20 min") })
                     }
                     putJsonArray("ingredients") {
                         add(
@@ -509,7 +516,9 @@ class McpControllerTest : ApplicationTest() {
             assertEquals("Tomato soup", persisted.title)
             assertEquals(DishClass.ENTREE, persisted.dishClass)
             assertEquals(4, persisted.yield)
-            assertEquals(listOf("chop", "simmer"), persisted.steps)
+            assertEquals(listOf("chop", "simmer 20 min"), persisted.steps.texts())
+            // The duration was never given, only written: 20 min parsed out of the wording.
+            assertEquals(listOf(null, 20 * 60), persisted.steps.map { it.durationSeconds })
             assertEquals(listOf("tomato", "basil"), persisted.ingredients.map { it.name })
             assertEquals(500f, persisted.ingredients.first().amount)
             assertEquals(AmountUnit.GRAM, persisted.ingredients.first().unit)
@@ -548,7 +557,7 @@ class McpControllerTest : ApplicationTest() {
                 title = "Ratatouille",
                 description = "Slowly",
                 yield = 4,
-                steps = mutableListOf("cut", "cook"),
+                steps = stepsOf("cut", "cook"),
                 tips = "Serve warm",
                 ingredients = mutableListOf(RecipeDTO.RecipeIngredientDTO(customName = "thyme")),
             ),
@@ -568,7 +577,7 @@ class McpControllerTest : ApplicationTest() {
         // Everything the caller did not mention survived the edit, which a PUT would have blanked.
         assertEquals("Slowly", updated.description)
         assertEquals(4, updated.yield)
-        assertEquals(listOf("cut", "cook"), updated.steps)
+        assertEquals(listOf("cut", "cook"), updated.steps.texts())
         assertEquals("Serve warm", updated.tips)
         assertEquals(listOf("thyme"), updated.ingredients.map { it.name })
     }
@@ -579,7 +588,7 @@ class McpControllerTest : ApplicationTest() {
         val recipe = client.createRecipe(
             RecipeDTO(
                 title = "Ratatouille",
-                steps = mutableListOf("cut", "cook"),
+                steps = stepsOf("cut", "cook"),
                 ingredients = mutableListOf(
                     RecipeDTO.RecipeIngredientDTO(customName = "thyme"),
                     RecipeDTO.RecipeIngredientDTO(customName = "aubergine"),
@@ -592,13 +601,13 @@ class McpControllerTest : ApplicationTest() {
             "update_recipe",
             buildJsonObject {
                 put("recipe_id", recipe.id)
-                putJsonArray("steps") { add("cut") }
+                putJsonArray("steps") { add(buildJsonObject { put("text", "cut") }) }
                 putJsonArray("ingredients") { add(buildJsonObject { put("custom_name", "courgette") }) }
             },
         )
 
         val updated = client.getRecipe(recipe.id)
-        assertEquals(listOf("cut"), updated.steps)
+        assertEquals(listOf("cut"), updated.steps.texts())
         assertEquals(listOf("courgette"), updated.ingredients.map { it.name })
     }
 

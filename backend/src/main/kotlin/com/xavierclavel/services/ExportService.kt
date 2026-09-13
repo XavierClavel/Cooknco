@@ -119,7 +119,11 @@ class ExportService: KoinComponent {
 
             PdfVariable.HAS_STEPS to recipe.steps.isNotEmpty(),
             PdfVariable.STEPS to recipe.steps.mapIndexed { index, step ->
-                mapOf("index" to index + 1, "text" to step)
+                // The step's duration is deliberately not offered to the layout. A printed
+                // sheet has no timer to start, the wording already says how long it takes,
+                // and a value a layout may name has to be declared in
+                // PdfDocumentKind.RECIPE.variables as well as here.
+                mapOf("index" to index + 1, "text" to step.text)
             },
 
             PdfVariable.TIPS to recipe.tips,

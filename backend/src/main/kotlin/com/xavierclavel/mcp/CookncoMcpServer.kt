@@ -32,6 +32,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.koin.java.KoinJavaComponent.inject
+import shared.utils.StepDurations
 import shared.RecipeFilter
 import shared.dto.RecipeDTO
 import shared.enums.AmountUnit
@@ -387,6 +388,18 @@ object CookncoMcpServer {
         "complement" to stringArg("A note on this line, such as 'finely chopped'."),
     )
 
+    /**
+     * A step is an object rather than a string because it can carry a timer, and a model
+     * that only has prose to give still gets it right: `duration_minutes` is optional, and
+     * a step that mentions its own time in the text ("laisser reposer 30 mn") has it read
+     * out server-side, exactly as the editors do.
+     */
+    private val stepRowArg = objectArg(
+        "One step. Give text; duration_minutes only when the step is a wait worth timing.",
+        "text" to stringArg("What to do at this step."),
+        "duration_minutes" to intArg("How long this step takes, when it is worth a timer. Omit otherwise."),
+    )
+
     private val recipeFields = arrayOf(
         "title" to stringArg("Title of the recipe."),
         "description" to stringArg("Short description of the dish."),
@@ -396,7 +409,7 @@ object CookncoMcpServer {
         "cooking_time" to intArg("Cooking time in minutes."),
         "cooking_temperature" to intArg("Oven temperature in degrees Celsius."),
         "ingredients" to arrayArg("The ingredient lines, in the order they should be read.", ingredientRowArg),
-        "steps" to arrayArg("The steps, in order. One entry per step.", stringArg("One step.")),
+        "steps" to arrayArg("The steps, in order. One entry per step.", stepRowArg),
         "tips" to stringArg("Closing tips or variations."),
     )
 
@@ -705,8 +718,21 @@ object CookncoMcpServer {
             cookingTime = optionalInt("cooking_time") ?: current?.cookingTime,
             cookingTemperature = optionalInt("cooking_temperature") ?: current?.cookingTemperature,
             ingredients = ingredients?.toMutableList() ?: mutableListOf(),
-            steps = (optionalStringList("steps") ?: current?.steps)?.toMutableList() ?: mutableListOf(),
+            steps = (optionalObjectList("steps")?.map { it.toStepRow() } ?: current?.steps)
+                ?.toMutableList() ?: mutableListOf(),
             tips = optionalString("tips") ?: current?.tips ?: "",
+        )
+    }
+
+    private fun JsonObject.toStepRow(): RecipeDTO.RecipeStepDTO {
+        val text = optionalString("text").orEmpty()
+        return RecipeDTO.RecipeStepDTO(
+            text = text,
+            // Minutes on the way in because that is how a recipe talks, seconds on the way
+            // through because that is what counts down. Falling back to the text's own
+            // wording means a model that just writes steps still produces working timers.
+            durationSeconds = optionalInt("duration_minutes")?.takeIf { it > 0 }?.times(60)
+                ?: StepDurations.parseSeconds(text),
         )
     }
 

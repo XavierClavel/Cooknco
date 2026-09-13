@@ -64,6 +64,20 @@ insert into custom_ingredients (id, recipe_id, amount, unit, name) values
   (2, 1, 30, 2, 'candied ginger'),
   (3, 2, null, 0, '');          -- blank name: must not be carried over
 
+-- Steps, as the old element collection held them: a recipes_id and a value, and no column
+-- saying which comes first. 1.48 has to reconstruct the order from physical row order, so
+-- these go in one INSERT at a time -- a single multi-row VALUES would also work, but one
+-- statement per row is the only way to be unambiguous about what order they were written in.
+--
+-- Deliberately neither alphabetical nor grouped by recipe: alphabetical would be
+-- 'Bake,Melt,Rest' for recipe 1, so a backfill that sorted by text instead of position would
+-- pass unnoticed, and interleaving the two recipes is what proves the partitioning.
+insert into recipes_steps (recipes_id, value) values (1, 'Melt the butter');
+insert into recipes_steps (recipes_id, value) values (2, 'Boil water');
+insert into recipes_steps (recipes_id, value) values (1, 'Rest the dough 30 mn');
+insert into recipes_steps (recipes_id, value) values (2, 'Add salt');
+insert into recipes_steps (recipes_id, value) values (1, 'Bake each side');
+
 select setval(pg_get_serial_sequence('recipe_ingredients','id'), 100);
 SQL
 
@@ -77,6 +91,9 @@ echo
 echo "== recipe_ingredients after migration =="
 psql -c "select recipe_id, ingredient_id, custom_name, amount, unit, complement, sort_order
          from recipe_ingredients order by recipe_id, sort_order;"
+
+echo "== recipe_steps after migration =="
+psql -c "select recipe_id, sort_order, text, duration_seconds from recipe_steps order by recipe_id, sort_order;"
 
 echo "== ingredients after migration =="
 psql -c "select id, grams_per_unit, grams_per_milliliter, measurable_by_weight, default_unit from ingredients order by id;"
@@ -113,6 +130,32 @@ begin
   select count(*) into n from ingredients
    where id = 2 and grams_per_unit is null and grams_per_milliliter = 1.03 and measurable_by_weight;
   if n <> 1 then raise exception 'milk conversions not backfilled'; end if;
+
+  -- 1.48: the steps became a table of their own, and kept the order they were written in.
+  select string_agg(text, '|' order by sort_order) into s from recipe_steps where recipe_id = 1;
+  if s <> 'Melt the butter|Rest the dough 30 mn|Bake each side' then
+    raise exception 'step order lost for recipe 1: %', s;
+  end if;
+  select string_agg(text, '|' order by sort_order) into s from recipe_steps where recipe_id = 2;
+  if s <> 'Boil water|Add salt' then raise exception 'step order lost for recipe 2: %', s; end if;
+
+  -- every step carried over, none invented
+  select count(*) into n from recipe_steps;
+  if n <> 5 then raise exception 'expected 5 steps, got %', n; end if;
+
+  -- sort_order is per recipe, zero-based and gapless
+  select string_agg(sort_order::text, ',' order by sort_order) into s from recipe_steps where recipe_id = 1;
+  if s <> '0,1,2' then raise exception 'recipe 1 sort_order is %', s; end if;
+  select string_agg(sort_order::text, ',' order by sort_order) into s from recipe_steps where recipe_id = 2;
+  if s <> '0,1' then raise exception 'recipe 2 sort_order is %', s; end if;
+
+  -- the column did not exist before 1.48, so nothing may arrive with a timer already set
+  select count(*) into n from recipe_steps where duration_seconds is not null;
+  if n <> 0 then raise exception '% migrated steps came out with a duration', n; end if;
+
+  -- the old table is left standing on purpose: until its drop migration, this is undoable
+  select count(*) into n from recipes_steps;
+  if n <> 5 then raise exception 'the old steps were destroyed: % rows left', n; end if;
 
   raise notice 'ALL ASSERTIONS PASSED';
 end $$;
