@@ -84,8 +84,12 @@ object RecipeController: Controller(RECIPE_URL) {
         val recipeDto = call.receive<RecipeDTO>()
         // Validated before the recipe is inserted, so a rejected ingredient leaves nothing behind.
         val ingredients = recipeIngredientService.validateIngredients(recipeDto)
+        recipeIngredientService.validateStepIngredients(recipeDto)
         val recipe = recipeService.createRecipe(recipeDto, user)
         recipeIngredientService.replaceRecipeIngredients(recipe.id, ingredients)
+        // Last, because it is the only point at which both the steps and the ingredients
+        // exist as rows able to point at each other.
+        recipeIngredientService.linkStepIngredients(recipe.id, recipeDto.steps)
         val recipeInfo = recipeService.getRawById(recipe.id, getSessionUserId(), Locale.EN)
         logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) created by user ${user.username}"}
         // After the ingredients, so the recipe a follower is sent to is a finished one.
@@ -99,8 +103,20 @@ object RecipeController: Controller(RECIPE_URL) {
         val recipe = recipeService.getRawById(recipeId, getSessionUserId(), Locale.EN)
         checkRecipeEditionRights(recipe.owner.id)
         val recipeDto = call.receive<RecipeDTO>()
-        recipeIngredientService.updateRecipeIngredients(recipe.id, recipeDto)
-        val recipeInfo = recipeService.updateRecipe(recipeId, recipeDto)
+        // Validated before anything is written, as on create: a rejected ingredient must not
+        // leave a half-edited recipe behind.
+        val ingredients = recipeIngredientService.validateIngredients(recipeDto)
+        recipeIngredientService.validateStepIngredients(recipeDto)
+        // Steps before ingredients, and not the other way round. Replacing the steps takes
+        // their ingredient links with them, which is what frees the ingredient rows to be
+        // deleted - recipe_step_ingredients is ON DELETE RESTRICT at both ends, and the
+        // ingredients are cleared with a bulk query-bean delete that cascades nothing. The
+        // old order also linked the steps that were about to be replaced, so every link was
+        // written and then immediately thrown away.
+        recipeService.updateRecipe(recipeId, recipeDto)
+        recipeIngredientService.replaceRecipeIngredients(recipeId, ingredients)
+        recipeIngredientService.linkStepIngredients(recipeId, recipeDto.steps)
+        val recipeInfo = recipeService.getRawById(recipeId, getSessionUserId(), Locale.EN)
         logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) edited by user ${recipe.owner.username}"}
         call.respond(HttpStatusCode.OK, recipeInfo)
     }

@@ -42,6 +42,37 @@ data class RecipeDTO (
     data class RecipeStepDTO (
         val text: String = "",
         val durationSeconds: Int? = null,
+        /**
+         * Which of the recipe's own ingredients this step uses, and how much of each.
+         *
+         * Empty for most steps: a step that says nothing about ingredients is the normal case.
+         */
+        val ingredients: List<RecipeStepIngredientDTO> = emptyList(),
+    )
+
+    /**
+     * One of the recipe's ingredients, used by one step.
+     *
+     * [index] is a position in [RecipeDTO.ingredients], not an id: on the way *in* an
+     * ingredient row has no identity to point at, because a save replaces the whole list —
+     * the rows a client sends have not been given ids yet and the ones they replace are about
+     * to lose theirs. The position is the only thing both sides can agree on inside one
+     * request. The server turns them into rows once both lists exist and back into positions
+     * on the way out, so a client never sees the join table.
+     *
+     * [amount] is in the ingredient's own unit — there is no unit of its own, because "200 g
+     * of the 500 g of flour" is the only sensible reading and a step measuring the same
+     * ingredient in a different unit would be a conversion nobody asked for.
+     *
+     * Null means *all of it*, which is what one step using an ingredient means and is why
+     * attaching an ingredient to a single step needs no number typed. Split it across two
+     * steps and the amounts stop adding up, which is refused rather than rounded: see
+     * `RecipeIngredientService.validateStepIngredients`.
+     */
+    @Serializable
+    data class RecipeStepIngredientDTO (
+        val index: Int,
+        val amount: Float? = null,
     )
 
     @Serializable

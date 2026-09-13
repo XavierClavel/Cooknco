@@ -307,9 +307,14 @@ const queryList = ref([])
 const CUSTOM_NAME_MAX_LENGTH = 50
 
 /**
- * A blank step. A step written here has no timer, and this page offers no way to give it one.
+ * A blank step.
+ *
+ * Text and nothing else: a step written here has no timer and uses no ingredients, and this
+ * page offers no way to give it either. Naming the absent fields would be this page claiming
+ * to know what a step is made of, which is the thing it should stop doing - see where the
+ * steps are loaded.
  */
-const newStep = () => ({ text: '', durationSeconds: null })
+const newStep = () => ({ text: '' })
 
 const recipe = ref<object>({
   title: "",
@@ -429,10 +434,11 @@ async function submit() {
     amount: item.unit == null || item.unit.value == "NONE" ? null : item.amount,
     unit: item.unit ? item.unit.value : "NONE",
     complement: item.complement}))
-  // The timer goes back exactly as it came. See where the steps are loaded.
+  // Everything the step arrived with goes back, with only the text - the one thing this page
+  // edits - taken from the form. See where the steps are loaded.
   submitted.steps = submitted.steps
     .filter((it) => it && it.text)
-    .map((it) => ({ text: it.text, durationSeconds: it.durationSeconds ?? null }))
+    .map(({ text, ...rest }) => ({ ...rest, text }))
   delete submitted['version']
   console.log(submitted)
   errorMessage.value = null
@@ -474,12 +480,14 @@ loadUnits().then(function () {
       recipe.value.title = response.data.title
       recipe.value.description = response.data.description
       recipe.value.dishClass = response.data.dishClass
-      // durationSeconds is carried even though nothing here shows it. A step's timer is set
-      // in the app, and editing a recipe from the web must not be what silently clears it.
-      recipe.value.steps = response.data.steps.map((step) => ({
-        text: step.text,
-        durationSeconds: step.durationSeconds ?? null,
-      }))
+      // Every field of a step is kept, not just the ones this page knows about.
+      //
+      // A step carries more than its words - a timer, the ingredients it uses, whatever comes
+      // next - and none of it is edited here. Listing the fields to keep meant this page had
+      // to be changed each time one was added, and forgetting to would not break a build: it
+      // would quietly drop the field on the next save from the browser. Spreading keeps them
+      // by default, so the failure mode of doing nothing is that a new field survives.
+      recipe.value.steps = response.data.steps.map((step) => ({ ...step }))
       recipe.value.ingredients = response.data.ingredients.map(item => ({
         ingredient: {
           id: item.id,

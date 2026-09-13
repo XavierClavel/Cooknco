@@ -91,6 +91,9 @@ enum class BadRequestCause (val key: String) {
     CUSTOM_INGREDIENT_NAME_TOO_LONG("custom_ingredient_name_too_long"),
     UNIT_NOT_ALLOWED_FOR_INGREDIENT("unit_not_allowed_for_ingredient"),
     INVALID_AMOUNT("invalid_amount"),
+    // The amounts a recipe's steps claim of an ingredient do not add up to the amount the
+    // recipe lists for it. See RecipeIngredientService.validateStepIngredients.
+    STEP_AMOUNTS_DO_NOT_ADD_UP("step_amounts_do_not_add_up"),
     INVALID_CONVERSION_FACTOR("invalid_conversion_factor"),
 
     INVALID_MAIL_ADDRESS("invalid_mail_address"),

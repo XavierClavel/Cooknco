@@ -5,6 +5,7 @@ import com.xavierclavel.models.jointables.query.QCookbookUser
 import com.xavierclavel.models.jointables.query.QFollow
 import com.xavierclavel.models.jointables.query.QLike
 import com.xavierclavel.models.jointables.query.QRecipeIngredient
+import com.xavierclavel.models.jointables.query.QRecipeStepIngredient
 import com.xavierclavel.models.query.QAppVersion
 import com.xavierclavel.models.query.QCookbook
 import com.xavierclavel.models.query.QDevice
@@ -51,6 +52,10 @@ object DatabaseManager {
         // (User.oauthGrants) so they would go with it regardless; listed here so the
         // wipe does not rest on that
         QOAuthGrant(),
+        // Before both tables it points at: a step's ingredient links restrict deletes at
+        // either end, and nothing else clears them — a recipe's own delete is soft, so its
+        // steps and their links outlive it
+        QRecipeStepIngredient(),
         QRecipe(),
         QRecipeIngredient(),
         QUser(),

@@ -517,6 +517,240 @@ class RecipeControllerTest : ApplicationTest() {
         assertEquals(listOf(600, null, 1800), reloaded.steps.map { it.durationSeconds })
     }
 
+    private fun butter(amount: Float? = 100f) =
+        RecipeDTO.RecipeIngredientDTO(customName = "butter", unit = AmountUnit.GRAM, amount = amount)
+
+    private fun used(index: Int, amount: Float? = null) =
+        RecipeDTO.RecipeStepIngredientDTO(index = index, amount = amount)
+
+    /**
+     * A step names the ingredients it uses by position, and how much of each it takes.
+     *
+     * The butter is split across two steps, which is the case the whole shape exists for: a
+     * link that can carry a number, rather than a set that can only say "this one too".
+     */
+    @Test
+    fun `a step keeps the ingredients and amounts it was given`() = runTestAsAdmin {
+        val created = client.createRecipe(
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(
+                    butter(),
+                    RecipeDTO.RecipeIngredientDTO(customName = "flour", unit = AmountUnit.GRAM, amount = 200f),
+                    RecipeDTO.RecipeIngredientDTO(customName = "salt", unit = AmountUnit.NONE),
+                ),
+                steps = mutableListOf(
+                    RecipeDTO.RecipeStepDTO("Melt most of the butter", ingredients = listOf(used(0, 60f))),
+                    RecipeDTO.RecipeStepDTO("Add the flour and salt", ingredients = listOf(used(1), used(2))),
+                    RecipeDTO.RecipeStepDTO("Brush with the rest", ingredients = listOf(used(0, 40f))),
+                    RecipeDTO.RecipeStepDTO("Bake"),
+                ),
+            )
+        )
+
+        val expected = listOf(
+            listOf(0 to 60f),
+            // The flour is a single blank of a 200 g line, so it works out to all of it; the
+            // salt has no amount to work anything out from.
+            listOf(1 to 200f, 2 to null),
+            listOf(0 to 40f),
+            emptyList(),
+        )
+        fun RecipeInfo.shape() = steps.map { step -> step.ingredients.map { it.index to it.amount } }
+        assertEquals(expected, created.shape())
+        // Read back rather than trusted from the write's reply: the links have to be on disk.
+        assertEquals(expected, client.getRecipe(created.id).shape())
+    }
+
+    /**
+     * What a blank is worth depends on what the recipe's other steps said about the same
+     * ingredient, so these four cases are the whole of the rule.
+     */
+    @Test
+    fun `a blank step amount is worked out from what the other steps spell out`() = runTestAsAdmin {
+        suspend fun shapeOf(steps: List<RecipeDTO.RecipeStepDTO>) =
+            client.createRecipe(
+                RecipeDTO(title = "My recipe", ingredients = mutableListOf(butter()), steps = steps.toMutableList())
+            ).steps.map { step -> step.ingredients.map { it.amount } }
+
+        // One blank, nothing else spelled out: the whole line.
+        assertEquals(
+            listOf(listOf(100f)),
+            shapeOf(listOf(RecipeDTO.RecipeStepDTO("Melt it", ingredients = listOf(used(0))))),
+        )
+
+        // One blank beside an amount: the remainder, without anyone subtracting.
+        assertEquals(
+            listOf(listOf(60f), listOf(40f)),
+            shapeOf(
+                listOf(
+                    RecipeDTO.RecipeStepDTO("Melt most", ingredients = listOf(used(0, 60f))),
+                    RecipeDTO.RecipeStepDTO("Brush with the rest", ingredients = listOf(used(0))),
+                )
+            ),
+        )
+
+        // Two blanks: a remainder nothing says how to divide, so no number is shown at all.
+        assertEquals(
+            listOf(listOf(null), listOf(null)),
+            shapeOf(
+                listOf(
+                    RecipeDTO.RecipeStepDTO("Melt some", ingredients = listOf(used(0))),
+                    RecipeDTO.RecipeStepDTO("Brush with some", ingredients = listOf(used(0))),
+                )
+            ),
+        )
+
+        // Two blanks beside an amount: the amount stands, the blanks stay blank.
+        assertEquals(
+            listOf(listOf(30f), listOf(null), listOf(null)),
+            shapeOf(
+                listOf(
+                    RecipeDTO.RecipeStepDTO("Melt 30", ingredients = listOf(used(0, 30f))),
+                    RecipeDTO.RecipeStepDTO("Some here", ingredients = listOf(used(0))),
+                    RecipeDTO.RecipeStepDTO("Some there", ingredients = listOf(used(0))),
+                )
+            ),
+        )
+    }
+
+    /**
+     * Only what cannot be true is refused: spending more than the line has, or spelling every
+     * share out and still missing the total. A gap is not a disagreement.
+     */
+    @Test
+    fun `step amounts that cannot be true are refused`() = runTestAsAdmin {
+        // Overspent: 60 + 60 of 100.
+        client.createRecipeRaw(
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(butter()),
+                steps = mutableListOf(
+                    RecipeDTO.RecipeStepDTO("Melt some", ingredients = listOf(used(0, 60f))),
+                    RecipeDTO.RecipeStepDTO("Brush with some", ingredients = listOf(used(0, 60f))),
+                ),
+            )
+        ).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+
+        // Short with no blank to absorb it: 30 + 30 of 100.
+        client.createRecipeRaw(
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(butter()),
+                steps = mutableListOf(
+                    RecipeDTO.RecipeStepDTO("Melt some", ingredients = listOf(used(0, 30f))),
+                    RecipeDTO.RecipeStepDTO("Brush with some", ingredients = listOf(used(0, 30f))),
+                ),
+            )
+        ).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+
+        // But short *with* a blank is only a gap, and the blank absorbs it.
+        val ok = client.createRecipe(
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(butter()),
+                steps = mutableListOf(
+                    RecipeDTO.RecipeStepDTO("Melt some", ingredients = listOf(used(0, 30f))),
+                    RecipeDTO.RecipeStepDTO("The rest", ingredients = listOf(used(0))),
+                ),
+            )
+        )
+        assertEquals(listOf(listOf(30f), listOf(70f)), ok.steps.map { step -> step.ingredients.map { it.amount } })
+    }
+
+    /** "Salt, to taste" has no amount to divide, so a step cannot claim a share of it. */
+    @Test
+    fun `a step cannot put a number on an ingredient that has none`() = runTestAsAdmin {
+        client.createRecipeRaw(
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(
+                    RecipeDTO.RecipeIngredientDTO(customName = "salt", unit = AmountUnit.NONE),
+                ),
+                steps = mutableListOf(RecipeDTO.RecipeStepDTO("Season", ingredients = listOf(used(0, 5f)))),
+            )
+        ).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+    }
+
+    /** A rejected split leaves nothing behind, like a rejected ingredient. */
+    @Test
+    fun `a recipe rejected for its step amounts is not created`() = runTestAsAdmin {
+        val user = client.getMe()
+        val before = client.listRecipes(user = user.id).size
+        client.createRecipeRaw(
+            RecipeDTO(
+                title = "Nope",
+                ingredients = mutableListOf(butter()),
+                steps = mutableListOf(
+                    RecipeDTO.RecipeStepDTO("a", ingredients = listOf(used(0, 80f))),
+                    RecipeDTO.RecipeStepDTO("b", ingredients = listOf(used(0, 80f))),
+                ),
+            )
+        ).apply { assertEquals(HttpStatusCode.BadRequest, status) }
+        assertEquals(before, client.listRecipes(user = user.id).size)
+    }
+
+    /**
+     * The one that would break.
+     *
+     * A save replaces both lists, and `recipe_step_ingredients` restricts deletes at both
+     * ends: an ingredient row a step still points at cannot go until that step has. This
+     * asserts the write order holds - steps first, then ingredients, then the links.
+     */
+    @Test
+    fun `a recipe whose steps use ingredients can have both replaced`() = runTestAsAdmin {
+        val created = client.createRecipe(
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(
+                    butter(),
+                    RecipeDTO.RecipeIngredientDTO(customName = "flour", unit = AmountUnit.GRAM, amount = 200f),
+                ),
+                steps = mutableListOf(
+                    RecipeDTO.RecipeStepDTO("Melt the butter", ingredients = listOf(used(0))),
+                    RecipeDTO.RecipeStepDTO("Add the flour", ingredients = listOf(used(1))),
+                ),
+            )
+        )
+
+        val updated = client.updateRecipe(
+            created.id,
+            RecipeDTO(
+                title = "My recipe",
+                // Shorter, so every row the old links pointed at is deleted.
+                ingredients = mutableListOf(
+                    RecipeDTO.RecipeIngredientDTO(customName = "sugar", unit = AmountUnit.GRAM, amount = 50f),
+                ),
+                steps = mutableListOf(RecipeDTO.RecipeStepDTO("Stir the sugar", ingredients = listOf(used(0)))),
+            )
+        )
+
+        assertEquals(listOf("Stir the sugar"), updated.steps.texts())
+        assertEquals(listOf(listOf(0)), updated.steps.map { step -> step.ingredients.map { it.index } })
+        assertEquals(listOf("sugar"), updated.ingredients.map { it.name })
+    }
+
+    /**
+     * A position with no ingredient behind it is dropped rather than failing the save.
+     *
+     * Not through `client.createRecipe`: that helper asserts the reply matches the DTO it was
+     * given (`RecipeInfo.compareToDTO`), and dropping the dead position is precisely the
+     * server declining to echo what it was sent.
+     */
+    @Test
+    fun `a step pointing past the ingredient list simply loses the link`() = runTestAsAdmin {
+        val response = client.createRecipeRaw(
+            RecipeDTO(
+                title = "My recipe",
+                ingredients = mutableListOf(butter()),
+                steps = mutableListOf(RecipeDTO.RecipeStepDTO("Melt it", ingredients = listOf(used(0), used(7)))),
+            )
+        )
+        assertEquals(HttpStatusCode.Created, response.status)
+        val created = Json.decodeFromString<RecipeInfo>(response.bodyAsText())
+        assertEquals(listOf(listOf(0)), created.steps.map { step -> step.ingredients.map { it.index } })
+    }
+
     /**
      * A zero is not a timer that has run out, it is a step without one, and the server says
      * so even though no client of ours sends one — all three normalise it first.

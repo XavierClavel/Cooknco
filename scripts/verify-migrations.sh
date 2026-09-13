@@ -13,10 +13,14 @@ cleanup() { docker rm -f $CT >/dev/null 2>&1 || true; }
 cleanup
 
 docker run -d --name $CT -e POSTGRES_PASSWORD=test -e POSTGRES_DB=verify -p $PORT:5432 postgres:17.2 >/dev/null
-for i in $(seq 1 60); do
-  docker exec $CT pg_isready -U postgres -d verify >/dev/null 2>&1 && break
-  sleep 1
-done
+# Waited for inside the container, not out here. The host's sleep is not always available -
+# some shells this is run from block it - and without it the loop spins through its sixty
+# turns in milliseconds and psql then talks to a server that has not finished starting. The
+# error it gives blames a missing socket, which reads like Docker is broken rather than like
+# a race.
+if ! docker exec $CT bash -c 'for i in $(seq 1 60); do pg_isready -U postgres -d verify >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1'; then
+  echo "postgres did not come up"; exit 1
+fi
 
 psql() { docker exec -i $CT psql -v ON_ERROR_STOP=1 -U postgres -d verify "$@"; }
 
