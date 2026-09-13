@@ -1,6 +1,7 @@
 package main.com.xavierclavel.utils
 
 import com.xavierclavel.utils.logger
+import com.xavierclavel.utils.stepsOf
 import shared.dto.RecipeDTO
 import shared.enums.DishClass
 import shared.enums.Sort
@@ -26,10 +27,7 @@ import kotlin.test.assertTrue
 val recipeDTO = RecipeDTO(
     title = "My recipe",
     description = "My description",
-    steps = mutableListOf(
-        "cut",
-        "cook"
-    )
+    steps = stepsOf("cut", "cook")
 )
 
 suspend fun HttpClient.createRecipeRaw(recipe: RecipeDTO = recipeDTO) =

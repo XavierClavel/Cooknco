@@ -16,7 +16,7 @@ data class RecipeDTO (
     val cookingTemperature: Int? = null,
 
     val ingredients: MutableList<RecipeIngredientDTO> = mutableListOf(),
-    val steps: MutableList<String> = mutableListOf(),
+    val steps: MutableList<RecipeStepDTO> = mutableListOf(),
 
     val tips: String = "",
 ) {
@@ -24,6 +24,26 @@ data class RecipeDTO (
      * A recipe ingredient is either a reference to the ingredients table (id) or free text
      * entered by the user (customName). Exactly one of the two is set.
      */
+    /**
+     * One step, and how long it takes.
+     *
+     * [durationSeconds] is nullable and means "this step has no timer" rather than "zero" —
+     * most steps do not have one, and a zero would be a timer that has already finished. It
+     * is what cook mode counts down, so it is stored in seconds even though the editors
+     * offer minutes: the durations are read out of the step's own wording ("laisser reposer
+     * 30 mn"), and that parse has always produced seconds.
+     *
+     * The same type carries a step in both directions — into [RecipeDTO] and back out in
+     * `RecipeInfo` — because a step is the same thing on the way in and on the way out,
+     * unlike an ingredient, whose input is a reference and whose output is a resolved name.
+     * It is also what lets `RecipeInfo.compareToDTO` stay a plain equality check.
+     */
+    @Serializable
+    data class RecipeStepDTO (
+        val text: String = "",
+        val durationSeconds: Int? = null,
+    )
+
     @Serializable
     data class RecipeIngredientDTO (
         val id: Long? = null,

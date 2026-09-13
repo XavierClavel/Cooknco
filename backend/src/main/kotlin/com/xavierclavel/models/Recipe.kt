@@ -10,7 +10,6 @@ import shared.infodto.AdminRecipeInfo
 import shared.infodto.RecipeInfo
 import shared.overviewdto.RecipeOverview
 import jakarta.persistence.CascadeType
-import jakarta.persistence.ElementCollection
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
@@ -57,8 +56,8 @@ class Recipe (
     var cookingTemperature: Int? = null,
 
 
-    @ElementCollection
-    var steps: List<String> = listOf(),
+    @OneToMany(fetch = FetchType.EAGER, cascade = [CascadeType.ALL], orphanRemoval = true)
+    var steps: List<RecipeStep> = listOf(),
 
     @OneToMany(fetch = FetchType.EAGER, cascade = [CascadeType.ALL], orphanRemoval = true)
     var ingredients: List<RecipeIngredient> = listOf(),
@@ -107,7 +106,9 @@ class Recipe (
         this.description = recipeDTO.description
         this.dishClass = recipeDTO.dishClass
 
-        this.steps = recipeDTO.steps
+        // Position is carried by the row now rather than by the order it happened to be
+        // written in, so the index the author put the step at is what is stored.
+        this.steps = recipeDTO.steps.mapIndexed { index, step -> RecipeStep.of(step, index) }
         this.modificationDate = LocalDateTime.now()
 
         this.yield = recipeDTO.yield
@@ -136,7 +137,7 @@ class Recipe (
         title = title,
         description = description,
         dishClass = dishClass,
-        steps = steps,
+        steps = steps.sortedBy { it.sortOrder }.map { it.toDto() },
         ingredients = ingredients.sortedBy { it.sortOrder }.map { it.toInfo(locale) },
 
         owner = this.owner!!.toOverview(),

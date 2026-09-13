@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="recipe_steps" identityType="identity" pkName="pk_recipe_steps">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="recipe_id" type="bigint" references="recipes.id" foreignKeyName="fk_recipe_steps_recipe_id" foreignKeyIndex="ix_recipe_steps_recipe_id"/>
+            <column name="text" type="varchar(255)" notnull="true"/>
+            <column name="duration_seconds" type="integer"/>
+            <column name="sort_order" type="integer" defaultValue="0" notnull="true"/>
+        </createTable>
+        <alterForeignKey name="fk_recipes_steps_recipes_id" columnNames="DROP FOREIGN KEY" indexName="ix_recipes_steps_recipes_id" tableName="recipes_steps"/>
+    </changeSet>
+    <changeSet type="pendingDrops">
+        <dropTable name="recipes_steps"/>
+    </changeSet>
+</migration>

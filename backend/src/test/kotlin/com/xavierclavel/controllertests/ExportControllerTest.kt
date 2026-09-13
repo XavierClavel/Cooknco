@@ -1,5 +1,6 @@
 package main.com.xavierclavel.controllertests
 
+import com.xavierclavel.utils.stepsOf
 import com.xavierclavel.ApplicationTest
 import io.ktor.client.request.get
 import io.ktor.http.ContentType
@@ -37,7 +38,7 @@ class ExportControllerTest : ApplicationTest() {
             RecipeDTO.RecipeIngredientDTO(customName = "salt", unit = AmountUnit.TEASPOON, amount = 1f),
             RecipeDTO.RecipeIngredientDTO(customName = "eggs", unit = AmountUnit.UNIT, amount = 3f, complement = "beaten"),
         ),
-        steps = mutableListOf("Mix everything", "Bake it"),
+        steps = stepsOf("Mix everything", "Bake it"),
         tips = "Serve warm",
     )
 

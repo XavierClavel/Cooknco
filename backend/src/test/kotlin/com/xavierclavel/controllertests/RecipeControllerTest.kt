@@ -1,5 +1,7 @@
 package main.com.xavierclavel.controllertests
 
+import com.xavierclavel.utils.stepsOf
+import com.xavierclavel.utils.texts
 import com.xavierclavel.ApplicationTest
 import com.xavierclavel.utils.logger
 import shared.dto.IngredientDTO
@@ -15,6 +17,8 @@ import io.ktor.client.request.header
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.client.statement.bodyAsText
+import kotlinx.serialization.json.Json
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import com.xavierclavel.services.RecipeService
@@ -48,7 +52,7 @@ class RecipeControllerTest : ApplicationTest() {
     val recipeDTO = RecipeDTO(
         title = "My recipe",
         description = "My description",
-        steps = mutableListOf(
+        steps = stepsOf(
             "cut",
             "cook"
         )
@@ -468,12 +472,71 @@ class RecipeControllerTest : ApplicationTest() {
             )
         val recipeDto = RecipeDTO(
             title = "My recipe",
-            steps = steps.toMutableList()
+            steps = stepsOf(steps)
         )
         val response = client.createRecipe(recipeDto)
         client.assertRecipeExists(response.id)
         assertEquals(2, response.steps.size)
-        assertEquals(steps, response.steps.toSet())
+        assertEquals(steps, response.steps.texts().toSet())
+    }
+
+    /**
+     * The two things the steps gained when they stopped being an element collection: an
+     * order that is stored rather than inferred from the order rows happened to be written
+     * in, and a duration per step.
+     *
+     * Asserted as lists, not sets. Every other test here compares sets, which is what let the
+     * old element collection's lack of a sort column go unnoticed for as long as it did.
+     */
+    @Test
+    fun `steps keep their order and their timers across a save`() = runTestAsAdmin {
+        val written = mutableListOf(
+            RecipeDTO.RecipeStepDTO("Melt the butter"),
+            RecipeDTO.RecipeStepDTO("Rest the dough", durationSeconds = 1800),
+            RecipeDTO.RecipeStepDTO("Bake each side", durationSeconds = 300),
+        )
+
+        val created = client.createRecipe(RecipeDTO(title = "My recipe", steps = written))
+        assertEquals(written.map { it.text }, created.steps.texts())
+        assertEquals(listOf(null, 1800, 300), created.steps.map { it.durationSeconds })
+
+        // Reordered and re-timed: the reply has to follow the list it was given, not the
+        // order the rows were first written in.
+        val rewritten = mutableListOf(
+            RecipeDTO.RecipeStepDTO("Bake each side", durationSeconds = 600),
+            RecipeDTO.RecipeStepDTO("Melt the butter"),
+            RecipeDTO.RecipeStepDTO("Rest the dough", durationSeconds = 1800),
+        )
+        val updated = client.updateRecipe(created.id, RecipeDTO(title = "My recipe", steps = rewritten))
+        assertEquals(rewritten.map { it.text }, updated.steps.texts())
+        assertEquals(listOf(600, null, 1800), updated.steps.map { it.durationSeconds })
+
+        // Read back rather than trusted from the write's reply: the order has to be on disk.
+        val reloaded = client.getRecipe(created.id)
+        assertEquals(rewritten.map { it.text }, reloaded.steps.texts())
+        assertEquals(listOf(600, null, 1800), reloaded.steps.map { it.durationSeconds })
+    }
+
+    /**
+     * A zero is not a timer that has run out, it is a step without one, and the server says
+     * so even though no client of ours sends one — all three normalise it first.
+     *
+     * Deliberately not through `client.createRecipe`: that helper asserts the reply matches
+     * the DTO it was given (`RecipeInfo.compareToDTO`), and this is the one field the server
+     * is *meant* not to echo back unchanged.
+     */
+    @Test
+    fun `a step timer of zero is stored as no timer`() = runTestAsAdmin {
+        val response = client.createRecipeRaw(
+            RecipeDTO(
+                title = "My recipe",
+                steps = mutableListOf(RecipeDTO.RecipeStepDTO("Stir", durationSeconds = 0)),
+            )
+        )
+        assertEquals(HttpStatusCode.Created, response.status)
+        val created = Json.decodeFromString<RecipeInfo>(response.bodyAsText())
+        assertEquals(listOf("Stir"), created.steps.texts())
+        assertEquals(listOf(null), created.steps.map { it.durationSeconds })
     }
 
     @Test
@@ -484,7 +547,7 @@ class RecipeControllerTest : ApplicationTest() {
         )
         val recipeDto = RecipeDTO(
             title = "My recipe",
-            steps = steps1.toMutableList()
+            steps = stepsOf(steps1)
         )
 
         val steps2 = setOf(
@@ -494,14 +557,14 @@ class RecipeControllerTest : ApplicationTest() {
         )
         val recipeDto2 = RecipeDTO(
             title = "My recipe",
-            steps = steps2.toMutableList()
+            steps = stepsOf(steps2)
         )
 
         val response = client.createRecipe(recipeDto)
-        assertEquals(steps1, response.steps.toSet())
+        assertEquals(steps1, response.steps.texts().toSet())
 
         val response2 = client.updateRecipe(response.id, recipeDto2)
-        assertEquals(steps2, response2.steps.toSet())
+        assertEquals(steps2, response2.steps.texts().toSet())
     }
 
 
@@ -519,7 +582,7 @@ class RecipeControllerTest : ApplicationTest() {
         val recipeDTO2 = RecipeDTO(
             title = "My better recipe",
             description = "My new description",
-            steps = mutableListOf(
+            steps = stepsOf(
                 "slice",
                 "cool",
             )
@@ -559,21 +622,21 @@ class RecipeControllerTest : ApplicationTest() {
         val recipe = client.createRecipe(
             RecipeDTO(
                 title = "My recipe",
-                steps = mutableListOf("cut", "cook"),
+                steps = stepsOf("cut", "cook"),
                 ingredients = mutableListOf(
                     RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = AmountUnit.GRAM, amount = 1f),
                 ),
             )
         )
         assertEquals(1, countRows("recipe_ingredients", recipe.id), "the recipe should have started with an ingredient")
-        assertEquals(2, countRows("recipes_steps", recipe.id), "and with its two steps")
+        assertEquals(2, countRows("recipe_steps", recipe.id), "and with its two steps")
 
         client.deleteRecipe(recipe.id)
 
         client.assertRecipeDoesNotExist(recipe.id)
         assertEquals(1, countRows("recipes", recipe.id), "the recipe row should still be there")
         assertEquals(1, countRows("recipe_ingredients", recipe.id), "its ingredient should still be there")
-        assertEquals(2, countRows("recipes_steps", recipe.id), "and so should its steps")
+        assertEquals(2, countRows("recipe_steps", recipe.id), "and so should its steps")
     }
 
     /** And putting the flag back brings the recipe back, whole. */
@@ -593,16 +656,12 @@ class RecipeControllerTest : ApplicationTest() {
     /**
      * Counts rows a soft delete must not have removed — raw SQL, since Ebean hides them.
      *
-     * The column differs per table because Ebean names them differently: an element
-     * collection is keyed by `<table>_id` (`recipes_steps.recipes_id`) and a join table by
-     * the association (`recipe_ingredients.recipe_id`).
+     * Every child of a recipe is keyed by the association now (`recipe_id`); the steps
+     * joined them in 1.48, when they stopped being an element collection keyed by
+     * `recipes_steps.recipes_id` and became a table of their own.
      */
     private fun countRows(table: String, recipeId: Long): Int {
-        val column = when (table) {
-            "recipes" -> "id"
-            "recipes_steps" -> "recipes_id"
-            else -> "recipe_id"
-        }
+        val column = if (table == "recipes") "id" else "recipe_id"
         return DB.sqlQuery("select count(*) as c from $table where $column = :id")
             .setParameter("id", recipeId)
             .findOne()

@@ -217,7 +217,7 @@
             >mdi-drag</v-icon>
 
             <v-text-field
-              v-model="recipe.steps[index]"
+              v-model="recipe.steps[index].text"
               :label="`${$t('step')} ${index + 1}`"
               :id="`step_${index}`"
               :rules="[max255]"
@@ -306,10 +306,15 @@ const queryList = ref([])
 // Mirrors the column width the backend enforces.
 const CUSTOM_NAME_MAX_LENGTH = 50
 
+/**
+ * A blank step. A step written here has no timer, and this page offers no way to give it one.
+ */
+const newStep = () => ({ text: '', durationSeconds: null })
+
 const recipe = ref<object>({
   title: "",
   description: "",
-  steps: [''],
+  steps: [newStep()],
   dishClass: "MAIN_DISH",
   ingredients: [],
   tips: "",
@@ -377,8 +382,7 @@ const getDefaultUnit = (ingredient) => {
 
 // Function to add a new item
 const addStep = () => {
-  console.log(recipe.value)
-  recipe.value.steps.push('');
+  recipe.value.steps.push(newStep());
 };
 
 const addIngredient = () => {
@@ -388,9 +392,7 @@ const addIngredient = () => {
 }
 
 async function deleteStepAt(index) {
-  console.log("called")
-  console.log(recipe.value.steps[index])
-  if (recipe.value.steps[index]) {
+  if (recipe.value.steps[index]?.text) {
     return
   }
   recipe.value.steps.splice(index, 1);
@@ -399,7 +401,7 @@ async function deleteStepAt(index) {
 }
 
 async function addStepAt(index) {
-  recipe.value.steps.splice(index+1, 0, "");
+  recipe.value.steps.splice(index + 1, 0, newStep());
   await nextTick()
   document.getElementById(`step_${index + 1}`).focus()
 }
@@ -427,7 +429,10 @@ async function submit() {
     amount: item.unit == null || item.unit.value == "NONE" ? null : item.amount,
     unit: item.unit ? item.unit.value : "NONE",
     complement: item.complement}))
-  submitted.steps = submitted.steps.filter((it) => it)
+  // The timer goes back exactly as it came. See where the steps are loaded.
+  submitted.steps = submitted.steps
+    .filter((it) => it && it.text)
+    .map((it) => ({ text: it.text, durationSeconds: it.durationSeconds ?? null }))
   delete submitted['version']
   console.log(submitted)
   errorMessage.value = null
@@ -469,7 +474,12 @@ loadUnits().then(function () {
       recipe.value.title = response.data.title
       recipe.value.description = response.data.description
       recipe.value.dishClass = response.data.dishClass
-      recipe.value.steps = response.data.steps
+      // durationSeconds is carried even though nothing here shows it. A step's timer is set
+      // in the app, and editing a recipe from the web must not be what silently clears it.
+      recipe.value.steps = response.data.steps.map((step) => ({
+        text: step.text,
+        durationSeconds: step.durationSeconds ?? null,
+      }))
       recipe.value.ingredients = response.data.ingredients.map(item => ({
         ingredient: {
           id: item.id,

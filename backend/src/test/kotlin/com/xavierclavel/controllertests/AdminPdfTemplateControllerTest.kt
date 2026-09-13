@@ -1,5 +1,6 @@
 package main.com.xavierclavel.controllertests
 
+import com.xavierclavel.utils.stepsOf
 import com.xavierclavel.ApplicationTest
 import com.xavierclavel.models.query.QPdfTemplate
 import io.ktor.client.request.delete
@@ -48,7 +49,7 @@ class AdminPdfTemplateControllerTest : ApplicationTest() {
         ingredients = mutableListOf(
             RecipeDTO.RecipeIngredientDTO(customName = "flour", unit = AmountUnit.GRAM, amount = 250f),
         ),
-        steps = mutableListOf("Mix everything"),
+        steps = stepsOf("Mix everything"),
     )
 
     /** Deliberately nothing like the packaged one, so a sheet printed from it is unmistakable. */
