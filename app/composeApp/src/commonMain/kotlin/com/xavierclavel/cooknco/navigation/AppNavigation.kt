@@ -60,7 +60,7 @@ private object Routes {
     const val RECIPE = "recipe/{recipeId}"
     const val RECIPE_EDIT = "recipe/{recipeId}/edit"
     const val RECIPE_CREATE = "recipe/create"
-    const val RECIPE_COOK_MODE = "recipe/{recipeId}/cook"
+    const val RECIPE_COOK_MODE = "recipe/{recipeId}/cook?servings={servings}"
     const val COOKBOOK = "cookbook/{cookbookId}"
     const val COOKBOOK_EDIT = "cookbook/{cookbookId}/edit"
     const val COOKBOOK_CREATE = "cookbook/create"
@@ -189,7 +189,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateToEdit = { id -> navController.navigate("recipe/$id/edit") },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
-                onNavigateToCookMode = { id -> navController.navigate("recipe/$id/cook") },
+                onNavigateToCookMode = { id, servings -> navController.navigate("recipe/$id/cook?servings=$servings") },
                 onNavigateToIngredient = { id -> navController.navigate("ingredient/$id") },
                 viewModel = recipeViewModel,
             )
@@ -239,11 +239,19 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
 
         composable(
             route = Routes.RECIPE_COOK_MODE,
-            arguments = listOf(navArgument("recipeId") { type = NavType.LongType }),
+            arguments = listOf(
+                navArgument("recipeId") { type = NavType.LongType },
+                // Optional: the timer's notification opens cook mode too, and it knows
+                // nothing about how many portions are being cooked. Zero means the recipe's
+                // own yield.
+                navArgument("servings") { type = NavType.IntType; defaultValue = 0 },
+            ),
         ) { backStackEntry ->
             val recipeId = backStackEntry.arguments?.read { getLongOrNull("recipeId") } ?: return@composable
+            val servings = backStackEntry.arguments?.read { getIntOrNull("servings") } ?: 0
             CookModeScreen(
                 recipeId = recipeId,
+                servings = servings,
                 onNavigateBack = { navController.popBackStack() },
             )
         }

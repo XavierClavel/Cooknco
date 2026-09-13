@@ -102,6 +102,26 @@ data class RecipeInfo(
 data class RecipeStepInfo(
     val text: String = "",
     val durationSeconds: Int? = null,
+    /** The recipe's own ingredients this step uses. Empty for most steps. */
+    val ingredients: List<RecipeStepIngredientInfo> = emptyList(),
+)
+
+/**
+ * One of the recipe's ingredients, used by one step.
+ *
+ * [index] is a position in `RecipeInfo.ingredients`, not an id — on the way *in* an
+ * ingredient row has no identity to point at, because a save replaces the whole list. The
+ * server resolves positions to rows and back, so this is all a client ever deals in.
+ *
+ * [amount] is in the ingredient's own unit, for the recipe's own yield — scaling it for a
+ * different number of portions is the reader's job, the same as for the ingredient list.
+ * Null means the server had nothing to work it out from: two steps sharing an ingredient
+ * with no amounts spelled out between them are worth no number each, so none is shown.
+ */
+@Serializable
+data class RecipeStepIngredientInfo(
+    val index: Int,
+    val amount: Float? = null,
 )
 
 @Serializable

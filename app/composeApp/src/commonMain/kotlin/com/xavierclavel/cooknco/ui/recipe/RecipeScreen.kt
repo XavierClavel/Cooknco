@@ -124,13 +124,6 @@ import org.jetbrains.compose.resources.painterResource
 private fun unitLabel(unit: String, s: Strings): String =
     if (unit == "NONE" || unit == "UNIT") "" else s.unitName(unit)
 
-private fun scaleAmount(amount: Float?, selectedYield: Int, recipeYield: Int): String {
-    if (amount == null) return ""
-    val scaled = amount * selectedYield.toFloat() / recipeYield.toFloat()
-    return if (scaled == scaled.roundToInt().toFloat()) scaled.roundToInt().toString()
-    else ((scaled * 100).roundToInt() / 100f).toString().trimEnd('0').trimEnd('.')
-}
-
 /**
  * "published 22 March", for the owner-actions sheet.
  *
@@ -154,7 +147,8 @@ fun RecipeScreen(
     onNavigateToEdit: (Long) -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateToUser: (Long) -> Unit = {},
-    onNavigateToCookMode: (Long) -> Unit = {},
+    /** The recipe, and the portions the cook has dialled in for it. */
+    onNavigateToCookMode: (Long, Int) -> Unit = { _, _ -> },
     onNavigateToIngredient: (Long) -> Unit = {},
     viewModel: RecipeViewModel,
     modifier: Modifier = Modifier,
@@ -196,7 +190,7 @@ fun RecipeScreen(
                 onCancelNoteEdit = viewModel::cancelNoteEdit,
                 onNavigateToUser = onNavigateToUser,
                 onNavigateBack = onNavigateBack,
-                onStartCooking = { onNavigateToCookMode(recipe.id) },
+                onStartCooking = { onNavigateToCookMode(recipe.id, uiState.selectedYield) },
                 onNavigateToIngredient = onNavigateToIngredient,
             )
         }
