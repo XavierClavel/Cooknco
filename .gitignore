@@ -36,8 +36,20 @@ out/
 .vscode/
 
 ### Custom ###
+# The compose stack reads /.env at the repository root -- POSTGRES_PASSWORD,
+# REDIS_PASSWORD and AES_KEY are in it. /backend/.env below is where it used to
+# live; the rule outlived the file and the root one was matched by nothing, so a
+# `git add .` staged every credential the stack has.
+/.env
+!/.env.example
 /backend/.env
 /backend/src/main/resources/application.yaml
+
+### Mounted secrets (the real files behind /secrets in the compose stack) ###
+# db.properties carries the database URL, user and password; application.properties
+# the backend's own. Production keeps both in the cooknco-config Secret, and
+# letsencrypt/ holds issued certificates and their private keys.
+/secrets/
 
 ### Firebase credentials (push notifications) ###
 # The service account key can send a notification to every install of the app.
@@ -54,6 +66,12 @@ out/
 /k8s/migration/backup-*/
 /k8s/migration/.last-backup
 /k8s/migration/.migration-plan
+/k8s/migration/.migration-plan.*
 
 # Kotlin compiler scratch (session locks, error logs) - regenerated every build
 .kotlin/
+
+### Capacitor Android build output ###
+# `npx cap add/sync android` regenerates the whole tree, local.properties included,
+# and it carries a copy of the built frontend bundle with it.
+/frontend/android/
