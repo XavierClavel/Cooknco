@@ -28,6 +28,16 @@ data class EditMember(
     val showDropdown: Boolean = false,
 )
 
+/**
+ * The accounts already on the cookbook, ignoring the row at [index] — which is the row
+ * being filled in, and is allowed to keep whoever it already holds.
+ *
+ * A row nobody has picked yet carries [EditMember.userId] 0, which is not an account and
+ * would otherwise block every empty row after the first.
+ */
+internal fun CookbookEditUiState.memberIdsExcept(index: Int): Set<Long> =
+    members.filterIndexed { i, _ -> i != index }.map { it.userId }.filter { it != 0L }.toSet()
+
 data class CookbookEditUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -142,9 +152,13 @@ class CookbookEditViewModel(
                         _uiState.update { state ->
                             val list = state.members.toMutableList()
                             if (index < list.size) {
+                                // Somebody already on the cookbook is not on offer: the
+                                // server keeps one row per member, so picking them twice
+                                // silently loses whichever role was set first
+                                val offered = result.items.filterNot { it.id in state.memberIdsExcept(index) }
                                 list[index] = list[index].copy(
-                                    searchResults = result.items,
-                                    showDropdown = result.items.isNotEmpty(),
+                                    searchResults = offered,
+                                    showDropdown = offered.isNotEmpty(),
                                 )
                             }
                             state.copy(members = list)
@@ -165,6 +179,13 @@ class CookbookEditViewModel(
     fun selectMember(index: Int, user: UserSummary) {
         _uiState.update { state ->
             val list = state.members.toMutableList()
+            // Checked again as it is spent, not only as it is offered: the results in front
+            // of the user were filtered against the rows as they stood when the search came
+            // back, and another row may have taken this account since
+            if (user.id in state.memberIdsExcept(index)) {
+                if (index < list.size) list[index] = list[index].copy(showDropdown = false)
+                return@update state.copy(members = list)
+            }
             if (index < list.size) {
                 list[index] = list[index].copy(
                     userId = user.id,

@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,7 +59,6 @@ import com.xavierclavel.cooknco.ui.components.CookbookImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.strings
-import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenDark
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
@@ -67,6 +67,7 @@ import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoOrangeDark
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerDashedButton
 import com.xavierclavel.cooknco.ui.theme.StickerDropdownMenu
 import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 import com.xavierclavel.cooknco.ui.theme.StickerPill
@@ -281,21 +282,6 @@ fun CookbookEditScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     FieldLabel(s.membersCaps, modifier = Modifier.weight(1f), color = CookncoNavy)
-                    StickerPill(
-                        onClick = viewModel::addMember,
-                        height = 44.dp,
-                        fillColor = CookncoGold,
-                        shadowOffset = 3.dp,
-                    ) {
-                        Icon(Icons.Outlined.Add, contentDescription = null, tint = CookncoNavy, modifier = Modifier.size(16.dp))
-                        Text(
-                            text = s.addMember,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CookncoNavy,
-                            modifier = Modifier.padding(start = 4.dp),
-                        )
-                    }
                 }
             }
             uiState.members.forEachIndexed { index, member ->
@@ -309,6 +295,18 @@ fun CookbookEditScreen(
                         onRemove = { viewModel.removeMember(index) },
                     )
                 }
+            }
+            item {
+                // Below the members rather than beside the heading: the row it adds appears
+                // at the end of the list, and a button sitting above the list looked like it
+                // had done nothing at all when the new row landed off-screen. Same control
+                // as "+ New cookbook" and "+ Add step", which is what it does here too.
+                StickerDashedButton(
+                    text = s.addMember,
+                    onClick = viewModel::addMember,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
 
             // ── Error ─────────────────────────────────────────────────────────
@@ -407,45 +405,68 @@ private fun MemberEditRow(
                     modifier = Modifier.size(40.dp).clip(CircleShape),
                 )
 
-                StickerDropdownMenu(
-                    expanded = member.showDropdown,
-                    onDismissRequest = onDismiss,
-                    items = member.searchResults,
-                    label = { it.username },
-                    onSelect = onSelect,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    // The white 44dp field the "Cookbook — edit" artboard draws a member's
-                    // name in — it is the search box until a member has been picked, and it
-                    // keeps its own look once one has.
-                    var focused by remember { mutableStateOf(false) }
-                    val borderColor by animateColorAsState(
-                        targetValue = if (focused) CookncoOrange else CookncoNavy,
-                        animationSpec = stickerSwitchSpec(),
-                        label = "member_field_border",
+                // A row is a search box until it holds somebody, and a member afterwards —
+                // two different things, so they are drawn as two different things rather
+                // than as one field that stops taking input.
+                //
+                // A username is not a field on this cookbook: typing over a chosen one
+                // renamed nobody and unpicked nobody, it only re-ran the search while the
+                // row went on holding the original account, so the field could read "sam"
+                // and save aya. Locking the same white box was no clearer — it still looked
+                // exactly like somewhere to type. A picked member therefore reads the way a
+                // member reads everywhere else in the product (`CookbookScreen`): the avatar
+                // already beside it and the name as plain text, no surface, nothing to tap.
+                // Changing who a row is means removing it, which is what the bin is for.
+                if (member.userId != 0L) {
+                    Text(
+                        text = member.username,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = CookncoNavy,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
                     )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 44.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(CookncoWhite)
-                            .border(2.dp, borderColor, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp),
-                        contentAlignment = Alignment.CenterStart,
+                } else {
+                    StickerDropdownMenu(
+                        expanded = member.showDropdown,
+                        onDismissRequest = onDismiss,
+                        items = member.searchResults,
+                        label = { it.username },
+                        onSelect = onSelect,
+                        modifier = Modifier.weight(1f),
                     ) {
-                        val textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy)
-                        if (member.searchQuery.isEmpty()) {
-                            Text(s.searchAMember, style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.35f)))
-                        }
-                        BasicTextField(
-                            value = member.searchQuery,
-                            onValueChange = onQueryChange,
-                            singleLine = true,
-                            textStyle = textStyle,
-                            cursorBrush = SolidColor(CookncoOrange),
-                            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+                        // The white 44dp field the "Cookbook — edit" artboard draws an
+                        // unfilled member row as.
+                        var focused by remember { mutableStateOf(false) }
+                        val borderColor by animateColorAsState(
+                            targetValue = if (focused) CookncoOrange else CookncoNavy,
+                            animationSpec = stickerSwitchSpec(),
+                            label = "member_field_border",
                         )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(CookncoWhite)
+                                .border(2.dp, borderColor, RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            val textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy)
+                            if (member.searchQuery.isEmpty()) {
+                                Text(s.searchAMember, style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.35f)))
+                            }
+                            BasicTextField(
+                                value = member.searchQuery,
+                                onValueChange = onQueryChange,
+                                singleLine = true,
+                                textStyle = textStyle,
+                                cursorBrush = SolidColor(CookncoOrange),
+                                modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+                            )
+                        }
                     }
                 }
 
