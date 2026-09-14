@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Share
@@ -83,6 +84,8 @@ import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.cookbook.AddToCookbookSheet
 import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
+import com.xavierclavel.cooknco.network.ReportTargetType
+import com.xavierclavel.cooknco.ui.moderation.ReportSheet
 import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -236,6 +239,7 @@ private fun RecipeContent(
     val recipeYield = recipe.yield ?: 1
     var selectedTab by rememberSaveable { mutableStateOf(RecipeTab.INGREDIENTS) }
     var showMenu by rememberSaveable { mutableStateOf(false) }
+    var showReport by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -438,6 +442,7 @@ private fun RecipeContent(
                     onShare = onShare,
                     onEdit = onEdit,
                     onDelete = onDelete,
+                    onReport = { showReport = true },
                     onDismissRequest = { showMenu = false },
                 )
             }
@@ -543,6 +548,17 @@ private fun RecipeContent(
                 )
             }
         }
+    }
+
+    // Outside the list, unlike the "..." sheet above it: that one is dismissed the moment
+    // it opens this, and a lazy item holding this one would go with it.
+    if (showReport) {
+        ReportSheet(
+            targetType = ReportTargetType.RECIPE,
+            targetId = recipe.id,
+            targetLabel = recipe.title,
+            onDismissRequest = { showReport = false },
+        )
     }
 }
 
@@ -969,6 +985,7 @@ private fun RecipeActionSheet(
     onShare: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onReport: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
     val s = strings()
@@ -981,6 +998,11 @@ private fun RecipeActionSheet(
         },
         actions = buildList {
             add(SheetAction(label = s.shareLink, onClick = onShare, icon = Icons.Outlined.Share))
+            // Not on your own recipe: the backend refuses a self-report, so an action there
+            // exists only to be turned down.
+            if (!isOwner) {
+                add(SheetAction(label = s.reportRecipe, onClick = onReport, icon = Icons.Outlined.Flag))
+            }
             if (isOwner) {
                 add(SheetAction(label = s.editRecipe, onClick = onEdit, icon = Icons.Outlined.Edit))
                 add(

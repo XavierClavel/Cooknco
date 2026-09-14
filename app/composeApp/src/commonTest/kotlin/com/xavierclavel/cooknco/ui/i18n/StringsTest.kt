@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.ui.i18n
 
 import com.xavierclavel.cooknco.data.UnitRepository
+import com.xavierclavel.cooknco.network.ReportReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -51,6 +52,28 @@ class StringsTest {
             assertFalse(name.contains('_'), "$language passes an unknown class through: $name")
             assertTrue(name.isNotBlank(), "$language names an unknown class as nothing")
         }
+    }
+
+    @Test
+    fun `every reason to report something is named in every language, and never as its constant`() {
+        // The moderation queue groups on these, so the set is the backend's and closed. A
+        // reason nobody can read is one nobody picks, which quietly skews what moderators see.
+        catalogues.forEach { (language, s) ->
+            ReportReason.entries.forEach { reason ->
+                val name = s.reportReasonName(reason)
+                assertFalse(name.contains('_'), "$language leaves $reason as its constant: $name")
+                assertNotEquals(reason.value, name, "$language does not name $reason, it echoes it")
+                assertTrue(name.isNotBlank(), "$language names $reason as nothing")
+            }
+        }
+    }
+
+    @Test
+    fun `the two languages disagree about a reason, which is the point of having two`() {
+        assertNotEquals(
+            EnStrings.reportReasonName(ReportReason.HARASSMENT),
+            FrStrings.reportReasonName(ReportReason.HARASSMENT),
+        )
     }
 
     @Test

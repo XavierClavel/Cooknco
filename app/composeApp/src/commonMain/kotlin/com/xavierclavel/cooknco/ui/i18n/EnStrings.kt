@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.ui.i18n
 
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
 import com.xavierclavel.cooknco.network.IngredientSort
+import com.xavierclavel.cooknco.network.ReportReason
 import com.xavierclavel.cooknco.ui.recipe.SearchScope
 import com.xavierclavel.cooknco.network.RecipeSort
 import kotlinx.datetime.DayOfWeek
@@ -467,6 +468,29 @@ object EnStrings : Strings {
             "this timer can go off several minutes late when your phone is asleep."
     override val timerRingOnTimeConfirm = "Open settings"
     override val timerRingOnTimeDismiss = "Not now"
+
+    override val reportRecipe = "Report this recipe"
+    override val reportAccount = "Report this account"
+    override val reportTitle = "Report this content"
+    override val reportDescription = "Tell us what is wrong. A moderator will review your report."
+    override val reportReasonLabel = "WHAT IS WRONG?"
+    override fun reportReasonName(reason: ReportReason) = when (reason) {
+        ReportReason.INAPPROPRIATE_CONTENT -> "Inappropriate content"
+        ReportReason.SPAM -> "Spam or advertising"
+        ReportReason.HARASSMENT -> "Harassment or hate speech"
+        ReportReason.COPYRIGHT -> "Copyright infringement"
+        ReportReason.MISINFORMATION -> "Dangerous or misleading information"
+        ReportReason.OTHER -> "Something else"
+    }
+    override val reportDetails = "DETAILS (OPTIONAL)"
+    override val reportDetailsPlaceholder = "Anything that helps a moderator understand the problem"
+    override val sendReport = "Send report"
+    override val reportSentTitle = "Report sent"
+    override val reportSentMessage = "Thanks — a moderator will review it."
+    override val alreadyReported = "You have already reported this, a moderator is looking into it."
+    override val cannotReportOwnContent = "You cannot report your own content."
+    override val reportTargetGone = "This content no longer exists."
+    override val reportFailed = "Your report could not be sent."
 
     override val timerChannelName = "Cook timer"
     override val timerChannelDescription = "The countdown of a timer you started in cook mode."
