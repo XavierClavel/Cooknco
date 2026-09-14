@@ -10,9 +10,11 @@ import shared.enums.ImageBucket
 import shared.enums.Locale
 import shared.enums.PdfDocumentKind
 import shared.enums.PdfVariable
+import shared.enums.UnitSystem
 import shared.infodto.RecipeInfo
 import shared.infodto.RecipeIngredientInfo
 import shared.utils.URL.RECIPE_VIEW_URL
+import shared.utils.UnitConversion
 import java.text.Normalizer
 
 /**
@@ -48,14 +50,23 @@ class ExportService: KoinComponent {
     /**
      * The sheet for a recipe, as PDF.
      *
+     * @param unitSystem which ladder to print the amounts on. A parameter rather than a
+     *   lookup of whoever asked: a sheet is a thing to print and hand over, and the export
+     *   is admin-only, so what it should read in is the caller's to say — the same reason
+     *   [locale] is one.
      * @param body the layout to use, or null for the one in service. The backoffice passes
      *   the draft sitting in its editor, so a preview shows what an operator is about to
      *   save rather than what is saved.
      */
-    suspend fun generatePDF(recipe: RecipeInfo, locale: Locale, body: String? = null): ByteArray {
+    suspend fun generatePDF(
+        recipe: RecipeInfo,
+        locale: Locale,
+        unitSystem: UnitSystem = UnitSystem.DEFAULT,
+        body: String? = null,
+    ): ByteArray {
         val photo = photoOf(recipe)
         val template = body ?: pdfTemplateService.bodyOf(PdfDocumentKind.RECIPE, locale)
-        val html = PdfTemplates.render(template, modelOf(recipe, locale, photo != null))
+        val html = PdfTemplates.render(template, modelOf(recipe, locale, unitSystem, photo != null))
 
         return pdfRenderer.render(
             html = html,
@@ -93,8 +104,13 @@ class ExportService: KoinComponent {
      * Values go in raw — Mustache escapes them on the way out — so a recipe titled with a
      * tag prints the tag rather than applying it.
      */
-    private fun modelOf(recipe: RecipeInfo, locale: Locale, hasPhoto: Boolean): Map<String, Any?> {
-        val units = UnitLabels.of(locale)
+    private fun modelOf(
+        recipe: RecipeInfo,
+        locale: Locale,
+        unitSystem: UnitSystem,
+        hasPhoto: Boolean,
+    ): Map<String, Any?> {
+        val units = UnitLabels.of(locale, unitSystem)
         return mapOf(
             PdfVariable.TITLE to recipe.title,
             PdfVariable.DESCRIPTION to recipe.description,
@@ -158,7 +174,7 @@ class ExportService: KoinComponent {
     }
 
     /**
-     * The unit words a sheet needs, per locale.
+     * The unit words a sheet needs, per locale, on the ladder the sheet was asked for.
      *
      * All that is left of the sheet's wording: every heading now lives in the layout, which
      * is written per locale. These stay in code because they are part of formatting a value
@@ -166,14 +182,15 @@ class ExportService: KoinComponent {
      * same way, from the same rules.
      */
     private class UnitLabels(
+        val unitSystem: UnitSystem,
         val teaspoons: String,
         val tablespoons: String,
         val cups: String,
     ) {
         companion object {
-            fun of(locale: Locale) = when (locale) {
-                Locale.EN -> UnitLabels(teaspoons = "tsp", tablespoons = "tbsp", cups = "cups")
-                Locale.FR -> UnitLabels(teaspoons = "c. à café", tablespoons = "c. à soupe", cups = "tasses")
+            fun of(locale: Locale, unitSystem: UnitSystem) = when (locale) {
+                Locale.EN -> UnitLabels(unitSystem, teaspoons = "tsp", tablespoons = "tbsp", cups = "cups")
+                Locale.FR -> UnitLabels(unitSystem, teaspoons = "c. à café", tablespoons = "c. à soupe", cups = "tasses")
             }
         }
 
@@ -189,16 +206,12 @@ class ExportService: KoinComponent {
             ingredient.amount?.takeIf { it > 0f }?.let { formatAmount(it, ingredient.unit) } ?: ""
 
         /**
-         * Mirrors what the clients display (`formatAmount` in the web app): grams and
-         * millilitres roll up to the larger unit once they reach a thousand, and a whole
-         * number keeps no decimals.
+         * Mirrors what the clients display (`formatAmount` in the web app): the amount goes
+         * on the reader's ladder — which is also what rolls grams and millilitres up to the
+         * larger unit — and a whole number keeps no decimals.
          */
         private fun formatAmount(amount: Float, unit: AmountUnit): String {
-            val (scaled, scaledUnit) = when {
-                unit == AmountUnit.GRAM && amount >= 1_000f -> amount / 1_000f to AmountUnit.KILOGRAM
-                unit == AmountUnit.MILLILITERS && amount >= 1_000f -> amount / 1_000f to AmountUnit.LITER
-                else -> amount to unit
-            }
+            val (scaled, scaledUnit) = UnitConversion.displayIn(amount, unit, unitSystem)
             val rounded = "%.2f".format(java.util.Locale.ROOT, scaled).trimEnd('0').trimEnd('.')
             return "$rounded${symbolOf(scaledUnit)}"
         }
@@ -207,10 +220,12 @@ class ExportService: KoinComponent {
             AmountUnit.NONE, AmountUnit.UNIT -> ""
             AmountUnit.GRAM -> "g"
             AmountUnit.KILOGRAM -> "kg"
+            AmountUnit.OUNCE -> "oz"
             AmountUnit.POUND -> "lb"
             AmountUnit.MILLILITERS -> "mL"
             AmountUnit.CENTILITER -> "cL"
             AmountUnit.LITER -> "L"
+            AmountUnit.FLUID_OUNCE -> " fl oz"
             AmountUnit.TEASPOON -> " $teaspoons"
             AmountUnit.TABLESPOON -> " $tablespoons"
             AmountUnit.CUP -> " $cups"

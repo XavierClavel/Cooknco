@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xavierclavel.cooknco.data.AppLanguage
+import com.xavierclavel.cooknco.data.AppUnits
 import com.xavierclavel.cooknco.data.UpdateRequirement
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.navigation.AppNavigation
@@ -26,6 +27,14 @@ fun App() {
     val language by AppLanguage.current.collectAsState()
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { AppLanguage.restore(AppGraph.devicePreferences, scope) }
+    // The ladder the account reads amounts on, and the catalogue that converts onto it.
+    // Restored from the last session first so the first recipe draws in the right units
+    // rather than in metric until settings are opened, and the catalogue refreshed behind
+    // it — the packaged copy is complete, so nothing waits for that.
+    LaunchedEffect(Unit) {
+        AppUnits.restore(AppGraph.devicePreferences, scope)
+        AppUnits.refresh(AppGraph.unitRepository, scope)
+    }
     // A timer started in an earlier process is still counting — its deadline outlived it.
     // Read back here, before cook mode is reachable, so the screen opens on the real one
     // rather than on its step's default. See [CookTimer].

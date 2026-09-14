@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.StepDurations
 import com.xavierclavel.cooknco.data.RecipeRepository
+import com.xavierclavel.cooknco.data.AppUnitSystem
+import com.xavierclavel.cooknco.data.AppUnits
 import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.dto.RecipeStepIngredientInfo
@@ -317,7 +319,7 @@ class RecipeEditViewModel(
                     ingredientName = name,
                     type = summary.type,
                     query = name,
-                    unit = defaultUnitFor(summary, state.units),
+                    unit = defaultUnitFor(summary, state.units, AppUnits.system.value),
                     allowedTypes = summary.allowedTypes,
                     searchResults = emptyList(),
                     showDropdown = false,
@@ -604,11 +606,28 @@ class RecipeEditViewModel(
 
         private fun customName(query: String) = query.trim().take(CUSTOM_NAME_MAX_LENGTH)
 
-        private fun defaultUnitFor(summary: IngredientSummary, units: List<UnitInfo>): String =
-            summary.defaultUnit
+        /**
+         * What the unit picker opens on for a freshly chosen ingredient.
+         *
+         * The catalogue's own default first, then weight, then whatever the ingredient
+         * allows — each of them put on the ladder this cook measures on, so an imperial
+         * cook adding flour meets ounces rather than grams and a picker to correct. The
+         * declared unit is mapped rather than kept because it cannot have been a choice
+         * about *this* cook: an operator sets it once for the whole catalogue.
+         *
+         * Only the preselection. What the cook then picks is what gets saved, as written.
+         */
+        private fun defaultUnitFor(
+            summary: IngredientSummary,
+            units: List<UnitInfo>,
+            system: AppUnitSystem,
+        ): String {
+            val unit = summary.defaultUnit
                 ?: "GRAM".takeIf { "WEIGHT" in summary.allowedTypes }
                 ?: units.firstOrNull { it.name != "NONE" && it.type in summary.allowedTypes }?.name
                 ?: "NONE"
+            return preferredUnitFor(unit, system, units)
+        }
 
         fun factory(recipeId: Long?, userId: Long): ViewModelProvider.Factory = viewModelFactory {
             initializer {

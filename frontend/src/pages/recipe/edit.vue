@@ -285,7 +285,8 @@ import {defaultImageRecipe, toErrorMessage, toViewRecipe} from "@/scripts/common
 import {searchIngredients} from "@/scripts/ingredients";
 import EditablePicture from "@/components/EditablePicture.vue";
 import {dishOptions} from "@/scripts/values";
-import {findUnitOption, getUnitOptions, loadUnits} from "@/scripts/units";
+import {findUnitOption, getUnitOptions, loadUnits, unitOptions} from "@/scripts/units";
+import {loadUnitSystem, preferredUnitFor, unitSystem} from "@/scripts/unitSystem";
 import {useI18n} from "vue-i18n";
 import {getLocale} from "@/scripts/localization";
 import {max100, max255, max50, max511, requiredRule} from "@/scripts/rules";
@@ -376,12 +377,25 @@ const onIngredientSelected = (selected, index) => {
   recipe.value.ingredients[index].unit = findUnitOption(getDefaultUnit(selected))
 }
 
+/**
+ * What the unit picker opens on for a freshly chosen ingredient.
+ *
+ * The catalogue's own default first, then weight, then whatever the ingredient allows - each
+ * of them put on the ladder this author cooks on, so an imperial cook adding flour meets
+ * ounces rather than grams and a picker to correct. The declared unit is mapped rather than
+ * kept because it cannot have been a choice about *this* author: an operator sets it once
+ * for the whole catalogue.
+ *
+ * Only the preselection. What the author then picks is what gets saved, as written.
+ */
 const getDefaultUnit = (ingredient) => {
   if (!ingredient) return "NONE"
-  if (ingredient.defaultUnit) return ingredient.defaultUnit
+  const preferred = (unit) => preferredUnitFor(unit, unitSystem.value, unitOptions.value)
+  if (ingredient.defaultUnit) return preferred(ingredient.defaultUnit)
   const allowed = getUnitOptions(ingredient.allowedTypes)
-  if (allowed.some(it => it.type == "WEIGHT")) return "GRAM"
-  return allowed.find(it => it.type != "NONE")?.value ?? "NONE"
+  if (allowed.some(it => it.type == "WEIGHT")) return preferred("GRAM")
+  const fallback = allowed.find(it => it.type != "NONE")?.value
+  return fallback ? preferred(fallback) : "NONE"
 }
 
 
@@ -469,6 +483,10 @@ async function submit() {
 
   toViewRecipe(recipeId.value)
 }
+
+// Not awaited with the units: nothing on this page reads it until an ingredient is picked,
+// and a picker that opened before it arrived would only have preselected metric
+loadUnitSystem()
 
 loadUnits().then(function () {
   if (recipeId.value == null) {

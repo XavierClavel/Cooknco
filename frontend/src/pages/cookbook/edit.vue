@@ -173,9 +173,26 @@ const ready = ref(false)
 const autocompleteList = ref([])
 
 const onAutocompleteChange = async (query, index) => {
-  const response = await listUsers(query, 0, 20);
-  autocompleteList.value[index] = response.data.items;
+  // As a filter object, not a bare term: URLSearchParams would read "xavier" as a
+  // parameter name and send `?xavier=`, so the list came back unfiltered and whoever was
+  // being typed never appeared in it
+  const response = await listUsers({query}, 0, 20);
+  autocompleteList.value[index] = response.data.items.filter(it => !takenMemberIds(index).has(it.id));
 }
+
+/**
+ * The accounts already on the cookbook, ignoring the row being filled in - which is allowed
+ * to keep whoever it already holds.
+ *
+ * The server keeps one row per member, so adding the same account twice silently loses
+ * whichever role was set first. A row nobody has picked yet carries id -1, which is not an
+ * account and must not block the empty rows after it.
+ */
+const takenMemberIds = (index) => new Set(
+  members.value
+    .filter((member, i) => i != index && member?.id != null && member.id > 0)
+    .map(member => member.id)
+)
 
 const updateMember = (index, value) => {
   if (value) {

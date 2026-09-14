@@ -2,7 +2,6 @@ package com.xavierclavel.cooknco.ui.cookbook
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,16 +25,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.addOutline
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
@@ -50,6 +42,7 @@ import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerDashedButton
 
 @Composable
 fun CookbooksScreen(
@@ -117,28 +110,7 @@ private fun CookbooksScreenContent(
 @Composable
 private fun NewCookbookRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val s = strings()
-    val shape = RoundedCornerShape(20.dp)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .dashedBorder(shape, CookncoNavy)
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("+", fontSize = 20.sp, color = CookncoNavy)
-        Text(s.newCookbook, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-    }
-}
-
-/** A dashed outline in [shape] — the "+ New cookbook" row is the only sticker element
- * without a solid border, so this isn't part of [com.xavierclavel.cooknco.ui.theme.Sticker]. */
-private fun Modifier.dashedBorder(shape: RoundedCornerShape, color: Color, width: Dp = 3.dp): Modifier = drawWithCache {
-    val outline = shape.createOutline(size, layoutDirection, this)
-    val path = Path().apply { addOutline(outline) }
-    val stroke = Stroke(width = width.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
-    onDrawBehind { drawPath(path, color = color, style = stroke) }
+    StickerDashedButton(text = s.newCookbook, onClick = onClick, modifier = modifier)
 }
 
 @Composable

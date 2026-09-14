@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.jetbrains.compose.resources.painterResource
+import com.xavierclavel.cooknco.data.AppUnits
 import com.xavierclavel.cooknco.data.CookTimerState
 import com.xavierclavel.cooknco.data.formatCookTimer
 import com.xavierclavel.cooknco.network.dto.RecipeStepIngredientInfo
@@ -393,8 +394,11 @@ private fun StepIngredientRow(
     showDivider: Boolean,
 ) {
     val s = strings()
-    val scaled = scaleAmount(amount, servings, recipeYield)
-    val unit = if (ingredient.unit == "NONE" || ingredient.unit == "UNIT") "" else s.unitName(ingredient.unit)
+    // Cook mode reads the same ladder as the recipe screen it was opened from: an amount
+    // that changed units between the two would be a recipe the cook has to re-read
+    val unitSystem by AppUnits.system.collectAsState()
+    val units by AppUnits.catalog.collectAsState()
+    val amountLabel = amountLabel(amount, ingredient.unit, servings, recipeYield, unitSystem, units, s)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -442,9 +446,9 @@ private fun StepIngredientRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (scaled.isNotEmpty()) {
+            if (amountLabel.isNotEmpty()) {
                 Text(
-                    text = if (unit.isEmpty()) scaled else "$scaled $unit",
+                    text = amountLabel,
                     color = if (checked) CookncoGreenDark.copy(alpha = 0.55f) else CookncoNavy,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,

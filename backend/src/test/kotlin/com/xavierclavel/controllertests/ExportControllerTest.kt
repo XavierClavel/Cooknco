@@ -16,6 +16,7 @@ import main.com.xavierclavel.utils.uploadRecipeImage
 import org.junit.jupiter.api.Test
 import shared.dto.RecipeDTO
 import shared.enums.AmountUnit
+import shared.enums.UnitSystem
 import shared.enums.Locale
 import shared.infodto.RecipeInfo
 import shared.utils.URL.EXPORT_URL
@@ -131,6 +132,26 @@ class ExportControllerTest : ApplicationTest() {
         assertContains(text, "1 tsp")
         // UNIT has no symbol of its own, and a complement is parenthesised after the name
         assertContains(text, "3")
+        assertContains(text, "eggs (beaten)")
+    }
+
+    /**
+     * The sheet is printed to be handed to somebody, so what it reads in is asked for
+     * rather than read off the admin printing it. Metric by default, which is what every
+     * assertion above is written against.
+     */
+    @Test
+    fun `export honours the requested units`() = runTestAsAdmin {
+        val recipe = client.createRecipe(fullRecipe)
+
+        val text = readPdfText(client.exportRecipe(recipe.id, unitSystem = UnitSystem.IMPERIAL))
+
+        // 250 g of flour is under a pound, so it lands on the ounce rather than nowhere
+        assertContains(text, "8.82oz")
+        // and 1.5 L of milk is over a quarter of a gallon we do not print, so it is cups
+        assertContains(text, "6.25 cups")
+        // A spoon belongs to neither ladder and is left exactly as it was written
+        assertContains(text, "1 tsp")
         assertContains(text, "eggs (beaten)")
     }
 

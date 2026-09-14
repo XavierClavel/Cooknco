@@ -8,6 +8,7 @@ import shared.dto.UserSettingsDTO
 import shared.infodto.AdminUserInfo
 import shared.infodto.UserInfo
 import shared.enums.AccountStatus
+import shared.enums.UnitSystem
 import shared.enums.UserRole
 import shared.overviewdto.UserOverview
 import io.ebean.Model
@@ -15,6 +16,8 @@ import io.ebean.annotation.DbDefault
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.OneToMany
 import jakarta.persistence.OneToOne
@@ -141,6 +144,24 @@ class User (
      */
     var locale: Locale? = null,
 
+    /**
+     * The units this account reads amounts in.
+     *
+     * Not nullable, unlike [locale], because nothing ever *reports* one: no client knows a
+     * handset's preferred ladder the way it knows its language, so there is no report to
+     * keep apart from a choice and the column can simply hold the answer. Metric is what
+     * every recipe in the product was authored in while there was nothing to choose, so an
+     * account that never opens the setting reads exactly what it read before.
+     *
+     * Display only. A recipe stores the unit its author picked
+     * ([com.xavierclavel.models.jointables.RecipeIngredient.unit]) and this never touches
+     * it — otherwise reading somebody's recipe in pounds and saving a line of it would
+     * rewrite their recipe in pounds.
+     */
+    @Enumerated(EnumType.STRING)
+    @DbDefault("METRIC")
+    var unitSystem: UnitSystem = UnitSystem.METRIC,
+
 
     ): Model() {
 
@@ -208,6 +229,7 @@ class User (
         userSettingsDTO.locale?.let { locale = it }
         // Absent means "leave as it is", for the same reason
         userSettingsDTO.mailNotificationsEnabled?.let { mailNotificationsEnabled = it }
+        userSettingsDTO.unitSystem?.let { unitSystem = it }
     }
 
     /**
@@ -284,6 +306,7 @@ class User (
         isAccountPublic = this.isAccountPublic,
         locale = this.locale,
         mailNotificationsEnabled = this.mailNotificationsEnabled,
+        unitSystem = this.unitSystem,
     )
 
     fun useToken() {

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <alterColumn columnName="default_unit" tableName="ingredients" checkConstraint="check ( default_unit in ('NONE','UNIT','GRAM','KILOGRAM','OUNCE','POUND','MILLILITERS','CENTILITER','LITER','FLUID_OUNCE','TEASPOON','TABLESPOON','CUP'))" checkConstraintName="ck_ingredients_default_unit"/>
+        <alterColumn columnName="unit" tableName="recipe_ingredients" checkConstraint="check ( unit in ('NONE','UNIT','GRAM','KILOGRAM','OUNCE','POUND','MILLILITERS','CENTILITER','LITER','FLUID_OUNCE','TEASPOON','TABLESPOON','CUP'))" checkConstraintName="ck_recipe_ingredients_unit"/>
+        <addColumn tableName="users">
+            <column name="unit_system" type="varchar(8)" defaultValue="'METRIC'" notnull="true" checkConstraint="check ( unit_system in ('METRIC','IMPERIAL'))" checkConstraintName="ck_users_unit_system"/>
+        </addColumn>
+    </changeSet>
+</migration>

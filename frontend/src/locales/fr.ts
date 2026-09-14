@@ -241,6 +241,12 @@ export default {
 
   unit_teaspoon: "cuillères à café",
   unit_tablespoon: "cuillères à soupe",
+  unit_cup: "tasses",
+
+  unit_system: "Unités",
+  unit_system_hint: "Comment les quantités te sont affichées. Les recettes gardent les unités dans lesquelles elles ont été écrites — seule ta lecture change.",
+  unit_system_metric: "Métrique (g, kg, mL, L)",
+  unit_system_imperial: "Impérial (oz, lb, tasses)",
 
   notes: "Ecris des notes ici !",
   everything: "Tout",

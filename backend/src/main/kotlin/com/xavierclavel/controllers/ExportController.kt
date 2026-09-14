@@ -7,6 +7,7 @@ import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.respondPDF
 import shared.enums.Locale
+import shared.enums.UnitSystem
 import shared.utils.URL.EXPORT_URL
 import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.Route
@@ -37,11 +38,15 @@ object ExportController: Controller(EXPORT_URL) {
     /**
      * @param locale which language to name the ingredients and the headings in; EN by default,
      *   so that pasting the URL into a browser returns a sheet rather than a 400
+     * @param unitSystem which units to print the amounts in; metric by default, for the same
+     *   reason. Asked for rather than read off the admin's account: the sheet is printed to
+     *   be handed to somebody, and who that is only the caller knows
      */
     private fun Route.exportRecipe() = get("/recipe/{id}") {
         val id = getPathId()
         val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
+        val unitSystem = getEnumQueryParam<UnitSystem>("unitSystem") ?: UnitSystem.DEFAULT
         val recipe = recipeService.getEntityById(id).toInfo(locale)
-        call.respondPDF(exportService.filenameOf(recipe), exportService.generatePDF(recipe, locale))
+        call.respondPDF(exportService.filenameOf(recipe), exportService.generatePDF(recipe, locale, unitSystem))
     }
 }

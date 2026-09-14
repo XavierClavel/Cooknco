@@ -123,7 +123,7 @@ const performDelete = (username) => {
 };
 
 const updateDisplay = debounce(() => {
-  listUsers(query.value || "",page.value - 1, pageSize.value).then (
+  listUsers({query: query.value}, page.value - 1, pageSize.value).then (
     function (response) {
       console.log(response)
       users.value = response.data.items

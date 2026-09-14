@@ -51,6 +51,21 @@
         </v-card>
 
         <v-card color="background" class="mb-2">
+          <v-select
+            v-model="settings.unitSystem"
+            :prepend-inner-icon="ICON_WEIGHT"
+            :label="`${$t('unit_system')}`"
+            :items="unitSystems"
+            item-title="label"
+            item-value="value"
+            class="mx-2 mt-2"
+          ></v-select>
+          <v-card-text class="pt-0 pb-2 text-caption">
+            {{ $t('unit_system_hint') }}
+          </v-card-text>
+        </v-card>
+
+        <v-card color="background" class="mb-2">
           <v-checkbox
             v-model="settings.mailNotificationsEnabled"
             :label="`${$t('mail_notifications')}`"
@@ -101,9 +116,10 @@ import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import {login, toMcp, toMyProfile, toSignup, toUpdatePassword} from '@/scripts/common'
 import {useI18n} from "vue-i18n";
-import {ICON_LOCALIZATION, ICON_SAVE} from "@/scripts/icons";
+import {ICON_LOCALIZATION, ICON_SAVE, ICON_WEIGHT} from "@/scripts/icons";
 import {forceLocale, fromApiLocale, getLocale, toApiLocale} from "@/scripts/localization";
 import {getSettings, updateSettings} from "@/scripts/settings";
+import {IMPERIAL, METRIC, setUnitSystem} from "@/scripts/unitSystem";
 
 const errorMessage = ref(null)
 const { t } = useI18n();
@@ -115,10 +131,16 @@ const locales = [
   {label: "English", value: "en"},
 ]
 
+const unitSystems = computed(() => [
+  {label: t("unit_system_metric"), value: METRIC},
+  {label: t("unit_system_imperial"), value: IMPERIAL},
+])
+
 const settings = ref({
   autoAcceptFollowRequests: false,
   isAccountPublic: false,
   mailNotificationsEnabled: false,
+  unitSystem: METRIC,
 })
 
 // Public accounts always auto accept: show the toggle locked on, but keep the
@@ -137,6 +159,10 @@ getSettings().then(response => {
 
 const submit = () => {
   forceLocale(locale.value)
+  // Same idea for the units: applied before the request comes back, because every amount
+  // already on screen is rendered from it and a page still showing grams after you asked
+  // for pounds reads as a save that failed
+  setUnitSystem(settings.value.unitSystem)
   // The language goes to the account, not only to this browser's cookie - it is what mails
   // and notifications are written in, and what every other browser of theirs will read back
   updateSettings({...settings.value, locale: toApiLocale(locale.value)}).then(response => {

@@ -150,6 +150,10 @@ interface Strings {
     val settings: String
     val language: String
     val languageNote: String
+    val units: String
+    val unitsNote: String
+    val unitsMetric: String
+    val unitsImperial: String
     val privacy: String
     val publicAccount: String
     val publicAccountNote: String

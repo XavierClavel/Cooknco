@@ -30,10 +30,12 @@ const UNITS = [
   {name: 'UNIT', type: 'AMOUNT', label: 'unit'},
   {name: 'GRAM', type: 'WEIGHT', label: 'g'},
   {name: 'KILOGRAM', type: 'WEIGHT', label: 'kg'},
+  {name: 'OUNCE', type: 'WEIGHT', label: 'oz'},
   {name: 'POUND', type: 'WEIGHT', label: 'lb'},
   {name: 'MILLILITERS', type: 'VOLUME', label: 'mL'},
   {name: 'CENTILITER', type: 'VOLUME', label: 'cL'},
   {name: 'LITER', type: 'VOLUME', label: 'L'},
+  {name: 'FLUID_OUNCE', type: 'VOLUME', label: 'fl oz'},
   {name: 'TEASPOON', type: 'VOLUME', label: 'tsp'},
   {name: 'TABLESPOON', type: 'VOLUME', label: 'tbsp'},
   {name: 'CUP', type: 'VOLUME', label: 'cup'},
@@ -41,7 +43,13 @@ const UNITS = [
 
 export const unitLabel = (unit: string) => UNITS.find(u => u.name === unit)?.label ?? unit
 
-/** Reads an ingredient row's quantity, scaling g to kg and mL to L for display only. */
+/**
+ * Reads an ingredient row's quantity, scaling g to kg and mL to L for display only.
+ *
+ * Deliberately not put on the reader's ladder the way the app's own `formatAmount` is: the
+ * backoffice shows what a row *holds*, and an operator checking a recipe against a report
+ * needs to see the unit its author picked rather than the one this admin reads in.
+ */
 export function formatAmount(amount: number | null | undefined, unit: string): string {
   if (!amount) return ''
   let value = amount

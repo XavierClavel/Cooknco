@@ -60,17 +60,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.decodeToImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -107,6 +101,8 @@ import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoOrangeDark
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
+import com.xavierclavel.cooknco.ui.theme.StickerDashedButton
+import com.xavierclavel.cooknco.ui.theme.dashedBorder
 import com.xavierclavel.cooknco.ui.theme.swallowTaps
 import com.xavierclavel.cooknco.ui.theme.sheetScrim
 import com.xavierclavel.cooknco.ui.theme.StickerDropdownMenu
@@ -260,24 +256,6 @@ private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-// A dashed sticker-navy outline, used for the "+ Add step" affordance — Modifier.border()
-// has no dashed variant, so this paints the stroke itself with a dash path effect.
-private fun Modifier.dashedBorder(
-    color: Color,
-    shape: Shape,
-    strokeWidth: Dp = 3.dp,
-    dashLength: Dp = 8.dp,
-    gapLength: Dp = 6.dp,
-): Modifier = drawWithContent {
-    drawContent()
-    val outline = shape.createOutline(size, layoutDirection, this)
-    val path = Path().apply { addOutline(outline) }
-    val stroke = Stroke(
-        width = strokeWidth.toPx(),
-        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLength.toPx(), gapLength.toPx()), 0f),
-    )
-    drawPath(path = path, color = color, style = stroke)
-}
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
@@ -1098,7 +1076,7 @@ private fun IngredientSearchResults(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Box(modifier = Modifier.size(30.dp).dashedBorder(CookncoNavy, RoundedCornerShape(8.dp), strokeWidth = 2.dp))
+                Box(modifier = Modifier.size(30.dp).dashedBorder(RoundedCornerShape(8.dp), CookncoNavy, strokeWidth = 2.dp))
                 Text(
                     text = s.addAsCustom(query.trim()),
                     fontSize = 15.sp,
@@ -1359,19 +1337,11 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
         item {
             // The dashed "+ Add step" affordance replaces the old top-right circle button —
             // the mockup only ever shows this one way to add a step.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .dashedBorder(CookncoNavy, RoundedCornerShape(18.dp))
-                    .clickable(onClick = viewModel::addStep),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-                Text(s.addStep, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-            }
+            StickerDashedButton(
+                text = s.addStep,
+                onClick = viewModel::addStep,
+                shape = RoundedCornerShape(18.dp),
+            )
         }
         item {
             SectionLabel(s.tipsOptional)
@@ -1466,7 +1436,7 @@ private fun StepAttachments(
                     modifier = Modifier
                         .height(34.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .dashedBorder(CookncoGreenDark, RoundedCornerShape(10.dp))
+                        .dashedBorder(RoundedCornerShape(10.dp), CookncoGreenDark)
                         .clickable { open = !open }
                         .padding(horizontal = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
