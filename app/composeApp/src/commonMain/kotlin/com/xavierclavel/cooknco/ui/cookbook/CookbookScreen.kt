@@ -40,6 +40,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -211,23 +214,32 @@ private fun CookbookContent(
             }
         }
 
-        // ── Banner image with the back / "···" overlay ───────────────────────
+        // ── Banner image, overlapped by the info card, with the back / "···" overlay ──
         item {
             Box(modifier = Modifier.fillMaxWidth()) {
                 CookbookImage(
                     cookbookId = cookbook.id,
                     version = cookbook.version,
                     contentDescription = cookbook.title,
-                    modifier = Modifier.fillMaxWidth().height(250.dp),
-                )
-                // The mockup's banner sits on a hard navy rule where it meets the
-                // overlapping info card, rather than fading straight into it.
-                Box(
+                    // The mockup's banner sits on a hard navy rule where it meets the
+                    // overlapping info card, rather than fading straight into it. Drawn
+                    // over the image rather than laid out under it, as on the recipe
+                    // screen: the card overlaps the banner's last 30dp, and a rule that
+                    // took layout space would push that overlap out by 3dp — and a rule
+                    // aligned to the bottom of this Box would now land under the card,
+                    // since the Box is as tall as the card that overhangs it.
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(CookncoNavy),
+                        .height(250.dp)
+                        .drawWithContent {
+                            drawContent()
+                            val stroke = 3.dp.toPx()
+                            drawRect(
+                                color = CookncoNavy,
+                                topLeft = Offset(0f, size.height - stroke),
+                                size = Size(size.width, stroke),
+                            )
+                        },
                 )
                 Row(
                     modifier = Modifier
@@ -258,41 +270,42 @@ private fun CookbookContent(
                         Icon(Icons.Outlined.MoreHoriz, contentDescription = s.more)
                     }
                 }
-            }
-        }
 
-        // ── Info card ────────────────────────────────────────────────────────
-        item {
-            StickerCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
-                shape = RoundedCornerShape(20.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(11.dp),
+                // Info card: title, description, counts — overlaps the banner's bottom
+                // edge by 30dp, the same as the recipe screen's.
+                StickerCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 18.dp, end = 18.dp, top = 220.dp, bottom = 12.dp),
+                    shape = RoundedCornerShape(20.dp),
                 ) {
-                    Text(
-                        text = cookbook.title,
-                        fontSize = 27.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CookncoNavy,
-                        lineHeight = 33.sp,
-                    )
-                    if (cookbook.description.isNotBlank()) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(11.dp),
+                    ) {
                         Text(
-                            text = cookbook.description,
-                            fontSize = 14.sp,
-                            lineHeight = 21.sp,
-                            color = CookncoNavy.copy(alpha = 0.72f),
+                            text = cookbook.title,
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                            lineHeight = 33.sp,
                         )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatChip(s.recipeCount(cookbook.recipesCount))
-                        StatChip(
-                            text = s.memberCount(cookbook.usersCount),
-                            fillColor = CookncoBlueLight,
-                            textColor = CookncoBlueDark,
-                        )
+                        if (cookbook.description.isNotBlank()) {
+                            Text(
+                                text = cookbook.description,
+                                fontSize = 14.sp,
+                                lineHeight = 21.sp,
+                                color = CookncoNavy.copy(alpha = 0.72f),
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatChip(s.recipeCount(cookbook.recipesCount))
+                            StatChip(
+                                text = s.memberCount(cookbook.usersCount),
+                                fillColor = CookncoBlueLight,
+                                textColor = CookncoBlueDark,
+                            )
+                        }
                     }
                 }
             }

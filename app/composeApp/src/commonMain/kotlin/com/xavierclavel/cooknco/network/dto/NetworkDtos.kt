@@ -398,3 +398,19 @@ data class AppVersionCheckInfo(
     val latestVersion: String? = null,
     val storeUrl: String? = null,
 )
+
+/**
+ * A report on its way to the moderation queue.
+ *
+ * [targetType] and [reason] travel as the strings the backend's enums are named by — see
+ * [com.xavierclavel.cooknco.network.ReportTargetType] and
+ * [com.xavierclavel.cooknco.network.ReportReason], which is where the app's own list of
+ * them lives.
+ */
+@Serializable
+data class ReportDto(
+    val targetType: String,
+    val targetId: Long,
+    val reason: String,
+    val comment: String = "",
+)

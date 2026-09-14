@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.ui.i18n
 
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
 import com.xavierclavel.cooknco.network.IngredientSort
+import com.xavierclavel.cooknco.network.ReportReason
 import com.xavierclavel.cooknco.ui.recipe.SearchScope
 import com.xavierclavel.cooknco.network.RecipeSort
 import kotlinx.datetime.DayOfWeek
@@ -476,6 +477,29 @@ object FrStrings : Strings {
             "retard quand le téléphone est en veille."
     override val timerRingOnTimeConfirm = "Ouvrir les réglages"
     override val timerRingOnTimeDismiss = "Plus tard"
+
+    override val reportRecipe = "Signaler cette recette"
+    override val reportAccount = "Signaler ce compte"
+    override val reportTitle = "Signaler ce contenu"
+    override val reportDescription = "Dites-nous ce qui ne va pas. Un modérateur examinera votre signalement."
+    override val reportReasonLabel = "QU'EST-CE QUI NE VA PAS ?"
+    override fun reportReasonName(reason: ReportReason) = when (reason) {
+        ReportReason.INAPPROPRIATE_CONTENT -> "Contenu inapproprié"
+        ReportReason.SPAM -> "Spam ou publicité"
+        ReportReason.HARASSMENT -> "Harcèlement ou propos haineux"
+        ReportReason.COPYRIGHT -> "Violation de droits d'auteur"
+        ReportReason.MISINFORMATION -> "Information dangereuse ou trompeuse"
+        ReportReason.OTHER -> "Autre chose"
+    }
+    override val reportDetails = "PRÉCISIONS (OPTIONNEL)"
+    override val reportDetailsPlaceholder = "Tout ce qui peut aider un modérateur à comprendre le problème"
+    override val sendReport = "Envoyer le signalement"
+    override val reportSentTitle = "Signalement envoyé"
+    override val reportSentMessage = "Merci — un modérateur va l'examiner."
+    override val alreadyReported = "Vous avez déjà signalé ce contenu, un modérateur s'en occupe."
+    override val cannotReportOwnContent = "Vous ne pouvez pas signaler votre propre contenu."
+    override val reportTargetGone = "Ce contenu n'existe plus."
+    override val reportFailed = "Votre signalement n'a pas pu être envoyé."
 
     override val timerChannelName = "Minuteur de cuisson"
     override val timerChannelDescription = "Le décompte d'un minuteur lancé en mode cuisson."

@@ -7,6 +7,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.xavierclavel.cooknco.data.AppLocale
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
 import com.xavierclavel.cooknco.network.IngredientSort
+import com.xavierclavel.cooknco.network.ReportReason
 import com.xavierclavel.cooknco.ui.recipe.SearchScope
 import com.xavierclavel.cooknco.network.RecipeSort
 import kotlinx.datetime.DayOfWeek
@@ -390,6 +391,28 @@ interface Strings {
     val timerRingOnTimeMessage: String
     val timerRingOnTimeConfirm: String
     val timerRingOnTimeDismiss: String
+
+    // ── Reporting something to the moderators ─────────────────────────────────
+    val reportRecipe: String
+    val reportAccount: String
+    val reportTitle: String
+    val reportDescription: String
+    val reportReasonLabel: String
+    /**
+     * Takes the enum rather than its name: the moderation queue groups on these, so the
+     * set is closed, and an unnamed one is a compile error instead of a screen showing
+     * `INAPPROPRIATE_CONTENT` to the person trying to report it.
+     */
+    fun reportReasonName(reason: ReportReason): String
+    val reportDetails: String
+    val reportDetailsPlaceholder: String
+    val sendReport: String
+    val reportSentTitle: String
+    val reportSentMessage: String
+    val alreadyReported: String
+    val cannotReportOwnContent: String
+    val reportTargetGone: String
+    val reportFailed: String
 
     // ── The cook timer, as Android's notification settings list it ────────────
     val timerChannelName: String

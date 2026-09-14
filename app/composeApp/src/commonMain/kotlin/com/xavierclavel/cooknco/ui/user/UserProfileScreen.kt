@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -55,6 +56,8 @@ import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
+import com.xavierclavel.cooknco.network.ReportTargetType
+import com.xavierclavel.cooknco.ui.moderation.ReportSheet
 import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
@@ -173,6 +176,7 @@ private fun ProfileContent(
     // Everything this profile can have done to it that is not "follow", behind the same
     // "..." the recipe and cookbook screens put their own actions behind.
     var showActions by remember { mutableStateOf(false) }
+    var showReport by remember { mutableStateOf(false) }
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -390,8 +394,27 @@ private fun ProfileContent(
                     add(SheetAction(label = s.editProfile, onClick = onNavigateToEdit, icon = Icons.Outlined.Edit))
                 }
                 add(SheetAction(label = s.shareProfile, onClick = onShare, icon = Icons.Outlined.Share))
+                // Nobody reports themselves, and the backend refuses it anyway.
+                if (!isOwnProfile) {
+                    add(
+                        SheetAction(
+                            label = s.reportAccount,
+                            onClick = { showReport = true },
+                            icon = Icons.Outlined.Flag,
+                        )
+                    )
+                }
             },
             onDismissRequest = { showActions = false },
+        )
+    }
+
+    if (showReport) {
+        ReportSheet(
+            targetType = ReportTargetType.USER,
+            targetId = user.id,
+            targetLabel = user.username,
+            onDismissRequest = { showReport = false },
         )
     }
 
