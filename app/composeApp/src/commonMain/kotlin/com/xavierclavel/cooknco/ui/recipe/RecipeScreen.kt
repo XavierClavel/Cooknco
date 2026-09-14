@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import com.xavierclavel.cooknco.data.AppUnits
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
@@ -110,19 +111,6 @@ import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.painterResource
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * The unit on a line of ingredients.
- *
- * A second table of units lived here, in English, which is where "2 tablespoons sugar"
- * came from in a French recipe. The names come from the catalogue now, like everywhere
- * else; what stays is the one thing this screen wants differently — a countable
- * ingredient prints "2 eggs", not the catalogue's "2 Unit eggs". The catalogue has to
- * name that unit, because the editor's picker needs a row to show for it; a line of
- * ingredients does not.
- */
-private fun unitLabel(unit: String, s: Strings): String =
-    if (unit == "NONE" || unit == "UNIT") "" else s.unitName(unit)
 
 /**
  * "published 22 March", for the owner-actions sheet.
@@ -377,8 +365,13 @@ private fun RecipeContent(
                                     .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
                                     .padding(horizontal = 10.dp, vertical = 3.dp),
                             ) {
+                                // Named by the catalogue, like every other word on this
+                                // screen. A second table lived here that only knew how to
+                                // prettify the constant — MAIN_DISH read "MAIN DISH" in a
+                                // French recipe, the same way a hand-rolled unit table once
+                                // put "2 tablespoons" in one.
                                 Text(
-                                    text = dishClassLabel(recipe.dishClass).uppercase(),
+                                    text = s.dishClassName(recipe.dishClass).uppercase(),
                                     fontSize = 10.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = CookncoWhite,
@@ -559,11 +552,6 @@ private fun RecipeTab.label(s: Strings): String = when (this) {
     RecipeTab.NOTES -> s.notes
 }
 
-private fun dishClassLabel(dishClass: String): String = dishClass
-    .lowercase()
-    .split('_')
-    .joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
-
 private fun LazyListScope.ingredientsTab(
     recipe: RecipeInfo,
     uiState: RecipeUiState,
@@ -728,12 +716,20 @@ private fun IngredientRow(
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
-    val amountStr = scaleAmount(ingredient.amount, selectedYield, recipeYield)
-    val unitStr = unitLabel(ingredient.unit, s)
-    val amountLabel = buildString {
-        if (amountStr.isNotEmpty()) append(amountStr)
-        if (unitStr.isNotEmpty()) append(if (amountStr.isEmpty()) unitStr else " $unitStr")
-    }
+    // The ladder the account reads on, and the catalogue that converts onto it. Read here
+    // rather than passed down: every line of every recipe wants the same answer, and one
+    // read where it is used cannot drift from another.
+    val unitSystem by AppUnits.system.collectAsState()
+    val units by AppUnits.catalog.collectAsState()
+    val amountLabel = amountLabel(
+        amount = ingredient.amount,
+        unit = ingredient.unit,
+        selectedYield = selectedYield,
+        recipeYield = recipeYield,
+        system = unitSystem,
+        units = units,
+        s = s,
+    )
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
