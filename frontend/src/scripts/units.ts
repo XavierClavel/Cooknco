@@ -29,11 +29,18 @@ async function loadUnits() {
   if (unitsPromise == null) {
     unitsPromise = apiClient.get(`/unit`).then(function (response) {
       unitOptions.value = response.data.map(unit => ({
-        label: unit.name.toLowerCase(),
+        // The enum name, read as words: FLUID_OUNCE is "fluid ounce" in the picker, not
+        // the constant with its underscore still in it
+        label: unit.name.toLowerCase().replaceAll('_', ' '),
         value: unit.name,
         icon: getMeasurementTypeIcon(unit.type),
         type: unit.type,
         factorToBase: unit.factorToBase,
+        // Which ladder the unit sits on, and whether a conversion may land on it. Read
+        // rather than restated here, so adding a unit is a change to `AmountUnit` alone -
+        // see `convertToPreferred` in @/scripts/unitSystem
+        system: unit.system,
+        isDisplayUnit: unit.isDisplayUnit,
       }))
       return unitOptions.value
     }).catch(function (error) {

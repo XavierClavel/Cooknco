@@ -241,6 +241,12 @@ export default {
 
   unit_teaspoon: "teaspoons",
   unit_tablespoon: "tablespoons",
+  unit_cup: "cups",
+
+  unit_system: "Units",
+  unit_system_hint: "How amounts are shown to you. Recipes keep the units they were written in — this only changes what you read.",
+  unit_system_metric: "Metric (g, kg, mL, L)",
+  unit_system_imperial: "Imperial (oz, lb, cups)",
 
   notes: "Write notes here !",
   everything: "Everything",

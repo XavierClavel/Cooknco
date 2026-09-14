@@ -191,6 +191,13 @@ data class UnitInfo(
     val name: String,
     val type: String,
     val factorToBase: Float,
+    /**
+     * The ladder this unit sits on ("METRIC"/"IMPERIAL"), or null when it sits on neither
+     * and is never converted in either direction — a countable piece, a spoon.
+     */
+    val system: String? = null,
+    /** Whether a conversion may land on this unit, as opposed to merely start from it. */
+    val isDisplayUnit: Boolean = false,
 )
 
 @Serializable
@@ -293,6 +300,14 @@ data class UserSettingsDTO(
     val locale: String? = null,
     /** Mails about what the people you follow are up to. Null means "leave it alone". */
     val mailNotificationsEnabled: Boolean? = null,
+    /**
+     * The units this account reads amounts in ("METRIC"/"IMPERIAL").
+     *
+     * Non-null on the way out. Null on the way *in* means "leave it alone", like the two
+     * above — and it stays null here until the user picks one, so saving a privacy toggle
+     * from a build that predates the setting cannot put the account back on metric.
+     */
+    val unitSystem: String? = null,
 )
 
 /**

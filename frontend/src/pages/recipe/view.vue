@@ -350,6 +350,7 @@ import {getIngredientIcon, ICON_REPORT} from "@/scripts/icons";
 import {useI18n} from "vue-i18n";
 import {max100, requiredRule} from "@/scripts/rules";
 import {createNotes, getNotes, updateNotes} from "@/scripts/notes";
+import {loadUnitSystem} from "@/scripts/unitSystem";
 
 // Get the route object
 const route = useRoute();
@@ -376,6 +377,10 @@ const recipe = ref<object>({
   ingredients: [],
   owner: {}
 })
+
+// Not awaited: the amounts draw in metric and redraw the moment the account's own ladder
+// comes back, which beats holding the whole recipe for a preference
+loadUnitSystem()
 
 getRecipe(recipeId).then (
   function (response) {

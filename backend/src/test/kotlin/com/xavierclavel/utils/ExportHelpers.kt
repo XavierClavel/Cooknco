@@ -6,6 +6,7 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.HttpStatusCode
 import shared.enums.Locale
+import shared.enums.UnitSystem
 import shared.utils.URL.EXPORT_URL
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfName
@@ -16,13 +17,24 @@ import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import kotlin.test.assertEquals
 
-suspend fun HttpClient.exportRecipeRaw(recipeId: Long, locale: Locale? = null): HttpResponse =
+suspend fun HttpClient.exportRecipeRaw(
+    recipeId: Long,
+    locale: Locale? = null,
+    unitSystem: UnitSystem? = null,
+): HttpResponse =
     this.get("$EXPORT_URL/recipe/$recipeId") {
-        url { locale?.let { parameters.append("locale", it.name) } }
+        url {
+            locale?.let { parameters.append("locale", it.name) }
+            unitSystem?.let { parameters.append("unitSystem", it.name) }
+        }
     }
 
-suspend fun HttpClient.exportRecipe(recipeId: Long, locale: Locale? = null): ByteArray =
-    this.exportRecipeRaw(recipeId, locale).let {
+suspend fun HttpClient.exportRecipe(
+    recipeId: Long,
+    locale: Locale? = null,
+    unitSystem: UnitSystem? = null,
+): ByteArray =
+    this.exportRecipeRaw(recipeId, locale, unitSystem).let {
         assertEquals(HttpStatusCode.OK, it.status)
         it.bodyAsBytes()
     }

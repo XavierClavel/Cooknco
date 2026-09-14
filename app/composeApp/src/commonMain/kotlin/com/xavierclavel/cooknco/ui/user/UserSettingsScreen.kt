@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xavierclavel.cooknco.data.AppUnitSystem
 import com.xavierclavel.cooknco.platform.appVersion
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
@@ -123,6 +124,31 @@ fun UserSettingsScreen(
                     )
                     Text(
                         text = s.languageNote,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = CookncoGreenDark,
+                        modifier = Modifier.padding(top = 8.dp, start = 2.dp),
+                    )
+                }
+
+                // ── Units ────────────────────────────────────────────────────────
+                Column {
+                    SettingsSectionLabel(s.units)
+                    StickerSegmentedControl(
+                        options = AppUnitSystem.entries,
+                        selected = uiState.unitSystem,
+                        onSelect = viewModel::selectUnitSystem,
+                        // Named by the catalogue rather than carried on the enum the way a
+                        // language name is: "Metric" is a word that translates, "Français"
+                        // is not.
+                        label = { if (it == AppUnitSystem.METRIC) s.unitsMetric else s.unitsImperial },
+                        shape = RoundedCornerShape(20.dp),
+                        segmentShape = RoundedCornerShape(15.dp),
+                        spacing = 5.dp,
+                        shadowOffset = 6.dp,
+                    )
+                    Text(
+                        text = s.unitsNote,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = CookncoGreenDark,

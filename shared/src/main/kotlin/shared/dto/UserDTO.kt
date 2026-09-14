@@ -1,6 +1,7 @@
 package shared.dto
 
 import shared.enums.Locale
+import shared.enums.UnitSystem
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -34,4 +35,16 @@ data class UserSettingsDTO(
      * controls per device.
      */
     val mailNotificationsEnabled: Boolean? = null,
+    /**
+     * The units this account reads amounts in.
+     *
+     * Non-null on the way out — a reader always has a ladder, and a client formatting an
+     * amount needs a definite answer rather than a fallback of its own. Null on the way
+     * *in* means "leave it alone", like the two fields above, so a client that predates
+     * this one cannot put an account back on metric by saving a privacy toggle.
+     *
+     * It says nothing about how recipes are *stored*: an author writes in whatever unit
+     * they picked, and this only decides what a reader is shown — see [UnitSystem].
+     */
+    val unitSystem: UnitSystem? = null,
 )

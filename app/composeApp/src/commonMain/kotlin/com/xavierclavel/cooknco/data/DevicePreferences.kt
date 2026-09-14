@@ -26,6 +26,7 @@ class DevicePreferences(private val dataStore: DataStore<Preferences>) {
     private val pushEnabledKey = booleanPreferencesKey("push_enabled")
     private val exactAlarmsAskedKey = booleanPreferencesKey("exact_alarms_asked")
     private val languageKey = stringPreferencesKey("app_language")
+    private val unitSystemKey = stringPreferencesKey("unit_system")
 
     val pushEnabled: Flow<Boolean> = dataStore.data.map { it[pushEnabledKey] ?: true }
 
@@ -56,5 +57,18 @@ class DevicePreferences(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setLanguage(code: String) {
         dataStore.edit { it[languageKey] = code }
+    }
+
+    /**
+     * The ladder the last session resolved, or null on a first launch.
+     *
+     * Cached for the same reason as [language]: a relaunch should draw the units the
+     * account reads in straight away rather than in metric until the settings request comes
+     * back. It is the account's choice and not the handset's — see [AppUnits].
+     */
+    val unitSystem: Flow<String?> = dataStore.data.map { it[unitSystemKey] }
+
+    suspend fun setUnitSystem(code: String) {
+        dataStore.edit { it[unitSystemKey] = code }
     }
 }

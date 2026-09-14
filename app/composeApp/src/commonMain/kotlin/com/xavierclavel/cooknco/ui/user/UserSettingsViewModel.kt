@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.AppLanguage
+import com.xavierclavel.cooknco.data.AppUnitSystem
+import com.xavierclavel.cooknco.data.AppUnits
 import com.xavierclavel.cooknco.data.AppLocale
 import com.xavierclavel.cooknco.data.DevicePreferences
 import com.xavierclavel.cooknco.data.PushRepository
@@ -35,6 +37,12 @@ data class UserSettingsUiState(
      * write a language the user never chose — see [UserSettingsViewModel.save].
      */
     val accountLocale: AccountLocale? = null,
+    /**
+     * The ladder amounts are shown on. Not nullable the way [accountLocale] is: nothing
+     * reports one, so there is no report to keep apart from a choice — the backend always
+     * answers with a real value and metric is what it answers until the user says.
+     */
+    val unitSystem: AppUnitSystem = AppUnitSystem.METRIC,
     val mailNotificationsEnabled: Boolean = false,
     val pushEnabled: Boolean = true,
     /** How many MCP clients this account has approved — the badge on the "MCP access" row. */
@@ -86,11 +94,16 @@ class UserSettingsViewModel(
                     // The account's language is the app's: adopted as soon as it is known,
                     // so a phone in English opens an account that reads French in French.
                     locale?.let { AppLanguage.set(AppLocale.of(it.code), devicePreferences, viewModelScope) }
+                    // Same rule for the ladder: what the account reads in is what every
+                    // recipe screen in the app draws in, from this moment on
+                    val unitSystem = AppUnitSystem.of(settings.unitSystem)
+                    AppUnits.set(unitSystem, devicePreferences, viewModelScope)
                     _uiState.update {
                         it.copy(
                             autoAcceptFollowRequests = settings.autoAcceptFollowRequests,
                             isAccountPublic = settings.isAccountPublic,
                             accountLocale = locale,
+                            unitSystem = unitSystem,
                             mailNotificationsEnabled = settings.mailNotificationsEnabled ?: false,
                             pushEnabled = pushEnabled,
                             isLoading = false,
@@ -108,6 +121,11 @@ class UserSettingsViewModel(
     fun toggleAccountPublic() = updateAndSave { it.copy(isAccountPublic = !it.isAccountPublic) }
 
     fun toggleMailNotifications() = updateAndSave { it.copy(mailNotificationsEnabled = !it.mailNotificationsEnabled) }
+
+    fun selectUnitSystem(system: AppUnitSystem) {
+        AppUnits.set(system, devicePreferences, viewModelScope)
+        updateAndSave { it.copy(unitSystem = system) }
+    }
 
     fun selectLocale(locale: AccountLocale) {
         AppLanguage.set(AppLocale.of(locale.code), devicePreferences, viewModelScope)
@@ -149,6 +167,7 @@ class UserSettingsViewModel(
                     // toggle cannot write a language nobody chose.
                     locale = state.accountLocale?.code,
                     mailNotificationsEnabled = state.mailNotificationsEnabled,
+                    unitSystem = state.unitSystem.code,
                 )
             )
                 .onSuccess {

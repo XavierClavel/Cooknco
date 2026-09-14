@@ -3,6 +3,7 @@ package main.com.xavierclavel.controllertests
 import com.xavierclavel.ApplicationTest
 import shared.enums.AmountUnit
 import shared.enums.MeasurementType
+import shared.enums.UnitSystem
 import shared.infodto.UnitInfo
 import shared.utils.URL.UNIT_URL
 import io.ktor.client.request.get
@@ -11,6 +12,8 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class UnitControllerTest : ApplicationTest() {
@@ -34,6 +37,29 @@ class UnitControllerTest : ApplicationTest() {
             assertTrue(it.type != MeasurementType.NONE, "${it.name} has no measurement type")
         }
         assertEquals(0f, AmountUnit.NONE.factorToBase)
+    }
+
+    /**
+     * Clients convert amounts onto the reader's ladder from this and nothing else, so the
+     * two fields that say which ladder a unit is on have to reach them — a unit served
+     * without them reads as belonging to neither and is silently never converted.
+     */
+    @Test
+    fun `the catalog says which ladder each unit is on`() = runTest {
+        client.get(UNIT_URL).apply {
+            assertEquals(HttpStatusCode.OK, status)
+            val units = Json.decodeFromString<List<UnitInfo>>(bodyAsText()).associateBy { it.name }
+
+            assertEquals(UnitSystem.METRIC, units.getValue(AmountUnit.GRAM).system)
+            assertEquals(UnitSystem.IMPERIAL, units.getValue(AmountUnit.POUND).system)
+            assertTrue(units.getValue(AmountUnit.GRAM).isDisplayUnit)
+            // Written in, never read back in: the product has always rolled mL up to L
+            assertEquals(UnitSystem.METRIC, units.getValue(AmountUnit.CENTILITER).system)
+            assertFalse(units.getValue(AmountUnit.CENTILITER).isDisplayUnit)
+            // On neither ladder, so never converted in either direction
+            assertNull(units.getValue(AmountUnit.TABLESPOON).system)
+            assertNull(units.getValue(AmountUnit.UNIT).system)
+        }
     }
 
     @Test

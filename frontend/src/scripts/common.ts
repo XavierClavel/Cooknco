@@ -7,6 +7,8 @@ import {getLocale} from "@/scripts/localization";
 import {switchCase} from "@babel/types";
 import {ingredientTypes} from "@/scripts/values";
 import i18n from "@/plugins/i18n";
+import {unitOptions} from "@/scripts/units";
+import {convertToPreferred, unitSystem} from "@/scripts/unitSystem";
 
 export {
   login,
@@ -364,14 +366,18 @@ const unitToReadable = (unit) => {
       return "cL"
     case "LITER":
       return "L"
+    case "OUNCE":
+      return "oz"
     case "POUND":
       return "lb"
+    case "FLUID_OUNCE":
+      return " fl oz"
     case "TEASPOON":
       return ` ${t("unit_teaspoon")}`
     case "TABLESPOON":
       return ` ${t("unit_tablespoon")}`
     case "CUP":
-      return " cups"
+      return ` ${t("unit_cup")}`
     case "NONE":
       return ""
     case null:
@@ -380,18 +386,20 @@ const unitToReadable = (unit) => {
 }
 
 
+/**
+ * An amount as this reader measures it.
+ *
+ * Takes the amount already scaled to the yield they picked, and only then puts it on their
+ * ladder: the ladder has to see the number they will actually measure, or a 200 g recipe
+ * cooked for four would read "4 x 7.05 oz" instead of "1.76 lb".
+ *
+ * Rolling grams up to kilograms is not a rule of its own any more - it is what landing on
+ * the largest metric display unit the amount reaches already does.
+ */
 const formatAmount = (amount, unit) => {
   if (!amount) return ""
-  let scaledAmount = amount
-  let scaledUnit = unit
-  if (unit == "GRAM" && amount >= 1000) {
-    scaledAmount = amount / 1000
-    scaledUnit = "KILOGRAM"
-  } else if (unit == "MILLILITERS" && amount >= 1000) {
-    scaledAmount = amount / 1000
-    scaledUnit = "LITER"
-  }
-  return `${scaledAmount.toFixed(2).replace(/[.,]?0+$/, '')}${unitToReadable(scaledUnit)}`
+  const converted = convertToPreferred(amount, unit, unitSystem.value, unitOptions.value)
+  return `${converted.amount.toFixed(2).replace(/[.,]?0+$/, '')}${unitToReadable(converted.unit)}`
 }
 
 
