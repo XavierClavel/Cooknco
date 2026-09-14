@@ -44,6 +44,11 @@ import androidx.compose.ui.window.PopupProperties
  * [anchor] is drawn in place and the menu is positioned under it by its measured height, so
  * a caller only says what opens the menu, never where the menu goes. [alignEnd] hangs it
  * from the anchor's trailing edge, which is what a narrow chip at the right of a row needs.
+ *
+ * [width] defaults to the anchor's own measured width, which is what a menu hung under a
+ * field should be. It has to be *some* width: the rows fill their parent and a [Popup] is
+ * measured against the window, so an unconstrained menu is a screen-wide one — which is
+ * what the member search was, being the only caller not passing an explicit width.
  */
 @Composable
 fun <T> StickerDropdownMenu(
@@ -57,16 +62,25 @@ fun <T> StickerDropdownMenu(
     /** The caps heading a row sits under, or null for an ungrouped list. */
     sectionOf: (T) -> String? = { null },
     alignEnd: Boolean = false,
+    /** Null means "as wide as the anchor". */
     width: Dp? = null,
     maxHeight: Dp = 340.dp,
     gap: Dp = 8.dp,
     anchor: @Composable () -> Unit,
 ) {
     var anchorHeight by remember { mutableStateOf(0) }
-    val gapPx = with(LocalDensity.current) { gap.roundToPx() }
+    var anchorWidth by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val gapPx = with(density) { gap.roundToPx() }
+    val menuWidth = width ?: with(density) { anchorWidth.toDp() }.takeIf { it > 0.dp }
 
     Box(modifier = modifier) {
-        Box(modifier = Modifier.onSizeChanged { anchorHeight = it.height }) {
+        Box(
+            modifier = Modifier.onSizeChanged {
+                anchorHeight = it.height
+                anchorWidth = it.width
+            },
+        ) {
             anchor()
         }
         if (expanded && items.isNotEmpty()) {
@@ -77,7 +91,7 @@ fun <T> StickerDropdownMenu(
                 properties = PopupProperties(focusable = true),
             ) {
                 StickerCard(
-                    modifier = if (width != null) Modifier.width(width) else Modifier,
+                    modifier = if (menuWidth != null) Modifier.width(menuWidth) else Modifier,
                     shape = RoundedCornerShape(18.dp),
                     shadowOffset = 6.dp,
                 ) {

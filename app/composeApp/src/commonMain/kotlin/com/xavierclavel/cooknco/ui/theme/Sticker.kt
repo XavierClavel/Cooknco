@@ -23,11 +23,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -209,5 +212,62 @@ fun StickerTextArea(
             cursorBrush = SolidColor(cursorColor),
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/**
+ * A dashed outline in [shape]. `Modifier.border()` has no dashed variant, so this paints the
+ * stroke itself.
+ *
+ * The one sticker element that carries no solid border, and the theme's way of saying "this
+ * is where a new one goes" — a new cookbook, a new step, a new member. It lived three times
+ * over as a private helper on the screens that draw it, with the dash pattern in raw pixels
+ * in one of them and in dp in another, so the same affordance dashed differently depending
+ * on the screen you reached it from.
+ */
+fun Modifier.dashedBorder(
+    shape: Shape,
+    color: Color = CookncoNavy,
+    strokeWidth: Dp = 3.dp,
+    dashLength: Dp = 8.dp,
+    gapLength: Dp = 6.dp,
+): Modifier = drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val path = Path().apply { addOutline(outline) }
+    val stroke = Stroke(
+        width = strokeWidth.toPx(),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLength.toPx(), gapLength.toPx()), 0f),
+    )
+    onDrawBehind { drawPath(path = path, color = color, style = stroke) }
+}
+
+/**
+ * The "+ something" row: a dashed outline, a plus, and a label.
+ *
+ * Every list in the product that can be added to ends with one of these, and they are meant
+ * to read as the same control — so the shape and the height are the only things a call site
+ * varies, and it says so rather than redrawing the border.
+ */
+@Composable
+fun StickerDashedButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(20.dp),
+    height: Dp = 56.dp,
+    color: Color = CookncoNavy,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+            .dashedBorder(shape, color)
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("+", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color)
+        Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = color)
     }
 }
