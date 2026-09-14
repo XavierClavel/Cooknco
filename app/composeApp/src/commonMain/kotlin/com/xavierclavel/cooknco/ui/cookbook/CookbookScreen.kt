@@ -156,6 +156,18 @@ fun CookbookScreen(
 
 // ── Cookbook content ────────────────────────────────────────────────────────────
 
+/** How tall the cookbook's picture is drawn. */
+private val BANNER_HEIGHT = 250.dp
+
+/**
+ * How far the info card rides up over the picture.
+ *
+ * Enough that the card is plainly on top of the banner rather than merely next to it, and no
+ * more: the title is the first thing on the card, so anything deeper starts eating the
+ * picture the cookbook was given.
+ */
+private val CARD_OVERLAP = 28.dp
+
 @Composable
 private fun CookbookContent(
     cookbook: CookbookInfo,
@@ -211,88 +223,101 @@ private fun CookbookContent(
             }
         }
 
-        // ── Banner image with the back / "···" overlay ───────────────────────
+        // ── Banner, with the info card riding up over its foot ───────────────
+        //
+        // One item rather than two, because the card has to sit *over* the picture and two
+        // rows of a LazyColumn cannot overlap. The Box stacks them: the banner is drawn
+        // first, at its own height, and the card is placed a little short of the foot of it,
+        // so the picture runs on behind the card's top edge instead of stopping at it. The
+        // Box takes its height from the card - the taller child - so everything below still
+        // starts where it should.
         item {
             Box(modifier = Modifier.fillMaxWidth()) {
-                CookbookImage(
-                    cookbookId = cookbook.id,
-                    version = cookbook.version,
-                    contentDescription = cookbook.title,
-                    modifier = Modifier.fillMaxWidth().height(250.dp),
-                )
-                // The mockup's banner sits on a hard navy rule where it meets the
-                // overlapping info card, rather than fading straight into it.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(CookncoNavy),
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 18.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
-                    }
-                    val menuFill by animateColorAsState(
-                        targetValue = if (showMenu) CookncoNavy else CookncoBackground,
-                        animationSpec = stickerSwitchSpec(),
-                        label = "menu_fill",
+                Box(modifier = Modifier.fillMaxWidth().height(BANNER_HEIGHT)) {
+                    CookbookImage(
+                        cookbookId = cookbook.id,
+                        version = cookbook.version,
+                        contentDescription = cookbook.title,
+                        modifier = Modifier.fillMaxWidth().height(BANNER_HEIGHT),
                     )
-                    val menuContent by animateColorAsState(
-                        targetValue = if (showMenu) CookncoWhite else CookncoNavy,
-                        animationSpec = stickerSwitchSpec(),
-                        label = "menu_content",
+                    // The mockup's banner sits on a hard navy rule where it meets the
+                    // overlapping info card, rather than fading straight into it. The card
+                    // covers the middle of that rule and leaves its ends showing either
+                    // side, which is what reads as one thing sitting on another.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(CookncoNavy),
                     )
-                    StickerIconButton(
-                        onClick = { showMenu = true },
-                        shadowOffset = 3.dp,
-                        fillColor = menuFill,
-                        contentColor = menuContent,
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Icon(Icons.Outlined.MoreHoriz, contentDescription = s.more)
+                        StickerIconButton(onClick = onNavigateBack, shadowOffset = 3.dp) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = s.back)
+                        }
+                        val menuFill by animateColorAsState(
+                            targetValue = if (showMenu) CookncoNavy else CookncoBackground,
+                            animationSpec = stickerSwitchSpec(),
+                            label = "menu_fill",
+                        )
+                        val menuContent by animateColorAsState(
+                            targetValue = if (showMenu) CookncoWhite else CookncoNavy,
+                            animationSpec = stickerSwitchSpec(),
+                            label = "menu_content",
+                        )
+                        StickerIconButton(
+                            onClick = { showMenu = true },
+                            shadowOffset = 3.dp,
+                            fillColor = menuFill,
+                            contentColor = menuContent,
+                        ) {
+                            Icon(Icons.Outlined.MoreHoriz, contentDescription = s.more)
+                        }
                     }
                 }
-            }
-        }
 
-        // ── Info card ────────────────────────────────────────────────────────
-        item {
-            StickerCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
-                shape = RoundedCornerShape(20.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(11.dp),
+                StickerCard(
+                    modifier = Modifier.fillMaxWidth().padding(
+                        top = BANNER_HEIGHT - CARD_OVERLAP,
+                        start = 18.dp,
+                        end = 18.dp,
+                        bottom = 12.dp,
+                    ),
+                    shape = RoundedCornerShape(20.dp),
                 ) {
-                    Text(
-                        text = cookbook.title,
-                        fontSize = 27.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CookncoNavy,
-                        lineHeight = 33.sp,
-                    )
-                    if (cookbook.description.isNotBlank()) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(11.dp),
+                    ) {
                         Text(
-                            text = cookbook.description,
-                            fontSize = 14.sp,
-                            lineHeight = 21.sp,
-                            color = CookncoNavy.copy(alpha = 0.72f),
+                            text = cookbook.title,
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                            lineHeight = 33.sp,
                         )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatChip(s.recipeCount(cookbook.recipesCount))
-                        StatChip(
-                            text = s.memberCount(cookbook.usersCount),
-                            fillColor = CookncoBlueLight,
-                            textColor = CookncoBlueDark,
-                        )
+                        if (cookbook.description.isNotBlank()) {
+                            Text(
+                                text = cookbook.description,
+                                fontSize = 14.sp,
+                                lineHeight = 21.sp,
+                                color = CookncoNavy.copy(alpha = 0.72f),
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatChip(s.recipeCount(cookbook.recipesCount))
+                            StatChip(
+                                text = s.memberCount(cookbook.usersCount),
+                                fillColor = CookncoBlueLight,
+                                textColor = CookncoBlueDark,
+                            )
+                        }
                     }
                 }
             }

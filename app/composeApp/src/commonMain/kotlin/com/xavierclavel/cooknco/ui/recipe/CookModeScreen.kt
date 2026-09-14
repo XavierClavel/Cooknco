@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,6 +56,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.platform.rememberExactTimerConsent
+import com.xavierclavel.cooknco.ui.components.StepImage
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -176,7 +178,8 @@ private fun CookModeContent(
 ) {
     val s = strings()
     val stepCount = recipe.steps.size
-    val stepText = recipe.steps.getOrNull(currentStep)?.text ?: ""
+    val step = recipe.steps.getOrNull(currentStep)
+    val stepText = step?.text ?: ""
     val isLastStep = currentStep >= stepCount - 1
 
     Column(
@@ -268,6 +271,30 @@ private fun CookModeContent(
                         lineHeight = 36.sp,
                         modifier = Modifier.padding(top = 10.dp),
                     )
+                }
+            }
+
+            // Between the words and the ingredients: it shows what the step is asking for,
+            // which is worth more mid-cook than a list of what goes into it. Only drawn when
+            // there is one - a step without a picture gets no frame and no placeholder.
+            val stepImageId = step?.id
+            val stepImageVersion = step?.imageVersion ?: 0
+            if (stepImageId != null && stepImageVersion > 0) {
+                item {
+                    StickerCard(
+                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        shadowOffset = 6.dp,
+                    ) {
+                        StepImage(
+                            stepId = stepImageId,
+                            version = stepImageVersion,
+                            contentDescription = s.recipeStepPhoto,
+                            // The shape the bucket stores them in, so nothing is cropped
+                            // twice - see ImageBucket.RECIPE_STEP.
+                            modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f),
+                        )
+                    }
                 }
             }
 

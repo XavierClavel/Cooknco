@@ -106,9 +106,8 @@ class Recipe (
         this.description = recipeDTO.description
         this.dishClass = recipeDTO.dishClass
 
-        // Position is carried by the row now rather than by the order it happened to be
-        // written in, so the index the author put the step at is what is stored.
-        this.steps = recipeDTO.steps.mapIndexed { index, step -> RecipeStep.of(step, index) }
+        // Not the steps: they are matched to the rows already there rather than replaced,
+        // which needs the database. See RecipeService.saveSteps.
         this.modificationDate = LocalDateTime.now()
 
         this.yield = recipeDTO.yield

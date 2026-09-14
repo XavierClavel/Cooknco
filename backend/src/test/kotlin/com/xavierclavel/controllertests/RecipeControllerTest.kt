@@ -564,6 +564,77 @@ class RecipeControllerTest : ApplicationTest() {
     }
 
     /**
+     * A step keeps its row across an edit, so anything hung off it by id survives one.
+     *
+     * Steps used to be deleted and re-inserted on every save, inherited from when they were an
+     * `@ElementCollection` of strings and had no identity to keep. Editing a recipe's title
+     * gave every step a new id.
+     */
+    @Test
+    fun `a step keeps its id when the recipe is edited`() = runTestAsAdmin {
+        val created = client.createRecipe(
+            RecipeDTO(
+                title = "My recipe",
+                steps = stepsOf("melt the butter", "add the flour", "bake"),
+            )
+        )
+        val ids = created.steps.map { it.id }
+        assertTrue(ids.all { it != null }, "a saved step has an id")
+
+        // Only the title changes; the steps come back exactly as they were sent.
+        val retitled = client.updateRecipe(
+            created.id,
+            RecipeDTO(title = "A better name", steps = created.steps.toMutableList()),
+        )
+        assertEquals(ids, retitled.steps.map { it.id }, "an edit elsewhere must not rewrite the steps")
+
+        // Rewording a step keeps its row too.
+        val reworded = client.updateRecipe(
+            created.id,
+            RecipeDTO(
+                title = "A better name",
+                steps = retitled.steps
+                    .mapIndexed { index, step -> if (index == 1) step.copy(text = "fold the flour in") else step }
+                    .toMutableList(),
+            ),
+        )
+        assertEquals(ids, reworded.steps.map { it.id })
+        assertEquals(listOf("melt the butter", "fold the flour in", "bake"), reworded.steps.texts())
+    }
+
+    /** A step the client stops naming goes; one it names without an id is new. */
+    @Test
+    fun `steps are inserted, kept and deleted by what the client names`() = runTestAsAdmin {
+        val created = client.createRecipe(
+            RecipeDTO(title = "My recipe", steps = stepsOf("first", "second", "third")),
+        )
+        val (first, second, third) = created.steps
+
+        val updated = client.updateRecipe(
+            created.id,
+            RecipeDTO(
+                title = "My recipe",
+                steps = mutableListOf(
+                    // Reordered, one dropped, one brand new.
+                    third,
+                    RecipeDTO.RecipeStepDTO(text = "a new one"),
+                    first,
+                ),
+            ),
+        )
+
+        assertEquals(listOf("third", "a new one", "first"), updated.steps.texts())
+        assertEquals(third.id, updated.steps[0].id, "a reordered step keeps its row")
+        assertEquals(first.id, updated.steps[2].id)
+        assertTrue(
+            updated.steps[1].id !in listOf(first.id, second.id, third.id),
+            "a step named without an id is a new row",
+        )
+        assertTrue(second.id !in updated.steps.mapNotNull { it.id }, "the dropped step's row is gone")
+        assertEquals(3, countRows("recipe_steps", created.id), "and no row was left behind")
+    }
+
+    /**
      * A blank comes back a blank.
      *
      * The server stores and returns what was stated, and nothing else — which is what lets an

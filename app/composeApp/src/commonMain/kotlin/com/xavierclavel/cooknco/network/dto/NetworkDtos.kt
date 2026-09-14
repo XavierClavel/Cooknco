@@ -101,6 +101,16 @@ data class RecipeInfo(
 @Serializable
 data class RecipeStepInfo(
     val text: String = "",
+    /**
+     * The step's own row, or null for a step that has never been saved.
+     *
+     * Sent back exactly as it arrived: it is how the server tells which step is which, and so
+     * what to update rather than replace. Anything hung off a step - a picture - is addressed
+     * by it, which is why a save no longer throws the rows away and writes them again.
+     */
+    val id: Long? = null,
+    /** Which version of this step's picture to ask for. Zero means it has none. */
+    val imageVersion: Long = 0,
     val durationSeconds: Int? = null,
     /** The recipe's own ingredients this step uses. Empty for most steps. */
     val ingredients: List<RecipeStepIngredientInfo> = emptyList(),
