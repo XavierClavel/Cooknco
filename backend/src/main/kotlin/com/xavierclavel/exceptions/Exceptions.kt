@@ -110,6 +110,8 @@ enum class BadRequestCause (val key: String) {
     NOTIFICATION_HAS_NO_AUDIENCE("notification_has_no_audience"),
     NOTIFICATION_HAS_NO_DEVICE("notification_has_no_device"),
 
+    COOKBOOK_TOO_LARGE_TO_EXPORT("cookbook_too_large_to_export"),
+
     PDF_TEMPLATE_EMPTY("pdf_template_empty"),
     PDF_TEMPLATE_TOO_LONG("pdf_template_too_long"),
     PDF_TEMPLATE_MALFORMED("pdf_template_malformed"),

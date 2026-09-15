@@ -55,6 +55,15 @@
           ></action-button>
         </v-col>
         <v-col cols="12" sm="auto" >
+          <admin-only>
+            <action-button
+              icon="mdi-tray-arrow-down"
+              :text="`${$t('export_pdf')}`"
+              :action="() => onExport()"
+            ></action-button>
+          </admin-only>
+        </v-col>
+        <v-col cols="12" sm="auto" >
           <v-dialog max-width="500">
             <template v-slot:activator="{ props: activatorProps }">
               <action-button
@@ -92,6 +101,24 @@
 
 
   </v-card>
+
+  <v-snackbar
+    v-model="snackbar"
+    :timeout="4000"
+    height="60px"
+  >
+    {{ snackbarMessage }}
+    <template v-slot:actions>
+      <v-btn
+        variant="flat"
+        color="primary"
+        @click="snackbar = false"
+        icon="mdi-close"
+        height="40px"
+        width="40px"
+      ></v-btn>
+    </template>
+  </v-snackbar>
   </v-container>
   <recipes-list v-if="!errors"></recipes-list>
 </template>
@@ -105,11 +132,14 @@ import {
   toEditCookbook,
   toEditUser,
   toListCookbooks,
+  toErrorMessage,
   toSignup
 } from "@/scripts/common";
-import {getCookbook, isAdminOfCookbook, leaveCookbook} from "@/scripts/cookbooks";
+import {downloadCookbook, getCookbook, isAdminOfCookbook, leaveCookbook} from "@/scripts/cookbooks";
 import {ICON_COOKBOOK_RECIPES, ICON_COOKBOOK_USERS} from "@/scripts/icons";
 import {useAuthStore} from "@/stores/auth";
+import {useI18n} from "vue-i18n";
+const {t} = useI18n()
 const route = useRoute();
 let cookbookId = ref(route.query.cookbook)
 const isAdmin = ref(false)
@@ -122,6 +152,8 @@ const cookbook = ref<object>({
   version: null,
 })
 const errors = ref(null)
+const snackbar = ref(false)
+const snackbarMessage = ref<string>("")
 
 
 if (cookbookId.value != null) {
@@ -138,6 +170,23 @@ if (cookbookId.value != null) {
       isAdmin.value = response.data
     }
   )
+}
+
+/**
+ * Prints the cookbook and saves it.
+ *
+ * Awaited so the button keeps its spinner for the whole print — a book is a page per
+ * recipe through a real browser, which is seconds rather than the blink a single sheet
+ * takes. The refusal is shown rather than swallowed: a cookbook too large to print says
+ * so, and that is the one failure an operator can do something about.
+ */
+async function onExport() {
+  try {
+    await downloadCookbook(cookbookId.value)
+  } catch (error) {
+    snackbarMessage.value = t(toErrorMessage(error))
+    snackbar.value = true
+  }
 }
 
 async function leave() {

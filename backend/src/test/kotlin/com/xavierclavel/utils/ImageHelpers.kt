@@ -37,6 +37,9 @@ suspend fun HttpClient.uploadImage(path: String, id: Long, bytes: ByteArray = te
 suspend fun HttpClient.uploadRecipeImage(recipeId: Long, bytes: ByteArray = testImageBytes()): HttpResponse =
     uploadImage("recipes", recipeId, bytes)
 
+suspend fun HttpClient.uploadCookbookImage(cookbookId: Long, bytes: ByteArray = testImageBytes()): HttpResponse =
+    uploadImage("cookbooks", cookbookId, bytes)
+
 /**
  * Posts a picture to an upload URL a ticket was minted for, the way a client holding one does.
  *

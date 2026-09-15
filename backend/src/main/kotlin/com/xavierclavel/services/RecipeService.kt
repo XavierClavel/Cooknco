@@ -97,6 +97,36 @@ class RecipeService: KoinComponent {
             .findOne()
             ?: throw NotFoundException(NotFoundCause.RECIPE_NOT_FOUND)
 
+    /**
+     * Every recipe a cookbook holds, in the order the book prints them.
+     *
+     * By title rather than by when each was added: a book is read by looking a recipe up,
+     * and the addition order is a fact about the cookbook's history that no reader of the
+     * printed copy can see. Soft-deleted recipes drop out on their own — Ebean applies the
+     * flag to its own queries — which is right, because a deleted recipe is gone rather
+     * than hidden. A moderator-hidden one is kept, matching the single-recipe export: both
+     * are behind the admin gate, and what the cookbook holds is what it prints.
+     *
+     * A typed `-to-many` predicate rather than the `EXISTS` [filterByCookbook] uses: that
+     * one exists because the join double-counts against the like aggregate in [findList],
+     * and there is no aggregate here. The owner is fetched because every sheet prints a
+     * byline; the collections load per recipe, which is what a bounded, admin-only export
+     * run once can afford — the print itself costs orders of magnitude more.
+     *
+     * @param limit how many rows to read at most. Callers asking whether a cookbook is
+     *   within a bound pass the bound plus one and compare, which answers that in the one
+     *   query that also fetches the recipes — rather than counting first and then reading,
+     *   which loads nothing extra but can disagree with itself if a recipe is added in
+     *   between.
+     */
+    fun findByCookbook(cookbookId: Long, limit: Int): List<Recipe> =
+        QRecipe()
+            .owner.fetch()
+            .cookbooks.cookbook.id.eq(cookbookId)
+            .orderBy().title.asc()
+            .setMaxRows(limit)
+            .findList()
+
     fun existsById(recipeId:Long, userId: Long?) =
         QRecipe()
             .id.eq(recipeId)

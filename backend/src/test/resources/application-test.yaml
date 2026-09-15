@@ -26,3 +26,9 @@ images:
   # Small on purpose: it is what lets the ticket endpoint's size refusal be exercised
   # without moving twenty megabytes through the test client.
   max_upload_bytes: 65536
+
+pdf:
+  # Small for the same reason as max_upload_bytes above: the cookbook export refuses a book
+  # past this, and a test that had to build a hundred recipes to reach the real bound would
+  # spend a minute proving one `if`. Every other export test stays well under it.
+  max_cookbook_recipes: 3

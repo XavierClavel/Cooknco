@@ -102,8 +102,8 @@
             </label>
 
             <label class="row small subtle" style="gap:5px">
-              {{ $t('admin_documents_preview_recipe') }}
-              <input v-model="previewRecipeId" class="input tnum" style="width:78px" type="number" min="1"
+              {{ subjectLabel }}
+              <input v-model="previewSubjectId" class="input tnum" style="width:78px" type="number" min="1"
                      :placeholder="$t('admin_documents_preview_newest')" />
             </label>
 
@@ -183,6 +183,13 @@ const LOCALE_LABELS: Record<string, string> = {FR: 'Français', EN: 'English'}
 
 const KIND_LABELS: Record<string, string> = {
   recipe: 'admin_documents_kind_recipe',
+  cookbook: 'admin_documents_kind_cookbook',
+}
+
+/** What a kind is previewed against, which is also what the id field asks for. */
+const SUBJECT_LABELS: Record<string, string> = {
+  recipe: 'admin_documents_preview_recipe',
+  cookbook: 'admin_documents_preview_cookbook',
 }
 
 /**
@@ -191,7 +198,7 @@ const KIND_LABELS: Record<string, string> = {
  * They are inserted as a section — `{{#steps}}…{{/steps}}` — because writing one as a plain
  * `{{steps}}` prints nothing, which is a confusing first thing to happen to an operator.
  */
-const SECTIONS = new Set(['ingredients', 'steps', 'hasIngredients', 'hasSteps'])
+const SECTIONS = new Set(['ingredients', 'steps', 'hasIngredients', 'hasSteps', 'recipes', 'hasRecipes'])
 
 const templates = ref<any[]>([])
 const loading = ref(true)
@@ -210,7 +217,7 @@ const drafts = reactive<Record<string, string>>({})
 const live = ref(true)
 const rendering = ref(false)
 const renderError = ref('')
-const previewRecipeId = ref<string>('')
+const previewSubjectId = ref<string>('')
 const restoreDialog = ref(false)
 const bodyInput = ref<HTMLTextAreaElement | null>(null)
 
@@ -224,6 +231,8 @@ let awaiting: 'a' | 'b' | null = null
 const shownUrl = computed(() => (shown.value === 'a' ? urlA.value : urlB.value))
 
 const selected = computed(() => templates.value.find(tpl => tpl.key === selectedKey.value) ?? null)
+
+const subjectLabel = computed(() => t(SUBJECT_LABELS[selectedKey.value ?? ''] ?? 'admin_documents_preview_recipe'))
 
 /** The layout in service for the locale on screen: an override, or the packaged one. */
 const current = computed(
@@ -332,23 +341,23 @@ let printed = ''
  *
  * @param now skips the debounce, for a click or a change of kind
  * @param force prints even if nothing has changed since the sheet on screen. Only the
- *   refresh button passes it: the recipe being printed can change under an unchanged
- *   layout, and that button is how an operator asks to see it.
+ *   refresh button passes it: what is being printed can change under an unchanged layout,
+ *   and that button is how an operator asks to see it.
  */
 async function render(now = false, force = false) {
   if (now) clearTimeout(timer)
   if (!selectedKey.value || !draft.value.trim()) return
 
-  const id = Number(previewRecipeId.value)
-  const recipeId = Number.isFinite(id) && id > 0 ? id : null
-  const signature = `${selectedKey.value}|${locale.value}|${recipeId}|${draft.value}`
+  const id = Number(previewSubjectId.value)
+  const subjectId = Number.isFinite(id) && id > 0 ? id : null
+  const signature = `${selectedKey.value}|${locale.value}|${subjectId}|${draft.value}`
   if (!force && signature === printed) return
   if (inFlight) { queued = true; return }
 
   inFlight = true
   rendering.value = true
   try {
-    const {data} = await previewPdfTemplate(selectedKey.value, locale.value, draft.value, recipeId)
+    const {data} = await previewPdfTemplate(selectedKey.value, locale.value, draft.value, subjectId)
     present(new Blob([data], {type: 'application/pdf'}))
     printed = signature
     renderError.value = ''
@@ -439,8 +448,8 @@ watch([selectedKey, locale], () => {
 watch(draft, schedule)
 
 // Through the debounce, not straight to a print: this is a text field, so typing a
-// two-digit recipe id is two keystrokes and would otherwise be two prints.
-watch(previewRecipeId, schedule)
+// two-digit id is two keystrokes and would otherwise be two prints.
+watch(previewSubjectId, schedule)
 
 // A click, so it is meant now.
 watch(live, () => { if (live.value) render(true) })

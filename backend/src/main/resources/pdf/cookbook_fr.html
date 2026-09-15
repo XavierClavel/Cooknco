@@ -1,0 +1,354 @@
+<!--
+  Le livre de recettes, tel que Chromium l'imprime : une couverture, un sommaire, puis une
+  page par recette.
+
+  Modifiable depuis le backoffice, comme la fiche recette. Les valeurs viennent en deux
+  groupes. Celles du livre — {{title}}, {{description}}, {{cover}}, {{recipeCount}},
+  {{url}} — se lisent partout. Celles d'une recette n'ont de sens que dans
+  {{#recipes}}…{{/recipes}}, qui se répète une fois par recette : là, {{title}} est le titre
+  de la recette et non celui du livre, Mustache répondant toujours par le nom le plus
+  proche. {{siteName}} n'a qu'un sens et se lit donc pareil des deux côtés.
+
+  Rendu par Chromium sans interface, donc le CSS moderne passe. La seule règle est que rien
+  ne peut être chargé depuis le réseau — polices et images doivent être envoyées avec ce
+  fichier, et une URL est ignorée.
+-->
+<meta charset="utf-8">
+<title>{{title}}</title>
+<style>
+  /* Envoyée avec ce fichier par l'export ; aucune autre police n'est disponible hors ligne. */
+  @font-face {
+    font-family: Roboto;
+    src: url(Roboto-Regular.ttf);
+  }
+
+  @page {
+    size: A4;
+    margin: 14mm 15mm;
+  }
+
+  :root {
+    --accent: #ff6f59;
+    --ink: #2f2b28;
+    --muted: #8a8178;
+    --rule: #ece7e1;
+    --wash: #fdf7f4;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Roboto, "Liberation Sans", sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: var(--ink);
+    /* Roboto ligates fl and fi, and the glyph is what ends up in the PDF's text: with
+       ligatures on, searching the book for "flour" finds nothing. A book people print is
+       also a book people search, and the typography is worth less than that. */
+    font-variant-ligatures: none;
+  }
+
+  h2 {
+    margin: 0 0 3mm;
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1pt;
+    color: var(--accent);
+  }
+
+  /* -------------------------------------------------------------- couverture */
+
+  .cover {
+    /* The page box less its margins, so the colophon sits at the foot of the sheet
+       rather than under whatever height the description happened to take. */
+    height: 269mm;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cover-photo {
+    display: block;
+    width: 100%;
+    height: 105mm;
+    object-fit: cover;
+    border-radius: 3mm;
+  }
+
+  .cover-title {
+    margin: 12mm 0 0;
+    font-size: 40pt;
+    line-height: 1.08;
+    letter-spacing: -1pt;
+    color: var(--accent);
+  }
+
+  .cover-description {
+    margin: 6mm 0 0;
+    font-size: 12pt;
+    color: #574f49;
+  }
+
+  .cover-count {
+    margin: 5mm 0 0;
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1pt;
+    color: var(--muted);
+  }
+
+  .colophon {
+    margin-top: auto;
+    padding-top: 2.5mm;
+    border-top: 0.4mm solid var(--rule);
+    font-size: 8pt;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ---------------------------------------------------------------- sommaire */
+
+  .contents { break-before: page; }
+
+  .contents ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    /* Two columns, so a book of any size keeps its contents to one or two sheets. */
+    column-count: 2;
+    column-gap: 10mm;
+  }
+
+  .contents li {
+    padding: 1.4mm 0;
+    border-bottom: 0.3mm dotted var(--rule);
+    break-inside: avoid;
+  }
+
+  /* ---------------------------------------------------------------- recettes */
+
+  /* One recipe per page: a book is read a recipe at a time, and a page that starts
+     halfway down the previous one cannot be pulled out and propped up by the hob. */
+  .recipe { break-before: page; }
+
+  .recipe-title {
+    margin: 0;
+    font-size: 22pt;
+    line-height: 1.15;
+    letter-spacing: -0.4pt;
+    color: var(--accent);
+  }
+
+  .byline {
+    margin: 2.5mm 0 0;
+    font-size: 9.5pt;
+    color: var(--muted);
+  }
+
+  .photo {
+    display: block;
+    width: 100%;
+    /* A band, not the whole picture: cropping to a fixed height is what keeps a full
+       recipe — picture, ingredients, steps and tips — on a single page. */
+    height: 42mm;
+    margin: 5mm 0 0;
+    object-fit: cover;
+    border-radius: 3mm;
+  }
+
+  .description {
+    margin: 5mm 0 0;
+    font-size: 10.5pt;
+    color: #574f49;
+  }
+
+  .facts {
+    display: flex;
+    gap: 4mm;
+    margin: 6mm 0 0;
+    padding: 3.5mm 0;
+    border-top: 0.4mm solid var(--rule);
+    border-bottom: 0.4mm solid var(--rule);
+  }
+
+  .fact { flex: 1; }
+
+  .fact dt {
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6pt;
+    color: var(--muted);
+  }
+
+  .fact dd {
+    margin: 1mm 0 0;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+
+  .body { margin: 7mm 0 0; }
+
+  /* Two columns only when there is an ingredient list to fill the narrow one. A recipe
+     with none would otherwise print its steps in the right-hand column with 62mm of
+     nothing beside them. */
+  .body.split {
+    display: grid;
+    grid-template-columns: 58mm 1fr;
+    gap: 9mm;
+  }
+
+  .ingredients {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ingredients li {
+    display: flex;
+    gap: 2mm;
+    padding: 1.5mm 0;
+    border-bottom: 0.3mm dotted var(--rule);
+    break-inside: avoid;
+  }
+
+  .ingredients .amount {
+    flex: 0 0 17mm;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ingredients .complement { color: var(--muted); }
+
+  .steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+
+  .steps li {
+    position: relative;
+    padding: 0 0 3.5mm 10mm;
+    break-inside: avoid;
+  }
+
+  .steps li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0.2mm;
+    width: 6.5mm;
+    height: 6.5mm;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 9pt;
+    font-weight: 700;
+    line-height: 6.5mm;
+    text-align: center;
+  }
+
+  .tips {
+    margin: 5mm 0 0;
+    padding: 3.5mm 4.5mm;
+    background: var(--wash);
+    border-left: 1mm solid var(--accent);
+    border-radius: 0 2mm 2mm 0;
+    break-inside: avoid;
+  }
+
+  .tips h2 { margin-bottom: 1.5mm; }
+
+  .footer {
+    margin: 6mm 0 0;
+    padding-top: 2.5mm;
+    border-top: 0.4mm solid var(--rule);
+    font-size: 8pt;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+
+<div class="cover">
+  {{#cover}}<img class="cover-photo" src="{{cover}}" alt="">{{/cover}}
+  <h1 class="cover-title">{{title}}</h1>
+  {{#description}}<p class="cover-description">{{description}}</p>{{/description}}
+  <!-- Un intitulé plutôt qu'une phrase : Mustache ne sait pas accorder, et toute
+       formulation plaçant le nom après le nombre donne « 1 recettes » sur un carnet
+       qui n'en contient qu'une. -->
+  <p class="cover-count">Recettes : {{recipeCount}}</p>
+  <div class="colophon">
+    <span>{{siteName}}</span>
+    <span>{{url}}</span>
+  </div>
+</div>
+
+{{#hasRecipes}}
+<section class="contents">
+  <h2>Sommaire</h2>
+  <ol>
+    {{#recipes}}<li>{{title}}</li>{{/recipes}}
+  </ol>
+</section>
+
+{{#recipes}}
+<article class="recipe">
+  <h1 class="recipe-title">{{title}}</h1>
+  <p class="byline">Par {{author}}</p>
+
+  {{#photo}}<img class="photo" src="{{photo}}" alt="">{{/photo}}
+
+  {{#description}}<p class="description">{{description}}</p>{{/description}}
+
+  <dl class="facts">
+    {{#yield}}<div class="fact"><dt>Portions</dt><dd>{{yield}}</dd></div>{{/yield}}
+    {{#preparationTime}}<div class="fact"><dt>Préparation</dt><dd>{{preparationTime}} min</dd></div>{{/preparationTime}}
+    {{#cookingTime}}<div class="fact"><dt>Cuisson</dt><dd>{{cookingTime}} min</dd></div>{{/cookingTime}}
+    {{#cookingTemperature}}<div class="fact"><dt>Température</dt><dd>{{cookingTemperature}} °C</dd></div>{{/cookingTemperature}}
+  </dl>
+
+  <div class="body{{#hasIngredients}} split{{/hasIngredients}}">
+    <section>
+      {{#hasIngredients}}
+      <h2>Ingrédients</h2>
+      <ul class="ingredients">
+        {{#ingredients}}
+        <li>
+          <span class="amount">{{amount}}</span>
+          <span>{{name}}{{#complement}} <span class="complement">({{complement}})</span>{{/complement}}</span>
+        </li>
+        {{/ingredients}}
+      </ul>
+      {{/hasIngredients}}
+
+      {{#tips}}
+      <div class="tips">
+        <h2>Astuces</h2>
+        <div>{{tips}}</div>
+      </div>
+      {{/tips}}
+    </section>
+
+    <section>
+      {{#hasSteps}}
+      <h2>Étapes</h2>
+      <ol class="steps">
+        {{#steps}}<li>{{text}}</li>{{/steps}}
+      </ol>
+      {{/hasSteps}}
+    </section>
+  </div>
+
+  <div class="footer">
+    <span>{{siteName}}</span>
+    <span>{{url}}</span>
+  </div>
+</article>
+{{/recipes}}
+{{/hasRecipes}}

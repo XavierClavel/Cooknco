@@ -5,7 +5,6 @@ import com.drew.metadata.exif.ExifIFD0Directory
 import com.xavierclavel.enums.ExifOrientation
 import shared.enums.ImageBucket
 import shared.utils.Filepath.DEFAULT_IMAGE
-import shared.utils.Filepath.RECIPES_IMG_PATH
 import org.koin.core.component.KoinComponent
 import java.awt.Image
 import java.awt.RenderingHints
@@ -174,20 +173,20 @@ class ImageService: KoinComponent {
     }
 
     /**
-     * The picture a recipe holds on the volume, or null when it holds none.
+     * The picture an entity holds in one bucket, or null when it holds none.
      *
      * A filename carries the entity's `imageVersion` (see [ImageBucket]), so the version has
-     * to come from the caller's own read of the recipe: a recipe nobody ever gave a picture
-     * to sits at version 0, which no file is ever written for, and deleting a picture bumps
-     * the version past the file that was removed.
+     * to come from the caller's own read of the entity: one nobody ever gave a picture to
+     * sits at version 0, which no file is ever written for, and deleting a picture bumps the
+     * version past the file that was removed.
      */
-    fun findRecipeImage(id: Long, version: Long): ByteArray? {
-        val file = Path("$RECIPES_IMG_PATH/$id-v$version.webp")
+    fun findImage(bucket: ImageBucket, id: Long, version: Long): ByteArray? {
+        val file = Path("${bucket.path}/$id-v$version.webp")
         if (!file.exists()) return null
         return try {
             file.readBytes()
         } catch (e: IOException) {
-            logger.error(e) { "Could not read the image of recipe $id" }
+            logger.error(e) { "Could not read the ${bucket.dir} image of $id" }
             null
         }
     }

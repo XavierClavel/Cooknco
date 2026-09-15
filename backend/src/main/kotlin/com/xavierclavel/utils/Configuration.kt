@@ -133,6 +133,20 @@ data class Configuration(
 
         /** How long a print waits for its turn before the caller is told to come back. */
         val renderQueueSeconds: Long = 20,
+
+        /**
+         * How many recipes a cookbook may hold and still be exported as one book.
+         *
+         * A bound rather than a truncation: a book printed silently short is one whose
+         * missing half nobody notices until it is handed over. Past this the export is
+         * refused and says so.
+         *
+         * Sized against the print, which is what actually fails: every recipe is a page
+         * with a picture posted alongside it, so a cookbook of a few hundred would send
+         * tens of megabytes into Chromium and time the request out (`requestTimeoutMillis`
+         * in [com.xavierclavel.services.GotenbergPdfRenderer]) rather than come back short.
+         */
+        val maxCookbookRecipes: Int = 100,
     )
 
     data class OAuth(
