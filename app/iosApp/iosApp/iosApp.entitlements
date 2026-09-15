@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Universal Links. iOS fetches https://cooknco.eu/.well-known/apple-app-site-association
+	     (through Apple's CDN) on install and checks this app's ID against it, which is what
+	     lets a shared recipe open here rather than in Safari. The paths it may claim are
+	     listed in that file rather than here, and they must agree with the manifest's App
+	     Links filter and with WebRoutes.
+
+	     The domain is declared, never enforced: an app whose team cannot be matched, or a
+	     file that does not answer, simply keeps the link in the browser — the website serves
+	     the same page.
+
+	     This capability also has to be enabled on the App ID in the developer portal, and
+	     the app signed by the team named in the association file. Until TEAM_ID is set in
+	     Configuration/Config.xcconfig, both ends are placeholders and nothing verifies. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:cooknco.eu</string>
+	</array>
+</dict>
+</plist>

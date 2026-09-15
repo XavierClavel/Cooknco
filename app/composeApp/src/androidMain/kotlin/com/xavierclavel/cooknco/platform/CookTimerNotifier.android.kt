@@ -369,7 +369,7 @@ private fun broadcast(context: Context, action: String, requestCode: Int): Pendi
  *
  * Through the launcher intent and the same `link` extra a push carries, rather than by
  * naming the activity: the activity is in `:androidApp` and this is not, and the route it
- * maps to is already `PushNotifications.routeFor`'s business.
+ * maps to is already `WebRoutes`' business.
  */
 private fun openCookMode(context: Context, recipeId: Long): PendingIntent? {
     val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)

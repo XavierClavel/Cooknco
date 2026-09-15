@@ -200,6 +200,46 @@ a save before making it. Three things about those figures:
 
 Only devices registered for push are visible, so reach is a floor on the real number.
 
+## A shared link opens the app, and falls back to the website
+
+Tapping `https://cooknco.eu/recipe/view?id=12` opens the recipe in the app when it is
+installed — an App Link on Android, a Universal Link on iOS. Both platforms verify the claim
+against a file served from the domain, and both **fail open**: an unverified claim leaves the
+link with the browser, which serves the same page. That is why the feature can ship before
+there is a store build to verify against.
+
+- **The claim is scoped to the four paths people share**, never to the host. `/recipe/view`,
+  `/user/view`, `/cookbook/view`, `/ingredient/view` — and nothing else. Claiming
+  `cooknco.eu` outright would swallow `/oauth/authorize`, the consent screen an MCP client
+  sends the user to and which has to be a browser page; `/login`, which is where the app
+  itself sends people for Google sign-in; and the verification and password-reset links a
+  mail carries. Each of those would open an app that has no screen for them.
+- **Three lists have to agree**: the `pathPrefix` entries in `androidApp`'s manifest, the
+  `components` in `apple-app-site-association`, and what `WebRoutes` maps. A path in the
+  first two that the third cannot place opens the app on its own home screen instead of the
+  website — strictly worse than not claiming it.
+- **One mapping serves links and notifications.** `WebRoutes` turns a web path into an app
+  route for both, because a link and a notification pointing at the same recipe must land on
+  the same screen. Which is also why it lives in the app rather than in the push payload: a
+  new screen is a change there rather than a migration of every notification already sent.
+- **The route waits for the session.** `DeepLinks.routes` replays, and the collector in
+  `AppNavigation` only runs once signed in, so a link tapped on a cold start restores the
+  session first rather than bouncing off the login screen.
+
+The two verification files live in `frontend/public/.well-known/` and ship with the SPA, so
+nginx serves them off disk. `apple-app-site-association` has no extension and needs its own
+nginx block to go out as `application/json` — Apple's CDN refuses anything else, silently, and
+the link then stays in Safari.
+
+**Both carry a placeholder and verify nothing until it is filled in.**
+`assetlinks.json` wants the SHA-256 of the certificate the release is *signed with* — from
+the Play Console's App signing page once the app is uploaded, not from a local keystore if
+Play re-signs — and `apple-app-site-association` wants the Apple team ID, the same one
+`app/iosApp/Configuration/Config.xcconfig` leaves empty. Filling them is a frontend deploy;
+Android re-verifies on install and on app update, iOS on install. Both steps, and how to
+check them, are written down in [`docs/pending-setup.md`](docs/pending-setup.md) — which is
+where any other out-of-band setup belongs too.
+
 ## The account's language is the backend's, and a client only ever reports
 
 `users.locale` is what the product writes *to* a user in — the mails `mail-service` sends and

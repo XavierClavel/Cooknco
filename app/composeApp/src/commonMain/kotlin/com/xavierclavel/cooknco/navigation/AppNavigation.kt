@@ -12,9 +12,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.xavierclavel.cooknco.DeepLinks
 import com.xavierclavel.cooknco.PushNotifications
 import com.xavierclavel.cooknco.di.AppGraph
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.merge
 import com.xavierclavel.cooknco.ui.auth.AuthState
 import com.xavierclavel.cooknco.ui.auth.AuthViewModel
 import com.xavierclavel.cooknco.platform.EnsureNotificationPermission
@@ -484,14 +486,21 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
     }
 
     /**
-     * Opens what a tapped notification pointed at.
+     * Opens what a tapped notification, or a tapped cooknco.eu link, pointed at.
      *
-     * Gated on being signed in, and replayed by [PushNotifications], so a tap that cold-starts
-     * the app waits for the session to be restored rather than bouncing off the login screen.
+     * One collector for both: they carry the same routes, translated from the same paths by
+     * [WebRoutes], and a link tapped while a notification is still replayed must not navigate
+     * twice.
+     *
+     * Gated on being signed in, and replayed by both bridges, so a tap that cold-starts the
+     * app waits for the session to be restored rather than bouncing off the login screen.
+     * Keyed on *whether* we are signed in rather than on [authState], for the same reason the
+     * registration above is: the state carries the user, so re-reading the profile would
+     * restart this effect, and a replayed route would then be navigated to a second time.
      */
-    LaunchedEffect(authState) {
-        if (authState !is AuthState.Authenticated) return@LaunchedEffect
-        PushNotifications.taps.collect { route ->
+    LaunchedEffect(signedIn) {
+        if (!signedIn) return@LaunchedEffect
+        merge(PushNotifications.taps, DeepLinks.routes).collect { route ->
             navController.navigate(route)
         }
     }

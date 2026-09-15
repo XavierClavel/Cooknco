@@ -11,5 +11,8 @@ fun MainViewController(): UIViewController {
     return ComposeUIViewController { App() }
 }
 
-/** Called from Swift's `onOpenURL` for the `cooknco://` scheme. */
-fun handleDeepLink(url: String) = DeepLinks.onCallbackUrl(url)
+/**
+ * Called from Swift for every URL the app is opened with: the `cooknco://` OAuth
+ * callback through `onOpenURL`, and a Universal Link through `onContinueUserActivity`.
+ */
+fun handleDeepLink(url: String) = DeepLinks.onIncomingUrl(url)
