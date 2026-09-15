@@ -1,5 +1,5 @@
 allprojects {
-    version = "1.24.0"
+    version = "1.25.0"
     group = "eu.cooknco"
 }
 
@@ -95,6 +95,8 @@ subprojects {
         // Images live on an absolute volume path in production; tests must not need to own
         // /img to read or write one.
         environment("COOKNCO_IMG_ROOT", layout.buildDirectory.dir("test-img").get().asFile.absolutePath)
+        // Same for the backup volume, which is a cluster PVC mounted at /backups in production.
+        environment("COOKNCO_BACKUPS_ROOT", layout.buildDirectory.dir("test-backups").get().asFile.absolutePath)
     }
 }
 

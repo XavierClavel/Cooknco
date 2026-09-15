@@ -22,4 +22,15 @@ object Filepath {
      * uploads one, in which case the app serves the picture packaged in its own jar.
      */
     const val DEFAULT_IMAGE = "default.webp"
+
+    /**
+     * Root of the database backup volume — the `database-backups` PVC the nightly
+     * `pg_dump` CronJob writes to (`k8s/base/backup.yaml`), mounted read-only into the
+     * backend so the backoffice can report on what is actually on it.
+     *
+     * Overridable like [IMG_ROOT], and for the same reason. Absent outside the cluster: a
+     * developer running the stack locally has no backup job, and the backups tab says so
+     * rather than reporting an empty volume as a run of failed nights.
+     */
+    val BACKUPS_ROOT: String = System.getenv("COOKNCO_BACKUPS_ROOT")?.takeIf { it.isNotBlank() } ?: "/backups"
 }

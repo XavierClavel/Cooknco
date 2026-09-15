@@ -45,6 +45,7 @@ import shared.infodto.AdminImageInfo
 import shared.infodto.AdminIngredientInfo
 import shared.infodto.AdminOverview
 import shared.infodto.AdminStorageCleanupResult
+import shared.infodto.AdminBackupOverview
 import shared.infodto.AdminStorageOverview
 import shared.infodto.AdminRecipeInfo
 import shared.infodto.AdminTrends
@@ -265,6 +266,14 @@ suspend fun HttpClient.getLogs(level: String? = null, search: String? = null, lo
     }
 
 // --------------------------------------------------------------------- storage
+
+suspend fun HttpClient.getBackupOverviewRaw(): HttpResponse = this.get("$ADMIN_URL/backups")
+
+suspend fun HttpClient.getBackupOverview(): AdminBackupOverview =
+    this.getBackupOverviewRaw().let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminBackupOverview>(it.bodyAsText())
+    }
 
 suspend fun HttpClient.getStorageOverviewRaw(): HttpResponse = this.get("$ADMIN_URL/storage")
 

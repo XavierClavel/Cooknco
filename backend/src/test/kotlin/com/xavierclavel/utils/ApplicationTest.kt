@@ -5,6 +5,7 @@ import com.xavierclavel.plugins.RedisService
 import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.AppShellSource
 import com.xavierclavel.services.AppVersionService
+import com.xavierclavel.services.BackupService
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DashboardService
 import com.xavierclavel.services.DefaultImageService
@@ -119,6 +120,7 @@ abstract class ApplicationTest: KoinTest {
                 single { PdfTemplateService() }
                 single { LinkPreviewService() }
                 single { DeviceService() }
+                single { BackupService() }
                 single { AppVersionService() }
                 single { NotificationService() }
                 single { OAuthService() }

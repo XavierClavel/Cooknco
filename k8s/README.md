@@ -45,6 +45,13 @@ Restoring into the live database is deliberately not a one-liner here: pick the
 rows you need out of a scratch restore and insert them, rather than replaying a
 whole dump over a database that has moved on since.
 
+The backoffice's **backups** tab reports on the same volume, which the backend
+mounts read-only. It watches the dumps rather than the CronJob, because a run that
+exits 0 having written nothing looks identical to a working one from Kubernetes.
+That read-only mount is also why the job now carries a `podAffinity` onto the
+backend's node: `database-backups` is ReadWriteOnce, so a second, long-lived
+consumer pins which node can attach it.
+
 ## Rendering and applying
 
 ```sh
