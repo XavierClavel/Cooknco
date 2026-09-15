@@ -253,6 +253,46 @@ also reachable outside composition (`stringsFor(AppLanguage.current.value)`), wh
 the view models write their error copy — see `AuthViewModel.parseError`, which is
 translatable only because the backend answers with a cause rather than a sentence.
 
+## The backups tab watches the dumps, never the job
+
+`BackupService` reads the `database-backups` volume — which the backend mounts **read-only**
+(`k8s/base/backend.yaml`) — and the backoffice backups tab reports what is on it. It never
+asks the CronJob how it went, because a `pg_dump` that exits 0 having written nothing is
+indistinguishable from a working one on the Kubernetes side, and that is the failure worth
+catching. The files are the evidence; nothing has to be handed a credential to report in,
+and no table is written to on a schedule.
+
+Four things about it are load-bearing:
+
+- **Freshness is read off the stamp in the filename, not the mtime.** A volume restored from
+  a snapshot, or dumps copied in by hand, have brand new mtimes and old stamps — and a
+  backups page that goes green because somebody moved files around is the exact failure it
+  exists to prevent. Both are shown, next to each other, because the two disagreeing is
+  itself the signal.
+- **`BackupDatabase` enumerates what is expected, rather than listing what is there.** A
+  database known only from the files it left behind vanishes from the page on the night it
+  stops being dumped — exactly when it should turn red. Adding a database to `backup.yaml`
+  means adding it here too, or nothing watches it.
+- **The tab is read-only, deliberately.** No route deletes a dump — retention does that on
+  the volume, where a mistake is survivable — and none serves one: a dump is every user's
+  data in one file, so a download button behind an admin session turns one stolen cookie
+  into the whole database. Copying one out stays a `kubectl cp` (`k8s/README.md`).
+- **Health and nights-covered answer different questions and must not be merged.**
+  `health` is "did the most recent night run", measured against the schedule;
+  `nightsCovered/nightsExpected` is a gap count across the span the volume holds, from its
+  oldest dump to its newest. A job that stopped a week ago is `STALE` at 14 of 14 — which is
+  true, because every night it ran, it worked.
+
+`Configuration.Backups` restates the schedule, the grace and the retention from
+`k8s/base/backup.yaml`; the manifest decides, and these drifting from it only makes the page
+wrong about a job that is fine. `COOKNCO_BACKUPS_ROOT` points the volume elsewhere, which is
+what lets the tests write real files (`Filepath.BACKUPS_ROOT`, and the root build script).
+
+Because the backend now holds that ReadWriteOnce volume for as long as it runs, the CronJob
+carries a `podAffinity` onto the backend's node. Without it the job can be scheduled where
+the volume cannot attach, and the backup fails for a reason that has nothing to do with
+backups.
+
 ## The MCP endpoint holds the SDK back on purpose
 
 `POST /mcp` serves Model Context Protocol from the backend (`McpController`, tools in

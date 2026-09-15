@@ -129,6 +129,17 @@ export const resetDefaultImage = (image: string) => api.delete(`/admin/storage/d
 export const defaultImageUrl = (path: string, lastModified?: number | null) =>
   `${import.meta.env.VITE_IMG_URL}/${path}?v=${lastModified ?? 0}`
 
+// ------------------------------------------------------------------ backups
+
+/**
+ * The nightly database dumps, read off the volume they are written to.
+ *
+ * One read and nothing more: the tab reports and never acts. Deleting a dump is retention's
+ * job, and a dump is the whole database in one file, so there is deliberately no endpoint
+ * that hands one to a browser — see `BackupService`.
+ */
+export const getBackupOverview = () => api.get('/admin/backups')
+
 // -------------------------------------------------------------------- mails
 export const listMailTemplates = () => api.get('/admin/mails/templates')
 

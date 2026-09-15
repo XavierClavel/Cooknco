@@ -25,7 +25,45 @@ data class Configuration(
 
     /** Defaulted whole, for the reason [pdf] is. */
     val images: Images = Images(),
+
+    /** Defaulted whole, for the reason [pdf] is. */
+    val backups: Backups = Backups(),
 ) {
+    /**
+     * What the backoffice measures the database dumps against.
+     *
+     * Every value here restates a line of `k8s/base/backup.yaml`, because the backend
+     * reads the volume and never the CronJob: it has no way to ask what the schedule is.
+     * They are configuration rather than constants so that a change to the manifest can be
+     * matched without a release — but the manifest is the thing that decides, and these
+     * drifting from it only makes the page wrong about a job that is working fine.
+     */
+    data class Backups(
+        /** The CronJob's schedule: `15 2 * * *`, so one dump per database per night. */
+        val intervalHours: Long = 24,
+
+        /**
+         * How long past its window a dump may be before it is called late.
+         *
+         * Covers `startingDeadlineSeconds: 3600` — a run displaced by an hour is still the
+         * night's backup — plus the dump's own runtime. Without it, every morning the job
+         * started a minute late would report a missed night.
+         */
+        val graceHours: Long = 2,
+
+        /** Matches `find /backups -name '*.dump' -mtime +14`, i.e. how many nights are kept. */
+        val retentionDays: Int = 14,
+
+        /**
+         * How much smaller than its predecessor a dump has to be to be flagged.
+         *
+         * Set well past anything ordinary use produces: a database that loses a third of
+         * its content overnight is news either way, but half is not something deleting
+         * recipes does, and a threshold that cries wolf is one nobody reads.
+         */
+        val shrinkRatio: Double = 0.5,
+    )
+
     data class Images(
         /**
          * The largest picture the ticket endpoint reads into memory

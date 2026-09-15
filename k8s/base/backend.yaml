@@ -35,6 +35,13 @@ spec:
             - name: cooknco-config
               mountPath: /app/config
               readOnly: true
+            # Read-only, and only ever read: the backoffice backups tab reports on what the
+            # nightly dump left here (see backup.yaml). Nothing in the backend writes to it,
+            # deletes from it or serves a dump out of it — a dump is every user's data in one
+            # file, and retention is the job's business, not the app's.
+            - name: backups
+              mountPath: /backups
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /api/v1/health
@@ -57,6 +64,10 @@ spec:
         - name: cooknco-config
           secret:
             secretName: cooknco-config
+        - name: backups
+          persistentVolumeClaim:
+            claimName: database-backups
+            readOnly: true
 ---
 apiVersion: v1
 kind: Service

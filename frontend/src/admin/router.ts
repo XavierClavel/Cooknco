@@ -11,6 +11,7 @@ const router = createRouter({
     {path: '/ingredients', name: 'ingredients', component: () => import('./views/IngredientsView.vue')},
     {path: '/moderation', name: 'moderation', component: () => import('./views/ModerationView.vue')},
     {path: '/storage', name: 'storage', component: () => import('./views/StorageView.vue')},
+    {path: '/backups', name: 'backups', component: () => import('./views/BackupsView.vue')},
     {path: '/mails', name: 'mails', component: () => import('./views/MailsView.vue')},
     {path: '/notifications', name: 'notifications', component: () => import('./views/NotificationsView.vue')},
     {path: '/documents', name: 'documents', component: () => import('./views/DocumentsView.vue')},

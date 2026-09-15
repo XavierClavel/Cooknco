@@ -42,6 +42,22 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
+          # `database-backups` is ReadWriteOnce, and since the backoffice backups tab was
+          # added the backend Deployment mounts it read-only too (`backend.yaml`) — an RWO
+          # volume attaches to one node, so this job has to run on the node already holding
+          # it or it will not mount. Before that it was the only consumer and could land
+          # anywhere, which is what this affinity replaces.
+          #
+          # Required rather than preferred: a dump that cannot mount the volume is a failed
+          # run, not a slower one. If no backend pod is up — the seconds of a rollout — the
+          # job stays pending, and `startingDeadlineSeconds` above gives it an hour to start.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app: cooknco-backend
+                  topologyKey: kubernetes.io/hostname
           containers:
             - name: pg-dump
               # Must match the server's major version: pg_dump refuses a server
