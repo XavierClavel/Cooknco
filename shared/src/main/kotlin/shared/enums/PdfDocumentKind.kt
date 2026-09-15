@@ -29,6 +29,43 @@ enum class PdfDocumentKind(val key: String, val variables: List<String>) {
             PdfVariable.SITE_NAME,
         ),
     ),
+
+    /**
+     * A whole cookbook, printed as one book: a cover, then every recipe in it.
+     *
+     * Its variables come in two groups, and the list below is their union because that is
+     * what the backoffice offers as chips. The first eight are the book's own; everything
+     * after [PdfVariable.RECIPES] resolves only *inside* that section, where it names the
+     * recipe being printed. [PdfVariable.TITLE] and [PdfVariable.DESCRIPTION] therefore
+     * appear in both groups, and Mustache resolves the innermost — inside the section they
+     * are the recipe's, outside they are the book's. The packaged layout shows both.
+     */
+    COOKBOOK(
+        "cookbook",
+        listOf(
+            PdfVariable.TITLE,
+            PdfVariable.DESCRIPTION,
+            PdfVariable.COVER,
+            PdfVariable.RECIPE_COUNT,
+            PdfVariable.URL,
+            PdfVariable.SITE_NAME,
+            PdfVariable.HAS_RECIPES,
+            PdfVariable.RECIPES,
+
+            // Inside {{#recipes}} only, where they name that recipe.
+            PdfVariable.AUTHOR,
+            PdfVariable.PHOTO,
+            PdfVariable.YIELD,
+            PdfVariable.PREPARATION_TIME,
+            PdfVariable.COOKING_TIME,
+            PdfVariable.COOKING_TEMPERATURE,
+            PdfVariable.HAS_INGREDIENTS,
+            PdfVariable.INGREDIENTS,
+            PdfVariable.HAS_STEPS,
+            PdfVariable.STEPS,
+            PdfVariable.TIPS,
+        ),
+    ),
     ;
 
     /**
@@ -84,4 +121,22 @@ object PdfVariable {
     /** Where the recipe lives on the site, for a footer or a QR-less "read it online" line. */
     const val URL = "url"
     const val SITE_NAME = "siteName"
+
+    // ----------------------------------------------------------------- cookbook
+
+    /** The cookbook's own picture, as the name of a file sent alongside. See [PHOTO]. */
+    const val COVER = "cover"
+
+    /** How many recipes the book holds, for a cover line. */
+    const val RECIPE_COUNT = "recipeCount"
+
+    /**
+     * A section, one pass per recipe, holding that recipe's own [TITLE], [PHOTO],
+     * [INGREDIENTS], [STEPS] and the rest of the recipe names.
+     *
+     * Wrap anything meant to appear once — the heading over a table of contents — in
+     * [HAS_RECIPES] rather than in this one, for the reason [HAS_INGREDIENTS] gives.
+     */
+    const val RECIPES = "recipes"
+    const val HAS_RECIPES = "hasRecipes"
 }

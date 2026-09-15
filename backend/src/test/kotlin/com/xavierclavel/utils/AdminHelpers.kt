@@ -446,15 +446,15 @@ suspend fun HttpClient.savePdfTemplateRaw(key: String, locale: Locale, body: Str
 suspend fun HttpClient.restorePdfTemplateRaw(key: String, locale: Locale) =
     this.delete("$PDF_TEMPLATES_URL/$key/${locale.name}")
 
-suspend fun HttpClient.previewPdfTemplateRaw(key: String, locale: Locale, body: String, recipeId: Long? = null) =
+suspend fun HttpClient.previewPdfTemplateRaw(key: String, locale: Locale, body: String, subjectId: Long? = null) =
     this.post("$PDF_TEMPLATES_URL/$key/${locale.name}/preview") {
         contentType(ContentType.Application.Json)
         header(HttpHeaders.ContentType, ContentType.Application.Json)
-        setBody(PdfPreviewDTO(body = body, recipeId = recipeId))
+        setBody(PdfPreviewDTO(body = body, subjectId = subjectId))
     }
 
-suspend fun HttpClient.previewPdfTemplate(key: String, locale: Locale, body: String, recipeId: Long? = null): ByteArray =
-    this.previewPdfTemplateRaw(key, locale, body, recipeId).let {
+suspend fun HttpClient.previewPdfTemplate(key: String, locale: Locale, body: String, subjectId: Long? = null): ByteArray =
+    this.previewPdfTemplateRaw(key, locale, body, subjectId).let {
         assertEquals(HttpStatusCode.OK, it.status)
         it.bodyAsBytes()
     }

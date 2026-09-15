@@ -204,10 +204,10 @@ export const restorePdfTemplate = (key: string, locale: string) =>
  * boxes, print media queries, where the pages break — so the preview has to be the
  * document itself for any of that to be checkable.
  */
-export const previewPdfTemplate = (key: string, locale: string, body: string, recipeId: number | null) =>
+export const previewPdfTemplate = (key: string, locale: string, body: string, subjectId: number | null) =>
   api.post(
     `/admin/documents/templates/${key}/${locale}/preview`,
-    {body, recipeId},
+    {body, subjectId},
     {responseType: 'blob'},
   )
 

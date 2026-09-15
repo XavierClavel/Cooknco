@@ -15,11 +15,12 @@ data class PdfTemplateDTO(
  * previewed is what sits in the editor, saved or not — the same reason [EmailPreviewDTO]
  * carries its wording.
  *
- * @param recipeId the recipe to fill the layout with. Null falls back to a sample, so the
- *   tab is usable on an install with nothing in it yet.
+ * @param subjectId what to fill the layout with, read against the kind being previewed: a
+ *   recipe id for `recipe`, a cookbook id for `cookbook`. Null falls back to the most
+ *   recent one of whichever it is, so the tab is usable without hunting for an id first.
  */
 @Serializable
 data class PdfPreviewDTO(
     val body: String,
-    val recipeId: Long? = null,
+    val subjectId: Long? = null,
 )

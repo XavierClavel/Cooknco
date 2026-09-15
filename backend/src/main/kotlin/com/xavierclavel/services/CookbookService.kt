@@ -44,6 +44,19 @@ class CookbookService: KoinComponent {
     fun getEntityById(id: Long): Cookbook =
         findEntityById(id) ?: throw NotFoundException(NotFoundCause.COOKBOOK_NOT_FOUND)
 
+    /**
+     * The newest cookbook there is, for the backoffice to preview a document layout against
+     * when the operator has not picked one. Private ones included, for the reason
+     * [RecipeService.findMostRecent] includes hidden recipes: this is only reached from
+     * behind the admin gate, and a layout shows off the same either way.
+     */
+    fun findMostRecent(): Cookbook =
+        QCookbook()
+            .orderBy().creationDate.desc()
+            .setMaxRows(1)
+            .findOne()
+            ?: throw NotFoundException(NotFoundCause.COOKBOOK_NOT_FOUND)
+
 
     fun createCookbook(cookbookDTO: CookbookDTO): CookbookInfo =
         Cookbook.from(cookbookDTO).insertAndGet().toInfo()

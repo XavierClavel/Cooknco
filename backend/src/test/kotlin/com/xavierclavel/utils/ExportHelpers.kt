@@ -39,6 +39,32 @@ suspend fun HttpClient.exportRecipe(
         it.bodyAsBytes()
     }
 
+suspend fun HttpClient.exportCookbookRaw(
+    cookbookId: Long,
+    locale: Locale? = null,
+    unitSystem: UnitSystem? = null,
+): HttpResponse =
+    this.get("$EXPORT_URL/cookbook/$cookbookId") {
+        url {
+            locale?.let { parameters.append("locale", it.name) }
+            unitSystem?.let { parameters.append("unitSystem", it.name) }
+        }
+    }
+
+suspend fun HttpClient.exportCookbook(
+    cookbookId: Long,
+    locale: Locale? = null,
+    unitSystem: UnitSystem? = null,
+): ByteArray =
+    this.exportCookbookRaw(cookbookId, locale, unitSystem).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        it.bodyAsBytes()
+    }
+
+/** How many pages a PDF came out at, which is what says a book kept a recipe per page. */
+fun countPdfPages(pdf: ByteArray): Int =
+    PdfDocument(PdfReader(ByteArrayInputStream(pdf))).use { it.numberOfPages }
+
 /** Every page of a PDF as text, so a test can assert on what a reader would actually see. */
 fun readPdfText(pdf: ByteArray): String =
     PdfDocument(PdfReader(ByteArrayInputStream(pdf))).use { document ->

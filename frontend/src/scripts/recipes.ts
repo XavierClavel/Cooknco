@@ -1,5 +1,6 @@
 import apiClient from '@/plugins/axios.js';
 import {getLocale} from "@/scripts/localization";
+import {downloadPdf} from "@/scripts/download";
 
 export {
   getRecipe,
@@ -46,32 +47,7 @@ async function deleteRecipe(id) {
  * Saves a recipe as a PDF.
  *
  * Admin-only, and the backend enforces it: the button lives inside `<admin-only>`.
- * Rejects on failure rather than logging, so the caller can tell the user the download
- * did not happen.
  */
 async function downloadRecipe(id) {
-  const response = await apiClient.get(`/export/recipe/${id}?locale=${getLocale()}`, {
-    responseType: 'blob',
-    headers: {
-      'Accept': 'application/pdf'
-    }
-  })
-  const url = window.URL.createObjectURL(new Blob([response.data], {type: 'application/pdf'}));
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filenameOf(response) ?? `recipe-${id}.pdf`);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  // Deferred, not immediate: some browsers only start reading the blob after the click
-  // returns, and revoking it first cancels the download. Without revoking at all it would
-  // sit in memory for as long as the page lives.
-  setTimeout(() => window.URL.revokeObjectURL(url), 0);
-}
-
-/** The name the backend chose for the file, from `Content-Disposition`. */
-function filenameOf(response) {
-  const disposition = response.headers['content-disposition']
-  if (!disposition) return null
-  return disposition.match(/filename="([^"]+)"/)?.[1] ?? null
+  return await downloadPdf(`/export/recipe/${id}?locale=${getLocale()}`, `recipe-${id}.pdf`)
 }

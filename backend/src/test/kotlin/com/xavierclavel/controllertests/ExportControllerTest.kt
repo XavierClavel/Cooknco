@@ -7,22 +7,35 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import com.xavierclavel.TestBuilderWrapper
+import io.ktor.client.statement.bodyAsText
+import main.com.xavierclavel.utils.addCookbookRecipe
+import main.com.xavierclavel.utils.countPdfPages
+import main.com.xavierclavel.utils.createCookbook
 import main.com.xavierclavel.utils.createRecipe
+import main.com.xavierclavel.utils.exportCookbook
+import main.com.xavierclavel.utils.exportCookbookRaw
 import main.com.xavierclavel.utils.exportRecipe
 import main.com.xavierclavel.utils.exportRecipeRaw
+import main.com.xavierclavel.utils.getCookbookRecipes
 import main.com.xavierclavel.utils.readPdfImages
 import main.com.xavierclavel.utils.readPdfText
+import main.com.xavierclavel.utils.sampleCookbookDto
+import main.com.xavierclavel.utils.testImageBytes
 import main.com.xavierclavel.utils.uploadRecipeImage
 import org.junit.jupiter.api.Test
+import shared.dto.CookbookDTO
 import shared.dto.RecipeDTO
 import shared.enums.AmountUnit
 import shared.enums.UnitSystem
 import shared.enums.Locale
+import shared.infodto.CookbookInfo
 import shared.infodto.RecipeInfo
 import shared.utils.URL.EXPORT_URL
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ExportControllerTest : ApplicationTest() {
 
@@ -248,5 +261,210 @@ class ExportControllerTest : ApplicationTest() {
                 headers[HttpHeaders.ContentDisposition],
             )
         }
+    }
+
+    // =================================================================== cookbooks
+
+    /**
+     * A cookbook holding [titles], in the order they are given — which is *not* the order
+     * the book prints them in, so a test can tell the two apart.
+     */
+    private suspend fun TestBuilderWrapper.cookbookOf(vararg titles: String): CookbookInfo {
+        val cookbook = client.createCookbook()
+        titles.forEach { title ->
+            val recipe = client.createRecipe(fullRecipe.copy(title = title))
+            client.addCookbookRecipe(cookbook.id, recipe.id)
+        }
+        return cookbook
+    }
+
+    // ----------------------------------------------------------- authorisation
+
+    @Test
+    fun `cookbook export is closed to anonymous callers`() = runTest {
+        var cookbook: CookbookInfo? = null
+        runAsAdmin { cookbook = cookbookOf("Chocolate cake") }
+        client.exportCookbookRaw(cookbook!!.id).apply { assertEquals(HttpStatusCode.Unauthorized, status) }
+    }
+
+    /**
+     * Membership is not what opens the export: a cookbook is every member's, and printing
+     * one prints recipes whose owners never agreed to be handed out as a file.
+     */
+    @Test
+    fun `cookbook export is closed to its own members`() = runTestAsUser {
+        val cookbook = cookbookOf("Chocolate cake")
+        client.exportCookbookRaw(cookbook.id).apply { assertEquals(HttpStatusCode.Unauthorized, status) }
+    }
+
+    // ------------------------------------------------------------------ output
+
+    @Test
+    fun `cookbook export returns a pdf named after the cookbook`() = runTestAsAdmin {
+        val cookbook = client.createCookbook(CookbookDTO(title = "Gâteaux d'hiver"))
+
+        val response = client.exportCookbookRaw(cookbook.id)
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(ContentType.Application.Pdf, response.contentType())
+        assertEquals(
+            "attachment; filename=\"gateaux-d-hiver.pdf\"",
+            response.headers[HttpHeaders.ContentDisposition],
+        )
+    }
+
+    @Test
+    fun `a cookbook title that slugs to nothing falls back to the cookbook id`() = runTestAsAdmin {
+        val cookbook = client.createCookbook(CookbookDTO(title = "!!!"))
+
+        client.exportCookbookRaw(cookbook.id).apply {
+            assertEquals(
+                "attachment; filename=\"cookbook-${cookbook.id}.pdf\"",
+                headers[HttpHeaders.ContentDisposition],
+            )
+        }
+    }
+
+    @Test
+    fun `the exported book holds its cover and every recipe in full`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Chocolate cake")
+
+        val text = readPdfText(client.exportCookbook(cookbook.id))
+
+        // the cover
+        assertContains(text, sampleCookbookDto.title)
+        assertContains(text, sampleCookbookDto.description)
+        // Lowercased for the reason the headings above are: the cover sets its count line
+        // in small caps with `text-transform`, and Chromium applies that to the text it
+        // writes into the PDF.
+        assertContains(text.lowercase(), "recipes: 1")
+        assertContains(text.lowercase(), "contents")
+        // and the recipe, printed exactly as its own sheet would be
+        assertContains(text, "Chocolate cake")
+        assertContains(text, "By admin")
+        assertContains(text, "8 20 min 35 min 180 °C")
+        assertContains(text, "250g")
+        assertContains(text, "flour")
+        assertContains(text, "Mix everything")
+        assertContains(text, "Serve warm")
+    }
+
+    /**
+     * A book is read a recipe at a time, so each one starts its own page: cover, contents,
+     * then one page per recipe. Asserted on the page count because that is the one thing
+     * the extracted text cannot show.
+     */
+    @Test
+    fun `every recipe starts a page of its own`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Chocolate cake", "Apple pie")
+
+        assertEquals(4, countPdfPages(client.exportCookbook(cookbook.id)))
+    }
+
+    @Test
+    fun `recipes are printed in title order rather than in the order they were added`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Chocolate cake", "Apple pie")
+
+        val text = readPdfText(client.exportCookbook(cookbook.id))
+
+        assertTrue(
+            text.indexOf("Apple pie") < text.indexOf("Chocolate cake"),
+            "the book prints its recipes in the order they were added",
+        )
+    }
+
+    /** The cover is worth printing on its own: a book starts empty and fills up. */
+    @Test
+    fun `an empty cookbook prints its cover and nothing else`() = runTestAsAdmin {
+        val cookbook = client.createCookbook()
+
+        val pdf = client.exportCookbook(cookbook.id)
+
+        assertEquals(1, countPdfPages(pdf))
+        val text = readPdfText(pdf)
+        assertContains(text, sampleCookbookDto.title)
+        assertContains(text.lowercase(), "recipes: 0")
+        assertFalse(text.lowercase().contains("contents"), "the book printed an empty contents page")
+    }
+
+    @Test
+    fun `cookbook export honours the requested locale`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Chocolate cake")
+
+        val text = readPdfText(client.exportCookbook(cookbook.id, Locale.FR))
+
+        assertContains(text.lowercase(), "sommaire")
+        assertContains(text.lowercase(), "ingrédients")
+        assertContains(text, "Par admin")
+        assertContains(text, "1 c. à café")
+    }
+
+    @Test
+    fun `cookbook export honours the requested units`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Chocolate cake")
+
+        val text = readPdfText(client.exportCookbook(cookbook.id, unitSystem = UnitSystem.IMPERIAL))
+
+        assertContains(text, "8.82oz")
+        assertContains(text, "6.25 cups")
+    }
+
+    @Test
+    fun `markup in a cookbook is printed rather than rendered`() = runTestAsAdmin {
+        val cookbook = client.createCookbook(
+            CookbookDTO(title = "<u>Winter</u> cakes", description = "<script>alert(1)</script>")
+        )
+
+        val text = readPdfText(client.exportCookbook(cookbook.id))
+
+        assertContains(text, "<u>Winter</u> cakes")
+        assertContains(text, "<script>alert(1)</script>")
+    }
+
+    /**
+     * Each recipe's own picture, not one of them repeated: the pictures are posted under
+     * per-recipe names, and a collision there would print the same photograph throughout.
+     * Read back as bytes because a picture the exporter cannot find is quietly replaced by
+     * the bucket default and the book is still a valid PDF.
+     */
+    @Test
+    fun `each recipe carries its own picture into the book`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Apple pie", "Chocolate cake")
+        val recipes = client.getCookbookRecipes(cookbook.id).sortedBy { it.title }
+        client.uploadRecipeImage(recipes.first().id, testImageBytes(width = 40, height = 30))
+        client.uploadRecipeImage(recipes.last().id, testImageBytes(width = 30, height = 40))
+
+        val images = readPdfImages(client.exportCookbook(cookbook.id))
+
+        // the cover and the two recipes, all three different from each other
+        assertEquals(3, images.size)
+        assertEquals(
+            3,
+            images.distinctBy { it.toList() }.size,
+            "the book printed the same picture more than once",
+        )
+    }
+
+    /**
+     * Past the bound the export is refused rather than shortened — see
+     * `Configuration.Pdf.maxCookbookRecipes`, which `application-test.yaml` lowers so this
+     * costs four recipes rather than a hundred.
+     */
+    @Test
+    fun `a cookbook with too many recipes is refused rather than printed short`() = runTestAsAdmin {
+        val cookbook = cookbookOf("A cake", "B cake", "C cake")
+        client.exportCookbookRaw(cookbook.id).apply { assertEquals(HttpStatusCode.OK, status) }
+
+        val extra = client.createRecipe(fullRecipe.copy(title = "D cake"))
+        client.addCookbookRecipe(cookbook.id, extra.id)
+
+        client.exportCookbookRaw(cookbook.id).apply {
+            assertEquals(HttpStatusCode.BadRequest, status)
+            assertContains(bodyAsText(), "cookbook_too_large_to_export")
+        }
+    }
+
+    @Test
+    fun `exporting a cookbook that does not exist is a 404`() = runTestAsAdmin {
+        client.exportCookbookRaw(404L).apply { assertEquals(HttpStatusCode.NotFound, status) }
     }
 }

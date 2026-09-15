@@ -1,5 +1,7 @@
 package com.xavierclavel.services
 
+import com.xavierclavel.exceptions.BadRequestCause
+import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.utils.Configuration
 import com.xavierclavel.utils.PdfTemplates
 import com.xavierclavel.utils.logger
@@ -11,25 +13,32 @@ import shared.enums.Locale
 import shared.enums.PdfDocumentKind
 import shared.enums.PdfVariable
 import shared.enums.UnitSystem
+import shared.infodto.CookbookInfo
 import shared.infodto.RecipeInfo
 import shared.infodto.RecipeIngredientInfo
+import shared.utils.URL.COOKBOOK_VIEW_URL
 import shared.utils.URL.RECIPE_VIEW_URL
 import shared.utils.UnitConversion
 import java.text.Normalizer
 
 /**
- * Renders a recipe as the printable sheet behind the export button.
+ * Renders a recipe as the printable sheet behind the export button, and a cookbook as a
+ * whole book of them.
  *
- * The sheet itself is HTML — a layout from [PdfTemplateService], filled in with the values
- * below and printed by [PdfRenderer]. Nothing here decides what the page looks like, which
- * is the point: the look is an operator's to change from the backoffice, and this only
- * decides what a layout has to work with.
+ * The documents themselves are HTML — a layout from [PdfTemplateService], filled in with
+ * the values below and printed by [PdfRenderer]. Nothing here decides what a page looks
+ * like, which is the point: the look is an operator's to change from the backoffice, and
+ * this only decides what a layout has to work with.
+ *
+ * The two kinds share one set of names: a recipe inside a book is described by exactly the
+ * values the single sheet is, so an operator who has written one layout can read the other.
  */
 class ExportService: KoinComponent {
     private val imageService: ImageService by inject()
     private val defaultImageService: DefaultImageService by inject()
     private val pdfTemplateService: PdfTemplateService by inject()
     private val pdfRenderer: PdfRenderer by inject()
+    private val recipeService: RecipeService by inject()
     private val configuration: Configuration by inject()
 
     companion object {
@@ -41,7 +50,18 @@ class ExportService: KoinComponent {
         private const val PHOTO = "photo.jpg"
         private const val FONT = "Roboto-Regular.ttf"
 
+        /** The book's own picture. Its recipes are named one by one, by [photoNameOf]. */
+        private const val COVER = "cover.jpg"
+
         const val SITE_NAME = "Cook&Co"
+
+        /**
+         * What a recipe's picture is called inside a cookbook.
+         *
+         * Named after the recipe rather than its position, so two recipes cannot collide
+         * and reordering the book changes nothing about which file is which.
+         */
+        private fun photoNameOf(recipeId: Long) = "recipe-$recipeId.jpg"
     }
 
     /** The font the packaged layouts declare. Read once: it is the same bytes every time. */
@@ -78,6 +98,64 @@ class ExportService: KoinComponent {
     }
 
     /**
+     * The whole cookbook, as one PDF: a cover, then every recipe it holds.
+     *
+     * Refused rather than shortened past [Configuration.Pdf.maxCookbookRecipes] — see that
+     * field for why the bound exists and why it is a refusal.
+     *
+     * Every recipe's picture is posted alongside the document under its own name, from the
+     * thumbnail bucket rather than the full-size one: a book prints a recipe's picture at a
+     * fraction of the page, and a hundred full-size photographs is tens of megabytes to
+     * push through the renderer for pixels nobody sees.
+     *
+     * @param body the layout to use, or null for the one in service. See [generatePDF].
+     */
+    suspend fun generateCookbookPDF(
+        cookbook: CookbookInfo,
+        locale: Locale,
+        unitSystem: UnitSystem = UnitSystem.DEFAULT,
+        body: String? = null,
+    ): ByteArray {
+        val max = configuration.pdf.maxCookbookRecipes
+        // One more than the bound, so the same read that fetches the book also says whether
+        // it is over it.
+        val recipes = recipeService.findByCookbook(cookbook.id, max + 1)
+        if (recipes.size > max) throw BadRequestException(BadRequestCause.COOKBOOK_TOO_LARGE_TO_EXPORT)
+
+        val cover = pictureOf(ImageBucket.COOKBOOK, cookbook.id, cookbook.version, "cookbook ${cookbook.id}")
+        val photos = recipes.associate { recipe ->
+            recipe.id to pictureOf(
+                ImageBucket.RECIPE_THUMBNAIL,
+                recipe.id,
+                recipe.imageVersion,
+                "recipe ${recipe.id}",
+            )
+        }
+
+        val template = body ?: pdfTemplateService.bodyOf(PdfDocumentKind.COOKBOOK, locale)
+        val html = PdfTemplates.render(
+            template,
+            cookbookModelOf(
+                cookbook,
+                recipes.map { it.toInfo(locale) },
+                locale,
+                unitSystem,
+                hasCover = cover != null,
+                photos = photos,
+            ),
+        )
+
+        return pdfRenderer.render(
+            html = html,
+            assets = buildMap {
+                put(FONT, robotoFont)
+                cover?.let { put(COVER, it) }
+                photos.forEach { (id, bytes) -> bytes?.let { put(photoNameOf(id), it) } }
+            },
+        )
+    }
+
+    /**
      * What the browser saves the export as: the recipe's title, slugged.
      *
      * A title is free text in any language, and it reaches the client through a
@@ -85,37 +163,93 @@ class ExportService: KoinComponent {
      * rather than sent as it was typed. A title that survives none of that — emoji only,
      * say — falls back to the id, because a nameless download is worse than an ugly one.
      */
-    fun filenameOf(recipe: RecipeInfo): String {
-        val slug = Normalizer.normalize(recipe.title.lowercase(), Normalizer.Form.NFD)
+    fun filenameOf(recipe: RecipeInfo): String = filename(recipe.title, "recipe-${recipe.id}")
+
+    /** The same, for a book. See [filenameOf]. */
+    fun filenameOf(cookbook: CookbookInfo): String = filename(cookbook.title, "cookbook-${cookbook.id}")
+
+    private fun filename(title: String, fallback: String): String {
+        val slug = Normalizer.normalize(title.lowercase(), Normalizer.Form.NFD)
             .replace(DIACRITICS, "")
             .replace(NOT_SLUG, "-")
             .trim('-')
             .take(60)
             .trim('-')
-        return "${slug.ifEmpty { "recipe-${recipe.id}" }}.pdf"
+        return "${slug.ifEmpty { fallback }}.pdf"
     }
 
     // -------------------------------------------------------------------- values
 
     /**
-     * Everything a layout may name, and nothing else: a name absent from here prints as
-     * nothing, which is why [PdfDocumentKind.RECIPE] lists exactly these.
-     *
-     * Values go in raw — Mustache escapes them on the way out — so a recipe titled with a
-     * tag prints the tag rather than applying it.
+     * Everything a recipe sheet may name, and nothing else: a name absent from here prints
+     * as nothing, which is why [PdfDocumentKind.RECIPE] lists exactly these.
      */
     private fun modelOf(
         recipe: RecipeInfo,
         locale: Locale,
         unitSystem: UnitSystem,
         hasPhoto: Boolean,
+    ): Map<String, Any?> =
+        recipeValues(recipe, locale, unitSystem, if (hasPhoto) PHOTO else null) +
+            mapOf(PdfVariable.SITE_NAME to SITE_NAME)
+
+    /**
+     * Everything a book may name.
+     *
+     * Its recipes are the same maps the single sheet is rendered from, one per pass of the
+     * `{{#recipes}}` section. Mustache resolves a name against the innermost context that
+     * has it, so `{{title}}` inside that section is the recipe's and outside it is the
+     * book's — which is what [PdfDocumentKind.COOKBOOK] documents and the packaged layout
+     * shows both halves of.
+     */
+    private fun cookbookModelOf(
+        cookbook: CookbookInfo,
+        recipes: List<RecipeInfo>,
+        locale: Locale,
+        unitSystem: UnitSystem,
+        hasCover: Boolean,
+        photos: Map<Long, ByteArray?>,
+    ): Map<String, Any?> = mapOf(
+        PdfVariable.TITLE to cookbook.title,
+        PdfVariable.DESCRIPTION to cookbook.description,
+        PdfVariable.COVER to if (hasCover) COVER else null,
+        PdfVariable.RECIPE_COUNT to recipes.size,
+
+        PdfVariable.HAS_RECIPES to recipes.isNotEmpty(),
+        PdfVariable.RECIPES to recipes.map { recipe ->
+            recipeValues(
+                recipe,
+                locale,
+                unitSystem,
+                photo = photoNameOf(recipe.id).takeIf { photos[recipe.id] != null },
+            )
+        },
+
+        PdfVariable.URL to "${configuration.frontend.url.trimEnd('/')}/$COOKBOOK_VIEW_URL?cookbook=${cookbook.id}",
+        PdfVariable.SITE_NAME to SITE_NAME,
+    )
+
+    /**
+     * One recipe, as the names a layout reads it by.
+     *
+     * Values go in raw — Mustache escapes them on the way out — so a recipe titled with a
+     * tag prints the tag rather than applying it.
+     *
+     * @param photo the name the picture was posted under, or null when there is none to
+     *   show, which is what makes the layout's `{{#photo}}` section drop out
+     */
+    private fun recipeValues(
+        recipe: RecipeInfo,
+        locale: Locale,
+        unitSystem: UnitSystem,
+        photo: String?,
     ): Map<String, Any?> {
         val units = UnitLabels.of(locale, unitSystem)
         return mapOf(
             PdfVariable.TITLE to recipe.title,
             PdfVariable.DESCRIPTION to recipe.description,
             PdfVariable.AUTHOR to recipe.owner.username,
-            PdfVariable.PHOTO to if (hasPhoto) PHOTO else null,
+            PdfVariable.PHOTO to photo,
 
             PdfVariable.YIELD to recipe.yield,
             PdfVariable.PREPARATION_TIME to recipe.preparationTime,
@@ -145,31 +279,35 @@ class ExportService: KoinComponent {
             PdfVariable.TIPS to recipe.tips,
 
             PdfVariable.URL to "${configuration.frontend.url.trimEnd('/')}/$RECIPE_VIEW_URL?id=${recipe.id}",
-            PdfVariable.SITE_NAME to SITE_NAME,
         )
     }
 
+    private fun photoOf(recipe: RecipeInfo): ByteArray? =
+        pictureOf(ImageBucket.RECIPE, recipe.id, recipe.version, "recipe ${recipe.id}")
+
     /**
-     * The recipe's picture as JPEG, falling back to the bucket's default: `imageVersion` is
-     * 0 until someone uploads one, and a recipe having no picture is no reason to refuse its
-     * export.
+     * An entity's picture as JPEG, falling back to the bucket's default: `imageVersion` is
+     * 0 until someone uploads one, and having no picture is no reason to refuse an export.
      *
      * Decoding is the one step here that depends on bytes nobody validated since they were
      * written, and on a native webp codec, so any failure costs the picture and not the whole
-     * sheet — the layout's `{{#photo}}` section simply drops out. `LinkageError` is caught
+     * document — the layout's `{{#photo}}` section simply drops out. `LinkageError` is caught
      * alongside the exceptions for the codec's sake: a native library missing or built for
-     * another architecture is an environment fault, and a recipe sheet is still worth having
+     * another architecture is an environment fault, and a sheet is still worth having
      * without its picture.
+     *
+     * @param what how the failure names its subject in the log; ids alone read the same for
+     *   a recipe, its thumbnail and a cookbook
      */
-    private fun photoOf(recipe: RecipeInfo): ByteArray? = try {
-        val webp = imageService.findRecipeImage(recipe.id, recipe.version)
-            ?: defaultImageService.read(ImageBucket.RECIPE).first
+    private fun pictureOf(bucket: ImageBucket, id: Long, version: Long, what: String): ByteArray? = try {
+        val webp = imageService.findImage(bucket, id, version)
+            ?: defaultImageService.read(bucket).first
         imageService.webpToJpeg(webp)
     } catch (e: Exception) {
-        logger.error(e) { "Could not embed the image of recipe ${recipe.id} in its export" }
+        logger.error(e) { "Could not embed the image of $what in its export" }
         null
     } catch (e: LinkageError) {
-        logger.error(e) { "Could not embed the image of recipe ${recipe.id} in its export" }
+        logger.error(e) { "Could not embed the image of $what in its export" }
         null
     }
 
