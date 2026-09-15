@@ -44,6 +44,34 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="cooknco" android:host="login" />
             </intent-filter>
+
+            <!-- Shared cooknco.eu links, so that tapping one opens the recipe here rather
+                 than in a browser. autoVerify makes Android check
+                 https://cooknco.eu/.well-known/assetlinks.json for this package's signing
+                 certificate: verified, the app opens with no chooser and no way for another
+                 app to claim the domain; unverified, nothing breaks — the link stays with
+                 the browser and the website answers it, which is the failure mode to have.
+
+                 Scoped to the four paths people share, never to the whole host. Claiming
+                 the host would also swallow /oauth/authorize — the consent screen an MCP
+                 client sends the user to, which must be a browser page — along with the
+                 email verification and password reset links, and /login, which is where
+                 the app itself sends people to sign in with Google.
+
+                 The paths match what WebRoutes maps and what the Universal Links file
+                 lists; the three have to agree. pathPrefix rather than path because both
+                 `/recipe/view` and `/recipe/view/` are in circulation. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="cooknco.eu" />
+                <data android:pathPrefix="/recipe/view" />
+                <data android:pathPrefix="/user/view" />
+                <data android:pathPrefix="/cookbook/view" />
+                <data android:pathPrefix="/ingredient/view" />
+            </intent-filter>
         </activity>
 
         <!-- Hands a camera app a writable URI for the one file a capture is staged in.

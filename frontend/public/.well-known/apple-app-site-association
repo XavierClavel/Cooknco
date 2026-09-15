@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["REPLACE_WITH_TEAM_ID.com.xavierclavel.cooknco"],
+        "components": [
+          { "/": "/recipe/view*", "comment": "A shared recipe" },
+          { "/": "/user/view*", "comment": "A shared profile" },
+          { "/": "/cookbook/view*", "comment": "A shared cookbook" },
+          { "/": "/ingredient/view*", "comment": "A shared ingredient" }
+        ]
+      }
+    ]
+  }
+}

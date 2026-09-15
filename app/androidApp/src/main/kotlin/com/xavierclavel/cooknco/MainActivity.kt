@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
         // is one Android silently drops every notification naming it
         CookncoMessagingService.ensureChannel(applicationContext)
         enableEdgeToEdge()
-        handleOAuthIntent(intent)
+        handleUrlIntent(intent)
         handleNotificationIntent(intent)
         setContent {
             App()
@@ -32,7 +32,10 @@ class MainActivity : ComponentActivity() {
     // Called when app is already running and receives a deep link (singleTop mode)
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleOAuthIntent(intent)
+        // The intent the activity keeps is replaced, so that the URL handled here is not
+        // handled a second time by a later onCreate
+        setIntent(intent)
+        handleUrlIntent(intent)
         handleNotificationIntent(intent)
     }
 
@@ -53,8 +56,17 @@ class MainActivity : ComponentActivity() {
         PushNotifications.onNotificationTapped(link)
     }
 
-    private fun handleOAuthIntent(intent: Intent) {
+    /**
+     * Picks up a URL the app was opened with: the `cooknco://login` OAuth callback, and a
+     * verified cooknco.eu link the system routed here instead of to a browser.
+     *
+     * Read once and cleared, on the same design as the notification extra above: the intent
+     * outlives the launch, and onCreate runs again on every configuration change, so leaving
+     * it in place would push the same recipe onto the back stack on each rotation.
+     */
+    private fun handleUrlIntent(intent: Intent) {
         val data = intent.data ?: return
-        DeepLinks.onCallbackUrl(data.toString())
+        intent.data = null
+        DeepLinks.onIncomingUrl(data.toString())
     }
 }

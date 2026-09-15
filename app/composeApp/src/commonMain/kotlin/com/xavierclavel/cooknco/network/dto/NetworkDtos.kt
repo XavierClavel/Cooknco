@@ -365,7 +365,7 @@ data class UserNotificationInfo(
     val kind: String,
     val title: String,
     val body: String,
-    /** App-relative path to open, or blank. Resolved by `PushNotifications.routeFor`. */
+    /** App-relative path to open, or blank. Resolved by `WebRoutes.routeForPath`. */
     val link: String = "",
     val actor: UserSummary? = null,
     val createdAt: Long,
