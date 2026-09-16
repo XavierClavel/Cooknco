@@ -27,7 +27,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.network.ApiException
 import com.xavierclavel.cooknco.network.ExportedDocument
-import com.xavierclavel.cooknco.platform.rememberDocumentSharer
+import com.xavierclavel.cooknco.platform.rememberDocumentSaver
 import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.stringsFor
 import com.xavierclavel.cooknco.ui.i18n.strings
@@ -36,7 +36,7 @@ import com.xavierclavel.cooknco.ui.theme.CookncoWhite
 import com.xavierclavel.cooknco.ui.theme.StickerCard
 
 /**
- * An export, from the moment it is asked for to the moment the share sheet has it.
+ * An export, from the moment it is asked for to the moment the picker has the file.
  *
  * One shape for both screens that offer one: a recipe sheet and a whole cookbook differ in
  * what is printed and in nothing else the user can see.
@@ -66,27 +66,27 @@ fun pdfExportFailure(throwable: Throwable, s: Strings = stringsFor(AppLanguage.c
 }
 
 /**
- * Mounts what an export shows: a modal while it prints, the platform's share sheet when it
- * is done, and a modal saying so when it is not.
+ * Mounts what an export shows: a modal while it prints, the platform's save-a-file picker
+ * when it is done, and a modal saying so when it is not.
  *
- * The share happens here rather than in the view model because handing a file to the system
- * needs a platform handle a composition has and a view model does not — the document is
- * parked in the state, shared, and then [onShared] takes it back out so a recomposition
+ * The saving happens here rather than in the view model because handing a file to the
+ * system needs a platform handle a composition has and a view model does not — the document
+ * is parked in the state, offered, and then [onSaved] takes it back out so a recomposition
  * cannot offer it twice.
  */
 @Composable
 fun PdfExportHost(
     state: PdfExportState,
-    onShared: () -> Unit,
+    onSaved: () -> Unit,
     onErrorDismissed: () -> Unit,
 ) {
     val s = strings()
-    val sharer = rememberDocumentSharer()
+    val saver = rememberDocumentSaver()
 
     LaunchedEffect(state.document) {
         val document = state.document ?: return@LaunchedEffect
-        sharer.share(document.filename, document.bytes)
-        onShared()
+        saver.save(document.filename, document.bytes)
+        onSaved()
     }
 
     if (state.isExporting) {
