@@ -134,7 +134,7 @@ fun CookbookScreen(
 
     PdfExportHost(
         state = uiState.export,
-        onShared = viewModel::onExportShared,
+        onSaved = viewModel::onExportSaved,
         onErrorDismissed = viewModel::dismissExportError,
     )
 

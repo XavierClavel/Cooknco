@@ -281,7 +281,7 @@ class RecipeViewModel(
 
     /**
      * Prints the recipe as a PDF and parks it for [com.xavierclavel.cooknco.ui.components.PdfExportHost]
-     * to hand to the share sheet.
+     * to hand to the save-a-file picker.
      *
      * Guarded against a second tap: the server bounds how many prints it runs at once and
      * refuses past that, so a double tap would answer the second one with a failure dialog
@@ -299,8 +299,8 @@ class RecipeViewModel(
         }
     }
 
-    /** The document is the share sheet's now; holding on to it would offer it again. */
-    fun onExportShared() = _uiState.update { it.copy(export = PdfExportState()) }
+    /** The document is the picker's now; holding on to it would offer it again. */
+    fun onExportSaved() = _uiState.update { it.copy(export = PdfExportState()) }
 
     fun dismissExportError() = _uiState.update { it.copy(export = PdfExportState()) }
 
