@@ -10,43 +10,58 @@ meanwhile.
 
 ---
 
-## 1. Android App Links — the release signing fingerprint
+## 1. Android App Links — the release signing fingerprint ✅ filled in
 
-**What is inert until this is done:** every `https://cooknco.eu/...` link opens the browser
-instead of the app. The website serves the same page, so nothing is broken — the app is
-simply never offered.
+**Done:** `frontend/public/.well-known/assetlinks.json` carries the app signing key's
+SHA-256. It takes effect when the frontend image that contains it is deployed, and Android
+re-verifies on install and on app update — so a handset that already has the app needs a
+reinstall, or the `verify-app-links --re-verify` below.
 
-**Where the placeholder is:** `frontend/public/.well-known/assetlinks.json`
+Until then, and on any handset that has not re-verified, every `https://cooknco.eu/...` link
+opens the browser. The website serves the same page, so nothing is broken — the app is simply
+not offered.
 
-```json
-"sha256_cert_fingerprints": ["REPLACE_WITH_THE_RELEASE_SIGNING_CERTIFICATE_SHA256"]
+### Which key this is, because the console offers three
+
+The fingerprint has to be of the certificate the APK is **installed** with. Play App Signing
+re-signs every artifact it distributes, so that is Google's key and not the one CI uploads
+with. **Test and release → Setup → App signing** lists up to three, and only the first
+belongs here:
+
+| Certificate on that page | Signs | In `assetlinks.json`? |
+| --- | --- | --- |
+| **App signing key certificate** | every install from Play — production, closed **and** internal testing tracks | **Yes.** This is the one. |
+| Upload key certificate | only the artifact handed to Play; never reaches a device | No |
+| Internal app sharing certificate | builds distributed by Play's internal app *sharing* links | Only if that is used — the internal testing *track* uses the app signing key |
+
+The third is the one that costs an afternoon: it is a genuinely different key, sitting on the
+same page, and internal app *sharing* is easy to confuse with the internal testing *track*
+this pipeline publishes to. The track gets the app signing key.
+
+A cheap way to confirm a fingerprint is *not* the upload key's, without needing the keystore
+password — read the certificate out of a locally built bundle and compare:
+
+```bash
+unzip -p app/androidApp/release/androidApp-release.aab 'META-INF/*.RSA' > /tmp/upload.rsa
+keytool -printcert -file /tmp/upload.rsa | grep SHA256
 ```
 
-### Getting the value
+If that matches what went into `assetlinks.json`, the wrong key was copied.
 
-The fingerprint has to be of the certificate the APK is **installed** with, which is not
-necessarily the one it was uploaded with — Play App Signing re-signs, and the upload key's
-fingerprint would verify nothing for a store install.
+### Adding the debug key too
 
-1. The app is on the store, so Play App Signing is enrolled and this value now exists.
-   `app/androidApp/build.gradle.kts` declares a release `signingConfig` fed by
-   `KEYSTORE_FILE` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` (see § 3 and
-   [`playstore-ci.md`](playstore-ci.md)) — but the fingerprint wanted below is **not** the
-   upload key's: Play re-signs, so a store install carries Google's certificate rather than
-   the one CI uploads with.
-2. Play Console → the app → **Test and release → Setup → App signing**. Copy the SHA-256
-   under **App signing key certificate** — uppercase hex, colon-separated.
-3. Paste it into the array. The array takes several, which is how a debug build can be
-   verified alongside the store one:
-   ```bash
-   keytool -list -v -keystore ~/.android/debug.keystore \
-     -alias androiddebugkey -storepass android -keypass android
-   ```
+The array takes several, which is how a locally installed build can verify alongside the
+store one:
+
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android
+```
 
 ### Deploying it
 
-The file is baked into the frontend image, so filling it in is an ordinary change: commit,
-bump the version, merge to `develop`, and CI deploys it.
+The file is baked into the frontend image, so this is an ordinary change: commit, bump the
+version, merge to `develop`, and CI deploys it.
 
 ### Checking it worked
 
