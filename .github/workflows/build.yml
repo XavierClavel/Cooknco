@@ -12,6 +12,7 @@ on:
     # version.
     paths-ignore:
       - 'app/**'
+      - 'store/**'
       - 'docs/**'
       - '.github/workflows/android-*.yml'
       - '**/*.md'

@@ -84,6 +84,13 @@ Four things not to undo:
   compile when Gradle and `check` disagree. Nothing greps `build.gradle.kts`; a bundle at the
   wrong number is unrecoverable.
 
+The store listing is **not** part of any of this. `store/` holds the copy, the icon and the
+screenshots so the live listing has a source, but the Fastfile passes `skip_upload_metadata`,
+`skip_upload_images` and `skip_upload_screenshots` and a release touches the binary alone.
+Those flags are load-bearing: without them fastlane treats the repository as authoritative,
+and a missing `fastlane/metadata/` directory **wipes the live listing** in every locale. So
+editing `store/` ships nothing, and wiring it up to upload is not a small convenience.
+
 A release `signingConfig` exists only where the keystore does
 (`signingConfigs.findByName("release")` returns null otherwise), so an unsigned bundle leaves
 the build with no error at all — hence the `jarsigner -verify` after the upload. And the app is
