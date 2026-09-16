@@ -6,7 +6,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.CookbookRepository
+import com.xavierclavel.cooknco.data.ExportRepository
 import com.xavierclavel.cooknco.di.AppGraph
+import com.xavierclavel.cooknco.ui.components.PdfExportState
+import com.xavierclavel.cooknco.ui.components.pdfExportFailure
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeInfo
 import com.xavierclavel.cooknco.network.dto.CookbookUserInfo
@@ -28,10 +31,13 @@ data class CookbookUiState(
     val showDeleteConfirm: Boolean = false,
     val isDeleting: Boolean = false,
     val deleted: Boolean = false,
+    /** Only ever moves for an admin: nobody else is offered the action that starts it. */
+    val export: PdfExportState = PdfExportState(),
 )
 
 class CookbookViewModel(
     private val repo: CookbookRepository,
+    private val exportRepo: ExportRepository,
     private val cookbookId: Long,
     private val currentUserId: Long,
 ) : ViewModel() {
@@ -135,9 +141,37 @@ class CookbookViewModel(
         }
     }
 
+    /**
+     * Prints the whole cookbook — cover and every recipe in it — and parks the result for
+     * [com.xavierclavel.cooknco.ui.components.PdfExportHost] to hand to the share sheet.
+     *
+     * A book takes the renderer appreciably longer than a single sheet, which is why the
+     * dialog it puts up says what is happening rather than merely spinning. Guarded against
+     * a second tap for the reason
+     * [com.xavierclavel.cooknco.ui.recipe.RecipeViewModel.exportPdf] is.
+     */
+    fun exportPdf() {
+        if (_uiState.value.export.isExporting) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(export = PdfExportState(isExporting = true)) }
+            exportRepo.exportCookbook(cookbookId)
+                .onSuccess { document -> _uiState.update { it.copy(export = PdfExportState(document = document)) } }
+                .onFailure { error ->
+                    _uiState.update { it.copy(export = PdfExportState(error = pdfExportFailure(error))) }
+                }
+        }
+    }
+
+    /** The document is the share sheet's now; holding on to it would offer it again. */
+    fun onExportShared() = _uiState.update { it.copy(export = PdfExportState()) }
+
+    fun dismissExportError() = _uiState.update { it.copy(export = PdfExportState()) }
+
     companion object {
         fun factory(cookbookId: Long, userId: Long): ViewModelProvider.Factory = viewModelFactory {
-            initializer { CookbookViewModel(AppGraph.cookbookRepository, cookbookId, userId) }
+            initializer {
+                CookbookViewModel(AppGraph.cookbookRepository, AppGraph.exportRepository, cookbookId, userId)
+            }
         }
     }
 }

@@ -1,7 +1,6 @@
 package main.com.xavierclavel.utils
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.basicAuth
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -20,8 +19,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import shared.dto.SessionDto
-import shared.utils.URL.AUTH_URL
 import shared.utils.URL.MCP_URL
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -40,19 +37,6 @@ import kotlin.test.fail
 private const val MCP_ACCEPT = "application/json, text/event-stream"
 
 private val json = Json { ignoreUnknownKeys = true }
-
-/**
- * Logs in over HTTP Basic and returns the session token, which is what an MCP client is given.
- *
- * The password is passed in rather than defaulted, like [login]: the fixture's own
- * `ApplicationTest.password` is the one place it is written down.
- */
-suspend fun HttpClient.mcpToken(username: String, password: String): String {
-    post("$AUTH_URL/login") { basicAuth(username = username, password = password) }.apply {
-        assertEquals(HttpStatusCode.OK, status, "login failed: ${bodyAsText()}")
-        return json.decodeFromString<SessionDto>(bodyAsText()).token
-    }
-}
 
 fun jsonRpc(method: String, params: JsonObject? = null, id: Int? = 1): JsonObject = buildJsonObject {
     put("jsonrpc", "2.0")

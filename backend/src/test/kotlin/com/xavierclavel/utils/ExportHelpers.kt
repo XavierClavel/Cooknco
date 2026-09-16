@@ -1,6 +1,7 @@
 package main.com.xavierclavel.utils
 
 import io.ktor.client.HttpClient
+import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsBytes
@@ -17,12 +18,18 @@ import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
 import kotlin.test.assertEquals
 
+/**
+ * @param token a session token to send as a bearer, for the app's way in. Null leaves the
+ *   client's cookie to authenticate, which is the web app's.
+ */
 suspend fun HttpClient.exportRecipeRaw(
     recipeId: Long,
     locale: Locale? = null,
     unitSystem: UnitSystem? = null,
+    token: String? = null,
 ): HttpResponse =
     this.get("$EXPORT_URL/recipe/$recipeId") {
+        token?.let { bearerAuth(it) }
         url {
             locale?.let { parameters.append("locale", it.name) }
             unitSystem?.let { parameters.append("unitSystem", it.name) }
@@ -39,12 +46,15 @@ suspend fun HttpClient.exportRecipe(
         it.bodyAsBytes()
     }
 
+/** See [exportRecipeRaw] for [token]. */
 suspend fun HttpClient.exportCookbookRaw(
     cookbookId: Long,
     locale: Locale? = null,
     unitSystem: UnitSystem? = null,
+    token: String? = null,
 ): HttpResponse =
     this.get("$EXPORT_URL/cookbook/$cookbookId") {
+        token?.let { bearerAuth(it) }
         url {
             locale?.let { parameters.append("locale", it.name) }
             unitSystem?.let { parameters.append("unitSystem", it.name) }

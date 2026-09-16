@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -59,6 +60,7 @@ import com.xavierclavel.cooknco.ui.components.UserAvatar
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.xavierclavel.cooknco.ui.components.PdfExportHost
 import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
@@ -80,6 +82,12 @@ import com.xavierclavel.cooknco.ui.theme.StickerIconButton
 fun CookbookScreen(
     cookbookId: Long,
     currentUserId: Long,
+    /**
+     * Whether the signed-in account moderates this product — not whether it administers
+     * this cookbook, which is [CookbookUiState.isAdmin] and a different thing entirely.
+     * Only the first is offered the export; see [com.xavierclavel.cooknco.ui.recipe.RecipeScreen].
+     */
+    isSiteAdmin: Boolean,
     onNavigateToEdit: (Long) -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateToRecipe: (Long) -> Unit = {},
@@ -110,6 +118,7 @@ fun CookbookScreen(
                 recipes = uiState.recipes,
                 members = uiState.members,
                 isAdmin = uiState.isAdmin,
+                isSiteAdmin = isSiteAdmin,
                 currentUserId = currentUserId,
                 error = uiState.error,
                 onLeave = viewModel::confirmLeave,
@@ -118,9 +127,16 @@ fun CookbookScreen(
                 onNavigateToRecipe = onNavigateToRecipe,
                 onNavigateToUser = onNavigateToUser,
                 onNavigateBack = onNavigateBack,
+                onExport = viewModel::exportPdf,
             )
         }
     }
+
+    PdfExportHost(
+        state = uiState.export,
+        onShared = viewModel::onExportShared,
+        onErrorDismissed = viewModel::dismissExportError,
+    )
 
     if (uiState.showLeaveConfirm) {
         AlertDialog(
@@ -165,10 +181,13 @@ private fun CookbookContent(
     recipes: List<CookbookRecipeInfo>,
     members: List<CookbookUserInfo>,
     isAdmin: Boolean,
+    /** Site admin, not cookbook admin — see [CookbookScreen]. */
+    isSiteAdmin: Boolean,
     currentUserId: Long,
     error: String?,
     onLeave: () -> Unit,
     onEdit: () -> Unit,
+    onExport: () -> Unit,
     onDelete: () -> Unit,
     onNavigateToRecipe: (Long) -> Unit = {},
     onNavigateToUser: (Long) -> Unit = {},
@@ -189,6 +208,18 @@ private fun CookbookContent(
                     actions = buildList {
                         if (isAdmin) {
                             add(SheetAction(label = s.editCookbook, onClick = onEdit, icon = Icons.Outlined.Edit))
+                        }
+                        // Site admins only: the export prints every recipe the book holds,
+                        // reading each straight from its id, so the route behind it is
+                        // closed to everyone else — including this cookbook's own admins.
+                        if (isSiteAdmin) {
+                            add(
+                                SheetAction(
+                                    label = s.exportCookbookPdf,
+                                    onClick = onExport,
+                                    icon = Icons.Outlined.FileDownload,
+                                )
+                            )
                         }
                         add(
                             SheetAction(
@@ -579,10 +610,12 @@ fun CookbookContentPreview() {
                 recipes = previewRecipes,
                 members = previewMembers,
                 isAdmin = true,
+                isSiteAdmin = true,
                 currentUserId = 1L,
                 error = null,
                 onLeave = {},
                 onEdit = {},
+                onExport = {},
                 onDelete = {},
             )
         }
@@ -599,10 +632,12 @@ fun CookbookContentMemberPreview() {
                 recipes = previewRecipes,
                 members = previewMembers,
                 isAdmin = false,
+                isSiteAdmin = false,
                 currentUserId = 2L,
                 error = null,
                 onLeave = {},
                 onEdit = {},
+                onExport = {},
                 onDelete = {},
             )
         }

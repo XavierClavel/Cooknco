@@ -8,6 +8,7 @@ import com.xavierclavel.cooknco.data.CookTimer
 import com.xavierclavel.cooknco.data.CookTimerStore
 import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.DevicePreferences
+import com.xavierclavel.cooknco.data.ExportRepository
 import com.xavierclavel.cooknco.data.PushRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.ReportRepository
@@ -18,6 +19,7 @@ import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.AppVersionApi
 import com.xavierclavel.cooknco.network.AuthApi
 import com.xavierclavel.cooknco.network.CookbookApi
+import com.xavierclavel.cooknco.network.ExportApi
 import com.xavierclavel.cooknco.network.NotificationApi
 import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.ReportApi
@@ -70,6 +72,7 @@ object AppGraph {
     private val cookbookApi by lazy { CookbookApi(ApiClient.httpClient) }
     private val notificationApi by lazy { NotificationApi(ApiClient.httpClient) }
     private val reportApi by lazy { ReportApi(ApiClient.httpClient) }
+    private val exportApi by lazy { ExportApi(ApiClient.httpClient) }
 
     val recipeApi by lazy { RecipeApi(ApiClient.httpClient) }
 
@@ -85,6 +88,9 @@ object AppGraph {
     val cookbookRepository by lazy { CookbookRepository(cookbookApi, tokenDataStore) }
     val unitRepository by lazy { UnitRepository(recipeApi) }
     val reportRepository by lazy { ReportRepository(reportApi, tokenDataStore) }
+
+    /** The PDF exports. Only an admin's session can obtain one — see [ExportRepository]. */
+    val exportRepository by lazy { ExportRepository(exportApi, tokenDataStore) }
 
     /**
      * Whether this build may still run. Needs no session and no data store, so it is

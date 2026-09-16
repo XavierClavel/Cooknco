@@ -492,6 +492,14 @@ object EnStrings : Strings {
     override val reportTargetGone = "This content no longer exists."
     override val reportFailed = "Your report could not be sent."
 
+    override val exportRecipePdf = "Export as PDF"
+    override val exportCookbookPdf = "Export the cookbook as PDF"
+    override val preparingPdf = "Preparing the PDF…"
+    override val exportFailedTitle = "Export failed"
+    override val exportFailed = "The PDF could not be prepared. Please try again."
+    override val cookbookTooLargeToExport = "This cookbook holds too many recipes to be printed as one book."
+    override val exportRendererBusy = "Too many exports are being printed right now. Try again in a moment."
+
     override val timerChannelName = "Cook timer"
     override val timerChannelDescription = "The countdown of a timer you started in cook mode."
     override val timerDoneChannelName = "Cook timer ringing"

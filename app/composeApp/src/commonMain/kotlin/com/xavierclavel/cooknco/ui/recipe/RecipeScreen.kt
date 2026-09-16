@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Add
@@ -82,6 +83,7 @@ import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.cookbook.AddToCookbookSheet
+import com.xavierclavel.cooknco.ui.components.PdfExportHost
 import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.network.ReportTargetType
@@ -135,6 +137,12 @@ private enum class RecipeTab { INGREDIENTS, STEPS, NOTES }
 fun RecipeScreen(
     recipeId: Long,
     currentUserId: Long,
+    /**
+     * Whether the signed-in account moderates this product, which is the only thing the
+     * export is offered to. The gate that counts is the server's — the routes behind it
+     * refuse anyone else — this one keeps an action nobody else can complete off the sheet.
+     */
+    isAdmin: Boolean,
     onNavigateToEdit: (Long) -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateToUser: (Long) -> Unit = {},
@@ -168,6 +176,7 @@ fun RecipeScreen(
                 recipe = recipe,
                 uiState = uiState,
                 isOwner = viewModel.isOwner,
+                isAdmin = isAdmin,
                 onToggleLike = viewModel::toggleLike,
                 onShare = { clipboardManager.setText(AnnotatedString("cooknco.eu/recipe?id=${recipe.id}")) },
                 onEdit = { onNavigateToEdit(recipe.id) },
@@ -183,6 +192,7 @@ fun RecipeScreen(
                 onNavigateBack = onNavigateBack,
                 onStartCooking = { onNavigateToCookMode(recipe.id, uiState.selectedYield) },
                 onNavigateToIngredient = onNavigateToIngredient,
+                onExport = viewModel::exportPdf,
             )
         }
     }
@@ -197,6 +207,14 @@ fun RecipeScreen(
             onDismissRequest = viewModel::closeCookbookPicker,
         )
     }
+
+    // Mounted here rather than inside the list, like the picker above: it is a dialog, and
+    // the sheet it is opened from is dismissed the moment it starts.
+    PdfExportHost(
+        state = uiState.export,
+        onShared = viewModel::onExportShared,
+        onErrorDismissed = viewModel::dismissExportError,
+    )
 
     if (uiState.showDeleteConfirm && recipe != null) {
         StickerConfirmDialog(
@@ -218,8 +236,11 @@ private fun RecipeContent(
     recipe: RecipeInfo,
     uiState: RecipeUiState,
     isOwner: Boolean,
+    /** Site admin — see [RecipeScreen]. */
+    isAdmin: Boolean,
     onToggleLike: () -> Unit,
     onShare: () -> Unit,
+    onExport: () -> Unit,
     onEdit: () -> Unit,
     onAddToCookbook: () -> Unit,
     onDelete: () -> Unit,
@@ -439,6 +460,8 @@ private fun RecipeContent(
                 RecipeActionSheet(
                     recipe = recipe,
                     isOwner = isOwner,
+                    isAdmin = isAdmin,
+                    onExport = onExport,
                     onShare = onShare,
                     onEdit = onEdit,
                     onDelete = onDelete,
@@ -982,7 +1005,9 @@ private fun Modifier.dashedNavyBorder(radius: Dp): Modifier = drawWithContent {
 private fun RecipeActionSheet(
     recipe: RecipeInfo,
     isOwner: Boolean,
+    isAdmin: Boolean,
     onShare: () -> Unit,
+    onExport: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onReport: () -> Unit,
@@ -1002,6 +1027,12 @@ private fun RecipeActionSheet(
             // exists only to be turned down.
             if (!isOwner) {
                 add(SheetAction(label = s.reportRecipe, onClick = onReport, icon = Icons.Outlined.Flag))
+            }
+            // Admins only: an export reads its subject straight from an id, with none of
+            // the visibility filtering the rest of the API applies, so the route behind
+            // this is closed to everyone else.
+            if (isAdmin) {
+                add(SheetAction(label = s.exportRecipePdf, onClick = onExport, icon = Icons.Outlined.FileDownload))
             }
             if (isOwner) {
                 add(SheetAction(label = s.editRecipe, onClick = onEdit, icon = Icons.Outlined.Edit))
@@ -1055,8 +1086,10 @@ fun RecipeScreenPreview() {
                 recipe = previewRecipe,
                 uiState = RecipeUiState(recipe = previewRecipe, selectedYield = 8, isLoading = false),
                 isOwner = true,
+                isAdmin = true,
                 onToggleLike = {},
                 onShare = {},
+                onExport = {},
                 onEdit = {},
                 onAddToCookbook = {},
                 onDelete = {},

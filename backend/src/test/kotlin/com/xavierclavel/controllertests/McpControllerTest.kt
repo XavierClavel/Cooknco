@@ -41,7 +41,7 @@ import main.com.xavierclavel.utils.jsonRpc
 import main.com.xavierclavel.utils.mcpPostRaw
 import main.com.xavierclavel.utils.mcpResult
 import io.ktor.client.HttpClient
-import main.com.xavierclavel.utils.mcpToken
+import main.com.xavierclavel.utils.sessionToken
 import org.junit.jupiter.api.Test
 import shared.dto.IngredientDTO
 import shared.dto.RecipeDTO
@@ -75,7 +75,7 @@ class McpControllerTest : ApplicationTest() {
      * A session token for one of the fixture users, which is what an MCP client is configured
      * with. Named here so the fixture credential appears once rather than at every call.
      */
-    private suspend fun HttpClient.tokenFor(username: String): String = mcpToken(username, password)
+    private suspend fun HttpClient.tokenFor(username: String): String = sessionToken(username, password)
 
     private val readTools = setOf(
         "search_recipes",
