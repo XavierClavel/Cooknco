@@ -414,6 +414,20 @@ interface Strings {
     val reportTargetGone: String
     val reportFailed: String
 
+    // ── Exporting a PDF, which only an admin is offered ───────────────────────
+    val exportRecipePdf: String
+    val exportCookbookPdf: String
+    val preparingPdf: String
+    val exportFailedTitle: String
+    val exportFailed: String
+    /**
+     * The one refusal the person asking can do something about: a cookbook past the bound
+     * the backend prints (`Configuration.Pdf.maxCookbookRecipes`) is refused rather than
+     * printed short. Deliberately vague about the number, which is the server's to change.
+     */
+    val cookbookTooLargeToExport: String
+    val exportRendererBusy: String
+
     // ── The cook timer, as Android's notification settings list it ────────────
     val timerChannelName: String
     val timerChannelDescription: String

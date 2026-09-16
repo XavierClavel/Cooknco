@@ -501,6 +501,14 @@ object FrStrings : Strings {
     override val reportTargetGone = "Ce contenu n'existe plus."
     override val reportFailed = "Votre signalement n'a pas pu être envoyé."
 
+    override val exportRecipePdf = "Exporter en PDF"
+    override val exportCookbookPdf = "Exporter le carnet en PDF"
+    override val preparingPdf = "Préparation du PDF…"
+    override val exportFailedTitle = "Échec de l'export"
+    override val exportFailed = "Le PDF n'a pas pu être préparé. Veuillez réessayer."
+    override val cookbookTooLargeToExport = "Ce carnet contient trop de recettes pour être imprimé en un seul livre."
+    override val exportRendererBusy = "Trop d'exports sont en cours d'impression. Réessayez dans un instant."
+
     override val timerChannelName = "Minuteur de cuisson"
     override val timerChannelDescription = "Le décompte d'un minuteur lancé en mode cuisson."
     override val timerDoneChannelName = "Sonnerie du minuteur"

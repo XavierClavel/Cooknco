@@ -24,8 +24,11 @@ import org.koin.java.KoinJavaComponent.inject
  * every account would hand out moderator-hidden recipes, the ones private profiles keep,
  * and every recipe of a cookbook nobody outside it can open.
  *
- * `admin-session` is cookie-based (see `configureAuthentication`), which is what the web app
- * authenticates with; the native app has no export.
+ * Two ways in, one gate. `admin-session` is the cookie the web app authenticates with;
+ * `admin-bearer` is the same session id presented as a bearer token, which is all a native
+ * client can send — both resolve the session in Redis and both require ADMIN on it (see
+ * `configureAuthentication`). The cookie provider is named first so that a caller with
+ * neither is still refused by the challenge the web app expects.
  */
 object ExportController: Controller(EXPORT_URL) {
     val exportService : ExportService by inject(ExportService::class.java)
@@ -33,7 +36,7 @@ object ExportController: Controller(EXPORT_URL) {
     val cookbookService : CookbookService by inject(CookbookService::class.java)
 
     override fun Route.routes() {
-        authenticate("admin-session") {
+        authenticate("admin-session", "admin-bearer") {
             exportRecipe()
             exportCookbook()
         }

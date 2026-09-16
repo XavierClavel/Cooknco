@@ -21,6 +21,7 @@ import main.com.xavierclavel.utils.getCookbookRecipes
 import main.com.xavierclavel.utils.readPdfImages
 import main.com.xavierclavel.utils.readPdfText
 import main.com.xavierclavel.utils.sampleCookbookDto
+import main.com.xavierclavel.utils.sessionToken
 import main.com.xavierclavel.utils.testImageBytes
 import main.com.xavierclavel.utils.uploadRecipeImage
 import org.junit.jupiter.api.Test
@@ -74,6 +75,42 @@ class ExportControllerTest : ApplicationTest() {
         }
         // and the recipe is still exportable by an admin, so the refusal is about the caller
         runAsAdmin { client.exportRecipeRaw(recipe!!.id).apply { assertEquals(HttpStatusCode.OK, status) } }
+    }
+
+    /**
+     * The app's way in. It holds a session token and no cookie jar, so the export it offers
+     * its admins reaches the same routes over `Authorization: Bearer` — see the
+     * `admin-bearer` provider in `configureAuthentication`.
+     *
+     * Deliberately driven from a client that has never signed in, so the token is the only
+     * thing that can be authenticating the call.
+     */
+    @Test
+    fun `an admin exports with a bearer token, having no cookie to send`() = runTest {
+        var recipe: RecipeInfo? = null
+        var cookbook: CookbookInfo? = null
+        runAsAdmin {
+            recipe = client.createRecipe()
+            cookbook = client.createCookbook()
+        }
+        val token = newNoRedirectClient().sessionToken("admin@mail.com", password)
+
+        val app = newNoRedirectClient()
+        app.exportRecipeRaw(recipe!!.id, token = token).apply { assertEquals(HttpStatusCode.OK, status) }
+        app.exportCookbookRaw(cookbook!!.id, token = token).apply { assertEquals(HttpStatusCode.OK, status) }
+        // and the same client with nothing to present is refused, so it is the token doing it
+        app.exportRecipeRaw(recipe!!.id).apply { assertEquals(HttpStatusCode.Unauthorized, status) }
+    }
+
+    @Test
+    fun `a regular user's bearer token exports nothing`() = runTest {
+        var recipe: RecipeInfo? = null
+        runAsAdmin { recipe = client.createRecipe() }
+        val token = newNoRedirectClient().sessionToken(USER1, password)
+
+        newNoRedirectClient().exportRecipeRaw(recipe!!.id, token = token).apply {
+            assertEquals(HttpStatusCode.Unauthorized, status)
+        }
     }
 
     // ------------------------------------------------------------------ output

@@ -1,6 +1,7 @@
 package main.com.xavierclavel.utils
 
 import shared.dto.PasswordDTO
+import shared.dto.SessionDto
 import shared.dto.UserDTO
 import shared.enums.Locale
 import shared.infodto.UserInfo
@@ -43,6 +44,22 @@ suspend fun HttpClient.login(username: String, password: String, locale: Locale?
     this.post("$AUTH_URL/login${locale?.let { "?locale=$it" } ?: ""}") {
         basicAuth(username = username, password = password)
     }
+
+
+/**
+ * Logs in over HTTP Basic and returns the session token, rather than riding on the cookie
+ * [login] leaves behind.
+ *
+ * What every client that has no cookie jar is given: an MCP client, and the app. The
+ * password is passed in rather than defaulted, like [login]: the fixture's own
+ * `ApplicationTest.password` is the one place it is written down.
+ */
+suspend fun HttpClient.sessionToken(username: String, password: String): String {
+    post("$AUTH_URL/login") { basicAuth(username = username, password = password) }.apply {
+        assertEquals(HttpStatusCode.OK, status, "login failed: ${bodyAsText()}")
+        return Json { ignoreUnknownKeys = true }.decodeFromString<SessionDto>(bodyAsText()).token
+    }
+}
 
 
 suspend fun HttpClient.logout() =

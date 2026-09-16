@@ -19,7 +19,18 @@ data class UserInfo(
     val cookbooksCount: Int,
     val followersCount: Int,
     val followsCount: Int,
-)
+) {
+    /**
+     * Whether this account moderates the product — the backend's `UserRole.ADMIN`.
+     *
+     * Read off the role rather than sent as a flag of its own, and compared leniently: the
+     * role is a string here because the app has no use for the rest of the enum, and an
+     * account whose role the app cannot place is not an admin, which is the safe way round.
+     * What it gates in the app is only what is *offered*; the routes themselves are gated
+     * on the server.
+     */
+    val isAdmin: Boolean get() = role.equals("ADMIN", ignoreCase = true)
+}
 
 @Serializable
 data class UserDTO(

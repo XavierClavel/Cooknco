@@ -10,7 +10,7 @@ import kotlinx.serialization.json.put
 import main.com.xavierclavel.utils.createRecipe
 import main.com.xavierclavel.utils.getRecipe
 import main.com.xavierclavel.utils.callToolOk
-import main.com.xavierclavel.utils.mcpToken
+import main.com.xavierclavel.utils.sessionToken
 import main.com.xavierclavel.utils.uploadRecipeImage
 import main.com.xavierclavel.utils.uploadToTicketUrl
 import org.junit.jupiter.api.Test
@@ -88,7 +88,7 @@ class ImageControllerTest : ApplicationTest() {
         assertEquals(0, client.getRecipe(recipe.id).version)
     }
 
-    private suspend fun HttpClient.tokenFor(username: String): String = mcpToken(username, password)
+    private suspend fun HttpClient.tokenFor(username: String): String = sessionToken(username, password)
 
     private fun assertImageExists(path: String, id: Long, version: Long) {
         val file = Path("$path/$id-v$version.webp")
