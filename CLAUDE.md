@@ -34,6 +34,12 @@ before the PR is merged. Two files carry it and they must stay in sync:
 Default level: patch for fixes, minor for features. Never reuse a version that has already
 reached `develop` — CI pushes an immutable image tag per version.
 
+**Nothing to bump when `build.yml` would not run.** Its `paths-ignore` covers `app/**`,
+`docs/**`, `**/*.md` and the Android workflows, so a change confined to those builds no image
+and the version would name a build that does not exist — which is worse than a gap, because
+the file would then claim a version the cluster is not running. A change touching anything
+else bumps as usual.
+
 The mobile app's version is **not** in that pair and is not written by hand any more. Its
 `versionCode` is the commit count of this repository and its `versionName` is
 `"<versionMajor>.<versionCode>"`, both derived by Gradle in `app/androidApp/build.gradle.kts`.

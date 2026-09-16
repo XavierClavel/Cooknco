@@ -360,15 +360,28 @@ jobs:
           [ "$missing" -eq 0 ]
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           # The app build is Gradle 9.4.1 / AGP 9.2.1 and is independent of the backend's,
           # which the root workflow still builds on 17.
           java-version: '21'
           distribution: 'temurin'
 
+      # `packages: ''` overrides the action's default of `tools platform-tools`. Google has
+      # removed the obsolete `tools` package from the SDK repository, so the default makes the
+      # action run `sdkmanager tools`, get "Failed to find package 'tools'", and throw — after
+      # it has already accepted the licences, which is the only part this build needs it for
+      # (upstream: android-actions/setup-android#537, #538).
+      #
+      # Installing nothing is correct rather than merely a workaround: the runner image ships
+      # the SDK, the action adds `platform-tools` to PATH either way, and AGP downloads the
+      # platform and build-tools it wants itself once the licences are in place. An empty
+      # string is handled — the action splits on spaces and filters empties, so the install
+      # loop simply does not run.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: ''
 
       # No `build-root-directory`: that was an input of the retired
       # `gradle/gradle-build-action` and this action has none. It does not need one — what it
