@@ -3,6 +3,7 @@ package com.xavierclavel.services
 import com.xavierclavel.exceptions.BadRequestCause
 import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.utils.Configuration
+import com.xavierclavel.utils.PdfDestinations
 import com.xavierclavel.utils.PdfTemplates
 import com.xavierclavel.utils.logger
 import org.koin.core.component.KoinComponent
@@ -62,6 +63,9 @@ class ExportService: KoinComponent {
          * and reordering the book changes nothing about which file is which.
          */
         private fun photoNameOf(recipeId: Long) = "recipe-$recipeId.jpg"
+
+        /** What the recipe's page is called inside the book. See [PdfVariable.ANCHOR]. */
+        private fun anchorOf(recipeId: Long) = "recipe-$recipeId"
     }
 
     /** The font the packaged layouts declare. Read once: it is the same bytes every time. */
@@ -98,7 +102,7 @@ class ExportService: KoinComponent {
     }
 
     /**
-     * The whole cookbook, as one PDF: a cover, then every recipe it holds.
+     * The whole cookbook, as one PDF: a cover, a contents, then every recipe it holds.
      *
      * Refused rather than shortened past [Configuration.Pdf.maxCookbookRecipes] — see that
      * field for why the bound exists and why it is a refusal.
@@ -107,6 +111,19 @@ class ExportService: KoinComponent {
      * thumbnail bucket rather than the full-size one: a book prints a recipe's picture at a
      * fraction of the page, and a hundred full-size photographs is tens of megabytes to
      * push through the renderer for pixels nobody sees.
+     *
+     * **Printed twice**, which is what puts page numbers in the contents. Nothing can know
+     * which page a recipe lands on until the book has been laid out: CSS has a
+     * `target-counter()` for it that Chromium does not implement, and the page is printed
+     * with scripting off, so the layout cannot measure itself either. So the first print is
+     * the measurement — its contents lines carry no numbers — and [PdfDestinations] reads
+     * back where each recipe actually landed from the destinations Chromium wrote for the
+     * contents links. The second print is the one that is handed over.
+     *
+     * The recipes are long enough for this to matter rather than be arithmetic: about
+     * seventeen ingredients and ten steps already spill a recipe onto a second page, so a
+     * book numbered by counting recipes would be wrong about everything after the first
+     * long one.
      *
      * @param body the layout to use, or null for the one in service. See [generatePDF].
      */
@@ -119,11 +136,11 @@ class ExportService: KoinComponent {
         val max = configuration.pdf.maxCookbookRecipes
         // One more than the bound, so the same read that fetches the book also says whether
         // it is over it.
-        val recipes = recipeService.findByCookbook(cookbook.id, max + 1)
-        if (recipes.size > max) throw BadRequestException(BadRequestCause.COOKBOOK_TOO_LARGE_TO_EXPORT)
+        val entities = recipeService.findByCookbook(cookbook.id, max + 1)
+        if (entities.size > max) throw BadRequestException(BadRequestCause.COOKBOOK_TOO_LARGE_TO_EXPORT)
 
         val cover = pictureOf(ImageBucket.COOKBOOK, cookbook.id, cookbook.version, "cookbook ${cookbook.id}")
-        val photos = recipes.associate { recipe ->
+        val photos = entities.associate { recipe ->
             recipe.id to pictureOf(
                 ImageBucket.RECIPE_THUMBNAIL,
                 recipe.id,
@@ -131,28 +148,49 @@ class ExportService: KoinComponent {
                 "recipe ${recipe.id}",
             )
         }
-
+        val recipes = entities.map { it.toInfo(locale) }
         val template = body ?: pdfTemplateService.bodyOf(PdfDocumentKind.COOKBOOK, locale)
-        val html = PdfTemplates.render(
-            template,
-            cookbookModelOf(
-                cookbook,
-                recipes.map { it.toInfo(locale) },
-                locale,
-                unitSystem,
-                hasCover = cover != null,
-                photos = photos,
-            ),
-        )
+        val assets = buildMap {
+            put(FONT, robotoFont)
+            cover?.let { put(COVER, it) }
+            photos.forEach { (id, bytes) -> bytes?.let { put(photoNameOf(id), it) } }
+        }
 
-        return pdfRenderer.render(
-            html = html,
-            assets = buildMap {
-                put(FONT, robotoFont)
-                cover?.let { put(COVER, it) }
-                photos.forEach { (id, bytes) -> bytes?.let { put(photoNameOf(id), it) } }
-            },
-        )
+        suspend fun print(pages: Map<Long, Int>): ByteArray {
+            val html = PdfTemplates.render(
+                template,
+                cookbookModelOf(cookbook, recipes, locale, unitSystem, cover != null, photos, pages),
+            )
+            return pdfRenderer.render(html, assets, PdfTemplates.footerOf(html))
+        }
+
+        val measured = print(emptyMap())
+        val pages = pagesOf(measured, recipes)
+        // Nothing to number, or nothing found to number it by: the layout's contents links
+        // are what Chromium writes the destinations from, so an operator who took them out
+        // gets a book without page numbers rather than a book with wrong ones.
+        if (pages.size < recipes.size) {
+            if (recipes.isNotEmpty()) {
+                logger.warn { "Cookbook ${cookbook.id}: located ${pages.size} of ${recipes.size} recipes, printing no page numbers" }
+            }
+            return measured
+        }
+
+        val numbered = print(pages)
+        // Writing the numbers in could in principle move what they point at — a contents
+        // line that wraps once it has a number on it pushes the whole book down a page. It
+        // does not in practice, and this is what makes that a fact rather than a hope.
+        return if (pagesOf(numbered, recipes) == pages) numbered else measured.also {
+            logger.warn { "Cookbook ${cookbook.id}: numbering moved the pages it names, printing no page numbers" }
+        }
+    }
+
+    /** Where each recipe landed in a print, by recipe id. See [PdfVariable.ANCHOR]. */
+    private fun pagesOf(pdf: ByteArray, recipes: List<RecipeInfo>): Map<Long, Int> {
+        val byAnchor = recipes.associateBy { anchorOf(it.id) }
+        return PdfDestinations.pagesOf(pdf, byAnchor.keys)
+            .mapNotNull { (anchor, page) -> byAnchor[anchor]?.let { it.id to page } }
+            .toMap()
     }
 
     /**
@@ -209,6 +247,7 @@ class ExportService: KoinComponent {
         unitSystem: UnitSystem,
         hasCover: Boolean,
         photos: Map<Long, ByteArray?>,
+        pages: Map<Long, Int>,
     ): Map<String, Any?> = mapOf(
         PdfVariable.TITLE to cookbook.title,
         PdfVariable.DESCRIPTION to cookbook.description,
@@ -222,6 +261,9 @@ class ExportService: KoinComponent {
                 locale,
                 unitSystem,
                 photo = photoNameOf(recipe.id).takeIf { photos[recipe.id] != null },
+            ) + mapOf(
+                PdfVariable.ANCHOR to anchorOf(recipe.id),
+                PdfVariable.PAGE to pages[recipe.id],
             )
         },
 

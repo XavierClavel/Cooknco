@@ -18,9 +18,12 @@ import main.com.xavierclavel.utils.exportCookbookRaw
 import main.com.xavierclavel.utils.exportRecipe
 import main.com.xavierclavel.utils.exportRecipeRaw
 import main.com.xavierclavel.utils.getCookbookRecipes
+import main.com.xavierclavel.utils.pageInContents
 import main.com.xavierclavel.utils.readPdfImages
+import main.com.xavierclavel.utils.readPdfPages
 import main.com.xavierclavel.utils.readPdfText
 import main.com.xavierclavel.utils.sampleCookbookDto
+import main.com.xavierclavel.utils.savePdfTemplateRaw
 import main.com.xavierclavel.utils.sessionToken
 import main.com.xavierclavel.utils.testImageBytes
 import main.com.xavierclavel.utils.uploadRecipeImage
@@ -30,12 +33,14 @@ import shared.dto.RecipeDTO
 import shared.enums.AmountUnit
 import shared.enums.UnitSystem
 import shared.enums.Locale
+import shared.enums.PdfDocumentKind
 import shared.infodto.CookbookInfo
 import shared.infodto.RecipeInfo
 import shared.utils.URL.EXPORT_URL
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExportControllerTest : ApplicationTest() {
@@ -503,5 +508,115 @@ class ExportControllerTest : ApplicationTest() {
     @Test
     fun `exporting a cookbook that does not exist is a 404`() = runTestAsAdmin {
         client.exportCookbookRaw(404L).apply { assertEquals(HttpStatusCode.NotFound, status) }
+    }
+
+    // ----------------------------------------------------------- page numbers
+
+    /** Enough ingredients and steps to run past one page. See [fullRecipe] for the short one. */
+    private val longRecipe = fullRecipe.copy(
+        ingredients = (1..24).map {
+            RecipeDTO.RecipeIngredientDTO(customName = "ingredient $it", unit = AmountUnit.GRAM, amount = 250f)
+        }.toMutableList(),
+        steps = stepsOf(
+            *(1..16).map { "Step $it: mix the dry ingredients in a bowl, make a well, then fold it in." }
+                .toTypedArray()
+        ),
+    )
+
+    /**
+     * The point of printing the book twice.
+     *
+     * Asserted against where the recipes actually are rather than against fixed numbers:
+     * what has to hold is that the contents agrees with the book, whatever the layout does
+     * with the space. The middle recipe runs to two pages, so a contents counting recipes
+     * instead of reading the print would be right about it and wrong about everything after.
+     */
+    @Test
+    fun `the contents gives the page each recipe starts on`() = runTestAsAdmin {
+        val cookbook = client.createCookbook()
+        listOf(
+            "Baba au rhum" to fullRecipe,
+            "Clafoutis aux cerises" to longRecipe,
+            "Tarte Tatin" to fullRecipe,
+        ).forEach { (title, dto) ->
+            client.addCookbookRecipe(cookbook.id, client.createRecipe(dto.copy(title = title)).id)
+        }
+
+        val pages = readPdfPages(client.exportCookbook(cookbook.id))
+        val contents = pages[1]
+
+        // the long one really does take two pages, or this proves nothing
+        assertEquals(6, pages.size, "the fixture no longer produces a two-page recipe")
+
+        listOf("Baba au rhum", "Clafoutis aux cerises", "Tarte Tatin").forEach { title ->
+            // where the recipe actually starts: the first page after the contents holding
+            // its title next to a byline, which no contents row has
+            val started = pages.indexOfFirst { it.contains(title) && it.contains("By admin") } + 1
+            assertEquals(started, pageInContents(contents, title), "the contents is wrong about $title")
+        }
+        // and, concretely, the recipe after the long one is not where counting would put it
+        assertEquals(6, pageInContents(contents, "Tarte Tatin"))
+    }
+
+    /**
+     * A contents saying "page 6" is only usable if page 6 says so, and the document cannot
+     * draw that itself — Chromium implements none of the CSS page margin boxes — so the
+     * folio is a `<template id="page-footer">` the layout carries and the renderer draws.
+     *
+     * Marked, so the assertion is about the folio and not about a digit that happens to be
+     * in a recipe: an unmarked "3" is also what 35 minutes looks like to a substring match.
+     */
+    @Test
+    fun `the layout's page footer is drawn on every page`() = runTestAsAdmin {
+        val cookbook = client.createCookbook()
+        repeat(2) { client.addCookbookRecipe(cookbook.id, client.createRecipe(fullRecipe.copy(title = "Cake $it")).id) }
+
+        client.savePdfTemplateRaw(
+            PdfDocumentKind.COOKBOOK.key,
+            Locale.EN,
+            """
+            <meta charset="utf-8">
+            <h1>{{title}}</h1>
+            {{#recipes}}<article style="break-before: page"><h1>{{title}}</h1></article>{{/recipes}}
+            <template id="page-footer"><div>FOLIO<span class="pageNumber"></span></div></template>
+            """.trimIndent(),
+        ).apply { assertEquals(HttpStatusCode.OK, status) }
+
+        val pages = readPdfPages(client.exportCookbook(cookbook.id))
+
+        assertEquals(3, pages.size)
+        pages.forEachIndexed { index, page ->
+            assertContains(page, "FOLIO${index + 1}", message = "page ${index + 1} carries no folio")
+        }
+    }
+
+    /**
+     * The numbers exist only because the contents links to the recipes: that is what makes
+     * Chromium record where each one landed. A layout that drops the links is a layout that
+     * cannot be numbered, and the book then prints none rather than printing guesses.
+     */
+    @Test
+    fun `a contents that does not link to its recipes prints no page numbers`() = runTestAsAdmin {
+        val cookbook = client.createCookbook()
+        client.addCookbookRecipe(cookbook.id, client.createRecipe(fullRecipe.copy(title = "Baba au rhum")).id)
+
+        client.savePdfTemplateRaw(
+            PdfDocumentKind.COOKBOOK.key,
+            Locale.EN,
+            """
+            <meta charset="utf-8">
+            <h1>{{title}}</h1>
+            <ol>{{#recipes}}<li>{{title}} {{#page}}{{page}}{{/page}}</li>{{/recipes}}</ol>
+            {{#recipes}}<article style="break-before: page"><h1>{{title}}</h1></article>{{/recipes}}
+            """.trimIndent(),
+        ).apply { assertEquals(HttpStatusCode.OK, status) }
+
+        val pages = readPdfPages(client.exportCookbook(cookbook.id))
+
+        // the book is still whole, and still one page per recipe
+        assertContains(pages[0], "Baba au rhum")
+        assertEquals(2, pages.size)
+        // but the contents row carries no number, because none could be stood behind
+        assertNull(pageInContents(pages[0], "Baba au rhum"))
     }
 }
