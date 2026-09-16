@@ -20,8 +20,15 @@ sh app/store/render.sh          # writes out/, CHROME=… if yours is somewhere 
 | `feature-graphic.html` | `out/feature-graphic-1024x500.png` | 1024×500, 24-bit | Feature graphic |
 | `feature-graphic-green.html` | `out/feature-graphic-1024x500-green.png` | 1024×500, 24-bit | Feature graphic, alternative ground |
 
-`listing-fr-FR.md` holds the French short and full descriptions, at the lengths the console
-enforces (80 and 4000 characters).
+`listing-fr-FR.md` and `listing-en-GB.md` hold the short and full descriptions, at the lengths
+the console enforces (80 and 4000 characters). They mirror each other section for section and
+are not translations of each other's sentences — when a feature changes, both change in the
+same commit, because a listing accurate in one locale and stale in the other is the version
+nobody notices.
+
+The feature graphics are **French-only**: the tagline is baked into the page. An English
+listing wants its own, and the console takes one per locale — the copy to change is in
+`feature-graphic.html`.
 
 Three things worth knowing before editing any of it:
 

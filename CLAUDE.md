@@ -84,12 +84,18 @@ Four things not to undo:
   compile when Gradle and `check` disagree. Nothing greps `build.gradle.kts`; a bundle at the
   wrong number is unrecoverable.
 
-The store listing is **not** part of any of this. `store/` holds the copy, the icon and the
-screenshots so the live listing has a source, but the Fastfile passes `skip_upload_metadata`,
-`skip_upload_images` and `skip_upload_screenshots` and a release touches the binary alone.
-Those flags are load-bearing: without them fastlane treats the repository as authoritative,
-and a missing `fastlane/metadata/` directory **wipes the live listing** in every locale. So
-editing `store/` ships nothing, and wiring it up to upload is not a small convenience.
+The store listing is **not** part of any of this. `app/store/` holds its source — the icon and
+feature graphic as HTML pages rendered by headless Chromium (`render.sh`, the same engine that
+prints the PDF exports, so no second renderer enters the build), and the copy per locale. But
+the Fastfile passes `skip_upload_metadata`, `skip_upload_images` and `skip_upload_screenshots`,
+and a release touches the binary alone. Those flags are load-bearing: without them fastlane
+treats the repository as authoritative, and a missing `fastlane/metadata/` directory **wipes
+the live listing** in every locale. So editing `app/store/` ships nothing — someone pastes it
+into the console — and wiring it up to upload is not a small convenience.
+
+The listing icon is the launcher icon, at the proportion a launcher shows after masking the
+adaptive icon, so the home screen and the store show one drawing. Changing the mark means
+changing `drawable/ic_launcher_*.xml` in the same commit.
 
 A release `signingConfig` exists only where the keystore does
 (`signingConfigs.findByName("release")` returns null otherwise), so an unsigned bundle leaves
