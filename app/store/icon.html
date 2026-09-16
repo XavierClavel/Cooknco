@@ -1,0 +1,30 @@
+<!doctype html>
+<!--
+  The 512x512 icon the Play Console asks for — not an adaptive icon, and not a resize of
+  one: Play wants a flat square, and the launcher's two layers are composed by the
+  launcher, not by us.
+
+  It is the same drawing as androidApp/res/drawable/ic_launcher_foreground.xml on the same
+  ground as ic_launcher_background.xml, so the store listing and the home screen show one
+  icon. The tomato's two paths are copied from frontend/src/assets/logo.svg; the wordmark
+  is not here for the reason it is not in the launcher icon — two lines of Geologica Black
+  are unreadable at listing size.
+
+  The viewBox frames the mark exactly (measured, not guessed), the CSS sizes it to 340 of
+  the 512 — the proportion a launcher shows once it has masked the adaptive icon — and the
+  -14px lifts the tomato's body to the optical centre, since the stem carries the bbox up.
+-->
+<html><head><meta charset="utf-8"><style>
+  *{margin:0;padding:0}
+  html,body{width:512px;height:512px;background:#F0F4EF;overflow:hidden}
+  body{display:flex;align-items:center;justify-content:center}
+  svg{display:block;width:309px;height:340px;transform:translateY(-14px)}
+</style></head><body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="23.92 3.995 19.53 21.49">
+  <path fill="#ED6D6B" stroke="#06151E" stroke-width="2" stroke-linejoin="round"
+        d="M42.44,16.5c0,4.59-3.92,8.16-8.76,7.97s-8.76-4.06-8.76-8.65,3.92-8.16,8.76-7.97,8.76,4.06,8.76,8.65Z"/>
+  <path fill="#429775" stroke="#06151E" stroke-width="2" stroke-linejoin="round"
+        transform="translate(4.74 -11.44) rotate(20.38)"
+        d="M34.96,4.75h0c.75,0,1.36.61,1.36,1.36v1.91c0,1.18-.96,2.14-2.14,2.14h0c-1.18,0-2.14-.96-2.14-2.14v-.36c0-1.61,1.31-2.92,2.92-2.92Z"/>
+</svg>
+</body></html>
