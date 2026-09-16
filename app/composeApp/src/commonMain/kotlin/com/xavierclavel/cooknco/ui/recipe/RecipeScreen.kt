@@ -212,7 +212,7 @@ fun RecipeScreen(
     // the sheet it is opened from is dismissed the moment it starts.
     PdfExportHost(
         state = uiState.export,
-        onShared = viewModel::onExportShared,
+        onSaved = viewModel::onExportSaved,
         onErrorDismissed = viewModel::dismissExportError,
     )
 

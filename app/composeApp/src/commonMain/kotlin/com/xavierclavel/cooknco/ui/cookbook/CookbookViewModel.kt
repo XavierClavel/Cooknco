@@ -143,7 +143,7 @@ class CookbookViewModel(
 
     /**
      * Prints the whole cookbook — cover and every recipe in it — and parks the result for
-     * [com.xavierclavel.cooknco.ui.components.PdfExportHost] to hand to the share sheet.
+     * [com.xavierclavel.cooknco.ui.components.PdfExportHost] to hand to the save-a-file picker.
      *
      * A book takes the renderer appreciably longer than a single sheet, which is why the
      * dialog it puts up says what is happening rather than merely spinning. Guarded against
@@ -162,8 +162,8 @@ class CookbookViewModel(
         }
     }
 
-    /** The document is the share sheet's now; holding on to it would offer it again. */
-    fun onExportShared() = _uiState.update { it.copy(export = PdfExportState()) }
+    /** The document is the picker's now; holding on to it would offer it again. */
+    fun onExportSaved() = _uiState.update { it.copy(export = PdfExportState()) }
 
     fun dismissExportError() = _uiState.update { it.copy(export = PdfExportState()) }
 
