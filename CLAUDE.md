@@ -145,6 +145,37 @@ review:
 - **Values are escaped.** Mustache's `{{name}}` escapes HTML, which is what keeps a recipe
   title from being markup. Do not reach for the raw `{{{name}}}` form on anything a user typed.
 
+### A cookbook is printed twice, to number its contents
+
+`PdfDocumentKind.COOKBOOK` prints a whole cookbook as one book — a cover, a contents, then
+every recipe — and its contents gives the page each recipe starts on. Nothing can know that
+while the document is being written: CSS has a `target-counter()` for exactly this that
+Chromium does not implement, and the renderer runs with `--chromium-disable-javascript`, so
+the layout cannot measure itself either. So `ExportService.generateCookbookPDF` prints the
+book **twice** — the first print carries no numbers and exists to be measured, `PdfDestinations`
+reads back where each recipe landed, and the second print is the one handed over.
+
+What makes that readable is the contents links. Chromium records a named destination only
+for an `id` something **links to**, so the layout's `href="#{{anchor}}"` rows are load-bearing
+as well as clickable — a contents that drops them is one that cannot be numbered. It then
+prints no numbers rather than guessing: `{{#page}}` is a section for that reason, and the
+second print's destinations are compared against the first's before it is returned, so
+numbering that moved what it names falls back to the unnumbered print.
+
+Do not replace this with arithmetic. About seventeen ingredients and ten steps already spill
+a recipe onto a second page, so a book numbered by counting recipes is wrong about everything
+after the first long one.
+
+PDFBox is on the runtime classpath for this, and for reading only — it is Apache-2.0, unlike
+the AGPL iText that stays test-only, and nothing should start building PDFs with either.
+
+The folio at the foot of each page cannot come from the document (Chromium implements no CSS
+page margin boxes), so it travels inside the layout as a `<template id="page-footer">` that
+`PdfTemplates.footerOf` lifts out and posts to Gotenberg separately. That search skips HTML
+comments: both packaged layouts document the convention by naming the element, and matching
+the mention makes the footer everything from the comment to the end of the file — every page
+then carries the whole book in its margin.
+
 `GotenbergPdfRenderer` bounds how many prints are in flight (`Configuration.Pdf.maxConcurrentRenders`,
 matching the renderer's own `--chromium-max-concurrency`) and refuses with a 503 rather than
 queueing for ever. Keep that bound: the backoffice paces its live preview, but nothing else

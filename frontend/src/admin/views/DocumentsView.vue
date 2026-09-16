@@ -198,7 +198,12 @@ const SUBJECT_LABELS: Record<string, string> = {
  * They are inserted as a section — `{{#steps}}…{{/steps}}` — because writing one as a plain
  * `{{steps}}` prints nothing, which is a confusing first thing to happen to an operator.
  */
-const SECTIONS = new Set(['ingredients', 'steps', 'hasIngredients', 'hasSteps', 'recipes', 'hasRecipes'])
+const SECTIONS = new Set([
+  'ingredients', 'steps', 'hasIngredients', 'hasSteps', 'recipes', 'hasRecipes',
+  // A book's page numbers are not known on the first of the two prints it takes, and may
+  // not be knowable at all, so a layout shows one only inside a section that can drop out.
+  'page',
+])
 
 const templates = ref<any[]>([])
 const loading = ref(true)

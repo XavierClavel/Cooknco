@@ -66,12 +66,27 @@ fun countPdfPages(pdf: ByteArray): Int =
     PdfDocument(PdfReader(ByteArrayInputStream(pdf))).use { it.numberOfPages }
 
 /** Every page of a PDF as text, so a test can assert on what a reader would actually see. */
-fun readPdfText(pdf: ByteArray): String =
+fun readPdfText(pdf: ByteArray): String = readPdfPages(pdf).joinToString("\n")
+
+/**
+ * The same, kept page by page.
+ *
+ * What a book's contents claims is only checkable against where each recipe actually is,
+ * and that is a question about pages rather than about the text as a whole.
+ */
+fun readPdfPages(pdf: ByteArray): List<String> =
     PdfDocument(PdfReader(ByteArrayInputStream(pdf))).use { document ->
-        (1..document.numberOfPages).joinToString("\n") {
-            PdfTextExtractor.getTextFromPage(document.getPage(it))
-        }
+        (1..document.numberOfPages).map { PdfTextExtractor.getTextFromPage(document.getPage(it)) }
     }
+
+/**
+ * The page a contents line gives for [title], or null when it gives none.
+ *
+ * Read with a pattern rather than by an exact string: the number sits at the far side of
+ * the row, and how much whitespace lands between the two is the layout's business.
+ */
+fun pageInContents(contents: String, title: String): Int? =
+    Regex("${Regex.escape(title)}\\s+(\\d+)").find(contents)?.groupValues?.get(1)?.toInt()
 
 /**
  * The pictures a PDF actually embeds, as the bytes of each.

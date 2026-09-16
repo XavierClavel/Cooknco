@@ -48,6 +48,12 @@ dependencies {
     //Document layouts: logic-less templating, so a layout an operator saved stays markup
     implementation("com.samskivert:jmustache:1.16")
 
+    //PDF reading, and only reading: a cookbook is printed twice, and this is what reads the
+    //first print to learn which page each recipe landed on (ExportService, PdfDestinations).
+    //Apache-2.0, unlike the iText below, which is why the runtime one is this and not that.
+    //Nothing here builds a PDF — the writing is Chromium's, in its own service.
+    implementation("org.apache.pdfbox:pdfbox:3.0.5")
+
     //PDF reading, to assert on what an export actually contains. The writing is Chromium's,
     //in its own service: see GotenbergPdfRenderer.
     testImplementation("com.itextpdf:itext-core:$itextVersion")

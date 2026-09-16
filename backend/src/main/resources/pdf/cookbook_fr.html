@@ -9,6 +9,24 @@
   de la recette et non celui du livre, Mustache répondant toujours par le nom le plus
   proche. {{siteName}} n'a qu'un sens et se lit donc pareil des deux côtés.
 
+  Deux choses ci-dessous sont de la mécanique autant que de la mise en page, et sont à
+  conserver :
+
+  * Les lignes du sommaire sont des liens — href="#{{anchor}}" — et chaque recette porte
+    l'id="{{anchor}}" correspondant. C'est ce qui rend le sommaire cliquable, et c'est aussi
+    la seule raison pour laquelle les numéros de page existent : le livre est imprimé une
+    première fois pour voir où chaque recette tombe, et Chromium ne le note que pour un id
+    vers lequel quelque chose pointe. Enlevez les liens et les numéros disparaissent avec.
+  * Le numéro s'écrit comme une section — {{#page}}…{{/page}} — parce qu'il est absent à
+    cette première impression, et absent encore s'il n'a pas pu être relu. Un livre
+    n'affiche jamais un numéro de page dont il ne répond pas. (Les sections de ce
+    commentaire sont écrites fermées exprès : la mise en page est analysée avant d'être
+    imprimée, commentaires compris, et une section non fermée ici casserait l'export.)
+
+  Le folio en pied de chaque page est le <template id="page-footer"> à la fin de ce fichier.
+  C'est un petit document à part : il n'hérite d'aucun style ci-dessus et apporte les siens,
+  et <span class="pageNumber"></span> est la façon dont il dit sur quelle page il est.
+
   Rendu par Chromium sans interface, donc le CSS moderne passe. La seule règle est que rien
   ne peut être chargé depuis le réseau — polices et images doivent être envoyées avec ce
   fichier, et une URL est ignorée.
@@ -126,6 +144,25 @@
     padding: 1.4mm 0;
     border-bottom: 0.3mm dotted var(--rule);
     break-inside: avoid;
+  }
+
+  /* La ligne est un lien pour que le sommaire soit cliquable et, surtout, pour que le
+     numéro de page puisse être connu — voir la note en haut de ce fichier. */
+  .contents a {
+    display: flex;
+    align-items: baseline;
+    gap: 2mm;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Pousse le folio contre le bord droit quelle que soit la longueur du titre. */
+  .contents .fill { flex: 1; }
+
+  .contents .folio {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
   }
 
   /* ---------------------------------------------------------------- recettes */
@@ -293,12 +330,20 @@
 <section class="contents">
   <h2>Sommaire</h2>
   <ol>
-    {{#recipes}}<li>{{title}}</li>{{/recipes}}
+    {{#recipes}}
+    <li>
+      <a href="#{{anchor}}">
+        <span>{{title}}</span>
+        <span class="fill"></span>
+        {{#page}}<span class="folio">{{page}}</span>{{/page}}
+      </a>
+    </li>
+    {{/recipes}}
   </ol>
 </section>
 
 {{#recipes}}
-<article class="recipe">
+<article class="recipe" id="{{anchor}}">
   <h1 class="recipe-title">{{title}}</h1>
   <p class="byline">Par {{author}}</p>
 
@@ -352,3 +397,25 @@
 </article>
 {{/recipes}}
 {{/hasRecipes}}
+
+<!--
+  Le folio, dessiné par le navigateur dans la marge basse de chaque page.
+
+  Il ne fait pas partie du document ci-dessus : Chromium n'implémente aucun des CSS qui
+  permettraient à une page de dessiner son propre folio, donc celui-ci lui est transmis à
+  part. Il n'hérite donc d'aucun style ci-dessus et apporte les siens.
+-->
+<template id="page-footer">
+  <style>
+    body { margin: 0; }
+    .folio {
+      width: 100%;
+      padding: 0 15mm;
+      font-family: "Liberation Sans", sans-serif;
+      font-size: 8pt;
+      color: #8a8178;
+      text-align: center;
+    }
+  </style>
+  <div class="folio"><span class="pageNumber"></span></div>
+</template>
