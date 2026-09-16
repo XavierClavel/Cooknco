@@ -1,0 +1,79 @@
+name: Android Release (Play closed testing)
+
+# `master` → the `alpha` track, which is what the console calls **closed testing** (the API
+# identifiers never followed the renamings). This is the release branch: it tags and opens a
+# GitHub release.
+#
+# It compiles **nothing**. `master` promotes the release `develop` already put into internal
+# testing, at the `versionCode` of the last `android-build-*` tag this commit contains. Google
+# Play refuses a `versionCode` it has already seen, for ever: re-uploading a bundle at the same
+# number is impossible. Promotion avoids that, and guarantees as a bonus that the bundle
+# delivered to closed testing is bit-for-bit the one tested internally.
+#
+# The number is **looked up, not recomputed**, and that is what guarantees it is exactly the
+# last pipeline's: the commit count changes at every commit, while only the published commits
+# exist on Play. A merge commit would yield a number nothing ever built.
+#
+# It is also looked up **late**: the tag is only pushed at the end of `develop`'s upload, a
+# dozen minutes after a push this cycle receives within the same minute. `check` therefore
+# waits for this commit's internal build before resolving — otherwise the promotion goes out one
+# build behind and fails on "versionCode N is not on the internal track".
+#
+# ⚠️ **`master` must only ever receive merges from `develop`.** An app commit pushed directly
+# here is promoted *without its own changes* — it is `develop`'s last build that goes out, and
+# the promotion succeeds, so nothing reports it.
+#
+# The body of the pipeline lives in `android-deploy.yml`; this file only describes the trigger
+# and the policy.
+on:
+  push:
+    branches: [ "master" ]
+    # Restricted to what actually goes into the AAB: a backend or docs change no longer costs a
+    # run for a `should_deploy=false`. A file forgotten here is not blocking —
+    # `workflow_dispatch` stays available to publish by hand.
+    paths:
+      - 'app/**'
+      - '.github/workflows/android-release-master.yml'
+      - '.github/workflows/android-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      track:
+        # `alpha` is what the console calls "closed testing", `beta` "open testing".
+        # `internal` is not offered: it is the **source** track of the promotion.
+        description: "Play track to promote the internal release to (alpha = closed, beta = open)"
+        required: true
+        default: "alpha"
+        type: choice
+        options:
+          - alpha
+          - beta
+          - production
+
+# `check` reads the tags, `release` creates one and publishes a GitHub release. Permissions are
+# granted here: a called workflow can never grant itself more than its caller.
+#
+# `actions: read` is what lets `check` see the `develop` cycle's runs and wait for this commit's.
+# Without it the promotion **fails** instead of skipping the wait: reading that registry is not
+# a convenience, it is what proves the promoted build contains the merge's changes.
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/android-deploy.yml
+    with:
+      # Empty on a push, so `master`'s default track is closed testing. The choice is not
+      # cosmetic — only a closed test feeds the "12 testers for 14 consecutive days" counter a
+      # personal developer account has to satisfy before Google opens production. See
+      # docs/playstore-ci.md.
+      track: ${{ inputs.track || 'alpha' }}
+      tag-release: true
+      # Non-empty: this cycle promotes instead of building. The release promoted is the one the
+      # `internal` track already carries at the `versionCode` of the last `android-build-*` tag
+      # reachable from this commit of `master`.
+      promote-from: internal
+      # Attach a required reviewer in Settings → Environments to put a human in front of every
+      # publication; GitHub creates the environment on the first run.
+      environment: play-store
+    secrets: inherit

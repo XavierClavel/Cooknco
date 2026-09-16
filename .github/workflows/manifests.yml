@@ -2,12 +2,14 @@ name: Kubernetes Manifests
 
 on:
   push:
-    branches: [ "master" ]
+    # Both: `develop` is where PRs land and where the deploy fires from, `master` still carries
+    # the same manifests and a broken render there would be worth knowing about too.
+    branches: [ "develop", "master" ]
     paths:
       - 'k8s/**'
       - '.github/workflows/manifests.yml'
   pull_request:
-    branches: [ "master" ]
+    branches: [ "develop", "master" ]
     paths:
       - 'k8s/**'
       - '.github/workflows/manifests.yml'
@@ -76,7 +78,7 @@ jobs:
           # running then depends on what it already has cached.
           #
           # `:latest` is accepted only for the three cooknco-* images, which the
-          # deploy pipeline owns end to end — a master build pushes both
+          # deploy pipeline owns end to end — a `develop` build pushes both
           # `:<version>` and `:latest`, tags the commit, and stamps the version
           # it built into the pod-template annotations, so the running build is
           # still identifiable and still reachable by its immutable tag for a
