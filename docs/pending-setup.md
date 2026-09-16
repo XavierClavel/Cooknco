@@ -154,5 +154,8 @@ git fetch --tags && git tag --list 'android-build-*'
 cd app && ./gradlew -q :androidApp:printVersion
 ```
 
-A first run failing with `The caller does not have permission` is usually Play permissions
-still propagating — Google takes up to 24 hours — not a wrong key.
+A first run failing with `The caller does not have permission` is a real misconfiguration, not
+something to wait out: the Google Play Android Developer API not enabled on the linked Cloud
+project, the wrong address invited to the Play Console (it must be the service account's own
+`…iam.gserviceaccount.com`, not yours), or the grant not scoped to this app. The JSON key on
+its own authorises nothing — [`playstore-ci.md`](playstore-ci.md) § 4 walks all five steps.

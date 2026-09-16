@@ -142,18 +142,40 @@ keytool -list -v -keystore upload-keystore.jks    # prints the alias
 
 ### The Play service account
 
-1. Play Console → **Users and permissions → Invite new users**, or
-   **Setup → API access** if the project is not linked to a Google Cloud project yet.
-2. Google Cloud console → **IAM & Admin → Service Accounts → Create**, then
-   **Keys → Add key → JSON**. Download it.
-3. Back in the Play Console, grant that service account access to the app with, at minimum:
-   **Release to testing tracks** and **Release apps to production, exclusive testing and
-   internal testing** — the promotion writes to a track it is not uploading to.
-4. Paste the entire JSON file as `PLAY_SERVICE_ACCOUNT_JSON`. The workflow parses it and
+**The JSON key on its own grants nothing.** It authenticates a principal that, until the two
+steps below are done, is allowed to do precisely nothing with this app. Both are easy to skip,
+and skipping either produces a 403 rather than anything that names the cause.
+
+1. **Link a Cloud project.** Play Console → **Setup → API access**. Link an existing Google
+   Cloud project or let the console create one.
+2. **Enable the API on that project.** Google Cloud console → **APIs & Services → Library →
+   Google Play Android Developer API → Enable**. Missing, every call fails with
+   *"Google Play Android Developer API has not been used in project N before or it is
+   disabled"* — which at least names itself, and the error carries the enable link.
+3. **Create the service account.** Google Cloud console → **IAM & Admin → Service Accounts →
+   Create**, then **Keys → Add key → JSON**. Download it. No Cloud IAM role is needed: the
+   authorisation that matters is granted in the Play Console, not here.
+4. **Invite it as a Play Console user.** Play Console → **Users and permissions → Invite new
+   users**, pasting the service account's own address — the
+   `something@project-id.iam.gserviceaccount.com` from the Service Accounts page, not your own.
+   This is the step people miss: the account exists, the key works, and it can see no apps.
+5. **Grant it, under App permissions scoped to Cooknco** (not Account permissions):
+   - **View app information (read-only)**
+   - **Release apps to testing tracks**
+
+   That second one covers both halves of this pipeline — `develop`'s upload to `internal` and
+   `master`'s promotion of it to closed testing. **Release to production** is deliberately not
+   granted: nothing here writes to production, and the `production` option on
+   `android-release-master.yml`'s manual dispatch will fail until it is. Grant it the day you
+   actually want that, so an accidental dispatch cannot ship to everyone before then.
+6. Paste the entire JSON file as `PLAY_SERVICE_ACCOUNT_JSON`. The workflow parses it and
    refuses a truncated paste rather than failing mid-upload.
 
-Permission changes can take up to 24 hours to propagate on Google's side. A first run failing
-with `The caller does not have permission` is usually that, not a wrong key.
+Google's documentation says access is available as soon as the invitation is accepted, and it
+usually is. So treat `The caller does not have permission` as a real misconfiguration rather
+than something to wait out: check the API is enabled (step 2), that the invited address is the
+service account's and not yours (step 4), and that the grant is on this app (step 5). Waiting a
+day on the assumption it will settle is how an afternoon gets lost to a disabled API.
 
 ---
 
@@ -212,6 +234,8 @@ reproducible — worth doing the next time anyone has Ruby to hand.
 | `The decoded keystore is unreadable` | `ANDROID_KEYSTORE_BASE64` truncated, or `KEYSTORE_PASSWORD` wrong. |
 | `is not signed — the release signingConfig did not apply` | `KEYSTORE_FILE` did not reach Gradle, so `signingConfigs.findByName("release")` returned null. |
 | `N rounds of waiting and the develop cycle is still publishing` | merges are landing faster than the promotion can catch up. Re-run once `develop` settles. |
+| `The caller does not have permission` | § 4 is incomplete — API not enabled, the wrong address invited, or the grant not on this app. Not a propagation delay. |
+| `Google Play Android Developer API has not been used in project N…` | § 4 step 2. The error carries the link that enables it. |
 
 A release that sits in "In review" on a closed track is normal — closed testing goes through
 Play review, unlike internal testing. Nothing in this pipeline can shorten that.
