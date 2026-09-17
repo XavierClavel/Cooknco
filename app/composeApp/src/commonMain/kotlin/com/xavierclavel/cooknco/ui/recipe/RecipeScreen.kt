@@ -62,8 +62,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -74,11 +72,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.data.AppUnits
+import com.xavierclavel.cooknco.navigation.WebRoutes
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
+import com.xavierclavel.cooknco.platform.rememberLinkSharer
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
@@ -154,9 +154,7 @@ fun RecipeScreen(
 ) {
     val s = strings()
     val uiState by viewModel.uiState.collectAsState()
-    // LocalClipboardManager is deprecated in favour of LocalClipboard, but ClipEntry
-    // has no common-code constructor yet, so this stays the multiplatform option.
-    val clipboardManager = LocalClipboardManager.current
+    val linkSharer = rememberLinkSharer()
 
     LaunchedEffect(uiState.deleted) { if (uiState.deleted) onNavigateBack() }
 
@@ -178,7 +176,7 @@ fun RecipeScreen(
                 isOwner = viewModel.isOwner,
                 isAdmin = isAdmin,
                 onToggleLike = viewModel::toggleLike,
-                onShare = { clipboardManager.setText(AnnotatedString("cooknco.eu/recipe?id=${recipe.id}")) },
+                onShare = { linkSharer.share(recipe.title, WebRoutes.recipeUrl(recipe.id)) },
                 onEdit = { onNavigateToEdit(recipe.id) },
                 onAddToCookbook = viewModel::openCookbookPicker,
                 onDelete = viewModel::confirmDelete,

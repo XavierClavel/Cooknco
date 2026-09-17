@@ -44,17 +44,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xavierclavel.cooknco.navigation.WebRoutes
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.platform.rememberLinkSharer
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.network.ReportTargetType
 import com.xavierclavel.cooknco.ui.moderation.ReportSheet
@@ -95,7 +95,7 @@ fun UserProfileScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val clipboardManager = LocalClipboardManager.current
+    val linkSharer = rememberLinkSharer()
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         when {
@@ -123,7 +123,10 @@ fun UserProfileScreen(
                 onNavigateToSettings = onNavigateToSettings,
                 onNavigateToFollowers = onNavigateToFollowers,
                 onNavigateToFollowing = onNavigateToFollowing,
-                onShare = { clipboardManager.setText(AnnotatedString("cooknco.eu/user?id=${uiState.user!!.id}")) },
+                onShare = {
+                    val user = uiState.user!!
+                    linkSharer.share(user.username, WebRoutes.userUrl(user.id))
+                },
                 onLoadMore = { viewModel.loadMoreShown() },
                 allLoaded = if (uiState.tab == ProfileTab.LIKED) uiState.allLikedLoaded else uiState.allRecipesLoaded,
                 onRecipeClick = onNavigateToRecipe,

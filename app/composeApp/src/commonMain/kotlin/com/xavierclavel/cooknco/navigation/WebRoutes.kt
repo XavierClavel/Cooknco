@@ -25,6 +25,23 @@ object WebRoutes {
     const val HOST = "cooknco.eu"
 
     /**
+     * The address a recipe is shared at, and the one a profile is — the inverse direction,
+     * kept here so that the shapes this app hands out and the shapes it can place are one
+     * file apart rather than one codebase apart. `WebRoutesTest` round-trips these through
+     * [routeForUrl], because a link we mint that we cannot place is the single worst kind:
+     * on a verified install it opens the app on its own home screen instead of the page.
+     *
+     * Absolute, with the scheme, because a share sheet passes the text on verbatim — `https`
+     * is what makes the recipient's system treat it as a link at all, and what sends it to
+     * the app rather than the browser where the app is installed and verified. The query
+     * parameter names are the website's (`LinkPreviewController` serves the `og:` tags off
+     * these same paths), so an unfurled link carries the recipe's own title and picture.
+     */
+    fun recipeUrl(id: Long): String = "https://$HOST/recipe/view?id=$id"
+
+    fun userUrl(id: Long): String = "https://$HOST/user/view?user=$id"
+
+    /**
      * Translates one of the backend's app-relative paths, query string included, such as
      * `/recipe/view?id=12`.
      */
@@ -61,8 +78,13 @@ object WebRoutes {
             // not know about.
             "/recipe/cook" -> parameters["id"]?.let { "recipe/$it/cook" }
             "/user/view" -> parameters["user"]?.let { "user/$it" }
-            "/cookbook/view" -> parameters["id"]?.let { "cookbook/$it" }
-            "/ingredient/view" -> parameters["id"]?.let { "ingredient/$it" }
+            // Each route names its id after what it holds — `?cookbook=`, `?ingredient=` —
+            // which is the website's shape and so the shape a shared link carries
+            // (`toViewCookbook` in frontend/src/scripts/common.ts, and the parameters
+            // LinkPreviewController reads). `id` stays accepted after it: it is what a
+            // notification's link may already say, and reading it costs nothing.
+            "/cookbook/view" -> (parameters["cookbook"] ?: parameters["id"])?.let { "cookbook/$it" }
+            "/ingredient/view" -> (parameters["ingredient"] ?: parameters["id"])?.let { "ingredient/$it" }
             else -> null
         }
 }
