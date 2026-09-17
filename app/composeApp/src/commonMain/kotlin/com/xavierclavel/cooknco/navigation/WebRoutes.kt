@@ -4,7 +4,8 @@ import io.ktor.http.Parameters
 import io.ktor.http.Url
 
 /**
- * The one place a cooknco.eu web address becomes a route of this app.
+ * The one place a cooknco.eu web address is built, and the one place it becomes a route of
+ * this app.
  *
  * Three things arrive here, and they share the mapping on purpose: a tapped notification
  * (an app-relative path the backend stored), the cook timer's own notification, and an
@@ -25,13 +26,57 @@ object WebRoutes {
     const val HOST = "cooknco.eu"
 
     /**
+     * The scheme a shared address must carry.
+     *
+     * Not decoration, and not something a link may lose: neither platform's claim covers
+     * `http`, and the ingress terminates TLS only — a plain-http address gets a 404 from
+     * Traefik rather than a redirect to fix it up. A schemeless `cooknco.eu/…` is the same
+     * failure once a mail or a messaging app linkifies it.
+     */
+    private const val SCHEME = "https"
+
+    /**
+     * What can be shared: the web path that serves it, the query parameter carrying the id,
+     * and the app route it opens.
+     *
+     * One list, read in both directions — [urlFor] builds a shareable address from it and
+     * [routeFor] places one — because they were two lists until a share button copied
+     * `cooknco.eu/recipe?id=…`: a path the website does not serve, the manifest and the
+     * association file do not claim, and this file could not place. It opened a generic
+     * page, in a browser.
+     *
+     * These four are exactly what the manifest's `pathPrefix` entries and the
+     * `apple-app-site-association` components list. The three have to agree.
+     */
+    enum class Shareable(
+        val path: String,
+        val parameter: String,
+        private val screen: String,
+    ) {
+        RECIPE("/recipe/view", "id", "recipe"),
+        USER("/user/view", "user", "user"),
+        COOKBOOK("/cookbook/view", "id", "cookbook"),
+        INGREDIENT("/ingredient/view", "id", "ingredient"),
+        ;
+
+        internal fun routeFor(id: String) = "$screen/$id"
+    }
+
+    /**
+     * The address to share for [what] with [id] — the full URL, scheme included, of the page
+     * the website serves and the app claims.
+     */
+    fun urlFor(what: Shareable, id: Long): String =
+        "$SCHEME://$HOST${what.path}?${what.parameter}=$id"
+
+    /**
      * Translates one of the backend's app-relative paths, query string included, such as
      * `/recipe/view?id=12`.
      */
     fun routeForPath(link: String?): String? {
         if (link.isNullOrBlank()) return null
         // Resolved against a base because the stored value is a path, which Url alone rejects
-        val parsed = runCatching { Url("https://$HOST${if (link.startsWith("/")) link else "/$link"}") }
+        val parsed = runCatching { Url("$SCHEME://$HOST${if (link.startsWith("/")) link else "/$link"}") }
             .getOrNull() ?: return null
         return routeFor(parsed.encodedPath, parsed.parameters)
     }
@@ -50,19 +95,16 @@ object WebRoutes {
         return routeFor(parsed.encodedPath, parsed.parameters)
     }
 
-    private fun routeFor(path: String, parameters: Parameters): String? =
+    private fun routeFor(path: String, parameters: Parameters): String? {
         // Both shapes are in circulation for these — `/recipe/view?id=1` but
         // `/user/view/?user=1` — so the trailing slash is trimmed rather than matched.
-        when (path.trimEnd('/')) {
-            "/recipe/view" -> parameters["id"]?.let { "recipe/$it" }
-            // Not a path the backend ever stores, and not one the website serves either —
-            // this one is minted by the cook timer's own notification, which goes through
-            // here so that a tap lands on a route rather than on a screen this file does
-            // not know about.
-            "/recipe/cook" -> parameters["id"]?.let { "recipe/$it/cook" }
-            "/user/view" -> parameters["user"]?.let { "user/$it" }
-            "/cookbook/view" -> parameters["id"]?.let { "cookbook/$it" }
-            "/ingredient/view" -> parameters["id"]?.let { "ingredient/$it" }
-            else -> null
-        }
+        val trimmed = path.trimEnd('/')
+        // Not a path the backend ever stores, and not one the website serves either — this
+        // one is minted by the cook timer's own notification, which goes through here so
+        // that a tap lands on a route rather than on a screen this file does not know
+        // about. Nothing shares it, which is why it is not a Shareable.
+        if (trimmed == "/recipe/cook") return parameters["id"]?.let { "recipe/$it/cook" }
+        val shareable = Shareable.entries.firstOrNull { it.path == trimmed } ?: return null
+        return parameters[shareable.parameter]?.let { shareable.routeFor(it) }
+    }
 }

@@ -74,6 +74,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.data.AppUnits
+import com.xavierclavel.cooknco.navigation.WebRoutes
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
@@ -178,7 +179,9 @@ fun RecipeScreen(
                 isOwner = viewModel.isOwner,
                 isAdmin = isAdmin,
                 onToggleLike = viewModel::toggleLike,
-                onShare = { clipboardManager.setText(AnnotatedString("cooknco.eu/recipe?id=${recipe.id}")) },
+                onShare = {
+                    clipboardManager.setText(AnnotatedString(WebRoutes.urlFor(WebRoutes.Shareable.RECIPE, recipe.id)))
+                },
                 onEdit = { onNavigateToEdit(recipe.id) },
                 onAddToCookbook = viewModel::openCookbookPicker,
                 onDelete = viewModel::confirmDelete,
