@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.navigation.WebRoutes
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.network.ReportTargetType
 import com.xavierclavel.cooknco.ui.moderation.ReportSheet
@@ -123,7 +124,9 @@ fun UserProfileScreen(
                 onNavigateToSettings = onNavigateToSettings,
                 onNavigateToFollowers = onNavigateToFollowers,
                 onNavigateToFollowing = onNavigateToFollowing,
-                onShare = { clipboardManager.setText(AnnotatedString("cooknco.eu/user?id=${uiState.user!!.id}")) },
+                onShare = {
+                    clipboardManager.setText(AnnotatedString(WebRoutes.urlFor(WebRoutes.Shareable.USER, uiState.user!!.id)))
+                },
                 onLoadMore = { viewModel.loadMoreShown() },
                 allLoaded = if (uiState.tab == ProfileTab.LIKED) uiState.allLikedLoaded else uiState.allRecipesLoaded,
                 onRecipeClick = onNavigateToRecipe,
