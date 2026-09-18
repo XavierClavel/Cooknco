@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+
+# Fastlane carries the Play publication (see fastlane/Fastfile). Only the Android app depends
+# on it: neither the backend nor the frontend goes through here, which is why the Gemfile lives
+# under `app/` rather than at the repository root.
+gem "fastlane"

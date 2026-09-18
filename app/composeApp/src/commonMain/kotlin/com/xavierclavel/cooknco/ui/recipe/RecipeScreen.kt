@@ -176,7 +176,9 @@ fun RecipeScreen(
                 isOwner = viewModel.isOwner,
                 isAdmin = isAdmin,
                 onToggleLike = viewModel::toggleLike,
-                onShare = { linkSharer.share(recipe.title, WebRoutes.recipeUrl(recipe.id)) },
+                onShare = {
+                    linkSharer.share(recipe.title, WebRoutes.urlFor(WebRoutes.Shareable.RECIPE, recipe.id))
+                },
                 onEdit = { onNavigateToEdit(recipe.id) },
                 onAddToCookbook = viewModel::openCookbookPicker,
                 onDelete = viewModel::confirmDelete,

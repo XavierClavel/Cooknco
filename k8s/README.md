@@ -112,11 +112,12 @@ Two workflows, both in `.github/workflows/`.
    `:latest`. The three `cooknco-*` images are exempt from the `:latest` rule —
    see below for what stands in for the pinned tag.
 
-**`build.yml`** — on a push to `master`:
+**`build.yml`** — on a push to `develop` that touches something other than `app/`,
+`docs/` or a Markdown file:
 
 1. Builds each subproject's image and pushes it twice, as `:<version>` (from
    `./gradlew printVersion`) and as `:latest`, then tags the commit `v<version>`
-   and cuts a GitHub release. Nothing is committed back to `master`.
+   and cuts a GitHub release. Nothing is committed back to `develop`.
 2. `overlays/prod` pins the three app images to `:latest`, so the `deploy` job
    does not rewrite any tag. It instead runs `kustomize edit add annotation` to
    stamp `cooknco.dev/deployed-version` and `cooknco.dev/deployed-revision` into
@@ -129,7 +130,7 @@ Two workflows, both in `.github/workflows/`.
 3. The job renders both roots on the runner and pipes them into `kubectl apply`
    over SSH: `--dry-run=server` first, then the apply, then all seven rollouts.
 
-The tradeoff `:latest` buys — one less commit on `master` per build, and no race
+The tradeoff `:latest` buys — one less commit on `develop` per build, and no race
 between that commit and the deploy job's checkout — is paid for in provenance.
 The live objects no longer name their image by an immutable tag; what identifies
 a running build is the annotation pair above (`kubectl -n cooknco get deploy
@@ -185,7 +186,7 @@ The workflow assumes sshd on port 22. If it listens elsewhere, change
 
 Two more repository-level notes:
 
-- `master` must accept pushes from `github-actions[bot]`. If branch protection
+- `develop` must accept pushes from `github-actions[bot]`. If branch protection
   blocks it, either add the bot as an exception or drop the *Commit image tag
   bump* step — the `deploy` job re-pins the tag itself, so deployments still
   work; only the git-recorded history of deployed versions is lost.

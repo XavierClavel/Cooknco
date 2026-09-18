@@ -3,81 +3,96 @@ package com.xavierclavel.cooknco.navigation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
- * That a cooknco.eu link the app claims lands on the screen it names — and, above all, that
- * the links this app *hands out* are links it can place.
+ * What a share button copies has to be what a tapped link can be placed by, and what the two
+ * platforms claim.
  *
- * The failure this rules out is quiet and one-directional. A shared link the app cannot map
- * is dropped, which is the right answer for a notification and the right answer for a link
- * the browser still holds; but on a *verified* install the system has already taken the link
- * away from the browser by then, so dropping it opens the app on its own home screen — worse
- * than never having claimed the path. The share sheet mints these URLs, so the mapping and
- * the minting have to agree, and nothing but this says so.
+ * The round trip below is the point of the file: the share buttons used to build their own
+ * address — `cooknco.eu/recipe?id=1` — which the website does not serve, the manifest and the
+ * association file do not claim, and [WebRoutes] could not place. Nothing failed; the link
+ * simply opened a generic page in a browser.
  */
 class WebRoutesTest {
 
     @Test
-    fun `a shared recipe link routes to the recipe`() {
-        assertEquals("recipe/12", WebRoutes.routeForUrl(WebRoutes.recipeUrl(12)))
+    fun `every shared address is placed back on the screen it names`() {
+        val expected = mapOf(
+            WebRoutes.Shareable.RECIPE to "recipe/12",
+            WebRoutes.Shareable.USER to "user/12",
+            WebRoutes.Shareable.COOKBOOK to "cookbook/12",
+            WebRoutes.Shareable.INGREDIENT to "ingredient/12",
+        )
+        WebRoutes.Shareable.entries.forEach { shareable ->
+            val url = WebRoutes.urlFor(shareable, 12)
+            assertEquals(expected.getValue(shareable), WebRoutes.routeForUrl(url), url)
+        }
     }
 
     @Test
-    fun `a shared profile link routes to the profile`() {
-        assertEquals("user/3", WebRoutes.routeForUrl(WebRoutes.userUrl(3)))
+    fun `a shared address carries the scheme and host the platforms claim`() {
+        WebRoutes.Shareable.entries.forEach { shareable ->
+            val url = WebRoutes.urlFor(shareable, 1)
+            // Neither claim covers http, and the ingress answers it with a 404 rather than a
+            // redirect, so a share that loses the scheme is a link that reaches nothing.
+            assertTrue(url.startsWith("https://${WebRoutes.HOST}/"), url)
+            // `*/view`, which is what the manifest's pathPrefix entries and the association
+            // file's components list. A path that is not one of those opens no app.
+            assertTrue(url.substringBefore('?').endsWith("/view"), url)
+        }
     }
 
-    /**
-     * The scheme is what makes a recipient's system treat the text as a link at all, and
-     * what hands it to the app rather than the browser. It went missing once already —
-     * "cooknco.eu/recipe?id=1" was what the clipboard used to get.
-     */
     @Test
-    fun `a shared link is absolute`() {
-        assertEquals("https://cooknco.eu/recipe/view?id=1", WebRoutes.recipeUrl(1))
-        assertEquals("https://cooknco.eu/user/view?user=1", WebRoutes.userUrl(1))
+    fun `the paths and parameters are the ones the backend stores`() {
+        assertEquals("https://cooknco.eu/recipe/view?id=12", WebRoutes.urlFor(WebRoutes.Shareable.RECIPE, 12))
+        // `user`, not `id` — NotificationService stores `/user/view?user=…`
+        assertEquals("https://cooknco.eu/user/view?user=12", WebRoutes.urlFor(WebRoutes.Shareable.USER, 12))
+        // `cookbook` and `ingredient`, not `id` — these name their id after what they hold,
+        // which is what the website navigates to and what LinkPreviewController reads off
+        // the same path. `?id=` here would unfurl as nothing and open an empty page.
+        assertEquals("https://cooknco.eu/cookbook/view?cookbook=12", WebRoutes.urlFor(WebRoutes.Shareable.COOKBOOK, 12))
+        assertEquals("https://cooknco.eu/ingredient/view?ingredient=12", WebRoutes.urlFor(WebRoutes.Shareable.INGREDIENT, 12))
     }
 
-    /**
-     * Each route names its id after what it holds, and the two that do not say `id` are the
-     * two that were read as `id` anyway — so every cookbook and ingredient link the website
-     * produces was dropped.
-     */
     @Test
-    fun `a link names its id the way the website does`() {
-        assertEquals("cookbook/5", WebRoutes.routeForPath("/cookbook/view?cookbook=5"))
-        assertEquals("ingredient/7", WebRoutes.routeForPath("/ingredient/view?ingredient=7"))
-        assertEquals("user/3", WebRoutes.routeForPath("/user/view?user=3"))
+    fun `a stored notification path lands on the same screen as the link`() {
         assertEquals("recipe/12", WebRoutes.routeForPath("/recipe/view?id=12"))
-    }
-
-    /** `?id=` stays accepted, because a notification already sent may carry it. */
-    @Test
-    fun `a bare id is still accepted`() {
-        assertEquals("cookbook/5", WebRoutes.routeForPath("/cookbook/view?id=5"))
-        assertEquals("ingredient/7", WebRoutes.routeForPath("/ingredient/view?id=7"))
-    }
-
-    /** Both shapes are in circulation — `/recipe/view?id=1` but `/user/view/?user=1`. */
-    @Test
-    fun `a trailing slash is trimmed rather than matched`() {
-        assertEquals("user/3", WebRoutes.routeForUrl("https://cooknco.eu/user/view/?user=3"))
+        assertEquals("user/7", WebRoutes.routeForPath("/user/view?user=7"))
+        // Both shapes are in circulation
+        assertEquals("user/7", WebRoutes.routeForPath("/user/view/?user=7"))
+        assertEquals("recipe/12", WebRoutes.routeForUrl("https://cooknco.eu/recipe/view/?id=12"))
     }
 
     @Test
-    fun `an unplaceable link is dropped rather than guessed at`() {
-        // A claimed path with no id: the recipe it names is missing, not zero.
+    fun `the id a link already in circulation carries is still placed`() {
+        // What a notification stored, and what a build predating the parameter names shared.
+        // Dropping these would send a link the app could open to the browser instead.
+        assertEquals("cookbook/12", WebRoutes.routeForUrl("https://cooknco.eu/cookbook/view?id=12"))
+        assertEquals("ingredient/9", WebRoutes.routeForUrl("https://cooknco.eu/ingredient/view?id=9"))
+        assertEquals("cookbook/12", WebRoutes.routeForPath("/cookbook/view?cookbook=12"))
+    }
+
+    @Test
+    fun `the path the cook timer mints is placed too`() {
+        assertEquals("recipe/12/cook", WebRoutes.routeForPath("/recipe/cook?id=12"))
+    }
+
+    @Test
+    fun `what cannot be placed is dropped rather than guessed at`() {
+        // The shape the share buttons used to copy. It must not resolve: were it to, the app
+        // would open on a link the website answers with its generic shell.
+        assertNull(WebRoutes.routeForUrl("https://cooknco.eu/recipe?id=12"))
+        assertNull(WebRoutes.routeForUrl("https://cooknco.eu/user?id=12"))
+        // The id is what the route is made of, so a path without one is nothing to open
         assertNull(WebRoutes.routeForUrl("https://cooknco.eu/recipe/view"))
-        // Paths deliberately left to the browser. /oauth/authorize is the consent screen an
-        // MCP client sends the user to, and /login is where the app sends people to sign in
-        // with Google; opening either in the app is opening it on a screen that does not exist.
-        assertNull(WebRoutes.routeForUrl("https://cooknco.eu/oauth/authorize?client_id=x"))
-        assertNull(WebRoutes.routeForUrl("https://cooknco.eu/login"))
-        // Another host claiming our shapes. The platforms only ever hand over a URL that
-        // matched the declaration, but the OAuth callback's entry point reaches this too.
-        assertNull(WebRoutes.routeForUrl("https://evil.example/recipe/view?id=1"))
-        assertNull(WebRoutes.routeForUrl("cooknco://login?code=1"))
+        assertNull(WebRoutes.routeForUrl("https://cooknco.eu/user/view?id=12"))
+        // Another host, and a claim the app does not make
+        assertNull(WebRoutes.routeForUrl("https://example.test/recipe/view?id=12"))
+        assertNull(WebRoutes.routeForUrl("https://cooknco.eu/oauth/authorize?client_id=1"))
+        // The OAuth callback reaches the same entry point, and is not a web address
+        assertNull(WebRoutes.routeForUrl("cooknco://login?token=abc"))
         assertNull(WebRoutes.routeForPath(null))
-        assertNull(WebRoutes.routeForPath(" "))
+        assertNull(WebRoutes.routeForPath(""))
     }
 }

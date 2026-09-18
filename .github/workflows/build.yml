@@ -2,13 +2,25 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "master" ]
+    # `develop` is the trunk and the branch production runs from: a merged PR deploys. `master`
+    # is the app's release branch and deploys nothing here — it only promotes the Android build
+    # `develop` already published (`android-release-master.yml`).
+    branches: [ "develop" ]
+    # An app-only commit must not roll the backend. The deploy job below stamps `GITHUB_SHA`
+    # into the pod templates, so `kubectl apply` is never a no-op: without this filter every
+    # `app/**` change merged to `develop` would restart all seven Deployments at an unchanged
+    # version.
+    paths-ignore:
+      - 'app/**'
+      - 'docs/**'
+      - '.github/workflows/android-*.yml'
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
   contents: write
 
-# Serialise master builds so two runs cannot race on the `latest` tag or apply
+# Serialise trunk builds so two runs cannot race on the `latest` tag or apply
 # to the cluster at the same time.
 concurrency:
   group: build-${{ github.ref }}
@@ -83,7 +95,7 @@ jobs:
     - name: Create tag if it does not exist
       run: |
         # Asks the remote, not the local ref: a tag created after this job's
-        # checkout is invisible to `git rev-parse`, which is how two master
+        # checkout is invisible to `git rev-parse`, which is how two trunk
         # builds four minutes apart both tried to create v1.2.10 and the second
         # failed on a rejected push.
         if [ -n "$(git ls-remote --tags origin "refs/tags/v${VERSION}")" ]; then
@@ -157,7 +169,7 @@ jobs:
   # is stored here — it lives on the host, owned by the deploy user.
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     # Attaching a required reviewer or a branch filter to this environment in the
     # repository settings puts a manual gate in front of prod. GitHub creates it

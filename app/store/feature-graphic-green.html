@@ -1,0 +1,48 @@
+<!doctype html>
+<!--
+  The 1024x500 feature graphic, the banner Play puts at the top of the listing.
+
+  The alternative to feature-graphic.html: the same layout on CookncoGreen (#629677)
+  rather than the cream, which is what the badge is already drawn to sit on — the logo's
+  own fill then reads as a card instead of dissolving into the ground. Louder in a row of
+  listings, one step further from the app's own surfaces. Ship one or the other, not both.
+
+  The one thing the SVG does not carry is its own wordmark: it is live type in Geologica
+  Black, so the two <tspan>s below reproduce it at the SVG's own coordinates, letter
+  spacing included. The gaps inside "C     OK" and "'N   CO" are the logo's, not padding.
+
+  Content is kept inside the middle ~85%: Play crops this graphic on some surfaces, and
+  anything near an edge is what goes first.
+-->
+<html><head><meta charset="utf-8"><style>
+  @font-face{font-family:'Geologica';font-weight:900;
+             src:url('geologica_black.ttf') format('truetype')}
+  @font-face{font-family:'GeologicaUI';font-weight:600;
+             src:url('../composeApp/src/commonMain/composeResources/font/geologica_semibold.ttf') format('truetype')}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1024px;height:500px;background:#629677;overflow:hidden}
+  .wrap{width:1024px;height:500px;display:flex;align-items:center;justify-content:center;gap:64px}
+  .logo{width:392px;height:245px;flex:none}
+  .wm{fill:#0D1821;font-family:'Geologica';font-weight:900;font-size:24.09px;letter-spacing:-.04em}
+  h1{font-family:'Geologica';font-weight:900;font-size:40px;line-height:1.12;
+     letter-spacing:-.02em;color:#F0F4EF;white-space:nowrap}
+  p{margin-top:18px;font-family:'GeologicaUI';font-weight:600;font-size:22px;
+    color:#FFF0C0;white-space:nowrap}
+</style></head><body>
+<div class="wrap">
+  <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 86.44 54.04">
+    <rect x="1" y="1" width="84.44" height="50.64" rx="11.78" ry="11.78"
+          fill="#F0F4EF" stroke="#06151E" stroke-width="2"/>
+    <text class="wm" transform="translate(6.68 24.5)" xml:space="preserve"><tspan x="0" y="0">C     OK</tspan><tspan x="0" y="21.68">&#8216;N   CO</tspan></text>
+    <path fill="#ED6D6B" stroke="#06151E" stroke-width="2" stroke-linejoin="round"
+          d="M42.44,16.5c0,4.59-3.92,8.16-8.76,7.97s-8.76-4.06-8.76-8.65,3.92-8.16,8.76-7.97,8.76,4.06,8.76,8.65Z"/>
+    <path fill="#429775" stroke="#06151E" stroke-width="2" stroke-linejoin="round"
+          transform="translate(4.74 -11.44) rotate(20.38)"
+          d="M34.96,4.75h0c.75,0,1.36.61,1.36,1.36v1.91c0,1.18-.96,2.14-2.14,2.14h0c-1.18,0-2.14-.96-2.14-2.14v-.36c0-1.61,1.31-2.92,2.92-2.92Z"/>
+  </svg>
+  <div>
+    <h1>Vos recettes,<br>vos carnets,<br>vos proches.</h1>
+    <p>Écrivez, cuisinez pas à pas, partagez.</p>
+  </div>
+</div>
+</body></html>
