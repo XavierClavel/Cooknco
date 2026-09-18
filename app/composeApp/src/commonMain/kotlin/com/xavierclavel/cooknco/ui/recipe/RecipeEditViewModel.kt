@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.xavierclavel.cooknco.data.AppLanguage
+import com.xavierclavel.cooknco.data.RecipeScan
+import com.xavierclavel.cooknco.data.ScannedRecipe
 import com.xavierclavel.cooknco.data.StepDurations
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.AppUnitSystem
@@ -19,6 +22,9 @@ import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.network.dto.displayName
 import com.xavierclavel.cooknco.platform.PickedImage
+import com.xavierclavel.cooknco.platform.ScanResult
+import com.xavierclavel.cooknco.ui.i18n.Strings
+import com.xavierclavel.cooknco.ui.i18n.stringsFor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -142,6 +148,16 @@ data class RecipeEditUiState(
     val error: String? = null,
     val recipeId: Long? = null,
     val recipeVersion: Long? = null,
+    /**
+     * A scanned page is being turned into a recipe.
+     *
+     * Its own flag rather than [isLoading], which greys the whole editor out: the fields are
+     * still the cook's to type in while the catalogue is being asked about the ingredients
+     * that have already been filled in.
+     */
+    val isScanning: Boolean = false,
+    /** What the last scan came to, shown once and dismissed. */
+    val scanMessage: String? = null,
 )
 
 class RecipeEditViewModel(
@@ -242,6 +258,144 @@ class RecipeEditViewModel(
                 }
         }
     }
+
+    // ── Scanning a page ───────────────────────────────────────────────────────
+
+    /** What a finished scan comes to: a recipe read off the page, or a sentence about why not. */
+    fun onScanned(result: ScanResult) = when (result) {
+        is ScanResult.Failed -> reportScanFailure()
+        is ScanResult.Read -> prefillFromScan(RecipeScan.parse(result.lines))
+    }
+
+    /**
+     * Fills the editor in from a scanned page, then asks the catalogue about what it read.
+     *
+     * **Nothing already written is overwritten.** A field the cook has filled in keeps what
+     * they put there, and ingredients and steps are appended rather than replaced — which is
+     * what makes scanning a second page of the same recipe work, and what stops a mis-aimed
+     * scan destroying half an hour of typing. The one thing a scan can do to existing content
+     * is add to it, and that is undone by deleting a row.
+     *
+     * The ingredients land as free text first and are matched to the catalogue afterwards, in
+     * the background: the match needs a request each, and a cook watching a page turn into a
+     * recipe should not wait on the network to see it.
+     */
+    fun prefillFromScan(scanned: ScannedRecipe) {
+        if (scanned.isEmpty) {
+            _uiState.update { it.copy(scanMessage = copy().scanFoundNothing) }
+            return
+        }
+
+        val added = scanned.ingredients.map { ingredient ->
+            EditIngredient(
+                customName = customName(ingredient.name),
+                ingredientName = ingredient.name,
+                query = ingredient.name,
+                unit = ingredient.unit,
+                amount = ingredient.amount,
+                complement = ingredient.complement.orEmpty(),
+            )
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                title = state.title.ifBlank { scanned.title.orEmpty() },
+                description = state.description.ifBlank { scanned.description.orEmpty() },
+                yield = state.yield.ifBlank { scanned.yield?.toString().orEmpty() },
+                prepTime = state.prepTime.ifBlank { scanned.prepMinutes?.toString().orEmpty() },
+                cookTime = state.cookTime.ifBlank { scanned.cookMinutes?.toString().orEmpty() },
+                cookTemp = state.cookTemp.ifBlank { scanned.temperatureCelsius?.toString().orEmpty() },
+                tips = state.tips.ifBlank { scanned.tips.orEmpty() },
+                ingredients = state.ingredients + added,
+                steps = state.steps + scanned.steps.map { text ->
+                    // The wording is read for a timer exactly as [updateStep] reads it while
+                    // it is typed: a step off a page has had no more said about it than one
+                    // being written, so it is not "touched" and the detection keeps up with
+                    // any edit the cook makes to it.
+                    val detected = StepDurations.parseSeconds(text)
+                    StepItem(
+                        id = newStepId(),
+                        text = text,
+                        durationSeconds = detected,
+                        attachments = setOfNotNull(StepAttachment.TIMER.takeIf { detected != null }),
+                    )
+                },
+                isScanning = added.isNotEmpty(),
+                scanMessage = null,
+                error = null,
+            )
+        }
+
+        if (added.isNotEmpty()) matchScannedIngredients(from = _uiState.value.ingredients.size - added.size)
+    }
+
+    /** The scanner could not be reached, or read nothing off the page. */
+    fun reportScanFailure() = _uiState.update { it.copy(scanMessage = copy().scanFailed) }
+
+    fun dismissScanMessage() = _uiState.update { it.copy(scanMessage = null) }
+
+    /**
+     * Turns the free-text ingredients a scan produced into catalogue references, where the
+     * catalogue clearly holds the same thing.
+     *
+     * **Only an unambiguous match is taken.** The search is fuzzy by design — it is there to
+     * find "farine" while somebody is still typing "fari" — so its best answer to "sel" is a
+     * salt of some sort, not necessarily salt. A row the catalogue does not obviously hold
+     * stays free text, which is a working ingredient rather than a wrong one, and one tap
+     * from being corrected by hand.
+     *
+     * [from] is the position the scanned rows start at. Rows are matched against that
+     * snapshot and written back by identity rather than by index: the cook is free to type,
+     * add and delete while this runs, and a row that moved or went away must not take
+     * another's name.
+     */
+    private fun matchScannedIngredients(from: Int) {
+        val pending = _uiState.value.ingredients.drop(from)
+        viewModelScope.launch {
+            val resolved = pending.map { row ->
+                val match = repo.searchIngredients(row.query)
+                    .getOrNull()
+                    ?.items
+                    ?.firstOrNull { sameIngredient(it.displayName(), row.query) }
+                row to match
+            }
+            _uiState.update { current ->
+                val units = current.units
+                val system = AppUnits.system.value
+                val ingredients = current.ingredients.map { row ->
+                    val match = resolved.firstOrNull { it.first === row }?.second ?: return@map row
+                    row.copy(
+                        ingredientId = match.id,
+                        customName = null,
+                        ingredientName = match.displayName(),
+                        type = match.type,
+                        query = match.displayName(),
+                        // What the page said, when it said anything: the catalogue's default
+                        // is for a row being started from nothing, not for one already
+                        // carrying "200 g".
+                        unit = row.unit.takeIf { it != "NONE" } ?: defaultUnitFor(match, units, system),
+                        allowedTypes = match.allowedTypes,
+                    )
+                }
+                current.copy(ingredients = ingredients, isScanning = false)
+            }
+        }
+    }
+
+    /**
+     * Whether two names are the same ingredient.
+     *
+     * Case, accents and a trailing plural aside — a page says "Pommes" where the catalogue
+     * says "pomme" — and nothing else. Anything looser starts accepting a near neighbour, and
+     * an ingredient silently replaced by a similar one is worse than one left as free text:
+     * it is wrong in the nutrition, and it reads as correct.
+     */
+    private fun sameIngredient(catalogue: String, scanned: String): Boolean {
+        fun normalise(value: String) = RecipeScan.fold(value.trim()).removeSuffix("s")
+        return normalise(catalogue) == normalise(scanned) && scanned.isNotBlank()
+    }
+
+    private fun copy(): Strings = stringsFor(AppLanguage.current.value)
 
     fun updateTitle(value: String) = _uiState.update { it.copy(title = value, error = null) }
     fun updateDescription(value: String) = _uiState.update { it.copy(description = value) }

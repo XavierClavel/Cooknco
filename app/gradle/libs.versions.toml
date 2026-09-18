@@ -23,6 +23,11 @@ coreSplashscreen = "1.0.1"
 firebaseBom = "34.17.0"
 googleServices = "4.5.0"
 datastore = "1.2.1"
+# ML Kit, for the recipe scanner. Both are the unbundled, Play-services-delivered builds:
+# the models and the scanning UI are downloaded on first use rather than carried in the APK,
+# which the app can rely on because it already needs Play services for Firebase.
+mlkitDocumentScanner = "16.0.0"
+mlkitTextRecognition = "19.0.1"
 ktor = "3.5.2"
 # Only the test artifact is declared: everything else pulls coroutines in transitively,
 # and kotlinx-coroutines-test has to match the version they resolve to.
@@ -69,6 +74,8 @@ androidx-browser = { group = "androidx.browser", name = "browser", version.ref =
 # NotificationCompat, to draw a push while the app is in the foreground.
 androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
+mlkit-document-scanner = { group = "com.google.android.gms", name = "play-services-mlkit-document-scanner", version.ref = "mlkitDocumentScanner" }
+mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "mlkitTextRecognition" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
