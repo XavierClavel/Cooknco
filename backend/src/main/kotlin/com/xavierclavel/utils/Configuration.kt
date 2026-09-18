@@ -185,6 +185,19 @@ data class Configuration(
 
     data class Encryption(
         val key: String,
+
+        /**
+         * The bcrypt work factor every password is hashed at.
+         *
+         * A production value, and the default is the one to ship: it is what makes a stolen
+         * `password_hash` column expensive to walk. It is configurable for the test suite
+         * alone, which overrides it in `application-test.yaml` — at 12 a single hash costs
+         * ~300ms, and a suite that creates two fixture users and an admin before every one
+         * of its tests spends nearly all of its wall clock here rather than on what it is
+         * testing. The factor is encoded in the hash itself, so nothing verifies
+         * differently and a hash written at one cost still checks out at another.
+         */
+        val passwordCost: Int = 12,
     ) {
         val aesKey = SecretKeySpec(key.toByteArray(), "AES")
     }
