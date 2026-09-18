@@ -20,11 +20,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,13 +76,27 @@ fun UserSettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToPassword: () -> Unit,
     onNavigateToMcpClients: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
     onLogout: () -> Unit,
+    /**
+     * Called once the account is actually gone. It is the sign-out: the token this screen
+     * was holding died with the account, so there is nothing left to stay signed in to.
+     */
+    onAccountDeleted: () -> Unit,
     isLoggingOut: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val s = strings()
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
+    var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+
+    // A deletion that failed has to be *seen* to have failed, and the reason is written on
+    // the screen behind the dialog. So the dialog gets out of the way when one arrives —
+    // the account is still there, and the row is still there to try again.
+    LaunchedEffect(uiState.error) {
+        if (uiState.error != null) showDeleteConfirm = false
+    }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         Row(
@@ -277,6 +293,28 @@ fun UserSettingsScreen(
                                 Text("›", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
                             }
                             HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
+                            // Opens the website in a browser rather than a screen here: the
+                            // policy has to be readable by somebody with no account, and it
+                            // is one document, written once, that the store listing points
+                            // at as well.
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onOpenPrivacyPolicy)
+                                    .padding(horizontal = 14.dp, vertical = 15.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text(
+                                    text = s.privacyPolicy,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CookncoNavy,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text("↗", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+                            }
+                            HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 15.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -315,6 +353,26 @@ fun UserSettingsScreen(
                     )
                 }
 
+                // ── Delete the account ───────────────────────────────────────────
+                // Below the sign-out, quieter than it, and behind a confirmation: Google
+                // requires an app that creates accounts to let them be deleted from inside
+                // it, and cooknco.eu/account-deletion — the URL the Play Console carries —
+                // describes these exact taps. The two change together.
+                StickerCard(
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    shadowOffset = 4.dp,
+                    onClick = { showDeleteConfirm = true },
+                ) {
+                    Text(
+                        text = s.deleteAccount,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = CookncoOrangeDark,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -331,6 +389,26 @@ fun UserSettingsScreen(
             isConfirming = isLoggingOut,
             onConfirm = onLogout,
             onDismissRequest = { showLogoutConfirm = false },
+        )
+    }
+
+    if (showDeleteConfirm) {
+        // The dialog stays up while the request is in flight and closes itself only on the
+        // way out, because the screen it would go back to belongs to an account that is
+        // about to stop existing. A failure leaves it closed with the reason on the screen.
+        StickerConfirmDialog(
+            icon = Icons.Outlined.DeleteForever,
+            title = s.deleteAccount,
+            message = s.deleteAccountMessage,
+            confirmText = s.deleteAccountConfirm,
+            isConfirming = uiState.isDeletingAccount,
+            onConfirm = {
+                viewModel.deleteAccount {
+                    showDeleteConfirm = false
+                    onAccountDeleted()
+                }
+            },
+            onDismissRequest = { showDeleteConfirm = false },
         )
     }
 }

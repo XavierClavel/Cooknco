@@ -15,6 +15,7 @@ import com.xavierclavel.cooknco.data.UserRepository
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
 import com.xavierclavel.cooknco.platform.deviceLocale
+import com.xavierclavel.cooknco.ui.i18n.stringsFor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +50,8 @@ data class UserSettingsUiState(
     val mcpClientCount: Int = 0,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
+    /** True while `DELETE /user` is in flight — the confirmation stays up and spins on it. */
+    val isDeletingAccount: Boolean = false,
     val saved: Boolean = false,
     val error: String? = null,
 ) {
@@ -147,6 +150,35 @@ class UserSettingsViewModel(
                 pushRepository.unregisterCurrentDevice()
             }
             result.onFailure { err -> _uiState.update { it.copy(error = err.message) } }
+        }
+    }
+
+    /**
+     * Deletes the account, then hands over to [onDeleted] — the sign-out, because the token
+     * this screen was using stopped existing along with the account.
+     *
+     * A failure leaves everything as it was, with the reason on the screen: the one thing
+     * that must not happen here is the app behaving as though the account were gone when the
+     * server still holds it. The copy is resolved rather than composed, the way every other
+     * view model's is, so it comes out in the language the account reads.
+     *
+     * What this removes, and what outlives it, is written at cooknco.eu/account-deletion —
+     * the page the Play Console's data deletion entry points at, and the one this screen is
+     * reviewed against.
+     */
+    fun deleteAccount(onDeleted: () -> Unit) {
+        if (_uiState.value.isDeletingAccount) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeletingAccount = true, error = null) }
+            userRepo.deleteAccount()
+                .onSuccess {
+                    _uiState.update { it.copy(isDeletingAccount = false) }
+                    onDeleted()
+                }
+                .onFailure {
+                    val message = stringsFor(AppLanguage.current.value).deleteAccountFailed
+                    _uiState.update { state -> state.copy(isDeletingAccount = false, error = message) }
+                }
         }
     }
 

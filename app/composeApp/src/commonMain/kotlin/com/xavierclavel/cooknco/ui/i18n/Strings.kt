@@ -169,9 +169,14 @@ interface Strings {
     val account: String
     val changePassword: String
     val mcpAccess: String
+    val privacyPolicy: String
     val appVersion: String
     fun clientCount(count: Int): String
     val logOutMessage: String
+    val deleteAccount: String
+    val deleteAccountMessage: String
+    val deleteAccountConfirm: String
+    val deleteAccountFailed: String
 
     // ── Change password ───────────────────────────────────────────────────────
     val currentPasswordCaps: String

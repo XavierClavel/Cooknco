@@ -138,6 +138,11 @@ const noLoginRedirect = [
   '/maintenance',
   '/verification-email-sent',
   '/password/update/success',
+  // The two documents the Play Console points at. Both have to be readable with no account:
+  // a reviewer opens them signed out, and so does somebody who has lost access to theirs and
+  // is reading how to have it deleted. Bouncing either to the login page fails the listing.
+  '/privacy',
+  '/account-deletion',
   'https://accounts.google.com/o/oauth2/auth',
 ]
 const noLoginRedirectStartsWith = [

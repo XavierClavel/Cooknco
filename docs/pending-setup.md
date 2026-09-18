@@ -174,3 +174,89 @@ something to wait out: the Google Play Android Developer API not enabled on the 
 project, the wrong address invited to the Play Console (it must be the service account's own
 `…iam.gserviceaccount.com`, not yours), or the grant not scoped to this app. The JSON key on
 its own authorises nothing — [`playstore-ci.md`](playstore-ci.md) § 4 walks all five steps.
+
+---
+
+## 4. The privacy policy, the deletion URL, and the mailbox behind them
+
+**What is inert until this is done:** nothing in the product. Both documents ship with the
+frontend and are live the moment the image is deployed — `https://cooknco.eu/privacy` and
+`https://cooknco.eu/account-deletion`, readable signed out, linked from the website's footer,
+and the first of the two linked from the app's settings screen. What is missing is the two
+console fields that point at them, and the mailbox they publish. **Play will not let the app
+out of internal testing without the first**, and a deletion address that bounces is worse
+than one that does not exist.
+
+### The mailbox comes first
+
+`contact@cooknco.eu` is written into both documents, in both languages, and into the failure
+message the settings screens show. It has to *receive*, and be read: the deletion page
+promises an answer within 30 days to somebody who has lost access to their account, and that
+promise is the only route left for them.
+
+Any address will do as long as it works — an alias forwarding to the Gmail the service already
+sends through is enough. If it is ever a different address, one constant carries it on the
+web (`CONTACT_EMAIL` in `frontend/src/locales/legal/shared.ts`) and four strings do not:
+`delete_account_failed` in `frontend/src/locales/{en,fr}.ts` and `deleteAccountFailed` in
+`app/composeApp/.../ui/i18n/{En,Fr}Strings.kt`.
+
+### Where the two URLs go
+
+Play Console → the app → **Policy → App content**:
+
+| Field | Value |
+| --- | --- |
+| **Privacy policy** | `https://cooknco.eu/privacy` |
+| **Data safety → Data deletion** | *Users can request that their data is deleted*, and the URL `https://cooknco.eu/account-deletion` |
+
+The deletion URL is asked for inside the Data safety questionnaire rather than on a page of
+its own, which is why it is easy to fill the form in and never be asked for it: the question
+only appears once the form says some data is collected.
+
+### What the Data safety form should say, and why
+
+Every answer below is one the code makes true today. Anything that changes what is collected
+changes this table, the two documents, and the form — in that order, and in the same change.
+
+| Question | Answer | Because |
+| --- | --- | --- |
+| Personal info → Name | Collected, required | the username, which is the account |
+| Personal info → Email address | Collected, required | sign-in and the account mails; stored encrypted |
+| Photos and videos → Photos | Collected, optional | recipe pictures and the profile picture |
+| Device or other IDs | Collected, optional | the FCM registration token, only while push is on |
+| App activity, messages, location, financial, health… | Not collected | none of it exists in the schema |
+| Is any of it **shared** with third parties? | No | Google carries mail and push as a processor, which Play's definition excludes |
+| Is it encrypted in transit? | Yes | the ingress terminates TLS and nothing serves plain HTTP |
+| Can users request deletion? | Yes | in the app, on the website, and by mail — `DELETE /api/v1/user` |
+| Is any of it collected for advertising or analytics? | No | there is no advertising identifier and no measurement SDK in the build |
+
+The app's manifest declares no `com.google.android.gms.permission.AD_ID`, and the only
+Firebase library it pulls in is **Messaging** — no Analytics, no Crashlytics. The ML Kit
+document scanner and text recogniser it also carries read the page on the device and send
+nothing anywhere. That is what
+makes the last row answerable with a flat no, and it is worth re-checking whenever a
+dependency is added: a transitive Analytics would make the declaration false without anybody
+writing a line of code.
+
+### The listing's closing line is part of this
+
+`app/store/listing-{fr-FR,en-GB}.md` ends on "no advertising, no sponsored content, no
+infinite feed". A Data safety declaration that contradicts the store listing is a policy
+problem rather than a wording one — the two say the same thing today, and stop saying it in
+the same commit or not at all.
+
+### Checking it worked
+
+```bash
+# Both pages, signed out, as a reviewer sees them
+curl -sS https://cooknco.eu/privacy            | grep -o '<title>.*</title>'
+curl -sS https://cooknco.eu/account-deletion   | grep -o '<title>.*</title>'
+
+# The mailbox actually receives
+echo "deletion test" | mail -s "Account deletion" contact@cooknco.eu
+```
+
+The two `curl`s return the SPA's shell rather than the text — the pages are Vue routes, and
+Play's review opens them in a browser, which runs the JavaScript. What the `curl` proves is
+that the path serves 200 rather than the SPA's 404 path; the text itself is worth opening in
+a private window once, in both languages (the browser's language picks which).

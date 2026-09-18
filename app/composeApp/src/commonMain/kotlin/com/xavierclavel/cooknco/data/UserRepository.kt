@@ -75,6 +75,14 @@ class UserRepository(
         userApi.updatePassword(requireToken(), old, new)
     }
 
+    /**
+     * Deletes the account. The token is dead the moment this returns, so the caller signs
+     * out straight after — see [com.xavierclavel.cooknco.ui.user.UserSettingsViewModel.deleteAccount].
+     */
+    suspend fun deleteAccount(): Result<Unit> = runCatching {
+        userApi.deleteAccount(requireToken())
+    }
+
     suspend fun getSettings(): Result<UserSettingsDTO> = runCatching {
         userApi.getSettings(requireToken())
     }

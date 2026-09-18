@@ -90,6 +90,21 @@ suspend fun HttpClient.deleteUser(id: Long) {
     this.assertUserDoesNotExist(id)
 }
 
+/**
+ * `DELETE /user` — the account the session belongs to, named by nothing because there is
+ * nobody else it could be.
+ *
+ * What the app's settings screen and the website's settings page call, and what
+ * cooknco.eu/account-deletion tells people happens when they confirm. Unlike [deleteUser]
+ * this asserts nothing about the account afterwards: the session it was reached with has
+ * just died, so the caller looks from somewhere else.
+ */
+suspend fun HttpClient.deleteMyAccount() {
+    this.delete(USER_URL).apply {
+        assertEquals(HttpStatusCode.OK, status)
+    }
+}
+
 suspend fun HttpClient.assertUserExists(id: Long) {
     this.get("$USER_URL/$id").apply {
         assertEquals(HttpStatusCode.OK, status)
