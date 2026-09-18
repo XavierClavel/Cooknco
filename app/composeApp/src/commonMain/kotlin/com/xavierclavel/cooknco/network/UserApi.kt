@@ -144,6 +144,21 @@ class UserApi(private val client: HttpClient) {
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }
 
+    /**
+     * `DELETE /user` — the account this token belongs to, with no id, because there is
+     * nobody else it could be.
+     *
+     * What it removes and what outlives it is written down at cooknco.eu/account-deletion,
+     * which is where the Play Console's data deletion entry points: the store listing is
+     * reviewed against this call, so the two are one change. Immediate, and not undoable.
+     */
+    suspend fun deleteAccount(token: String) {
+        val response = client.delete("$base/user") {
+            bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+    }
+
     /** `PUT /user/password` — the backend checks [old] itself and answers 401 if it is wrong. */
     suspend fun updatePassword(token: String, old: String, new: String) {
         val response = client.put("$base/user/password") {

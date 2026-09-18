@@ -791,4 +791,15 @@ export default {
   mcp_expiry_note: "A connection you stop using expires after 30 days, and the assistant has to ask again.",
   copy: "Copy",
   copied: "Copied",
+
+  // The two legal pages, and the settings action the deletion one describes. The documents
+  // themselves live in locales/legal — these are only the words the product says about them.
+  privacy_policy: "Privacy policy",
+  account_deletion: "Account deletion",
+  delete_account: "Delete my account",
+  delete_account_hint: "Deletes your account, your recipes and their photos, straight away and for good. What outlives it, and why, is on the account deletion page.",
+  delete_account_title: "Delete your account?",
+  delete_account_description: "Your recipes, their photos, your private notes, your cookbook memberships and the account itself go, straight away. Export anything you want to keep before confirming: this cannot be undone.",
+  delete_account_confirm: "Delete for ever",
+  delete_account_failed: "The account could not be deleted. Try again, or write to contact@cooknco.eu.",
 };

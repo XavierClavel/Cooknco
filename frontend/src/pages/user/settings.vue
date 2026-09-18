@@ -106,6 +106,51 @@
 
 
       </form>
+
+      <!--
+        Deleting the account, at the bottom and behind a confirmation, because it is the one
+        thing on this page that cannot be undone. cooknco.eu/account-deletion describes these
+        exact steps, and the Play Console's data deletion entry points at that page: when
+        this moves, that page moves with it.
+      -->
+      <v-divider class="my-2"></v-divider>
+
+      <v-card color="background" class="mb-2">
+        <v-card-text class="pb-0 text-caption">
+          {{ $t('delete_account_hint') }}
+        </v-card-text>
+        <v-card-actions class="justify-center">
+          <v-dialog max-width="500">
+            <template v-slot:activator="{ props: activatorProps }">
+              <action-button
+                icon="mdi-account-remove"
+                :text="`${$t('delete_account')}`"
+                v-bind="activatorProps"
+              ></action-button>
+            </template>
+
+            <template v-slot:default="{ isActive }">
+              <v-card>
+                <v-card-text class="font-weight-bold text-h5">{{ $t('delete_account_title') }}</v-card-text>
+                <v-card-text>{{ $t('delete_account_description') }}</v-card-text>
+
+                <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn
+                    :text="`${$t('cancel')}`"
+                    @click="isActive.value = false"
+                  ></v-btn>
+                  <v-btn
+                    :text="`${$t('delete_account_confirm')}`"
+                    :loading="isDeleting"
+                    @click="deleteAccount(isActive)"
+                  ></v-btn>
+                </v-card-actions>
+              </v-card>
+            </template>
+          </v-dialog>
+        </v-card-actions>
+      </v-card>
     </v-card>
   </v-container>
 
@@ -114,12 +159,14 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import {login, toMcp, toMyProfile, toSignup, toUpdatePassword} from '@/scripts/common'
+import {login, toLogin, toMcp, toMyProfile, toSignup, toUpdatePassword} from '@/scripts/common'
 import {useI18n} from "vue-i18n";
 import {ICON_LOCALIZATION, ICON_SAVE, ICON_WEIGHT} from "@/scripts/icons";
 import {forceLocale, fromApiLocale, getLocale, toApiLocale} from "@/scripts/localization";
 import {getSettings, updateSettings} from "@/scripts/settings";
 import {IMPERIAL, METRIC, setUnitSystem} from "@/scripts/unitSystem";
+import {deleteMyAccount} from "@/scripts/users";
+import {useAuthStore} from "@/stores/auth";
 
 const errorMessage = ref(null)
 const { t } = useI18n();
@@ -168,6 +215,32 @@ const submit = () => {
   updateSettings({...settings.value, locale: toApiLocale(locale.value)}).then(response => {
     toMyProfile()
   })
+}
+
+const isDeleting = ref(false)
+
+/**
+ * Deletes the account, then leaves the page signed out.
+ *
+ * Nothing is asked of the server afterwards - the session died with the account, so the
+ * ordinary sign-out call would answer 401 - and only the local state is dropped. The dialog
+ * is closed first so the page is not left with a modal over a login redirect.
+ */
+const deleteAccount = async (isActive) => {
+  if (isDeleting.value) return
+  isDeleting.value = true
+  try {
+    await deleteMyAccount()
+    isActive.value = false
+    localStorage.removeItem("authToken")
+    useAuthStore().logout()
+    toLogin()
+  } catch {
+    isActive.value = false
+    errorMessage.value = "delete_account_failed"
+  } finally {
+    isDeleting.value = false
+  }
 }
 
 

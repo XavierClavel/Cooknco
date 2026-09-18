@@ -21,6 +21,7 @@ declare module 'vue' {
     IngredientNutritionalData: typeof import('./components/IngredientNutritionalData.vue')['default']
     IngredientsGrid: typeof import('./components/IngredientsGrid.vue')['default']
     InteractiblePictoInfo: typeof import('./components/InteractiblePictoInfo.vue')['default']
+    LegalDocument: typeof import('./components/LegalDocument.vue')['default']
     PictoInfo: typeof import('./components/PictoInfo.vue')['default']
     Recipe: typeof import('./components/Recipe.vue')['default']
     RecipeFilter: typeof import('./components/RecipeFilter.vue')['default']

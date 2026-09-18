@@ -404,12 +404,18 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
         composable(Routes.SETTINGS) {
             val isLoggingOut by viewModel.isLoggingOut.collectAsState()
             val settingsViewModel: UserSettingsViewModel = viewModel(factory = UserSettingsViewModel.factory())
+            val urlOpener = rememberUrlOpener()
             UserSettingsScreen(
                 viewModel = settingsViewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToPassword = { navController.navigate(Routes.PASSWORD) },
                 onNavigateToMcpClients = { navController.navigate(Routes.MCP_CLIENTS) },
+                onOpenPrivacyPolicy = { urlOpener.open(WebRoutes.PRIVACY_POLICY_URL) },
                 onLogout = viewModel::logout,
+                // The same sign-out, because that is all that is left to do: the account the
+                // session belonged to no longer exists, and `logout` tolerates a call it
+                // cannot authenticate.
+                onAccountDeleted = viewModel::logout,
                 isLoggingOut = isLoggingOut,
             )
         }

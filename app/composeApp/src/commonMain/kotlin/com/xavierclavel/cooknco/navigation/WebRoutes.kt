@@ -36,6 +36,18 @@ object WebRoutes {
     private const val SCHEME = "https"
 
     /**
+     * The privacy policy, on the website, opened in a browser from the settings screen.
+     *
+     * Deliberately *not* a [Shareable]: claiming the path would open an app that has no
+     * screen for it, and the policy has to be readable by somebody with no account — which
+     * is what a browser does and a signed-in app cannot. The same holds for the deletion
+     * notice at `/account-deletion`, which is the page the Play Console points at; the app
+     * does not link that one, because the account is deleted from the settings screen
+     * itself.
+     */
+    const val PRIVACY_POLICY_URL = "$SCHEME://$HOST/privacy"
+
+    /**
      * What can be shared: the web path that serves it, the query parameter carrying the id,
      * and the app route it opens.
      *

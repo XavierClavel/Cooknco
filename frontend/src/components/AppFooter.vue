@@ -16,6 +16,18 @@
       />
     </a>
 
+    <!--
+      The privacy policy has to be reachable from the product itself, not only from the
+      store listing, and the footer is the one place on every page. Router links rather than
+      hrefs: both pages are part of the app and load without a reload.
+    -->
+    <router-link class="text-caption text-decoration-none on-surface mx-2" to="/privacy">
+      {{ $t('privacy_policy') }}
+    </router-link>
+    <router-link class="text-caption text-decoration-none on-surface mx-2 d-none d-sm-inline-block" to="/account-deletion">
+      {{ $t('account_deletion') }}
+    </router-link>
+
     <div
       class="text-caption text-disabled"
       style="position: absolute; right: 16px;"

@@ -6,6 +6,7 @@ export{
   listUsers,
   getUsersCount,
   deleteUser,
+  deleteMyAccount,
   updatePassword,
   setRole,
 }
@@ -49,6 +50,17 @@ async function setRole(id, role) {
 
 async function deleteUser(id) {
   return await apiClient.delete(`/user/${id}`)
+}
+
+/**
+ * Deletes the account behind the session — no id, because there is nobody else it could be.
+ *
+ * This is what cooknco.eu/account-deletion tells people to use, and what the Play Console's
+ * data deletion entry points at, so the two are one change: what this does and what that
+ * page says it does must not drift. It is immediate and cannot be undone.
+ */
+async function deleteMyAccount() {
+  return await apiClient.delete(`/user`)
 }
 
 async function updatePassword(oldPassword, newPassword) {

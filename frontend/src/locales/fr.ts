@@ -791,4 +791,15 @@ export default {
   mcp_expiry_note: "Une connexion que tu n'utilises plus expire au bout de 30 jours, et l'assistant doit redemander l'autorisation.",
   copy: "Copier",
   copied: "Copié",
+
+  // Les deux pages légales, et l'action de réglages que la seconde décrit. Les documents
+  // eux-mêmes sont dans locales/legal — ici, seulement ce que le produit en dit.
+  privacy_policy: "Politique de confidentialité",
+  account_deletion: "Suppression du compte",
+  delete_account: "Supprimer mon compte",
+  delete_account_hint: "Supprime ton compte, tes recettes et leurs photos, immédiatement et définitivement. Ce qui y survit, et pourquoi, est sur la page de suppression du compte.",
+  delete_account_title: "Supprimer ton compte ?",
+  delete_account_description: "Tes recettes, leurs photos, tes notes privées, ton appartenance aux carnets et le compte lui-même disparaissent, immédiatement. Exporte ce que tu veux garder avant de confirmer : c'est irréversible.",
+  delete_account_confirm: "Supprimer définitivement",
+  delete_account_failed: "Le compte n'a pas pu être supprimé. Réessaie, ou écris à contact@cooknco.eu.",
 };
