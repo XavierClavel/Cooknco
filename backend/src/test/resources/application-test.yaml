@@ -17,6 +17,11 @@ smtp:
   password: test
 encryption:
   key: 6r5HI1W9n4U3tOMS
+  # The floor bcrypt allows, against 12 in production. Nothing here tests how expensive a
+  # hash is to attack, and everything here pays for it: three hashes and a login per test,
+  # ~300ms each at 12, which is most of what the suite spends. At 4 they are ~1ms.
+  # The cost travels inside the hash, so verification is unchanged either way.
+  password_cost: 4
 oauth:
   google:
     client_id: test

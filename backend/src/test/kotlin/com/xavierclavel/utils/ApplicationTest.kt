@@ -153,6 +153,42 @@ abstract class ApplicationTest: KoinTest {
         @JvmStatic
         fun stopKoinApplication() {
         }
+
+        /**
+         * The one statement [cleanDb] empties the database with.
+         *
+         * `DatabaseManager.getTables()` names the tables — asking Ebean what each query
+         * bean's entity is mapped to, rather than spelling the table names a second time
+         * where a rename would not reach them. Its hand-maintained order is what a wipe
+         * deleting table by table needs and does not matter to a `TRUNCATE`: one statement
+         * empties them together, so nothing is ever briefly pointing at a row that is
+         * already gone. A table still has to be listed there to be named here.
+         *
+         * `CASCADE` covers what the list does not reach: the tables Ebean writes for a
+         * recipe's steps are cleared by the cascade from `recipe` rather than by a delete
+         * of their own, which matters because `Recipe.delete()` is soft — under the
+         * previous row-by-row wipe a recipe's row, its steps and their links all survived
+         * every wipe of the run, invisible to queries but never actually gone.
+         *
+         * Resolved once per JVM: the mapping cannot change while it runs.
+         */
+        private val truncateEveryTable: String by lazy {
+            DatabaseManager.getTables()
+                .joinToString(", ") { DB.getDefault().pluginApi().beanType(it.beanType).baseTable() }
+                .let { "TRUNCATE TABLE $it CASCADE" }
+        }
+
+        /**
+         * Installed once, not before every test: `CREATE EXTENSION IF NOT EXISTS` is a
+         * no-op after the first, but a no-op still costs a round trip, and there were two
+         * of them per test. An extension belongs to the database rather than to the schema
+         * ebean-test drop-creates, so once per JVM is the right lifetime.
+         */
+        private val databaseExtensions: Unit by lazy {
+            DB.sqlUpdate("CREATE EXTENSION IF NOT EXISTS unaccent").execute()
+            DB.sqlUpdate("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute()
+            Unit
+        }
     }
 
 
@@ -163,11 +199,8 @@ abstract class ApplicationTest: KoinTest {
         // previous test may still be inserting. Draining it first keeps its rows out of this
         // test, and keeps the wipe below from racing an insert.
         runBlocking { notificationService.awaitDispatches() }
-        DatabaseManager.getTables().forEach {
-            it.findList().forEach { it.delete() }
-        }
-        DB.sqlUpdate("CREATE EXTENSION IF NOT EXISTS unaccent").execute()
-        DB.sqlUpdate("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute()
+        databaseExtensions
+        DB.sqlUpdate(truncateEveryTable).execute()
         setupTestUser(USER1)
         setupTestUser(USER2)
     }

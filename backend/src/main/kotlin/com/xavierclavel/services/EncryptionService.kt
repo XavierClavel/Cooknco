@@ -27,7 +27,9 @@ class EncryptionService: KoinComponent {
     }
 
     fun encryptPassword(password: String?): String? =
-        password?.let { BCrypt.withDefaults().hashToString(12, password.toCharArray()) }
+        password?.let {
+            BCrypt.withDefaults().hashToString(configuration.encryption.passwordCost, password.toCharArray())
+        }
 
 
 
