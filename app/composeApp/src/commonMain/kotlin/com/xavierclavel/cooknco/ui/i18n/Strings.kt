@@ -309,6 +309,13 @@ interface Strings {
     val stepPhoto: String
     val theBasics: String
     val theBasicsSubtitle: String
+
+    // Scanning a printed recipe into the editor.
+    val scanARecipe: String
+    val scanARecipeSubtitle: String
+    val scanning: String
+    val scanFoundNothing: String
+    val scanFailed: String
     val nameYourRecipe: String
     val aLineAboutTheDish: String
     val timesAndYield: String

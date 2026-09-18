@@ -52,12 +52,28 @@ object WebRoutes {
         val path: String,
         val parameter: String,
         private val screen: String,
+        /**
+         * Whether `?id=` is read as well as [parameter]. True only where a link carrying it
+         * is genuinely in circulation — a notification stored before these paths named their
+         * ids after what they hold. It is off for [USER] on purpose: the website serves
+         * `?user=` there, so `/user/view?id=12` is a shape nothing mints, and placing it
+         * would be guessing rather than accepting.
+         */
+        private val alsoReadsId: Boolean = false,
     ) {
         RECIPE("/recipe/view", "id", "recipe"),
         USER("/user/view", "user", "user"),
-        COOKBOOK("/cookbook/view", "id", "cookbook"),
-        INGREDIENT("/ingredient/view", "id", "ingredient"),
+        // These two name their id after what they hold, which is the website's shape:
+        // `toViewCookbook` in frontend/src/scripts/common.ts navigates to
+        // `?cookbook=`, the view page reads `route.query.cookbook`, and
+        // LinkPreviewController serves the `og:` tags off the same name. Minting `?id=`
+        // here instead would hand out a link the website answers with an empty page.
+        COOKBOOK("/cookbook/view", "cookbook", "cookbook", alsoReadsId = true),
+        INGREDIENT("/ingredient/view", "ingredient", "ingredient", alsoReadsId = true),
         ;
+
+        internal fun idIn(parameters: Parameters): String? =
+            parameters[parameter] ?: if (alsoReadsId) parameters["id"] else null
 
         internal fun routeFor(id: String) = "$screen/$id"
     }
@@ -105,6 +121,6 @@ object WebRoutes {
         // about. Nothing shares it, which is why it is not a Shareable.
         if (trimmed == "/recipe/cook") return parameters["id"]?.let { "recipe/$it/cook" }
         val shareable = Shareable.entries.firstOrNull { it.path == trimmed } ?: return null
-        return parameters[shareable.parameter]?.let { shareable.routeFor(it) }
+        return shareable.idIn(parameters)?.let { shareable.routeFor(it) }
     }
 }

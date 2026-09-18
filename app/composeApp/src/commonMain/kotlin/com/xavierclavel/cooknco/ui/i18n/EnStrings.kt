@@ -340,6 +340,12 @@ object EnStrings : Strings {
     override val stepPhoto = "Photo"
     override val theBasics = "The basics"
     override val theBasicsSubtitle = "Only the title is required — the rest can wait."
+
+    override val scanARecipe = "Scan a recipe"
+    override val scanARecipeSubtitle = "Photograph a page and we'll fill in what we can read."
+    override val scanning = "Reading the page…"
+    override val scanFoundNothing = "No recipe could be read on that page."
+    override val scanFailed = "The scanner isn't available on this device."
     override val nameYourRecipe = "Name your recipe"
     override val aLineAboutTheDish = "A line about the dish"
     override val timesAndYield = "Times & yield"
