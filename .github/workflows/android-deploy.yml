@@ -1,0 +1,620 @@
+name: Android deploy (reusable)
+
+# Shared body of the app's two publication cycles:
+#
+#   android-internal-develop.yml   push to `develop` → builds and uploads to `internal`
+#   android-release-master.yml     push to `master`  → **promotes** `internal` → `alpha`
+#
+# This file never fires on its own. Everything that separates the two cycles goes through the
+# `inputs` below, which is the whole reason for the `workflow_call`.
+#
+# The app is its own Gradle build under `app/` — the repository root holds the backend monolith
+# and knows nothing about `:androidApp`. Hence `working-directory: app` on every Gradle and
+# fastlane step, while git commands stay at the root where `.git` is.
+#
+# ── One build, promoted afterwards ──────────────────────────────────────────────────────────
+#
+# `versionCode` = commit count (`git rev-list --count HEAD`), derived by Gradle and never
+# committed. So there is no bot commit, no race between two runs over the same lines, and no
+# grep of `build.gradle.kts`: CI asks Gradle for the value (`:androidApp:printVersion`), which
+# makes what it tags the same thing it compiled.
+#
+# `develop` is the only branch that **builds**. Google Play refuses a `versionCode` it has
+# already seen, for ever — even one belonging to a deleted release — and a Play edit covers the
+# whole app rather than a track: `master` cannot re-upload a bundle at the number `develop`
+# already published.
+#
+# `master` therefore rebuilds nothing: it **promotes** the release `develop` already put into
+# internal testing. What reaches closed testing is then bit-for-bit what was tested internally
+# — which two separate compilations cannot guarantee — and the release cycle takes a minute
+# instead of ten.
+#
+# ── Where `master` gets the `versionCode` to promote ────────────────────────────────────────
+#
+# **It looks it up, it does not recompute it.** The commit count changes at *every* commit,
+# while only the commits actually published exist on Play: a merge commit, or a fast-forward to
+# an intermediate commit of `develop`, would yield a number nothing ever built. So `develop`
+# tags every successful upload `android-build-<code>`, and `master` resolves the highest such
+# tag its own commit contains — by construction, the last published build that is in what it is
+# promoting. The promoted number is the last pipeline's, whatever shape the merge took.
+#
+# ── And it looks it up **late** ─────────────────────────────────────────────────────────────
+#
+# The tag is pushed at the *end* of `develop`'s upload, a dozen minutes after a push that this
+# cycle receives within the same minute. Resolved at start-up, the number would be the
+# **previous** build's — the very one the upload in flight is about to replace on `internal`.
+# `check` therefore waits for the in-flight `develop` runs whose commit is contained in what is
+# being promoted, then re-reads the registry. The "nothing in flight" case costs nothing, and a
+# failed internal build stops the promotion instead of sending an amputated release to closed
+# testing.
+#
+# ⚠️ Corollary: an app commit pushed straight to `master` is promoted *without its own
+# changes* — it is `develop`'s last build that goes out, and the promotion succeeds, so nothing
+# reports it. **`master` must only ever receive merges from `develop`.**
+#
+# ⚠️ A promotion **moves** the release: Play deactivates it on the source track, so `internal`
+# is left with no active release until the next push to `develop`. That is how a track funnel
+# works, not a side effect of this workflow.
+on:
+  workflow_call:
+    inputs:
+      track:
+        description: >
+          Target Play track id. The API names did not follow the console's renamings:
+          `internal` = internal testing, `alpha` = closed testing, `beta` = open testing.
+        required: true
+        type: string
+      tag-release:
+        description: >
+          Tag the published commit (`android-v<versionName>`) and open a GitHub release. Also
+          turns on the guard in `check`: nothing is republished if the tag already exists,
+          which makes a promotion idempotent — two merges to `master` containing the same
+          `develop` build resolve the same `versionCode`, hence the same tag.
+        required: false
+        default: false
+        type: boolean
+      promote-from:
+        description: >
+          Source track of a promotion. Empty = the cycle builds and uploads a fresh bundle
+          (`develop`). Non-empty = it compiles nothing and promotes to `track` the release that
+          this track already carries at the resolved `versionCode` (`master`).
+        required: false
+        default: ''
+        type: string
+      environment:
+        description: >
+          GitHub environment guarding the publication. Empty string = no guard, the job runs
+          without human approval.
+        required: false
+        default: ''
+        type: string
+
+env:
+  # `app/` is its own Gradle build. Declared once so the Gradle cache key, the working
+  # directories and the artifact paths cannot drift apart.
+  APP_DIR: app
+  AAB_PATH: app/androidApp/build/outputs/bundle/release/androidApp-release.aab
+
+jobs:
+  # Resolves the version that will be published, and decides whether to publish at all. No JDK:
+  # this job only reads git and the Actions API.
+  #
+  # It is also the job that **waits** for `develop`'s build, when promoting — see "it looks it
+  # up late" in the header. The wait lives here and nowhere else for a mechanical reason:
+  # `check` is the only job in this file without a concurrency group. Waiting from `promote`,
+  # which shares `android-play-release` with `upload`, would deadlock — the promotion would
+  # hold the lock the build it is waiting for needs.
+  check:
+    runs-on: ubuntu-latest
+    # The wait is bounded here rather than by a clock in the script: a `develop` build takes a
+    # dozen minutes, and a suspended job has to die eventually.
+    timeout-minutes: 45
+    outputs:
+      should_deploy: ${{ steps.meta.outputs.should_deploy }}
+      version: ${{ steps.meta.outputs.version }}
+      code: ${{ steps.meta.outputs.code }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          # Explicit, as in `upload` and `promote`: the whole run must read the same tree.
+          ref: ${{ github.sha }}
+          # `fetch-depth: 0` is **structural** here, not a precaution: the `versionCode` is the
+          # commit count, and the `android-build-*` tags are the registry of published builds.
+          # A shallow clone would count a handful of commits and see no tags at all.
+          fetch-depth: 0
+
+      - name: Resolve version and decide whether to deploy
+        id: meta
+        env:
+          PROMOTE_FROM: ${{ inputs.promote-from }}
+          TAG_RELEASE: ${{ inputs.tag-release }}
+          # Read by `gh` on the promotion path: querying the Actions API needs the
+          # `actions: read` scope, which the caller has to grant
+          # (`android-release-master.yml`). A missing permission fails this job saying so,
+          # rather than silently skipping the wait and promoting the previous build.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Published `versionCode`s, read out of the tag names. `grep` filters a malformed tag
+          # instead of letting it become an empty number, and `|| true` covers the "no tags"
+          # case: under `pipefail`, a `grep` with no match would kill the script.
+          published_codes() {
+            git tag --list 'android-build-*' "$@" \
+              | sed 's/^android-build-//' \
+              | grep -E '^[0-9]+$' \
+              | sort -n || true
+          }
+
+          # A sha missing from the clone is never contained: `master` is fetched whole, so a
+          # missing object proves the opposite of what we are looking for, and `continue` is the
+          # right answer. A failing `gh api` is never ignored: without its answer, nothing
+          # proves this commit's build was published.
+          api_unreachable() {
+            echo "::error::Cannot query the \`develop\` cycle's runs: the caller is missing the \`actions: read\` scope, or \`android-internal-develop.yml\` was renamed. Without that answer nothing guarantees this commit's build is published, so the promotion stops rather than going out with the previous one."
+            exit 1
+          }
+
+          # In-flight runs of the `develop` cycle whose commit is **contained** in what we are
+          # promoting: those will publish a build this promotion has to wait for.
+          # `--is-ancestor` is the whole filter — a run on a commit `master` does not have is
+          # none of its business, and waiting for it would block the release on work that is
+          # not going out.
+          inflight_internal_runs() {
+            gh api -X GET \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/android-internal-develop.yml/runs" \
+                -f per_page=30 \
+                --jq '.workflow_runs[] | select(.status != "completed") | "\(.id) \(.head_sha)"' \
+              | while read -r run_id sha; do
+                  git cat-file -e "${sha}^{commit}" 2>/dev/null || continue
+                  git merge-base --is-ancestor "$sha" HEAD 2>/dev/null || continue
+                  echo "$run_id"
+                done
+          }
+
+          if [ -n "$PROMOTE_FROM" ]; then
+            # ── Promotion: the number is **looked up**, not recomputed — and looked up late ──
+            #
+            # The **highest** published `versionCode` this commit contains (`--merged HEAD`),
+            # i.e. the last `develop` build that is genuinely inside what we are promoting.
+            # Recounting commits would produce a number absent from the source track as soon as
+            # a merge commit or a fast-forward to an intermediate commit got involved.
+            #
+            # `--merged` and not `git describe --abbrev=0`: `describe` keeps the tag nearest in
+            # the graph, which is not necessarily the highest of the contained builds.
+            #
+            # ⚠️ The registry is **re-read every round**, and that is the heart of the guard:
+            # the `android-build-<code>` tag is pushed at the *end* of `develop`'s upload, a
+            # dozen minutes after the push. `master` and `develop` receiving the same commit
+            # seconds apart, a single resolution at start-up can only see the **previous**
+            # build — the one the upload in flight is about to replace on `internal`. That
+            # produced a promotion permanently one build behind, failing on "versionCode N is
+            # not on the internal track".
+            SETTLE_SECONDS=90
+            MAX_ROUNDS=6
+
+            round=0
+            while :; do
+              round=$((round + 1))
+              git fetch --tags --force --quiet origin
+              CODE=$(published_codes --merged HEAD | tail -n1)
+
+              # The tag sits on the commit being promoted: `develop` published exactly this
+              # content, there is nothing to wait for. The case of a re-run, a manual dispatch,
+              # and of any merge that arrived after the build — it does not cost a second.
+              if [ -n "$CODE" ] \
+                 && [ "$(git rev-parse "refs/tags/android-build-$CODE^{commit}")" = "$(git rev-parse HEAD)" ]; then
+                echo "android-build-$CODE sits on this commit: \`develop\` already published it."
+                break
+              fi
+
+              runs=$(inflight_internal_runs) || api_unreachable
+
+              # Settling window, first round only. `master` and `develop` receive the same
+              # commit seconds apart in an order nothing guarantees: `master` arriving first
+              # would see no run, promote the previous build — and **succeed**, since the source
+              # track still carries it. The next round does not need this: a run that just
+              # finished has necessarily left a trace.
+              if [ -z "$runs" ] && [ "$round" -eq 1 ]; then
+                echo "No \`develop\` run in flight, and the last contained build is not this commit: waiting ${SETTLE_SECONDS}s in case the push to \`develop\` follows."
+                waited=0
+                while [ -z "$runs" ] && [ "$waited" -lt "$SETTLE_SECONDS" ]; do
+                  sleep 15
+                  waited=$((waited + 15))
+                  runs=$(inflight_internal_runs) || api_unreachable
+                done
+              fi
+
+              # Nothing in flight: the last contained build is all there is. The normal case of
+              # a merge arriving long after the build; also the case of an app commit pushed
+              # straight to `master`, which nothing can tell apart from here and which stays
+              # promoted without its own changes (see the header).
+              if [ -z "$runs" ]; then
+                break
+              fi
+
+              for run_id in $runs; do
+                echo "Run $run_id of the \`develop\` cycle is in flight on a commit this promotion contains — waiting for it to finish."
+                gh run watch "$run_id" --exit-status --interval 30 >/dev/null || {
+                  echo "::error::Run $run_id of the \`develop\` cycle did not succeed: this commit's build does not exist on \`$PROMOTE_FROM\`. Promoting the previous one would send a release to closed testing with these changes missing — fix the internal build, then re-run this promotion."
+                  exit 1
+                }
+              done
+
+              if [ "$round" -ge "$MAX_ROUNDS" ]; then
+                echo "::error::$MAX_ROUNDS rounds of waiting and the \`develop\` cycle is still publishing: builds are landing faster than this promotion can catch up. Re-run it once \`develop\` has settled."
+                exit 1
+              fi
+            done
+
+            if [ -z "$CODE" ]; then
+              echo "::error::No \`android-build-*\` tag among the ancestors of $(git rev-parse --short HEAD): this commit contains no published build, so there is nothing to promote. Go through a push to \`develop\`, which builds, uploads and tags."
+              exit 1
+            fi
+            echo "Promoting build $CODE (tag android-build-$CODE)."
+          else
+            # ── Fresh build: the commit count, as `androidApp/build.gradle.kts` derives it ───
+            #
+            # ⚠️ Formula duplicated on purpose — this job has no JDK. The `upload` job checks
+            # that Gradle really produces this number **before** compiling, so a divergence
+            # fails without ever reaching Play.
+            CODE=$(git rev-list --count HEAD)
+
+            # Monotonicity guard. Play refuses a number it has already seen, for ever, and the
+            # commit count can go *down* — a `push --force` that rewrites history, a shallow
+            # clone that only sees part of it. The registry of published builds says whether
+            # that happened, here and not ten minutes later at upload time.
+            # All tags, not only the ancestors: Play remembers the numbers of **every** branch,
+            # including those of a history since rewritten.
+            HIGHEST=$(published_codes | tail -n1)
+            if [ -n "$HIGHEST" ] && [ "$CODE" -le "$HIGHEST" ]; then
+              echo "::error::versionCode $CODE <= $HIGHEST, already published — Play will refuse it. History went backwards: either this clone is shallow (check \`fetch-depth: 0\`), or \`develop\` was rewritten. In the latter case the only lever is a constant offset added to \`gitCommitCount\` in app/androidApp/build.gradle.kts."
+              exit 1
+            fi
+          fi
+
+          # The major lives in Gradle and this job has no JDK, so it is read here. Anchored
+          # grep on a single declaration: an unanchored read of the literal would happily match
+          # the comment block that cites it.
+          KTS=app/androidApp/build.gradle.kts
+          n=$(grep -cE '^val versionMajor = [0-9]+$' "$KTS" || true)
+          if [ "$n" -ne 1 ]; then
+            echo "::error::$n declaration(s) of \`val versionMajor = <n>\` in $KTS, exactly one is expected."
+            exit 1
+          fi
+          MAJOR=$(grep -oP '^val versionMajor = \K[0-9]+' "$KTS")
+
+          VERSION="${MAJOR}.${CODE}"
+          # The tag carries only the `versionName`, and stays unique: the `versionCode` is its
+          # minor.
+          TAG="android-v${VERSION}"
+          {
+            echo "version=$VERSION"
+            echo "code=$CODE"
+            echo "tag=$TAG"
+          } >> "$GITHUB_OUTPUT"
+
+          # The guard only means anything where a tag is pushed. A branch that publishes
+          # without tagging (the `develop` builds) has no registry of versions already gone out.
+          if [ "$TAG_RELEASE" != "true" ]; then
+            echo "Untagged track — deploying $VERSION without checking existing tags."
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch — deploying $TAG regardless of existing tag."
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          elif git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::notice::$TAG already exists — this build is already released, skipping."
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version $TAG — will deploy."
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Builds and uploads a fresh bundle, then tags the build. The `develop` case: the only branch
+  # that compiles, hence the only one to produce a `versionCode` Play has never seen.
+  upload:
+    needs: check
+    if: inputs.promote-from == '' && needs.check.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    # Empty string = no environment, hence no manual approval. Attaching a required reviewer to
+    # the environment passed as input puts a human in front of the publication.
+    environment: ${{ inputs.environment }}
+    # Group deliberately **shared across both callers and both modes**: two simultaneous Play
+    # writes tread on each other (one validates an edit the other holds open), and an edit
+    # belongs to the app, not to a track. An upload from `develop` and a promotion from
+    # `master` must therefore wait for each other. Never cancelled in flight: a run cut off
+    # after the write would leave an edit open in the console.
+    concurrency:
+      group: android-play-release
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          # `fetch-depth: 0` is **structural**: Gradle derives the `versionCode` from the commit
+          # count. The default (`1`) would produce a bundle numbered 1, which Play would refuse
+          # as lower than the last published one — and the error would only surface at upload.
+          fetch-depth: 0
+
+      # Fail fast, before the ~10 minutes of build: a missing secret would otherwise produce an
+      # unsigned bundle, or an empty Play key, and the error would only surface at upload time.
+      - name: Verify required secrets are present
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          missing=0
+          for name in ANDROID_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD \
+                      PLAY_SERVICE_ACCOUNT_JSON; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set. See docs/playstore-ci.md."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ]
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          # The app build is Gradle 9.4.1 / AGP 9.2.1 and is independent of the backend's,
+          # which the root workflow still builds on 17.
+          java-version: '21'
+          distribution: 'temurin'
+
+      # `packages: ''` overrides the action's default of `tools platform-tools`. Google has
+      # removed the obsolete `tools` package from the SDK repository, so the default makes the
+      # action run `sdkmanager tools`, get "Failed to find package 'tools'", and throw — after
+      # it has already accepted the licences, which is the only part this build needs it for
+      # (upstream: android-actions/setup-android#537, #538).
+      #
+      # Installing nothing is correct rather than merely a workaround: the runner image ships
+      # the SDK, the action adds `platform-tools` to PATH either way, and AGP downloads the
+      # platform and build-tools it wants itself once the licences are in place. An empty
+      # string is handled — the action splits on spaces and filters empties, so the install
+      # loop simply does not run.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      # No `build-root-directory`: that was an input of the retired
+      # `gradle/gradle-build-action` and this action has none. It does not need one — what it
+      # caches is `~/.gradle`, which is per-user rather than per-build, and it validates every
+      # wrapper jar in the workspace (this repository has two: the backend's and `app/`'s).
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Ruby and Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ${{ env.APP_DIR }}
+
+      - name: Make gradlew executable
+        working-directory: ${{ env.APP_DIR }}
+        run: chmod +x gradlew
+
+      # The keystore only exists for the life of the job, under ${RUNNER_TEMP} which disappears
+      # with the runner, and in 0600 so no other step reads it by accident.
+      - name: Decode upload keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          KEYSTORE_FILE="${RUNNER_TEMP}/upload-keystore.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          # A secret truncated on copy produces a file `base64 -d` accepts but keytool refuses:
+          # checking it here names the real cause, instead of a signature failure ten minutes
+          # later. Password on stdin and not as an argument: a process's command line is
+          # readable by everyone on the machine.
+          if ! printf '%s\n' "$KEYSTORE_PASSWORD" \
+               | keytool -list -keystore "$KEYSTORE_FILE" >/dev/null 2>&1; then
+            echo "::error::The decoded keystore is unreadable — ANDROID_KEYSTORE_BASE64 is corrupt, or KEYSTORE_PASSWORD is wrong."
+            exit 1
+          fi
+          echo "KEYSTORE_FILE=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+
+      # Path expected by app/fastlane/Appfile. The secret travels through the environment rather
+      # than the command line: an apostrophe in the JSON would break an interpolated `echo`.
+      - name: Write Play service-account JSON
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > fastlane/play-service-account.json
+          chmod 600 fastlane/play-service-account.json
+          if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' fastlane/play-service-account.json; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON is not valid JSON — paste the whole key file, unmodified."
+            exit 1
+          fi
+
+      # The published version is the one Gradle compiles; `check` re-derived it on its side for
+      # want of a JDK. Both formulas must give the same number, and that is verified **before**
+      # compiling: a bundle at the wrong `versionCode` is unrecoverable, Play refusing for ever
+      # both a number it has seen and a number below the last published one.
+      #
+      # Placed after the keystore: Gradle then configures with the same inputs as the real build
+      # — `KEYSTORE_FILE` set — hence the same configuration-cache entry.
+      - name: Verify Gradle agrees with the resolved version
+        env:
+          EXPECTED: ${{ needs.check.outputs.version }} ${{ needs.check.outputs.code }}
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+          ACTUAL=$(./gradlew -q --console=plain :androidApp:printVersion --no-daemon | tail -n1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Gradle would compile \"$ACTUAL\" while this run publishes \"$EXPECTED\". The two versionCode derivations diverged — see \`gitCommitCount\` in app/androidApp/build.gradle.kts and the \`check\` job."
+            exit 1
+          fi
+          echo "Gradle and the run agree on $ACTUAL."
+
+      # `commonTest` runs on the JVM through the KMP library plugin's `withHostTest {}`, so this
+      # needs no emulator. The instrumented tests in `:androidApp` do, and are not run here.
+      - name: Unit tests
+        working-directory: ${{ env.APP_DIR }}
+        run: ./gradlew :composeApp:testAndroidHostTest --no-daemon
+
+      - name: Deploy to Play (${{ inputs.track }})
+        env:
+          # KEYSTORE_FILE comes from the $GITHUB_ENV set above.
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        working-directory: ${{ env.APP_DIR }}
+        # The version is derived by Gradle from the commit count: no override to pass.
+        run: bundle exec fastlane deploy track:${{ inputs.track }}
+
+      # `signingConfig` is `null` when the keystore is missing, so an unsigned bundle would
+      # leave the build with no error at all. Checked after the fact rather than before the
+      # upload — Play would have refused it, but with a message that does not name the cause.
+      # No `-strict`: a self-signed certificate, which any upload key is, would make jarsigner
+      # exit non-zero over an unvalidated chain.
+      - name: Verify the published bundle was signed
+        run: |
+          jarsigner -verify "${AAB_PATH}" | grep -q 'jar verified' || {
+            echo "::error::${AAB_PATH} is not signed — the release signingConfig did not apply."
+            exit 1
+          }
+
+      # The registry of published builds, and **the only thing that tells `master` what to
+      # promote**. Pushed after the upload, never before: a tag for a release that did not go
+      # out would have `master` promote a `versionCode` the source track does not carry.
+      # Lightweight-annotated tag, no GitHub release — an internal test is not a milestone.
+      #
+      # One attempt, no retry loop: the name contains the `versionCode`, so it is unique per
+      # commit and two runs cannot contend for it. If it fails, the job fails — a build
+      # published but not tagged would be invisible to the promotion.
+      - name: Tag the published build
+        env:
+          CODE: ${{ needs.check.outputs.code }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Annotated: the tag is a registry, and `git tag -n` has to say what, where and when.
+          git tag -a "android-build-${CODE}" "${{ github.sha }}" \
+            -m "Cooknco ${{ needs.check.outputs.version }} (${CODE}) — published to the Play \"${{ inputs.track }}\" track."
+          git push origin "refs/tags/android-build-${CODE}"
+          echo "Build \`${{ needs.check.outputs.version }}\` (\`$CODE\`) published to the \`${{ inputs.track }}\` track and tagged \`android-build-$CODE\`." >> "$GITHUB_STEP_SUMMARY"
+
+      # Kept independently of Play: this is the exact artifact that was published, and the only
+      # archived copy of the bundle `master` will later promote without rebuilding it.
+      #
+      # `mapping.txt` is listed too, for the day minification is turned on — the release variant
+      # does not minify today, so `if-no-files-found` stays at its default (`warn`) and the file
+      # simply is not there.
+      - name: Archive the published bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: cooknco-${{ inputs.track }}-${{ needs.check.outputs.version }}-${{ needs.check.outputs.code }}
+          path: |
+            ${{ env.AAB_PATH }}
+            app/androidApp/build/outputs/mapping/release/mapping.txt
+          retention-days: 30
+
+  # Promotes an existing release from one track to another, rebuilding nothing. The `master`
+  # case.
+  #
+  # No JDK, no Android SDK, no keystore: there is no compilation. The only useful secret is
+  # `PLAY_SERVICE_ACCOUNT_JSON`, and the job takes a minute.
+  promote:
+    needs: check
+    if: inputs.promote-from != '' && needs.check.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    # Same group as `upload`: see the comment up there, a Play edit belongs to the app and not
+    # to a track.
+    concurrency:
+      group: android-play-release
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+
+      # One secret to check, but check it anyway: a missing key would otherwise fail in the
+      # middle of the fastlane call, with a message that does not name it.
+      - name: Verify required secrets are present
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::Secret PLAY_SERVICE_ACCOUNT_JSON is not set. See docs/playstore-ci.md."
+            exit 1
+          fi
+
+      - name: Set up Ruby and Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ${{ env.APP_DIR }}
+
+      - name: Write Play service-account JSON
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > fastlane/play-service-account.json
+          chmod 600 fastlane/play-service-account.json
+          if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' fastlane/play-service-account.json; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON is not valid JSON — paste the whole key file, unmodified."
+            exit 1
+          fi
+
+      # The lane first checks that this versionCode really is on the source track, and names
+      # the available codes when it is not — supply's bare error ("Track X doesn't have any
+      # releases") does not help anyone see that a pass through `develop` is missing.
+      - name: Promote ${{ inputs.promote-from }} to ${{ inputs.track }}
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          bundle exec fastlane promote \
+            from:${{ inputs.promote-from }} \
+            to:${{ inputs.track }} \
+            version_code:${{ needs.check.outputs.code }}
+
+  # Publish and then tag: the tag is the trace of what actually went out to Play, so a failed
+  # publication must not leave behind a tag claiming otherwise. Only on push — a manual
+  # dispatch may target a track that is already tagged.
+  #
+  # `!cancelled() && !failure()` is indispensable: this job depends on `upload` **and** on
+  # `promote`, exactly one of which is always skipped. Without it GitHub would propagate the
+  # skip and no tag would ever be pushed.
+  release:
+    needs: [ check, upload, promote ]
+    if: >
+      !cancelled() && !failure()
+      && inputs.tag-release
+      && github.event_name == 'push'
+      && needs.check.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          # Without the full history, `git rev-parse` sees no tags and the guard below would
+          # always believe it is on new ground.
+          fetch-depth: 0
+
+      - name: Tag version and create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git rev-parse "refs/tags/${{ needs.check.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Tag ${{ needs.check.outputs.tag }} already exists — skipping release."
+          else
+            gh release create "${{ needs.check.outputs.tag }}" \
+              --title "Cooknco app ${{ needs.check.outputs.version }}" \
+              --notes "versionCode ${{ needs.check.outputs.code }}, published to the Play '${{ inputs.track }}' track automatically by GitHub Actions." \
+              --target "${{ github.sha }}"
+          fi

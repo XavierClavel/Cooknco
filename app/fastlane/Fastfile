@@ -1,0 +1,111 @@
+default_platform(:android)
+
+# Runs from `app/`, which is its own Gradle build — the repository root holds the backend
+# monolith and knows nothing about `:androidApp`. Every path below is therefore relative to
+# `app/`, and `bundle exec fastlane` has to be invoked from here.
+
+platform :android do
+  desc "Builds a signed release AAB and uploads it to a Play test track"
+  desc "Usage: bundle exec fastlane deploy track:internal (or alpha / beta / production)"
+  lane :deploy do |options|
+    # `internal` is the track this lane serves in CI: `develop` is the only branch that
+    # builds, because it is the only one that moves the `versionCode`. Publishing to closed
+    # testing goes through `promote`, not through a second compilation — see
+    # docs/playstore-ci.md.
+    track = options[:track] || "internal"
+
+    # The version is derived by `androidApp/build.gradle.kts` from the commit count
+    # (`git rev-list --count HEAD`): nothing to pass to Gradle here, and nothing to commit
+    # beforehand.
+    #
+    # This lane must therefore run on a **full** clone. On a shallow one the bundle would come
+    # out numbered 1, which Play refuses as lower than the last published code.
+    #
+    # Task is qualified: this build also holds `:composeApp`, and a bare `bundleRelease` would
+    # look for the task in every module.
+    #
+    # Signing comes from the `signingConfig` in androidApp/build.gradle.kts, fed by
+    # KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD — which this lane never
+    # reads itself: they travel through the environment as far as Gradle.
+    gradle(
+      task: ":androidApp:bundle",
+      build_type: "Release",
+    )
+
+    upload_to_play_store(
+      track: track,
+      # Name derived from the module name by AGP, hence `androidApp-release.aab`.
+      aab: "androidApp/build/outputs/bundle/release/androidApp-release.aab",
+      # "completed" pushes the release to the track's testers. Switch to "draft" to review it
+      # in the Play Console before promoting.
+      #
+      # On a closed track, "completed" does not mean "visible immediately": the release goes
+      # through Play review first. Nothing to fix here when it sits there — that is the cost of
+      # closed testing, not a fault of this lane.
+      release_status: "completed",
+      skip_upload_apk: true,
+      # The store listing (copy, screenshots, graphics) is maintained by hand in the console:
+      # without these three, a repository with no `metadata/` directory would wipe the
+      # existing listing.
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+
+  desc "Promotes an already published release from one track to another, rebuilding nothing"
+  desc "Usage: bundle exec fastlane promote from:internal to:alpha version_code:679"
+  lane :promote do |options|
+    from = options[:from] || "internal"
+    to   = options[:to]   || "alpha"
+    version_code = options[:version_code].to_s.strip
+
+    if version_code.empty?
+      UI.user_error!("promote: version_code is required. Without it, supply promotes \"the\" release of the source track and fails as soon as there is more than one.")
+    end
+    unless version_code.match?(/\A\d+\z/)
+      UI.user_error!("promote: version_code \"#{version_code}\" is not an integer.")
+    end
+    version_code = version_code.to_i
+
+    if from == to
+      UI.user_error!("promote: source and destination track are the same (#{from}).")
+    end
+
+    # Checked before acting: supply would refuse on its own, but with "Track 'internal' doesn't
+    # have any releases", which does not say that the real problem is a `versionCode` nothing
+    # ever built — typically an app commit pushed straight to `master` without going through
+    # `develop`.
+    available = google_play_track_version_codes(track: from)
+    unless available.include?(version_code)
+      UI.user_error!(
+        "versionCode #{version_code} is not on the \"#{from}\" track " \
+        "(present: #{available.empty? ? 'none' : available.sort.join(', ')}).\n" \
+        "That version was never built or uploaded. `master` compiles nothing: it promotes " \
+        "what `develop` already published, so every change has to go through `develop`."
+      )
+    end
+
+    # `track` is the **source** track and `track_promote_to` the destination: the release
+    # changes track, no binary is re-uploaded. Every `skip_*` is therefore mandatory — without
+    # them supply would go looking for an AAB and a store listing to send.
+    #
+    # Play **deactivates** the release on the source track: `from` is left with no active
+    # release until the next upload. That is how a track funnel works, not a side effect of
+    # this lane.
+    upload_to_play_store(
+      track: from,
+      track_promote_to: to,
+      track_promote_release_status: "completed",
+      version_code: version_code,
+      skip_upload_aab: true,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true,
+    )
+
+    UI.success("versionCode #{version_code} promoted from \"#{from}\" to \"#{to}\".")
+  end
+end

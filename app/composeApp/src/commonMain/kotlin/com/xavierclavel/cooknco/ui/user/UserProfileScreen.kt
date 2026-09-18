@@ -125,7 +125,7 @@ fun UserProfileScreen(
                 onNavigateToFollowing = onNavigateToFollowing,
                 onShare = {
                     val user = uiState.user!!
-                    linkSharer.share(user.username, WebRoutes.userUrl(user.id))
+                    linkSharer.share(user.username, WebRoutes.urlFor(WebRoutes.Shareable.USER, user.id))
                 },
                 onLoadMore = { viewModel.loadMoreShown() },
                 allLoaded = if (uiState.tab == ProfileTab.LIKED) uiState.allLikedLoaded else uiState.allRecipesLoaded,

@@ -24,3 +24,20 @@ DerivedData/
 
 ### Kotlin/Native ###
 .kotlin/
+
+### Play publication — nothing here may ever be committed ###
+# Upload keystore. In CI it is rebuilt under $RUNNER_TEMP from ANDROID_KEYSTORE_BASE64 and
+# never lands in the working tree; locally it is pointed at by KEYSTORE_FILE in
+# local.properties, ideally at a path outside the repository.
+*.jks
+*.keystore
+# Play service-account key, written by the workflow from PLAY_SERVICE_ACCOUNT_JSON.
+fastlane/play-service-account.json
+# Fastlane's own scratch output.
+fastlane/report.xml
+fastlane/README.md
+/vendor/bundle
+.bundle/
+# Android Studio's "Generate Signed Bundle" output. The published bundle comes from CI, and a
+# hand-built one at a versionCode CI does not know about is exactly what Play refuses later.
+/androidApp/release/

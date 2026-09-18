@@ -4,7 +4,22 @@ Kotlin monolith (`backend`) + Vue web app (`frontend`) + `mail-service`, sharing
 A Kotlin Multiplatform mobile app lives in `app/` with its own Gradle build. One third-party
 service rides along: `cooknco-gotenberg`, headless Chromium, which prints the PDF exports.
 Deployed to Kubernetes from `k8s/` by `.github/workflows/build.yml` on every push to
-`master`.
+`develop`.
+
+## `develop` is the trunk, `master` is the app's release branch
+
+**PRs target `develop`, and merging one deploys.** `build.yml` builds the three images, pushes
+them and applies the overlay from `develop`; nothing about the backend happens on `master`.
+
+`master` exists for the Play Store. A merge from `develop` into it promotes the Android build
+`develop` already published from internal testing to closed testing — it compiles nothing, and
+deploys no backend. **Only ever merge `develop` into `master`**: an app commit pushed straight
+there is promoted *without its own changes*, because it is `develop`'s last build that goes
+out, and the promotion succeeds, so nothing reports it.
+
+`build.yml` ignores `app/**`, `docs/**` and `*.md`, so an app-only or docs-only merge does not
+roll the backend — the deploy stamps `GITHUB_SHA` into the pod templates, so an apply is never
+a no-op and would otherwise restart all seven Deployments at an unchanged version.
 
 ## Always bump the version when a feature is done
 
@@ -17,10 +32,19 @@ before the PR is merged. Two files carry it and they must stay in sync:
 - `frontend/package.json` — `"version"`.
 
 Default level: patch for fixes, minor for features. Never reuse a version that has already
-reached `master` — CI pushes an immutable image tag per version.
+reached `develop` — CI pushes an immutable image tag per version.
 
-The mobile app's `versionCode` / `versionName` in `app/androidApp/build.gradle.kts` are a
-separate, store-facing pair. Leave them alone unless the task is a store build.
+**Nothing to bump when `build.yml` would not run.** Its `paths-ignore` covers `app/**`,
+`docs/**`, `**/*.md` and the Android workflows, so a change confined to those builds no image
+and the version would name a build that does not exist — which is worse than a gap, because
+the file would then claim a version the cluster is not running. A change touching anything
+else bumps as usual.
+
+The mobile app's version is **not** in that pair and is not written by hand any more. Its
+`versionCode` is the commit count of this repository and its `versionName` is
+`"<versionMajor>.<versionCode>"`, both derived by Gradle in `app/androidApp/build.gradle.kts`.
+Nothing to bump, and nothing to keep in sync: `versionMajor` is the only literal left there,
+and it moves only for a product milestone. See "Publishing the app" below.
 
 ## Git and PRs
 
@@ -29,6 +53,61 @@ separate, store-facing pair. Leave them alone unless the task is a store build.
   footer or note in commit messages or PR bodies. Commits and PRs are authored by
   Xavier alone.
 - PR bodies describe the change and why, nothing else.
+
+## Publishing the app: one build, promoted, never rebuilt
+
+`develop` builds the Android bundle and uploads it to Play's `internal` track
+(`android-internal-develop.yml`); `master` **promotes** that same release to `alpha`, which is
+what the console calls closed testing (`android-release-master.yml`). Both are thin callers of
+`android-deploy.yml`, whose header carries the reasoning; the operator's side — the five
+secrets, the Play service account, the failure messages — is
+[`docs/playstore-ci.md`](docs/playstore-ci.md).
+
+Everything about it follows from one fact: **Google Play refuses a `versionCode` it has already
+seen, for ever**, even one belonging to a deleted release, and a Play edit covers the whole app
+rather than a track. So `master` cannot re-upload at the number `develop` already published,
+and promoting is not an optimisation — it is the only thing that works. It also makes what
+reaches closed testing bit-for-bit what was tested internally, which two compilations cannot.
+
+Four things not to undo:
+
+- **`versionCode` is the commit count**, derived by Gradle, never committed. Not
+  `github.run_number`, which restarts at 1 the moment a workflow is renamed; not a literal,
+  which needed a bot commit per push and a `sed`/`grep` round trip. The commit count is a
+  property of the *commit*, so `develop` and `master` derive the same number at the same
+  commit — which is what the promotion depends on. The price is a `versionName` that changes
+  every commit and means nothing beyond its major.
+- **Every Android checkout is `fetch-depth: 0`.** A shallow clone counts a handful of commits
+  and would build a bundle numbered far below the last published one. The `check` job compares
+  the number against the `android-build-*` tags *before* compiling, so this fails in seconds.
+- **`master` looks the number up, it does not recompute it, and it looks it up late.**
+  `develop` tags each successful upload `android-build-<code>` — that tag registry is the only
+  thing that says what to promote, and a recomputed count would name a build nothing ever
+  made. The tag lands at the *end* of an upload, a dozen minutes after a push `master` sees in
+  the same minute, so `check` waits for the in-flight `develop` run its commit contains before
+  resolving. Without the wait the promotion is permanently one build behind.
+- **CI asks Gradle for the version** (`:androidApp:printVersion`), and `upload` refuses to
+  compile when Gradle and `check` disagree. Nothing greps `build.gradle.kts`; a bundle at the
+  wrong number is unrecoverable.
+
+The store listing is **not** part of any of this. `app/store/` holds its source — the icon and
+feature graphic as HTML pages rendered by headless Chromium (`render.sh`, the same engine that
+prints the PDF exports, so no second renderer enters the build), and the copy per locale. But
+the Fastfile passes `skip_upload_metadata`, `skip_upload_images` and `skip_upload_screenshots`,
+and a release touches the binary alone. Those flags are load-bearing: without them fastlane
+treats the repository as authoritative, and a missing `fastlane/metadata/` directory **wipes
+the live listing** in every locale. So editing `app/store/` ships nothing — someone pastes it
+into the console — and wiring it up to upload is not a small convenience.
+
+The listing icon is the launcher icon, at the proportion a launcher shows after masking the
+adaptive icon, so the home screen and the store show one drawing. Changing the mark means
+changing `drawable/ic_launcher_*.xml` in the same commit.
+
+A release `signingConfig` exists only where the keystore does
+(`signingConfigs.findByName("release")` returns null otherwise), so an unsigned bundle leaves
+the build with no error at all — hence the `jarsigner -verify` after the upload. And the app is
+its own Gradle build under `app/`: every Gradle and fastlane step runs
+`working-directory: app`, while the git commands stay at the root where `.git` is.
 
 ## All queries go through query beans
 

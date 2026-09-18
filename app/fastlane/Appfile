@@ -1,0 +1,8 @@
+# Google Play service-account key.
+#
+# In CI the workflow writes this file from the `PLAY_SERVICE_ACCOUNT_JSON` secret. Locally,
+# export `PLAY_JSON_KEY_PATH` at your own key rather than dropping a file here — the default
+# path is gitignored, but a Play key outside the repository is still preferable.
+json_key_file(ENV["PLAY_JSON_KEY_PATH"] || "fastlane/play-service-account.json")
+
+package_name("com.xavierclavel.cooknco")

@@ -1,0 +1,47 @@
+name: Android Internal (develop)
+
+# `develop` → the `internal` track. Delivered immediately (internal testing does not go through
+# Play review) to at most 100 testers, so the integration can be seen running before it reaches
+# `master`.
+#
+# **This is the only cycle that builds**: `master` promotes the bundle produced here rather than
+# compiling a second one. It writes no version — the `versionCode` is the commit count, derived
+# by Gradle — but it **tags** every successful upload `android-build-<code>`, and that tag is
+# what `master` queries to know what to promote. See the header of `android-deploy.yml`.
+#
+# The backend's own deployment from `develop` lives in `build.yml` and shares no secret with
+# this cycle.
+on:
+  push:
+    branches: [ "develop" ]
+    # Same list as the `master` cycle: only what actually goes into the AAB triggers a build.
+    paths:
+      - 'app/**'
+      - '.github/workflows/android-internal-develop.yml'
+      - '.github/workflows/android-deploy.yml'
+  workflow_dispatch:
+
+# `contents: write` for the `android-build-<code>` tag pushed after the upload. A called
+# workflow can never grant itself more than its caller.
+#
+# No commit is ever pushed to `develop`: a branch protection requiring a pull request or a
+# review therefore does not get in this cycle's way. Only tag creation has to stay permitted
+# (tag protection rule, where one exists).
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/android-deploy.yml
+    with:
+      track: internal
+      # No `android-v…` tag and no GitHub release: the version changes at every commit, and an
+      # internal test is not a milestone anyone wants to find in the release history. `master`
+      # tags. The `android-build-<code>` tag is pushed either way — it is a technical registry,
+      # not a milestone.
+      tag-release: false
+      # Empty = this cycle builds and uploads a fresh bundle, it promotes nothing.
+      promote-from: ''
+      # Empty string = no guard: an internal build has no business waking a reviewer.
+      environment: ''
+    secrets: inherit

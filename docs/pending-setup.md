@@ -10,40 +10,58 @@ meanwhile.
 
 ---
 
-## 1. Android App Links — the release signing fingerprint
+## 1. Android App Links — the release signing fingerprint ✅ filled in
 
-**What is inert until this is done:** every `https://cooknco.eu/...` link opens the browser
-instead of the app. The website serves the same page, so nothing is broken — the app is
-simply never offered.
+**Done:** `frontend/public/.well-known/assetlinks.json` carries the app signing key's
+SHA-256. It takes effect when the frontend image that contains it is deployed, and Android
+re-verifies on install and on app update — so a handset that already has the app needs a
+reinstall, or the `verify-app-links --re-verify` below.
 
-**Where the placeholder is:** `frontend/public/.well-known/assetlinks.json`
+Until then, and on any handset that has not re-verified, every `https://cooknco.eu/...` link
+opens the browser. The website serves the same page, so nothing is broken — the app is simply
+not offered.
 
-```json
-"sha256_cert_fingerprints": ["REPLACE_WITH_THE_RELEASE_SIGNING_CERTIFICATE_SHA256"]
+### Which key this is, because the console offers three
+
+The fingerprint has to be of the certificate the APK is **installed** with. Play App Signing
+re-signs every artifact it distributes, so that is Google's key and not the one CI uploads
+with. **Test and release → Setup → App signing** lists up to three, and only the first
+belongs here:
+
+| Certificate on that page | Signs | In `assetlinks.json`? |
+| --- | --- | --- |
+| **App signing key certificate** | every install from Play — production, closed **and** internal testing tracks | **Yes.** This is the one. |
+| Upload key certificate | only the artifact handed to Play; never reaches a device | No |
+| Internal app sharing certificate | builds distributed by Play's internal app *sharing* links | Only if that is used — the internal testing *track* uses the app signing key |
+
+The third is the one that costs an afternoon: it is a genuinely different key, sitting on the
+same page, and internal app *sharing* is easy to confuse with the internal testing *track*
+this pipeline publishes to. The track gets the app signing key.
+
+A cheap way to confirm a fingerprint is *not* the upload key's, without needing the keystore
+password — read the certificate out of a locally built bundle and compare:
+
+```bash
+unzip -p app/androidApp/release/androidApp-release.aab 'META-INF/*.RSA' > /tmp/upload.rsa
+keytool -printcert -file /tmp/upload.rsa | grep SHA256
 ```
 
-### Getting the value
+If that matches what went into `assetlinks.json`, the wrong key was copied.
 
-The fingerprint has to be of the certificate the APK is **installed** with, which is not
-necessarily the one it was uploaded with — Play App Signing re-signs, and the upload key's
-fingerprint would verify nothing for a store install.
+### Adding the debug key too
 
-1. There is no release signing key yet: `app/androidApp/build.gradle.kts` declares no
-   `signingConfig`, so a release build is unsigned today. Creating one, and enrolling in
-   Play App Signing on the first upload, comes first.
-2. Play Console → the app → **Test and release → Setup → App signing**. Copy the SHA-256
-   under **App signing key certificate** — uppercase hex, colon-separated.
-3. Paste it into the array. The array takes several, which is how a debug build can be
-   verified alongside the store one:
-   ```bash
-   keytool -list -v -keystore ~/.android/debug.keystore \
-     -alias androiddebugkey -storepass android -keypass android
-   ```
+The array takes several, which is how a locally installed build can verify alongside the
+store one:
+
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android
+```
 
 ### Deploying it
 
-The file is baked into the frontend image, so filling it in is an ordinary change: commit,
-bump the version, merge to `master`, and CI deploys it.
+The file is baked into the frontend image, so this is an ordinary change: commit, bump the
+version, merge to `develop`, and CI deploys it.
 
 ### Checking it worked
 
@@ -103,3 +121,56 @@ the app — tap a link from Notes or Messages instead.
 For testing before the CDN catches up, `applinks:cooknco.eu?mode=developer` in the
 entitlement, with **Settings → Developer → Associated Domains Development** on, makes the
 device fetch the file from the domain directly. Do not ship that form.
+
+---
+
+## 3. Play publication from CI — the five secrets, and the branch model
+
+**What is inert until this is done:** nothing regresses, but the app stops being publishable
+from CI. `android-internal-develop.yml` fails its first step — deliberately, before spending
+ten minutes on a build — naming whichever secret is missing. Publishing stays a manual
+*Generate Signed Bundle* and a drag into the Play Console meanwhile.
+
+**Where they go:** Settings → Secrets and variables → Actions.
+
+| Secret | What it is |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | the **existing** upload keystore, base64 of the `.jks`, one line |
+| `KEYSTORE_PASSWORD` | its store password |
+| `KEY_ALIAS` | the key alias inside it |
+| `KEY_PASSWORD` | that key's password |
+| `PLAY_SERVICE_ACCOUNT_JSON` | the whole Play service-account key file, verbatim |
+
+It has to be the **same** keystore the store build was signed with: Play matches the upload key
+on every upload and rejects a different one. If it is gone, *App signing → Request upload key
+reset* in the console is the only way back.
+
+[`playstore-ci.md`](playstore-ci.md) has the commands for encoding it, the Play service-account
+steps, the track-name table, and what each failure message means.
+
+### Two things to set once, outside the secrets
+
+- **`develop` is the default branch**, and the base of every PR. `build.yml` deploys the
+  backend from it; `master` is the app's release branch and deploys no backend at all.
+  **`master` must only ever receive merges from `develop`** — an app commit pushed straight
+  there is promoted *without its own changes*, and the promotion succeeds, so nothing reports
+  it.
+- **The `play-store` environment guards the promotion to closed testing.** GitHub creates it
+  on the first run and it is inert until Settings → Environments → `play-store` → *Required
+  reviewers* names somebody. Until then every merge to `master` promotes without asking.
+
+### Checking it worked
+
+```bash
+# The first push to develop should build and upload; the tag is the evidence it reached Play
+git fetch --tags && git tag --list 'android-build-*'
+
+# What CI thinks it is publishing, from app/
+cd app && ./gradlew -q :androidApp:printVersion
+```
+
+A first run failing with `The caller does not have permission` is a real misconfiguration, not
+something to wait out: the Google Play Android Developer API not enabled on the linked Cloud
+project, the wrong address invited to the Play Console (it must be the service account's own
+`…iam.gserviceaccount.com`, not yours), or the grant not scoped to this app. The JSON key on
+its own authorises nothing — [`playstore-ci.md`](playstore-ci.md) § 4 walks all five steps.
