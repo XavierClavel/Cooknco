@@ -85,6 +85,12 @@ kotlin {
             // its buttons are addressed to.
             implementation(libs.androidx.core)
             implementation(libs.ktor.client.okhttp)
+            // The recipe scanner: Google's document capture flow, and the text reader run
+            // over what it captured. Both unbundled, so the APK carries neither the scanning
+            // UI nor the recognition model — Play services delivers them on first use, which
+            // this app can depend on because Firebase already does.
+            implementation(libs.mlkit.document.scanner)
+            implementation(libs.mlkit.text.recognition)
             // Only for the push token: the notification itself is drawn by :androidApp,
             // which is where the service that receives one has to be declared.
             implementation(project.dependencies.platform(libs.firebase.bom))

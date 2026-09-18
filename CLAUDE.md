@@ -431,6 +431,61 @@ Signing in is delegated to the app's login page (`?redirect=` in `frontend/src/s
 same-origin paths only), so the flow keeps Google sign-in and there is still one page in the
 product that asks for a password.
 
+## Scanning a recipe prefills the editor, and never overwrites it
+
+The app can read a printed recipe off a page and fill the new-recipe form in with it
+(`platform/RecipeScanner.kt`, `data/RecipeScan.kt`). All of it happens on the device: no
+photograph and no text leaves the phone, there is no API key, and it works with no network.
+
+The capture and the reading are the platform's, one component each:
+
+- **Android**: ML Kit's document scanner (`play-services-mlkit-document-scanner`) for the
+  capture, ML Kit Text Recognition (`play-services-mlkit-text-recognition`) for the words.
+  Both are the *unbundled* builds, so the APK carries neither the scanning UI nor the model
+  — Play services downloads them on first use. That is a dependency this app already has,
+  for Firebase; without Play services `getStartScanIntent` fails and the scan reports
+  `ScanResult.Failed`.
+- **iOS**: `VNDocumentCameraViewController` and `VNRecognizeTextRequest`, both already in
+  the Kotlin/Native distribution. **No dependency is added on iOS at all.**
+
+What the two hand over is `List<OcrLine>` — text *with its box*, normalised to `0..1` with a
+top-left origin. The geometry is not decoration:
+
+- **A page is split into columns before it is read.** Ingredients printed beside the method
+  interleave the moment the lines are flattened into a string, and no wording analysis
+  recovers the order afterwards. The gutter is the x fewest lines cross.
+- **The title is the biggest text at the top, and only if it stands out.** It is the one
+  part of a recipe with no wording that identifies it. A card set in one size throughout has
+  no title to find, and taking its tallest line would lose a step as well as invent a name —
+  so a line that is not distinctly taller than the body is not a title.
+- **Each platform normalises against the text, not the image.** The margins the scanner left
+  around the page would otherwise shift the gutter by however much of the desk got into
+  frame, and on Android the box space and the decoded image's dimensions disagree the moment
+  EXIF says the page is rotated.
+
+**A scan adds, and never takes away.** A field already filled in keeps what was typed;
+ingredients and steps are appended. That is what makes scanning page two work, and what
+makes a mis-aimed scan survivable by deleting a few rows rather than by remembering what was
+there. `RecipeEditScanTest` is what holds that, and it is the test to keep.
+
+Two smaller things it depends on:
+
+- **An ingredient is matched to the catalogue only on an exact name**, accents and a
+  trailing plural aside. `IngredientService.search` is fuzzy by design — it has to find
+  "farine" from "fari" — so its best answer to "sel" is a salt of some kind. A row the
+  catalogue does not obviously hold stays free text (`customName`), which is a working
+  ingredient rather than a wrong one; a silently substituted neighbour reads as correct and
+  is wrong in the nutrition.
+- **The parser has no second copy**, unlike `StepDurations`: nothing on the server or the
+  web parses a scan, because nothing there has a camera. It also reads a *labelled* duration
+  ("Cuisson : 1h30") rather than a step's wording, which is a different question and why it
+  does not go through `StepDurations` — that one is still what gives a scanned step its
+  timer, exactly as it does a typed one.
+
+Nothing here can be verified on this machine beyond compiling: there is no emulator and no
+device, so the parser is the part that is tested (`RecipeScanTest`, over fixtures built from
+the geometry) and the two platform shims are compile-checked only.
+
 ## Build and test
 
 Use `sh ./gradlew` (the wrapper lacks the exec bit in worktrees) with JDK 23 — Gradle 8.10.2
