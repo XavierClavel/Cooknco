@@ -48,8 +48,11 @@ class WebRoutesTest {
         assertEquals("https://cooknco.eu/recipe/view?id=12", WebRoutes.urlFor(WebRoutes.Shareable.RECIPE, 12))
         // `user`, not `id` — NotificationService stores `/user/view?user=…`
         assertEquals("https://cooknco.eu/user/view?user=12", WebRoutes.urlFor(WebRoutes.Shareable.USER, 12))
-        assertEquals("https://cooknco.eu/cookbook/view?id=12", WebRoutes.urlFor(WebRoutes.Shareable.COOKBOOK, 12))
-        assertEquals("https://cooknco.eu/ingredient/view?id=12", WebRoutes.urlFor(WebRoutes.Shareable.INGREDIENT, 12))
+        // `cookbook` and `ingredient`, not `id` — these name their id after what they hold,
+        // which is what the website navigates to and what LinkPreviewController reads off
+        // the same path. `?id=` here would unfurl as nothing and open an empty page.
+        assertEquals("https://cooknco.eu/cookbook/view?cookbook=12", WebRoutes.urlFor(WebRoutes.Shareable.COOKBOOK, 12))
+        assertEquals("https://cooknco.eu/ingredient/view?ingredient=12", WebRoutes.urlFor(WebRoutes.Shareable.INGREDIENT, 12))
     }
 
     @Test
@@ -59,6 +62,15 @@ class WebRoutesTest {
         // Both shapes are in circulation
         assertEquals("user/7", WebRoutes.routeForPath("/user/view/?user=7"))
         assertEquals("recipe/12", WebRoutes.routeForUrl("https://cooknco.eu/recipe/view/?id=12"))
+    }
+
+    @Test
+    fun `the id a link already in circulation carries is still placed`() {
+        // What a notification stored, and what a build predating the parameter names shared.
+        // Dropping these would send a link the app could open to the browser instead.
+        assertEquals("cookbook/12", WebRoutes.routeForUrl("https://cooknco.eu/cookbook/view?id=12"))
+        assertEquals("ingredient/9", WebRoutes.routeForUrl("https://cooknco.eu/ingredient/view?id=9"))
+        assertEquals("cookbook/12", WebRoutes.routeForPath("/cookbook/view?cookbook=12"))
     }
 
     @Test

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,6 +88,9 @@ import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.network.dto.displayName
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberCameraCapture
+import com.xavierclavel.cooknco.platform.RecipeScannerLauncher
+import com.xavierclavel.cooknco.platform.rememberRecipeScanner
+import kotlinx.coroutines.delay
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.i18n.Strings
@@ -431,6 +435,10 @@ fun RecipeEditScreen(
 private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel, modifier: Modifier = Modifier) {
     val s = strings()
     var picking by remember { mutableStateOf<RecipeNumber?>(null) }
+    // Remembered out here rather than inside the item that uses it: a launcher registered
+    // from a lazy item is unregistered the moment that item scrolls out of the viewport, and
+    // the result of a scan that was already running would then have nowhere to arrive.
+    val scanner = rememberRecipeScanner(onScanned = viewModel::onScanned)
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
@@ -438,6 +446,12 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
     ) {
         item {
             StepHeading(title = s.theBasics, subtitle = s.theBasicsSubtitle)
+        }
+        // Offered on a recipe being written, not on one being edited: what a scan does to
+        // the editor is add to it, and a page dropped into a recipe that already exists is
+        // far more likely to be a mistake than an intention.
+        if (uiState.recipeId == null) {
+            item { ScanCard(uiState = uiState, scanner = scanner, viewModel = viewModel) }
         }
         item {
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
@@ -593,6 +607,72 @@ private fun totalTimeLabel(state: RecipeEditUiState, s: Strings): String {
 }
 
 /** One row of the TIMES & YIELD card: name and hint, then a −/value/+ pill. */
+/**
+ * The way into the scanner, at the top of a recipe being started.
+ *
+ * It sits above the title field rather than behind a menu because it is only worth anything
+ * before anything has been typed, and because it has to explain itself: "we'll fill in what
+ * we can read" is the whole contract — the editor is still where the recipe is written, and
+ * the scan is a first draft of it rather than a result to accept or reject. That is also why
+ * there is no review screen between the two: what would be reviewed is exactly the form
+ * underneath.
+ */
+@Composable
+private fun ScanCard(
+    uiState: RecipeEditUiState,
+    scanner: RecipeScannerLauncher,
+    viewModel: RecipeEditViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val s = strings()
+
+    StickerCard(modifier = modifier.fillMaxWidth().padding(bottom = 10.dp), shadowOffset = 6.dp) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !uiState.isScanning) { scanner.launch() }
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (uiState.isScanning) {
+                    CircularProgressIndicator(color = CookncoNavy, strokeWidth = 2.5.dp, modifier = Modifier.size(22.dp))
+                } else {
+                    Icon(
+                        Icons.Outlined.DocumentScanner,
+                        contentDescription = null,
+                        tint = CookncoNavy,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Text(
+                    text = if (uiState.isScanning) s.scanning else s.scanARecipe,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CookncoNavy,
+                )
+            }
+            Text(
+                text = uiState.scanMessage ?: s.scanARecipeSubtitle,
+                fontSize = 12.5.sp,
+                color = if (uiState.scanMessage != null) CookncoOrange else CookncoNavy.copy(alpha = 0.6f),
+                lineHeight = 17.sp,
+            )
+        }
+    }
+
+    // Said once. It describes the scan that just happened, and the next tap is a new one.
+    LaunchedEffect(uiState.scanMessage) {
+        if (uiState.scanMessage != null) {
+            delay(4000)
+            viewModel.dismissScanMessage()
+        }
+    }
+}
+
 @Composable
 private fun NumberStepperRow(
     number: RecipeNumber,
