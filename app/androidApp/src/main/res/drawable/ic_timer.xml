@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Status-bar icon for the cook timer, and the mark in the Android 16 status bar chip.
+
+  An hourglass rather than the app's silhouette, because that chip sits beside the clock
+  with no room for a caption: whatever it shows has to say "a timer is running" on its own,
+  which the bell over every other notification this app posts does not.
+
+  Sand in the upper chamber, the lower one left as glass — there is time still to fall, and
+  an hourglass drawn the other way up is the picture of one that has finished. The empty half
+  is a hole rather than a second colour, because the small icon is masked to its alpha
+  channel and tinted: everything opaque here comes out as one flat shape whatever it was
+  painted. It is therefore cut by winding — the inner subpath runs against the outer one, and
+  reversing it would fill the glass in solid.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,2H6v6l4,4 -4,4v6h12v-6l-4,-4 4,-4V2zm-2,14.5V20H8v-3.5l4,-4 4,4z" />
+</vector>

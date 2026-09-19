@@ -126,7 +126,7 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
     ensureChannels(context)
     val step = state.stepText.ifBlank { s.timerLabel }
     val notification = NotificationCompat.Builder(context, RUNNING_CHANNEL_ID)
-        .setSmallIcon(smallIcon(context))
+        .setSmallIcon(timerIcon(context))
         .setContentTitle(state.recipeTitle)
         // The step, not a number naming it: the whole reason to glance at this rather than
         // open the app is to be told what is meant to be happening.
@@ -145,6 +145,21 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
         .setChronometerCountDown(state.running)
         .setWhen(state.endsAtEpochMillis)
         .setShowWhen(state.running)
+        // Android 16's chip in the status bar, which is where a timer belongs — the platform
+        // clock puts its own there, and a cook glancing at the phone should not have to pull
+        // the shade down to see how long is left. Requested, never relied on: the system
+        // decides, the user can turn Live Updates off per app, and below API 36 there is no
+        // chip at all. Everything it needs is already above — ongoing, a title, a style that
+        // is not a custom view, and a channel above IMPORTANCE_MIN.
+        .setRequestPromotedOngoing(true)
+        // What the chip says. Its content is short critical text first, then the chronometer,
+        // then the bare icon — so this is left unset while running, where the countdown above
+        // already fills it and ticks with this process frozen. Paused is the case with no
+        // chronometer running and therefore nothing to show, hence the remaining time here.
+        // Seven characters is what the chip fits whole, which mm:ss is and h:mm:ss is not.
+        .setShortCriticalText(
+            if (state.running) null else formatCookTimer(state.pausedRemainingSeconds)
+        )
         // Ongoing so a swipe does not silently throw the timer away, and silent because the
         // thing worth a sound is the end, not each pause.
         .setOngoing(true)
@@ -185,7 +200,7 @@ fun postCookTimerAlert(context: Context, state: CookTimerState) {
     val s = stringsFor(AppLanguage.current.value)
     ensureAlertChannel(context)
     val notification = NotificationCompat.Builder(context, DONE_CHANNEL_ID)
-        .setSmallIcon(smallIcon(context))
+        .setSmallIcon(timerIcon(context))
         .setContentTitle(s.timerTimeIsUp)
         .setContentText(state.stepText.ifBlank { state.recipeTitle })
         .setStyle(NotificationCompat.BigTextStyle().bigText(state.stepText.ifBlank { state.recipeTitle }))
@@ -384,6 +399,19 @@ private fun openCookMode(context: Context, recipeId: Long): PendingIntent? {
         intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+}
+
+/**
+ * The hourglass both of the timer's notifications are posted under.
+ *
+ * Its own mark rather than the app's, because on Android 16 this is also what is drawn in
+ * the status bar chip — next to the clock, with no title and no text beside it — and there
+ * it has to say "a timer is running" unaided. The app silhouette is the fallback, so a build
+ * without the drawable still posts.
+ */
+private fun timerIcon(context: Context): Int {
+    val id = context.resources.getIdentifier("ic_timer", "drawable", context.packageName)
+    return if (id != 0) id else smallIcon(context)
 }
 
 /**

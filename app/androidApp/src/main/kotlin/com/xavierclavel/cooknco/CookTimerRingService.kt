@@ -222,7 +222,9 @@ class CookTimerRingService : Service() {
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
+            // The same hourglass the countdown was posted under — this replaces it, and a
+            // timer that changed mark on going off would read as something else entirely.
+            .setSmallIcon(R.drawable.ic_timer)
             .setContentTitle(s.timerTimeIsUp)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

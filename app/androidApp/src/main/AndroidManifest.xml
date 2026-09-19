@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 13+. Asked for once signed in: see EnsureNotificationPermission. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 16+. Lets the running cook timer be promoted to the chip in the status
+         bar, the way the platform clock's own timer is. Granted on install rather than
+         asked for, and a request rather than a guarantee: the system decides, and the user
+         can withdraw it per app. So nothing depends on it — see CookTimerNotifier. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <!-- The cook timer's ring. Requested rather than assumed: from Android 14 this is denied
          until the user grants it, and the alternative that is granted without asking
          (USE_EXACT_ALARM) is reserved for apps whose purpose is alarms. Without it the alarm
