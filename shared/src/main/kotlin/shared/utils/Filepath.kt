@@ -13,6 +13,7 @@ object Filepath {
     val RECIPES_THUMBNAIL_PATH = "$IMG_ROOT/recipes-thumbnails"
     val USERS_IMG_PATH = "$IMG_ROOT/users"
     val COOKBOOKS_IMG_PATH = "$IMG_ROOT/cookbooks"
+    val RECIPE_STEPS_IMG_PATH = "$IMG_ROOT/recipe-steps"
 
     /**
      * The picture every bucket serves in place of one it does not have.

@@ -33,6 +33,7 @@ import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.BackupService
+import com.xavierclavel.services.RecipeStepService
 import com.xavierclavel.services.StorageService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.loadConfig
@@ -46,6 +47,7 @@ import shared.events.KafkaEventProducer
 val config = loadConfig()
 val appModules = module {
     single { RecipeService() }
+    single { RecipeStepService() }
     single { UserService() }
     single { IngredientService() }
     single { ImageService() }

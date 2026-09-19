@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +25,15 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,6 +71,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     user: UserInfo,
@@ -78,6 +89,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val s = strings()
     val gridState = rememberLazyGridState()
+    val pullState = rememberPullToRefreshState()
 
     val reachedEnd by remember {
         derivedStateOf {
@@ -93,53 +105,138 @@ fun HomeScreen(
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         HomeHeader(user = user, onAvatarClick = onProfileClick)
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            state = gridState,
+        // Around the feed and not the header: the greeting is not part of what a pull
+        // reloads, and dragging it down with the rows would say that it was.
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
+            state = pullState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            indicator = {
+                StickerRefreshIndicator(
+                    state = pullState,
+                    isRefreshing = uiState.isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            },
         ) {
-            uiState.dateGroups.forEach { group ->
-                // A date is a heading over the rows beneath it, not a cell beside one.
-                item(key = "header_${group.key}", span = { GridItemSpan(2) }) {
-                    DateGroupHeader(label = s.dateGroup(group.key), count = group.recipes.size)
-                }
-                items(group.recipes, key = { it.id }) { recipe ->
-                    RecipeCard(
-                        recipe = recipe,
-                        onClick = { onRecipeClick(recipe.id) },
-                        onUserClick = onUserClick,
-                    )
-                }
-            }
-
-            if (uiState.isLoading) {
-                item(span = { GridItemSpan(2) }) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                state = gridState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                uiState.dateGroups.forEach { group ->
+                    // A date is a heading over the rows beneath it, not a cell beside one.
+                    item(key = "header_${group.key}", span = { GridItemSpan(2) }) {
+                        DateGroupHeader(label = s.dateGroup(group.key), count = group.recipes.size)
+                    }
+                    items(group.recipes, key = { it.id }) { recipe ->
+                        RecipeCard(
+                            recipe = recipe,
+                            onClick = { onRecipeClick(recipe.id) },
+                            onUserClick = onUserClick,
+                        )
                     }
                 }
-            }
 
-            if (uiState.error != null) {
-                item(span = { GridItemSpan(2) }) {
-                    Text(
-                        text = uiState.error!!,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(16.dp),
-                    )
+                if (uiState.isLoading) {
+                    item(span = { GridItemSpan(2) }) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
+                        }
+                    }
                 }
-            }
 
-            item(span = { GridItemSpan(2) }) { Spacer(Modifier.height(24.dp)) }
+                if (uiState.error != null) {
+                    item(span = { GridItemSpan(2) }) {
+                        Text(
+                            text = uiState.error!!,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
+
+                item(span = { GridItemSpan(2) }) { Spacer(Modifier.height(24.dp)) }
+            }
         }
     }
 }
+
+/**
+ * What a pull looks like: a sticker coin that comes down with the finger and spins.
+ *
+ * Material's own indicator was a plain circle on a plain shadow - the one piece of chrome on
+ * this screen with none of the border the rest of it is drawn with. This is the same coin the
+ * app draws everything else as, which also makes it big and dark enough to be seen moving;
+ * the stock one was a pale wisp that a cook would have to be looking for.
+ *
+ * Two states, both from [PullToRefreshState.distanceFraction]: while the finger is down an
+ * arrow turns with the pull, so the gesture answers before it is finished, and once it is let
+ * go the arrow becomes a spinner. What holds that spinner on screen long enough to register
+ * is not here - see `HomeViewModel.MIN_VISIBLE_REFRESH`.
+ */
+@Composable
+private fun StickerRefreshIndicator(
+    state: PullToRefreshState,
+    isRefreshing: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val fraction = state.distanceFraction
+    // Nothing at rest: no frame, no ghost of one, above a feed nobody is pulling.
+    if (fraction <= 0f && !isRefreshing) return
+
+    // Settles at the threshold while it works rather than following a finger that has gone.
+    val travel by animateFloatAsState(
+        targetValue = if (isRefreshing) 1f else fraction.coerceIn(0f, 1.4f),
+        label = "refresh_travel",
+    )
+
+    Box(
+        modifier = modifier.graphicsLayer {
+            translationY = travel * PULL_TRAVEL.toPx()
+            // Grows into place, so a pull too short to trigger anything still says so.
+            val presence = if (isRefreshing) 1f else fraction.coerceIn(0f, 1f)
+            alpha = presence
+            scaleX = 0.55f + 0.45f * presence
+            scaleY = scaleX
+        },
+    ) {
+        StickerCard(shape = CircleShape, shadowOffset = 4.dp, borderWidth = 2.5.dp) {
+            Box(
+                modifier = Modifier.size(46.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        color = CookncoNavy,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(24.dp),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        tint = CookncoNavy,
+                        modifier = Modifier
+                            .size(24.dp)
+                            // A full turn by the time the pull is worth letting go of.
+                            .graphicsLayer { rotationZ = fraction.coerceAtMost(1f) * 300f },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** How far the coin travels from the top of the feed to where it sits while refreshing. */
+private val PULL_TRAVEL = 72.dp
 
 @Composable
 private fun HomeHeader(user: UserInfo, onAvatarClick: () -> Unit, modifier: Modifier = Modifier) {

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <addColumn tableName="recipe_steps">
+            <column name="image_version" type="bigint" defaultValue="0" notnull="true"/>
+        </addColumn>
+    </changeSet>
+</migration>

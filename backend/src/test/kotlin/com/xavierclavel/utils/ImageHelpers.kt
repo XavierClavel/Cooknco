@@ -1,6 +1,7 @@
 package main.com.xavierclavel.utils
 
 import io.ktor.client.HttpClient
+import io.ktor.client.request.delete
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.post
@@ -39,6 +40,13 @@ suspend fun HttpClient.uploadRecipeImage(recipeId: Long, bytes: ByteArray = test
 
 suspend fun HttpClient.uploadCookbookImage(cookbookId: Long, bytes: ByteArray = testImageBytes()): HttpResponse =
     uploadImage("cookbooks", cookbookId, bytes)
+
+/** A picture for one step, addressed by the step's own row rather than by the recipe's. */
+suspend fun HttpClient.uploadStepImage(stepId: Long, bytes: ByteArray = testImageBytes()): HttpResponse =
+    uploadImage("recipe-steps", stepId, bytes)
+
+suspend fun HttpClient.deleteStepImage(stepId: Long): HttpResponse =
+    this.delete("$IMAGE_URL/recipe-steps/$stepId")
 
 /**
  * Posts a picture to an upload URL a ticket was minted for, the way a client holding one does.

@@ -596,6 +596,14 @@ A join table needs listing *before* both tables it references. Soft-deleted rows
 sharper than it looks: `Recipe.delete()` is a soft delete, so a recipe's steps and their links
 outlive the recipe row and nothing reaches them by cascade.
 
+### A new service goes in `ApplicationTest`'s Koin module too
+
+`testModules` is a hand-kept copy of `appModules`, not a wrapper around it, so registering a
+service in one leaves it missing from the other. What the gap gives you is a 500 from the one
+endpoint that injects it — `NoDefinitionFoundException` — while everything else passes, so it
+surfaces only if a test actually calls that endpoint. A new endpoint with no test of its own
+will ship the hole instead.
+
 ## Frontend
 
 ```bash
