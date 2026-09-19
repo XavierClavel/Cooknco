@@ -10,7 +10,7 @@
 
 <script lang="ts" setup>
 import { computed } from 'vue'
-import { legalDocument } from '@/scripts/legal'
+import { legalCopy } from '@/scripts/legal'
 
-const doc = computed(() => legalDocument('privacy'))
+const doc = computed(() => legalCopy('privacy'))
 </script>
