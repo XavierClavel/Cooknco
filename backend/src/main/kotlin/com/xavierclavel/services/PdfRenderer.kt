@@ -30,9 +30,18 @@ interface PdfRenderer {
      * @param html the whole document, rendered as the page's `index.html`
      * @param assets files [html] refers to by relative name — a picture, a font. Nothing is
      *   fetched from anywhere else, so whatever the document needs has to be in here.
+     * @param footer drawn by the browser into the bottom margin of every page, or null for
+     *   none. Its own little document: it inherits nothing from [html] and has to carry its
+     *   own styles, and `<span class="pageNumber">` is how it says which page it is on.
+     *   A folio cannot come from the document itself — Chromium implements none of the CSS
+     *   page margin boxes — so this is the only way a printed book gets one.
      * @throws ServiceUnavailableException when no PDF could be produced
      */
-    suspend fun render(html: String, assets: Map<String, ByteArray> = emptyMap()): ByteArray
+    suspend fun render(
+        html: String,
+        assets: Map<String, ByteArray> = emptyMap(),
+        footer: String? = null,
+    ): ByteArray
 }
 
 /**
@@ -69,6 +78,9 @@ class GotenbergPdfRenderer(
     companion object {
         /** What Gotenberg treats as the page; every other part is a file next to it. */
         private const val INDEX = "index.html"
+
+        /** The name Gotenberg reads a page footer from. `header.html` is its opposite. */
+        private const val FOOTER = "footer.html"
         private const val ROUTE = "forms/chromium/convert/html"
     }
 
@@ -82,7 +94,11 @@ class GotenbergPdfRenderer(
      */
     private val slots = Semaphore(concurrency)
 
-    override suspend fun render(html: String, assets: Map<String, ByteArray>): ByteArray {
+    override suspend fun render(
+        html: String,
+        assets: Map<String, ByteArray>,
+        footer: String?,
+    ): ByteArray {
         val url = "${baseUrl.trimEnd('/')}/$ROUTE"
 
         // `acquire` releases its permit if the wait is cancelled, so a timeout leaks nothing.
@@ -93,17 +109,23 @@ class GotenbergPdfRenderer(
             }
 
         try {
-            return print(url, html, assets)
+            return print(url, html, assets, footer)
         } finally {
             slots.release()
         }
     }
 
-    private suspend fun print(url: String, html: String, assets: Map<String, ByteArray>): ByteArray {
+    private suspend fun print(
+        url: String,
+        html: String,
+        assets: Map<String, ByteArray>,
+        footer: String?,
+    ): ByteArray {
         val response = try {
             client.post(url) {
                 setBody(MultiPartFormDataContent(formData {
                     appendFile(INDEX, html.toByteArray())
+                    footer?.let { appendFile(FOOTER, it.toByteArray()) }
                     assets.forEach { (name, bytes) -> appendFile(name, bytes) }
                 }))
             }

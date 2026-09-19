@@ -2,11 +2,15 @@ package main.com.xavierclavel.controllertests
 
 import com.xavierclavel.utils.stepsOf
 import com.xavierclavel.ApplicationTest
+import com.xavierclavel.TestBuilderWrapper
 import com.xavierclavel.models.query.QPdfTemplate
 import io.ktor.client.request.delete
 import io.ktor.http.HttpStatusCode
 import main.com.xavierclavel.containers.GotenbergTestContainer
+import main.com.xavierclavel.utils.addCookbookRecipe
+import main.com.xavierclavel.utils.createCookbook
 import main.com.xavierclavel.utils.createRecipe
+import main.com.xavierclavel.utils.exportCookbook
 import main.com.xavierclavel.utils.exportRecipe
 import main.com.xavierclavel.utils.listPdfTemplates
 import main.com.xavierclavel.utils.listPdfTemplatesRaw
@@ -15,13 +19,16 @@ import main.com.xavierclavel.utils.previewPdfTemplate
 import main.com.xavierclavel.utils.previewPdfTemplateRaw
 import main.com.xavierclavel.utils.readPdfText
 import main.com.xavierclavel.utils.restorePdfTemplateRaw
+import main.com.xavierclavel.utils.sampleCookbookDto
 import main.com.xavierclavel.utils.savePdfTemplateRaw
 import org.junit.jupiter.api.Test
+import shared.dto.CookbookDTO
 import shared.dto.RecipeDTO
 import shared.enums.AmountUnit
 import shared.enums.Locale
 import shared.enums.PdfDocumentKind
 import shared.enums.PdfVariable
+import shared.infodto.CookbookInfo
 import shared.utils.URL.ADMIN_URL
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -292,6 +299,127 @@ class AdminPdfTemplateControllerTest : ApplicationTest() {
     @Test
     fun `a preview of a recipe that does not exist is a 404`() = runTestAsAdmin {
         client.previewPdfTemplateRaw(recipeKey, Locale.EN, layout("DRAFT"), 404L).apply {
+            assertEquals(HttpStatusCode.NotFound, status)
+        }
+    }
+
+    // =================================================================== cookbooks
+
+    /**
+     * The book is an operator's to lay out too, and it is the kind where that is least
+     * obvious: it has a second subject (a cookbook rather than a recipe), a second thing to
+     * preview against, and values no sheet has. Each of those is a place the tab could work
+     * for recipes and quietly not for books.
+     */
+    private val cookbookKey = PdfDocumentKind.COOKBOOK.key
+
+    /** Deliberately nothing like the packaged one, so a book printed from it is unmistakable. */
+    private fun bookLayout(marker: String) = """
+        <meta charset="utf-8">
+        <h1>$marker {{${PdfVariable.TITLE}}}</h1>
+        <p>{{${PdfVariable.RECIPE_COUNT}}} in the book</p>
+        {{#${PdfVariable.RECIPES}}}<article><h2>{{${PdfVariable.TITLE}}}</h2></article>{{/${PdfVariable.RECIPES}}}
+    """.trimIndent()
+
+    private suspend fun TestBuilderWrapper.cookbookOf(vararg titles: String): CookbookInfo {
+        val cookbook = client.createCookbook()
+        titles.forEach { client.addCookbookRecipe(cookbook.id, client.createRecipe(recipe.copy(title = it)).id) }
+        return cookbook
+    }
+
+    @Test
+    fun `the cookbook is one of the kinds the tab offers`() = runTestAsAdmin {
+        val kinds = client.listPdfTemplates()
+
+        val book = kinds.single { it.key == cookbookKey }
+        assertEquals(Locale.entries.size, book.locales.size)
+        assertTrue(book.locales.none { it.custom }, "a fresh install already has a saved book layout")
+        // the names a book layout may use, which a recipe sheet has no equivalent of
+        assertContains(book.variables, PdfVariable.RECIPES)
+        assertContains(book.variables, PdfVariable.RECIPE_COUNT)
+        assertContains(book.variables, PdfVariable.COVER)
+        assertContains(book.variables, PdfVariable.ANCHOR)
+        assertContains(book.variables, PdfVariable.PAGE)
+    }
+
+    @Test
+    fun `a saved cookbook layout is what the book is printed from`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Tarte tatin")
+        assertContains(readPdfText(client.exportCookbook(cookbook.id)).lowercase(), "contents")
+
+        client.savePdfTemplateRaw(cookbookKey, Locale.EN, bookLayout("MARKER")).apply {
+            assertEquals(HttpStatusCode.OK, status)
+        }
+
+        val text = readPdfText(client.exportCookbook(cookbook.id))
+        assertContains(text, "MARKER ${sampleCookbookDto.title}")
+        assertContains(text, "1 in the book")
+        assertContains(text, "Tarte tatin")
+        // the packaged layout's furniture is gone, so this really is the saved one
+        assertFalse(text.lowercase().contains("contents"))
+    }
+
+    /** Saving the book's layout must not reach the sheet's, and the other way round. */
+    @Test
+    fun `the book and the sheet are laid out separately`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Tarte tatin")
+        val created = client.createRecipe(recipe)
+
+        client.savePdfTemplateRaw(cookbookKey, Locale.EN, bookLayout("BOOK"))
+
+        assertContains(readPdfText(client.exportCookbook(cookbook.id)), "BOOK")
+        assertFalse(readPdfText(client.exportRecipe(created.id)).contains("BOOK"))
+        // and the sheet is still printed from the layout packaged with the app
+        assertContains(readPdfText(client.exportRecipe(created.id)).lowercase(), "ingredients")
+    }
+
+    @Test
+    fun `restoring the cookbook layout puts the packaged book back`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Tarte tatin")
+        client.savePdfTemplateRaw(cookbookKey, Locale.EN, bookLayout("MARKER"))
+        assertContains(readPdfText(client.exportCookbook(cookbook.id)), "MARKER")
+
+        client.restorePdfTemplateRaw(cookbookKey, Locale.EN).apply {
+            assertEquals(HttpStatusCode.OK, status)
+        }
+
+        val text = readPdfText(client.exportCookbook(cookbook.id))
+        assertFalse(text.contains("MARKER"))
+        assertContains(text.lowercase(), "contents")
+    }
+
+    /**
+     * The preview has to fill a book layout with a cookbook. It used to fill every layout
+     * with a recipe whatever the kind, which left a book previewing as a blank page — the
+     * one screen an operator writes these on.
+     */
+    @Test
+    fun `a cookbook preview prints the draft against a real cookbook`() = runTestAsAdmin {
+        val cookbook = cookbookOf("Tarte tatin", "Baba au rhum")
+
+        val pdf = client.previewPdfTemplate(cookbookKey, Locale.EN, bookLayout("DRAFT"), cookbook.id)
+
+        val text = readPdfText(pdf)
+        assertContains(text, "DRAFT ${sampleCookbookDto.title}")
+        assertContains(text, "2 in the book")
+        assertContains(text, "Tarte tatin")
+        assertEquals(0, QPdfTemplate().findCount())
+    }
+
+    @Test
+    fun `a cookbook preview with none named falls back to the newest one`() = runTestAsAdmin {
+        cookbookOf("Tarte tatin")
+        val newest = client.createCookbook(CookbookDTO(title = "Winter cakes"))
+
+        val pdf = client.previewPdfTemplate(cookbookKey, Locale.EN, bookLayout("DRAFT"))
+
+        assertContains(readPdfText(pdf), "DRAFT Winter cakes")
+        assertEquals("Winter cakes", newest.title)
+    }
+
+    @Test
+    fun `a cookbook preview of one that does not exist is a 404`() = runTestAsAdmin {
+        client.previewPdfTemplateRaw(cookbookKey, Locale.EN, bookLayout("DRAFT"), 404L).apply {
             assertEquals(HttpStatusCode.NotFound, status)
         }
     }

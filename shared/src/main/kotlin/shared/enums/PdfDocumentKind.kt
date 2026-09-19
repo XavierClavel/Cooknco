@@ -36,7 +36,8 @@ enum class PdfDocumentKind(val key: String, val variables: List<String>) {
      * Its variables come in two groups, and the list below is their union because that is
      * what the backoffice offers as chips. The first eight are the book's own; everything
      * after [PdfVariable.RECIPES] resolves only *inside* that section, where it names the
-     * recipe being printed. [PdfVariable.TITLE] and [PdfVariable.DESCRIPTION] therefore
+     * recipe being printed — including [PdfVariable.PAGE], which is what the contents lines
+     * are numbered from. [PdfVariable.TITLE] and [PdfVariable.DESCRIPTION] therefore
      * appear in both groups, and Mustache resolves the innermost — inside the section they
      * are the recipe's, outside they are the book's. The packaged layout shows both.
      */
@@ -53,6 +54,8 @@ enum class PdfDocumentKind(val key: String, val variables: List<String>) {
             PdfVariable.RECIPES,
 
             // Inside {{#recipes}} only, where they name that recipe.
+            PdfVariable.ANCHOR,
+            PdfVariable.PAGE,
             PdfVariable.AUTHOR,
             PdfVariable.PHOTO,
             PdfVariable.YIELD,
@@ -139,4 +142,25 @@ object PdfVariable {
      */
     const val RECIPES = "recipes"
     const val HAS_RECIPES = "hasRecipes"
+
+    /**
+     * A name for the recipe's own page, unique within the book.
+     *
+     * Load-bearing rather than decorative: it goes on the recipe as `id="{{anchor}}"` and in
+     * the contents as `href="#{{anchor}}"`, and Chromium turns a linked id into a PDF
+     * destination naming the page it landed on. That is what [PAGE] is read back from, so a
+     * contents that drops the link is a contents that loses its page numbers — see
+     * `ExportService.generateCookbookPDF`. It also makes the printed contents clickable.
+     */
+    const val ANCHOR = "anchor"
+
+    /**
+     * The page the recipe starts on, 1-based, for a contents line.
+     *
+     * Absent on the first of the two prints a book takes — it is not knowable until the book
+     * has been laid out — and absent again if the pages could not be read back, so a layout
+     * writes it as a section: `{{#page}}…{{page}}{{/page}}` shows a number only when there
+     * is one to show, and never a wrong one.
+     */
+    const val PAGE = "page"
 }

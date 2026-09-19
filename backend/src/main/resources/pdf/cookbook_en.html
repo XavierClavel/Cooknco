@@ -9,6 +9,23 @@
   the book's: Mustache answers with the innermost name it can find. {{siteName}} has only
   one meaning and so reads the same in both places.
 
+  Two things below are machinery as well as decoration, and are worth keeping:
+
+  * The contents rows are links — href="#{{anchor}}" — and each recipe carries the matching
+    id="{{anchor}}". That is what makes the contents clickable, and it is also the only way
+    the page numbers exist at all: the book is printed once to see where each recipe landed,
+    and Chromium records that only for an id something links to. Take the links out and the
+    numbers go with them.
+  * The number is written as a section — {{#page}}…{{/page}} — because it is absent on that
+    first print, and absent again if it could not be read back. A book never shows a page
+    number it cannot stand behind. (Sections in this comment are written closed on purpose:
+    the layout is parsed before it is printed, comments and all, so an unclosed one here
+    would break the export.)
+
+  The folio at the foot of every page is the <template id="page-footer"> at the end of this
+  file. It is a little document of its own: it inherits none of the styles above and has to
+  bring its own, and <span class="pageNumber"></span> is how it says which page it is on.
+
   Rendered by headless Chromium, so modern CSS is fair game. The one rule is that nothing
   may be fetched from the network — fonts and pictures have to be sent with this file, and
   a URL is silently dropped.
@@ -126,6 +143,25 @@
     padding: 1.4mm 0;
     border-bottom: 0.3mm dotted var(--rule);
     break-inside: avoid;
+  }
+
+  /* The row is a link so that the contents is clickable and, more to the point, so that
+     the page number can be known at all — see the note at the top of this file. */
+  .contents a {
+    display: flex;
+    align-items: baseline;
+    gap: 2mm;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Pushes the folio to the right edge whatever the title's length. */
+  .contents .fill { flex: 1; }
+
+  .contents .folio {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
   }
 
   /* ----------------------------------------------------------------- recipes */
@@ -292,12 +328,20 @@
 <section class="contents">
   <h2>Contents</h2>
   <ol>
-    {{#recipes}}<li>{{title}}</li>{{/recipes}}
+    {{#recipes}}
+    <li>
+      <a href="#{{anchor}}">
+        <span>{{title}}</span>
+        <span class="fill"></span>
+        {{#page}}<span class="folio">{{page}}</span>{{/page}}
+      </a>
+    </li>
+    {{/recipes}}
   </ol>
 </section>
 
 {{#recipes}}
-<article class="recipe">
+<article class="recipe" id="{{anchor}}">
   <h1 class="recipe-title">{{title}}</h1>
   <p class="byline">By {{author}}</p>
 
@@ -351,3 +395,25 @@
 </article>
 {{/recipes}}
 {{/hasRecipes}}
+
+<!--
+  The folio, drawn by the browser into the bottom margin of every page.
+
+  Not part of the document above: Chromium implements none of the CSS that would let a
+  page draw its own folio, so this is handed to it separately. It therefore inherits
+  nothing from the styles above and carries its own.
+-->
+<template id="page-footer">
+  <style>
+    body { margin: 0; }
+    .folio {
+      width: 100%;
+      padding: 0 15mm;
+      font-family: "Liberation Sans", sans-serif;
+      font-size: 8pt;
+      color: #8a8178;
+      text-align: center;
+    }
+  </style>
+  <div class="folio"><span class="pageNumber"></span></div>
+</template>
