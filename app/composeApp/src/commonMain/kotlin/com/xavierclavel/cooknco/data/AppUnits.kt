@@ -2,6 +2,8 @@ package com.xavierclavel.cooknco.data
 
 import com.xavierclavel.cooknco.network.dto.UnitInfo
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +35,13 @@ enum class AppUnitSystem(val code: String) {
  * until it has said. That value is cached in [DevicePreferences] so a relaunch draws the
  * right units immediately rather than in metric until the settings request comes back.
  *
+ * The cache is a head start, never the answer: [AccountSettings.sync] asks the account on
+ * every sign-in, and [AccountSettings.forget] drops it on the way out. A cache that was
+ * only ever refreshed by opening the settings screen kept drawing the ladder of whoever
+ * used the handset last, or the one this account read on before it was changed from the
+ * web — and reading it back on the settings screen repaired it, so the one screen that
+ * could show the fault was the one screen that could not.
+ *
  * [catalog] is what [com.xavierclavel.cooknco.ui.recipe.convertToPreferred] converts with,
  * seeded with [UnitRepository.DEFAULT_UNITS] so it is never empty and never blocks a screen.
  * Holding it here rather than fetching it per screen keeps one copy in front of the whole
@@ -47,21 +56,51 @@ object AppUnits {
     val catalog: StateFlow<List<UnitInfo>> = _catalog.asStateFlow()
 
     /**
+     * Whether the ladder in front of us came from the account rather than from the cache.
+     *
+     * [restore] and [sync] race by nature — one reads a disk, the other a network — and the
+     * account's answer is the one that must survive whichever order they land in.
+     */
+    private var resolved = false
+
+    /**
+     * Writes the remembered ladder back to disk, on a scope that outlives every screen.
+     *
+     * A ladder picked in settings used to be persisted on the settings screen's own scope,
+     * so leaving the screen in the same breath could cancel the write: the app read on the
+     * new ladder until it was relaunched, and on the old one for ever after.
+     */
+    private val persistence = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
      * Restores the ladder the last session resolved, before anything asks the network.
      * Called once, from the app's entry point.
+     *
+     * Never over a ladder the account has already given us: on a warm start the settings
+     * request can answer before the disk does.
      */
-    fun restore(preferences: DevicePreferences, scope: CoroutineScope) {
-        scope.launch {
-            preferences.unitSystem.first()?.let { set(AppUnitSystem.of(it)) }
-        }
+    suspend fun restore(preferences: DevicePreferences) {
+        val cached = preferences.unitSystem.first() ?: return
+        if (!resolved) _system.value = AppUnitSystem.of(cached)
     }
 
     /** Adopts a ladder and remembers it. Called when settings load, and when one is picked. */
-    fun set(system: AppUnitSystem, preferences: DevicePreferences? = null, scope: CoroutineScope? = null) {
+    fun set(system: AppUnitSystem, preferences: DevicePreferences? = null) {
+        resolved = true
         _system.value = system
-        if (preferences != null && scope != null) {
-            scope.launch { preferences.setUnitSystem(system.code) }
+        if (preferences != null) {
+            persistence.launch { preferences.setUnitSystem(system.code) }
         }
+    }
+
+    /**
+     * Drops what the account that just signed out read on. See [AccountSettings.forget] —
+     * the next account is asked for its own, and reads metric until it answers rather than
+     * on the ladder of the person who was holding the phone before.
+     */
+    fun forget() {
+        resolved = false
+        _system.value = AppUnitSystem.METRIC
     }
 
     /**
@@ -70,7 +109,7 @@ object AppUnits {
      * Silent on failure, because [UnitRepository] already falls back to the packaged copy:
      * a unit the app does not know about yet is a unit nothing in an existing recipe uses.
      */
-    fun refresh(repository: UnitRepository, scope: CoroutineScope) {
-        scope.launch { _catalog.value = repository.getUnits() }
+    suspend fun refresh(repository: UnitRepository) {
+        _catalog.value = repository.getUnits()
     }
 }

@@ -74,6 +74,34 @@ class AuthRepositoryLogoutTest {
         assertNull(tokens.tokenFlow.first(), "the device stays signed in until the token goes")
     }
 
+    /**
+     * The account's language and units are cached on the handset so a relaunch draws in
+     * them straight away — which is exactly why they cannot outlive the account. Left
+     * behind, they were what the *next* account signed in and was shown, with nothing on
+     * any screen saying so and nothing but opening settings putting it right.
+     */
+    @Test
+    fun logout_forgets_what_the_account_read_in() = runTest {
+        val tokens = tokenStore()
+        tokens.saveToken(TOKEN)
+        val preferences = devicePreferences()
+        preferences.setUnitSystem(AppUnitSystem.IMPERIAL.code)
+        preferences.setLanguage(AppLocale.EN.code)
+        preferences.setPushEnabled(false)
+        val repository = repositoryOver(tokens) { respond("", HttpStatusCode.OK) }
+
+        assertTrue(repository.logout().isSuccess)
+
+        assertNull(preferences.unitSystem.first(), "the ladder belongs to the account, not the phone")
+        assertNull(preferences.language.first(), "and so does the language")
+        assertEquals(AppUnitSystem.METRIC, AppUnits.system.value, "and neither survives in memory")
+        assertEquals(
+            false,
+            preferences.pushEnabled.first(),
+            "whether this handset buzzes is its own business, and stays",
+        )
+    }
+
     @Test
     fun logout_without_a_session_calls_nothing() = runTest {
         val tokens = tokenStore()
@@ -85,7 +113,12 @@ class AuthRepositoryLogoutTest {
         assertNull(tokens.tokenFlow.first())
     }
 
-    private fun tokenStore() = TokenDataStore(createPreferencesDataStore(storeFile.toString()))
+    /** One store per test, read through both faces of it. DataStore refuses a second. */
+    private val store by lazy { createPreferencesDataStore(storeFile.toString()) }
+
+    private fun tokenStore() = TokenDataStore(store)
+
+    private fun devicePreferences() = DevicePreferences(store)
 
     private fun repositoryOver(tokens: TokenDataStore, handler: MockRequestHandler): AuthRepository {
         engine = MockEngine(handler)
@@ -94,6 +127,7 @@ class AuthRepositoryLogoutTest {
             authApi = AuthApi(client),
             tokenDataStore = tokens,
             pushRepository = PushRepository(NotificationApi(client), tokens),
+            devicePreferences = devicePreferences(),
         )
     }
 }

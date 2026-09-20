@@ -91,7 +91,7 @@ object AppGraph {
      */
     val pushRepository by lazy { PushRepository(notificationApi, tokenDataStore) }
 
-    val authRepository by lazy { AuthRepository(authApi, tokenDataStore, pushRepository) }
+    val authRepository by lazy { AuthRepository(authApi, tokenDataStore, pushRepository, devicePreferences) }
     val userRepository by lazy { UserRepository(userApi, tokenDataStore) }
     val recipeRepository by lazy { RecipeRepository(recipeApi, tokenDataStore) }
     val cookbookRepository by lazy { CookbookRepository(cookbookApi, tokenDataStore) }

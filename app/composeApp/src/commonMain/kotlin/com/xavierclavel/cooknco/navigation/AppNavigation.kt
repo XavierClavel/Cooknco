@@ -17,6 +17,7 @@ import com.xavierclavel.cooknco.PushNotifications
 import com.xavierclavel.cooknco.di.AppGraph
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.merge
+import com.xavierclavel.cooknco.data.AccountSettings
 import com.xavierclavel.cooknco.ui.auth.AuthState
 import com.xavierclavel.cooknco.ui.auth.AuthViewModel
 import com.xavierclavel.cooknco.platform.EnsureNotificationPermission
@@ -476,15 +477,34 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
     EnsureNotificationPermission(request = authState is AuthState.Authenticated)
 
     /**
+     * Keyed on *whether* we are signed in rather than on [authState] itself, by the three
+     * effects below. The state carries the user, so re-reading the profile would otherwise
+     * restart each of them — which would ask the account its settings again, cancel the
+     * retries `registerCurrentDevice` needs on a fresh install, and navigate a replayed
+     * route a second time.
+     */
+    val signedIn = authState is AuthState.Authenticated
+
+    /**
+     * Asks the account what it reads in — its language and its units — as soon as there is
+     * a session to ask under.
+     *
+     * Here rather than on the settings screen, which is where it used to be and nowhere
+     * else. Both values are cached on the handset so a launch draws in them straight away,
+     * and a cache nothing but that screen refreshed went on drawing a ladder the account
+     * had since changed from the web, or the one the previous account on this phone read
+     * on. Opening settings repaired it on the spot, so the fault could not be seen from the
+     * one screen that showed the value. See [AccountSettings].
+     */
+    LaunchedEffect(signedIn) {
+        if (signedIn) AccountSettings.sync(AppGraph.userRepository, AppGraph.devicePreferences)
+    }
+
+    /**
      * Registers this device once there is an account to register it against, and again on
      * every launch: a token can be rotated while the app is not running, in which case
      * `onNewToken` fired with no session to send it under.
-     *
-     * Keyed on *whether* we are signed in rather than on [authState] itself. The state
-     * carries the user, so re-reading the profile would otherwise restart this effect and
-     * cancel the retries `registerCurrentDevice` needs on a fresh install.
      */
-    val signedIn = authState is AuthState.Authenticated
     LaunchedEffect(signedIn) {
         // Skipped when push is switched off for this handset (settings): registration runs
         // on every launch, so without this it would undo the switch the next morning.
@@ -502,9 +522,6 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
      *
      * Gated on being signed in, and replayed by both bridges, so a tap that cold-starts the
      * app waits for the session to be restored rather than bouncing off the login screen.
-     * Keyed on *whether* we are signed in rather than on [authState], for the same reason the
-     * registration above is: the state carries the user, so re-reading the profile would
-     * restart this effect, and a replayed route would then be navigated to a second time.
      */
     LaunchedEffect(signedIn) {
         if (!signedIn) return@LaunchedEffect
