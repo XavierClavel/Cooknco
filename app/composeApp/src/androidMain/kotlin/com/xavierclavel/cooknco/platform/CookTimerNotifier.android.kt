@@ -175,16 +175,18 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
             if (state.running) s.pause else s.resume,
             broadcast(context, ACTION_COOK_TIMER_TOGGLE, REQUEST_TOGGLE),
         )
-        // The button a kitchen timer is actually reached for. A pan is not done when the
-        // timer says so, it is done when it looks done — and the answer to that is another
-        // minute far more often than it is stopping the timer.
-        .addAction(0, s.addAMinute, broadcast(context, ACTION_COOK_TIMER_ADD_MINUTE, REQUEST_ADD_MINUTE))
 
-    // Stopping is what somebody who has paused is deciding about; a running timer is left
-    // with the two buttons that are about cooking, in the order Android draws them. Dropping
-    // one that is still counting is a thing to mean, and meaning it is a tap on Pause away —
-    // which is also the state the card on the screen offers it in.
-    if (!state.running) {
+    // Two buttons in either state, and the second is whatever the first one leaves to decide.
+    //
+    // Running, that is another minute: a pan is not done when the timer says so, it is done
+    // when it looks done, and the answer to that is a minute more far more often than it is
+    // stopping the timer. Paused, the timer is already not counting — a minute added to it
+    // would change a number nobody is watching — and what the cook stopped to decide is
+    // whether to carry on or drop it. So Stop appears exactly there, one tap from anywhere,
+    // and never under the hand of somebody whose timer is still running.
+    if (state.running) {
+        builder.addAction(0, s.addAMinute, broadcast(context, ACTION_COOK_TIMER_ADD_MINUTE, REQUEST_ADD_MINUTE))
+    } else {
         builder.addAction(0, s.stopTimer, broadcast(context, ACTION_COOK_TIMER_STOP, REQUEST_STOP))
     }
 
