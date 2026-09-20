@@ -8,6 +8,9 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StrikethroughSpan
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -122,9 +125,9 @@ private const val REQUEST_STOP = 8_213
 private const val REQUEST_TIMER = 8_214
 
 /**
- * One per row, because a `PendingIntent` is identified by everything *except* its extras: six
- * ticks sharing a request code would be six handles on the same intent, and every box would
- * toggle whichever one was built last.
+ * One per row, because a `PendingIntent` is identified by everything *except* its extras: rows
+ * sharing a request code would be so many handles on one intent, and every box would toggle
+ * whichever of them was built last.
  */
 private const val REQUEST_TICK_BASE = 8_220
 
@@ -304,6 +307,12 @@ private fun drawnControl(
     views.setOnClickPendingIntent(id, intent)
 }
 
+/** One line of the checklist, crossed off. See [ingredientRow]. */
+private fun struckThrough(line: String): CharSequence =
+    SpannableString(line).apply {
+        setSpan(StrikethroughSpan(), 0, length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+    }
+
 /**
  * The accent this notification draws itself in: the handset's own, read from the palette
  * Android builds for every app on the device.
@@ -370,9 +379,15 @@ private fun ingredientRow(
         if (checked) R.drawable.cooknco_tick_box_checked else R.drawable.cooknco_tick_box,
     )
     accent?.let { row.setInt(R.id.cooknco_ingredient_box, "setColorFilter", it) }
-    row.setTextViewText(R.id.cooknco_ingredient_label, line)
-    // Dimmed once it is in, which is what the strikethrough does on the screen. Left alone
-    // otherwise, so an unticked line keeps the colour the shade chose for its own theme.
+    // Struck through and dimmed once it is in, the way the cook mode screen shows it: the two
+    // lists are the same checklist, and a line crossed off in one has to look crossed off in
+    // the other. Unticked is left alone, so it keeps the colour the shade chose for its theme.
+    //
+    // A span rather than `setPaintFlags`. RemoteViews calls a setter by reflection and refuses
+    // any that is not annotated `@RemotableViewMethod`, which that one is not — it would throw
+    // where it is applied, in the shade, and take the whole notification down with it. Text is
+    // parcelled across with its spans intact, so this crosses the process boundary as drawn.
+    row.setTextViewText(R.id.cooknco_ingredient_label, if (checked) struckThrough(line) else line)
     if (checked) {
         row.setTextColor(
             R.id.cooknco_ingredient_label,
