@@ -2,6 +2,8 @@ package com.xavierclavel.cooknco.platform
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.Notification
+import android.app.Notification.Metric.TimeDifference
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -13,24 +15,35 @@ import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.data.CookTimerState
 import com.xavierclavel.cooknco.data.formatCookTimer
+import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.stringsFor
+import java.time.Duration
+import java.time.Instant
 
 /**
  * The cook timer, as Android shows it: one ongoing notification that counts down on its own,
  * and one alarm that rings at the end.
  *
  * **Nothing here keeps the app running, and nothing needs to.** The countdown in the shade is
- * drawn by the system from `setWhen` + a counting-down chronometer, so it stays right with
- * this process frozen or killed; the ring is an `AlarmManager` alarm, which wakes the device
- * and starts the app back up if it has to. That is what Android's own timer does, and it is
- * why this is not a foreground service: a service would hold a process open for half an hour
- * to decrement a number that the clock already knows.
+ * drawn by the system from a deadline, so it stays right with this process frozen or killed;
+ * the ring is an `AlarmManager` alarm, which wakes the device and starts the app back up if it
+ * has to. That is what Android's own timer does, and it is why this is not a foreground
+ * service: a service would hold a process open for half an hour to decrement a number that the
+ * clock already knows.
+ *
+ * The countdown is written two ways, because the platform learned to draw one properly.
+ * [metricNotification] is Android 17's `MetricStyle`, where the time is the notification —
+ * large, and the same number on the lock screen, the always-on display and the status bar chip.
+ * [countdownNotification] is every version before it, where the same deadline is a chronometer
+ * in the timestamp slot. Both are the standard template: a custom layout could imitate the
+ * first anywhere, and would forfeit the promotion that all of it hangs on.
  *
  * Two things it depends on live in `:androidApp`, because a manifest entry cannot come from a
  * KMP library — the receiver that the actions and the alarm are addressed to, and the
@@ -128,6 +141,96 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
 
     val s = stringsFor(AppLanguage.current.value)
     ensureChannels(context)
+
+    postNotification(
+        context,
+        RUNNING_NOTIFICATION_ID,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) metricNotification(context, state, s)
+        else countdownNotification(context, state, s),
+    )
+}
+
+/**
+ * The countdown as Android 17 draws it: one metric, which is the whole point of the template.
+ *
+ * `Notification.MetricStyle` is what a Live Update timer is made of. The value it is given is
+ * *the* thing the notification shows — large, beside the label rather than under a title, and
+ * the same number the status bar chip and the lock screen draw — which is the treatment the
+ * platform clock's timer has and which no arrangement of the standard template reaches.
+ *
+ * It is worth a second way of building the same notification because the alternative is worse.
+ * A big countdown drawn by hand would be a custom `RemoteViews`, and a notification with one of
+ * those is not eligible for promotion at all — so the layout that imitated this would cost the
+ * chip, the lock screen and the always-on display that come with it.
+ *
+ * Platform rather than `NotificationCompat` because the style is: there is no compat wrapper
+ * for it, and `NotificationCompat.Builder` takes only its own styles. Everything below
+ * therefore mirrors [countdownNotification] by hand, and the two have to be changed together.
+ *
+ * The timer is handed over as a *deadline* here too — `forTimer` takes the instant it reaches
+ * zero, and the paused form takes what is left — so the platform counts it down with this
+ * process frozen, exactly as the chronometer did.
+ */
+@RequiresApi(Build.VERSION_CODES.CINNAMON_BUN)
+private fun metricNotification(context: Context, state: CookTimerState, s: Strings): Notification {
+    val step = state.stepText.ifBlank { s.timerLabel }
+    // A deadline while it runs and a remainder while it does not — the same two halves the
+    // state itself is kept in, handed over as they are. The platform counts it down from
+    // there, so this process is asked for nothing between one press and the next.
+    val remaining = if (state.running) {
+        TimeDifference.forTimer(
+            Instant.ofEpochMilli(state.endsAtEpochMillis),
+            TimeDifference.FORMAT_CHRONOMETER,
+        )
+    } else {
+        TimeDifference.forPausedTimer(
+            Duration.ofSeconds(state.pausedRemainingSeconds.coerceAtLeast(0).toLong()),
+            TimeDifference.FORMAT_CHRONOMETER,
+        )
+    }
+
+    val builder = Notification.Builder(context, RUNNING_CHANNEL_ID)
+        .setSmallIcon(timerIcon(context))
+        .setContentTitle(state.recipeTitle)
+        .setContentText(step)
+        .setStyle(
+            Notification.MetricStyle()
+                // The step, as the metric's label: a number that large needs saying what it is
+                // counting, and what it is counting is the thing the cook is meant to be doing.
+                .setMetrics(listOf(Notification.Metric(remaining, if (state.running) step else s.timerPaused)))
+                // Which metric the status bar chip carries. There is one, so it is that one —
+                // and naming it is what replaces the chronometer the chip used to read.
+                .setCriticalMetric(0)
+        )
+        .setCategory(Notification.CATEGORY_STOPWATCH)
+        // Nothing sets a chronometer or a `when` on this path. The metric is the countdown, in
+        // the shade and in the chip alike, and a second copy of it in the timestamp slot would
+        // be the same number twice.
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
+        .setRequestPromotedOngoing(true)
+        .setContentIntent(openCookMode(context, state.recipeId, REQUEST_OPEN))
+        .addAction(0, if (state.running) s.pause else s.resume, broadcast(context, ACTION_COOK_TIMER_TOGGLE, REQUEST_TOGGLE))
+
+    // See [countdownNotification] for why these two are the pair.
+    if (state.running) {
+        builder.addAction(0, s.addAMinute, broadcast(context, ACTION_COOK_TIMER_ADD_MINUTE, REQUEST_ADD_MINUTE))
+    } else {
+        builder.addAction(0, s.stopTimer, broadcast(context, ACTION_COOK_TIMER_STOP, REQUEST_STOP))
+    }
+
+    return builder.build()
+}
+
+/**
+ * The same timer on every Android before 17, where the countdown is the standard template's
+ * chronometer: small, in the timestamp slot, and drawn by the system from the deadline.
+ *
+ * Still eligible for Android 16's chip — that is what the notes below are about — which is why
+ * this is the fallback rather than a custom layout that would have looked closer to
+ * [metricNotification] and lost the chip doing it.
+ */
+private fun countdownNotification(context: Context, state: CookTimerState, s: Strings): Notification {
     val step = state.stepText.ifBlank { s.timerLabel }
     val builder = NotificationCompat.Builder(context, RUNNING_CHANNEL_ID)
         .setSmallIcon(timerIcon(context))
@@ -190,7 +293,7 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
         builder.addAction(0, s.stopTimer, broadcast(context, ACTION_COOK_TIMER_STOP, REQUEST_STOP))
     }
 
-    postNotification(context, RUNNING_NOTIFICATION_ID, builder.build())
+    return builder.build()
 }
 
 actual fun onCookTimerFinished(state: CookTimerState) {
