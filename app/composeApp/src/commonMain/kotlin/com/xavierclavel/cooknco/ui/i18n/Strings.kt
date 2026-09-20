@@ -422,6 +422,8 @@ interface Strings {
     val pause: String
     val resume: String
     val stopTimer: String
+    /** The button a pan that is not quite done is answered with. */
+    val addAMinute: String
     val timerPaused: String
     val timerTimeIsUp: String
     val timerRingOnTimeTitle: String

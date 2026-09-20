@@ -488,6 +488,7 @@ object FrStrings : Strings {
     override val pause = "Pause"
     override val resume = "Reprendre"
     override val stopTimer = "Arrêter"
+    override val addAMinute = "+1 min"
     override val timerPaused = "En pause"
     override val timerTimeIsUp = "C'est prêt !"
     override val timerRingOnTimeTitle = "Sonner à l'heure"

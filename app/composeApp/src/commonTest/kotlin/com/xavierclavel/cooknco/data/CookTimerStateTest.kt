@@ -55,6 +55,45 @@ class CookTimerStateTest {
     }
 
     @Test
+    fun `another minute moves the deadline and the length it would run again for`() {
+        val timer = running(endsAt = 100_000L + 1_800_000L)
+        val longer = timer.withExtraMinute(nowMillis = 100_000L)
+        assertEquals(1860, longer.remainingSecondsAt(100_000L))
+        // The length grows with it, so running this timer again runs it for what it became.
+        assertEquals(1860, longer.totalSeconds)
+        assertTrue(longer.running)
+    }
+
+    @Test
+    fun `a minute given to a deadline already gone is a minute from now`() {
+        // An ordinary state, not a broken one: without the exact-alarm permission the alarm
+        // is approximate, and a frozen process catches up when it thaws. Added to the
+        // deadline itself, a minute here would already be nine minutes over.
+        val overdue = running(endsAt = 100_000L).withExtraMinute(nowMillis = 700_000L)
+        assertEquals(60, overdue.remainingSecondsAt(700_000L))
+    }
+
+    @Test
+    fun `a paused timer is given its minute without being started`() {
+        val paused = running(endsAt = 0L).copy(running = false, pausedRemainingSeconds = 42)
+        val longer = paused.withExtraMinute(nowMillis = 9_999L)
+        assertFalse(longer.running)
+        assertEquals(102, longer.remainingSecondsAt(9_999L))
+    }
+
+    @Test
+    fun `a rung timer runs again for the minute it was given`() {
+        // What a cook who has just looked in the oven means by another minute.
+        val rung = running(endsAt = 0L).copy(running = false, pausedRemainingSeconds = 0)
+        assertTrue(rung.finished)
+        val again = rung.withExtraMinute(nowMillis = 500_000L)
+        assertTrue(again.running)
+        assertFalse(again.finished)
+        assertEquals(60, again.remainingSecondsAt(500_000L))
+        assertEquals(60, again.totalSeconds)
+    }
+
+    @Test
     fun `finished is stopped with nothing left`() {
         assertFalse(running(endsAt = 1_000L).finished)
         assertTrue(running(endsAt = 0L).copy(running = false, pausedRemainingSeconds = 0).finished)

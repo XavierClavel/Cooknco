@@ -64,6 +64,41 @@ data class CookTimerState(
     fun remainingSecondsAt(nowMillis: Long): Int =
         if (running) ((endsAtEpochMillis - nowMillis + 999) / 1000).coerceAtLeast(0L).toInt()
         else pausedRemainingSeconds.coerceAtLeast(0)
+
+    /**
+     * A minute more — what every kitchen timer has a button for, because a pan is not done
+     * when the timer says so, it is done when it looks done.
+     *
+     * [totalSeconds] grows with it, so a timer that has been given two more minutes offers
+     * *that* when it is run again rather than the length it was first set to.
+     *
+     * The deadline is moved from now rather than from itself when it has already passed. A
+     * timer whose deadline is behind it but which has not rung yet is an ordinary state —
+     * the alarm is approximate without the exact-alarm permission, and a frozen process
+     * catches up when it thaws — and a minute added to a deadline ten minutes gone would be
+     * nine minutes already over.
+     */
+    fun withExtraMinute(nowMillis: Long): CookTimerState = when {
+        // A rung timer runs again for the minute it was given, rather than adding one to
+        // nothing. It is what a cook who has just been told the oven is done and looked in
+        // means by another minute.
+        finished -> copy(
+            running = true,
+            totalSeconds = 60,
+            endsAtEpochMillis = nowMillis + 60_000L,
+            pausedRemainingSeconds = 60,
+        )
+
+        running -> copy(
+            totalSeconds = totalSeconds + 60,
+            endsAtEpochMillis = maxOf(endsAtEpochMillis, nowMillis) + 60_000L,
+        )
+
+        else -> copy(
+            totalSeconds = totalSeconds + 60,
+            pausedRemainingSeconds = pausedRemainingSeconds + 60,
+        )
+    }
 }
 
 /** `mm:ss`, or `h:mm:ss` once there is an hour to show. Used on screen and in the notification. */
@@ -199,6 +234,18 @@ class CookTimer(
                 )
             )
         }
+    }
+
+    /**
+     * Gives the timer another minute. See [CookTimerState.withExtraMinute].
+     *
+     * A running timer keeps running with a later deadline, so nothing is paused and nothing
+     * has to be resumed — which is the whole point of the button being reachable without
+     * looking: hands are busy and the pan needs one more minute.
+     */
+    fun addMinute(): Job = mutate {
+        val current = _state.value ?: return@mutate
+        apply(current.withExtraMinute(now()))
     }
 
     /** Drops the timer entirely: the notification goes, the alarm is cancelled. */

@@ -89,10 +89,11 @@ val gitCommitCount: Int = runCatching {
 
 android {
     namespace = "com.xavierclavel.cooknco"
+    // 37 for Notification.MetricStyle, which is what draws the cook timer's countdown as a
+    // Live Update — see CookTimerNotifier.android.kt. targetSdk stays at 36: nothing about
+    // this asks for Android 17's behaviour changes, only for one of its APIs.
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
