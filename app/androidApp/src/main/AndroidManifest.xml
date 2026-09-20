@@ -115,6 +115,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.xavierclavel.cooknco.COOK_TIMER_TOGGLE" />
+                <action android:name="com.xavierclavel.cooknco.COOK_TIMER_ADD_MINUTE" />
                 <action android:name="com.xavierclavel.cooknco.COOK_TIMER_STOP" />
                 <action android:name="com.xavierclavel.cooknco.COOK_TIMER_FIRE" />
             </intent-filter>

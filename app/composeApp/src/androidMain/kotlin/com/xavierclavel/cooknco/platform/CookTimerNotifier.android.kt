@@ -49,6 +49,9 @@ const val NOTIFICATION_LINK_EXTRA = "cooknco.notification.link"
 const val ACTION_COOK_TIMER_TOGGLE = "com.xavierclavel.cooknco.COOK_TIMER_TOGGLE"
 const val ACTION_COOK_TIMER_STOP = "com.xavierclavel.cooknco.COOK_TIMER_STOP"
 
+/** Another minute on the timer. See [CookTimerState.withExtraMinute]. */
+const val ACTION_COOK_TIMER_ADD_MINUTE = "com.xavierclavel.cooknco.COOK_TIMER_ADD_MINUTE"
+
 /** What the alarm sends when the deadline arrives. */
 const val ACTION_COOK_TIMER_FIRE = "com.xavierclavel.cooknco.COOK_TIMER_FIRE"
 
@@ -83,6 +86,7 @@ private const val REQUEST_OPEN = 8_110
 private const val REQUEST_TOGGLE = 8_111
 private const val REQUEST_STOP = 8_112
 private const val REQUEST_FIRE = 8_113
+private const val REQUEST_ADD_MINUTE = 8_114
 
 /**
  * Captured at startup — see `AppGraph.initFor`.
@@ -125,7 +129,7 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
     val s = stringsFor(AppLanguage.current.value)
     ensureChannels(context)
     val step = state.stepText.ifBlank { s.timerLabel }
-    val notification = NotificationCompat.Builder(context, RUNNING_CHANNEL_ID)
+    val builder = NotificationCompat.Builder(context, RUNNING_CHANNEL_ID)
         .setSmallIcon(timerIcon(context))
         .setContentTitle(state.recipeTitle)
         // The step, not a number naming it: the whole reason to glance at this rather than
@@ -171,10 +175,20 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
             if (state.running) s.pause else s.resume,
             broadcast(context, ACTION_COOK_TIMER_TOGGLE, REQUEST_TOGGLE),
         )
-        .addAction(0, s.stopTimer, broadcast(context, ACTION_COOK_TIMER_STOP, REQUEST_STOP))
-        .build()
+        // The button a kitchen timer is actually reached for. A pan is not done when the
+        // timer says so, it is done when it looks done — and the answer to that is another
+        // minute far more often than it is stopping the timer.
+        .addAction(0, s.addAMinute, broadcast(context, ACTION_COOK_TIMER_ADD_MINUTE, REQUEST_ADD_MINUTE))
 
-    postNotification(context, RUNNING_NOTIFICATION_ID, notification)
+    // Stopping is what somebody who has paused is deciding about; a running timer is left
+    // with the two buttons that are about cooking, in the order Android draws them. Dropping
+    // one that is still counting is a thing to mean, and meaning it is a tap on Pause away —
+    // which is also the state the card on the screen offers it in.
+    if (!state.running) {
+        builder.addAction(0, s.stopTimer, broadcast(context, ACTION_COOK_TIMER_STOP, REQUEST_STOP))
+    }
+
+    postNotification(context, RUNNING_NOTIFICATION_ID, builder.build())
 }
 
 actual fun onCookTimerFinished(state: CookTimerState) {

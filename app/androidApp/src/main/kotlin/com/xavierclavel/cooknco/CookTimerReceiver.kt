@@ -7,6 +7,7 @@ import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.data.AppLocale
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.di.initFor
+import com.xavierclavel.cooknco.platform.ACTION_COOK_TIMER_ADD_MINUTE
 import com.xavierclavel.cooknco.platform.ACTION_COOK_TIMER_FIRE
 import com.xavierclavel.cooknco.platform.ACTION_COOK_TIMER_STOP
 import com.xavierclavel.cooknco.platform.ACTION_COOK_TIMER_TOGGLE
@@ -53,6 +54,7 @@ class CookTimerReceiver : BroadcastReceiver() {
                 val timer = AppGraph.cookTimer
                 when (action) {
                     ACTION_COOK_TIMER_TOGGLE -> timer.toggle()
+                    ACTION_COOK_TIMER_ADD_MINUTE -> timer.addMinute()
                     ACTION_COOK_TIMER_STOP -> timer.stop()
                     else -> timer.finish()
                 }.join()
@@ -63,6 +65,11 @@ class CookTimerReceiver : BroadcastReceiver() {
     }
 
     private companion object {
-        val handled = setOf(ACTION_COOK_TIMER_TOGGLE, ACTION_COOK_TIMER_STOP, ACTION_COOK_TIMER_FIRE)
+        val handled = setOf(
+            ACTION_COOK_TIMER_TOGGLE,
+            ACTION_COOK_TIMER_ADD_MINUTE,
+            ACTION_COOK_TIMER_STOP,
+            ACTION_COOK_TIMER_FIRE,
+        )
     }
 }

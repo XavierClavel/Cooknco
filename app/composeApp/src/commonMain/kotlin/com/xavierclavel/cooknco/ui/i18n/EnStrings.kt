@@ -480,6 +480,7 @@ object EnStrings : Strings {
     override val pause = "Pause"
     override val resume = "Resume"
     override val stopTimer = "Stop"
+    override val addAMinute = "+1 min"
     override val timerPaused = "Paused"
     override val timerTimeIsUp = "Time's up"
     override val timerRingOnTimeTitle = "Let the timer ring on time"
