@@ -39,6 +39,10 @@ fun App() {
     // Read back here, before cook mode is reachable, so the screen opens on the real one
     // rather than on its step's default. See [CookTimer].
     LaunchedEffect(Unit) { AppGraph.cookTimer.restore() }
+    // And the recipe it belongs to. A cook who has been pressing Next on the notification for
+    // the last half hour is several steps in, and opening cook mode — which a tap on that
+    // notification does — has to land there rather than back at step one. See [CookSession].
+    LaunchedEffect(Unit) { AppGraph.cookSession.restore() }
 
     CompositionLocalProvider(LocalStrings provides stringsFor(language)) {
     CookncoTheme {

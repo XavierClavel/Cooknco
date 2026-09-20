@@ -120,6 +120,22 @@
             </intent-filter>
         </receiver>
 
+        <!-- The buttons that walk a recipe from the shade — see CookSessionReceiver and
+             CookSessionNotifier.android.kt. Separate from the timer's receiver above
+             because they are separate features: a session has no alarm and no ring, and a
+             timer outlives the session that started it. -->
+        <receiver
+            android:name=".CookSessionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.xavierclavel.cooknco.COOK_SESSION_NEXT" />
+                <action android:name="com.xavierclavel.cooknco.COOK_SESSION_PREVIOUS" />
+                <action android:name="com.xavierclavel.cooknco.COOK_SESSION_TIMER" />
+                <action android:name="com.xavierclavel.cooknco.COOK_SESSION_TICK" />
+                <action android:name="com.xavierclavel.cooknco.COOK_SESSION_STOP" />
+            </intent-filter>
+        </receiver>
+
         <!-- Rings until stopped. Addressed by action rather than by name: the intents are
              built in :composeApp, which resolves this component at run time because a
              service intent must be explicit. -->

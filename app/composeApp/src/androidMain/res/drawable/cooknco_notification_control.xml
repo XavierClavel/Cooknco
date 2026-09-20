@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The outline that makes a control in the cook session's notification look like one.
+
+    A notification drawing its own buttons has to say so: the system's action chips carry a
+    background of their own, and a bare mark in a custom layout reads as decoration rather
+    than as something to press. Hollow rather than filled, so the row does not shout louder
+    than the step above it.
+
+    ?android:attr/colorAccent is the handset's accent, resolved against the shade's theme when
+    this is inflated there — so these are the colour that phone's notifications are, including
+    the progress bar at the top of this one.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="14dp" />
+    <stroke
+        android:width="2dp"
+        android:color="?android:attr/colorAccent" />
+    <solid android:color="#00000000" />
+</shape>

@@ -455,7 +455,13 @@ object EnStrings : Strings {
     override val nothingCookedWithThis = "Nothing has been cooked with this yet. Add it to a recipe and it shows up here."
 
     override fun stepOf(step: Int, total: Int) = "STEP $step OF $total"
+    override fun stepProgress(step: Int, total: Int) = "Step $step of $total"
     override val nextStep = "Next step"
+    override val previousStep = "Previous step"
+    override val startTimer = "Start the timer"
+    override fun andMoreIngredients(count: Int) = "+$count more"
+    override fun ingredientTicked(line: String, ticked: Boolean) =
+        if (ticked) "$line, ticked off" else "$line, not ticked off"
     override val finish = "Finish"
     override fun nextIs(step: String) = "Next: $step"
     override val timerLabel = "Timer"
@@ -518,4 +524,8 @@ object EnStrings : Strings {
     override val timerChannelDescription = "The countdown of a timer you started in cook mode."
     override val timerDoneChannelName = "Cook timer ringing"
     override val timerDoneChannelDescription = "Rings when a cook mode timer runs out."
+
+    override val cookSessionChannelName = "Recipe in progress"
+    override val cookSessionChannelDescription =
+        "The step you are on, so you can follow a recipe without opening the app."
 }

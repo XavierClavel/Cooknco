@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The controls of the cook session notification, as styles rather than four copies of the
+    same eight attributes — see cooknco_cook_session.xml.
+
+    Two of them, because two are drawn and two are typed: an arrow from the system font is set
+    on a baseline at that font's size, which is not the size of the tick and the stopwatch
+    beside it. Everything else about the two is the same, so the row reads as one set of
+    controls.
+
+    The size is a target before it is a shape: these are pressed by somebody holding a spoon,
+    without looking, and the tint is the handset's own accent rather than the app's — a
+    notification's controls belong to the shade they are sitting in.
+-->
+<resources>
+    <style name="CookncoNotificationControl">
+        <item name="android:layout_width">56dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginEnd">8dp</item>
+        <item name="android:background">@drawable/cooknco_notification_control</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textColor">?android:attr/colorAccent</item>
+        <item name="android:textSize">19sp</item>
+    </style>
+
+    <style name="CookncoNotificationControlIcon">
+        <item name="android:layout_width">56dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginEnd">8dp</item>
+        <item name="android:background">@drawable/cooknco_notification_control</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:padding">11dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:tint">?android:attr/colorAccent</item>
+    </style>
+</resources>

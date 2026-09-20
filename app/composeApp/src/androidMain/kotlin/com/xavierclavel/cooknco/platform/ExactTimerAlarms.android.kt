@@ -23,7 +23,7 @@ import androidx.compose.ui.platform.LocalContext
  */
 actual fun canRingTimersExactly(): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
-    val context = cookTimerContext ?: return true
+    val context = cookModeContext ?: return true
     return context.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() ?: true
 }
 

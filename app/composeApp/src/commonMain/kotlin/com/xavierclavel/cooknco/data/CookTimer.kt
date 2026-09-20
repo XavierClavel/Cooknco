@@ -137,6 +137,19 @@ class CookTimer(
         }
     }
 
+    /**
+     * The timer as it stands, having read it back off the disk first if nothing has yet.
+     *
+     * For the one caller that cannot watch [state] and wait: cook mode has to know which step
+     * to open on *before* it draws, and on a cold start — which a notification tap usually is
+     * — the answer is still on disk. Everything else reads [state], which arrives at it a
+     * moment later by itself.
+     */
+    suspend fun current(): CookTimerState? {
+        ensureRestored()
+        return _state.value
+    }
+
     /** Starts [seconds] for one step, replacing any timer already running. */
     fun start(
         recipeId: Long,

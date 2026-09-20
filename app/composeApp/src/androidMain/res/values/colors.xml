@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The one colour the cook session's notification names.
+
+    Everything else there takes the shade's own: the controls, the tick boxes and the progress
+    bar are `?android:attr/colorAccent`, which is the handset's accent, and the text takes
+    androidx's notification appearances, which follow the shade into dark mode. A notification
+    is a surface this app does not own, so the fewer colours it brings to it the better.
+
+    This one has no equivalent to borrow — it is an ingredient already in the pan, dimmed the
+    way the screen strikes one through. A neutral mid-grey, legible against a cream shade and a
+    near-black one alike, which is why there is no values-night beside this file.
+-->
+<resources>
+    <color name="cooknco_notification_muted">#FF8A8A8A</color>
+</resources>

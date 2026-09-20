@@ -90,15 +90,15 @@ private const val REQUEST_FIRE = 8_113
  * The timer is driven from common code that has no `Context` to reach the notification
  * manager with, the same reason [captureAppVersion] exists.
  */
-internal var cookTimerContext: Context? = null
+internal var cookModeContext: Context? = null
     private set
 
-internal fun captureCookTimerContext(context: Context) {
-    cookTimerContext = context.applicationContext
+internal fun captureCookModeContext(context: Context) {
+    cookModeContext = context.applicationContext
 }
 
 actual fun onCookTimerChanged(state: CookTimerState?) {
-    val context = cookTimerContext ?: return
+    val context = cookModeContext ?: return
     // A finished timer is the alert's business, not the countdown's: it arrives here only
     // when one is read back off the disk at launch, and there is nothing left to count.
     if (state == null || state.finished) {
@@ -165,7 +165,7 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setSilent(true)
-        .setContentIntent(openCookMode(context, state.recipeId))
+        .setContentIntent(openCookMode(context, state.recipeId, REQUEST_OPEN))
         .addAction(
             0,
             if (state.running) s.pause else s.resume,
@@ -174,11 +174,11 @@ actual fun onCookTimerChanged(state: CookTimerState?) {
         .addAction(0, s.stopTimer, broadcast(context, ACTION_COOK_TIMER_STOP, REQUEST_STOP))
         .build()
 
-    notify(context, RUNNING_NOTIFICATION_ID, notification)
+    postNotification(context, RUNNING_NOTIFICATION_ID, notification)
 }
 
 actual fun onCookTimerFinished(state: CookTimerState) {
-    val context = cookTimerContext ?: return
+    val context = cookModeContext ?: return
     cancelAlarm(context)
     NotificationManagerCompat.from(context).cancel(RUNNING_NOTIFICATION_ID)
     if (startRinging(context)) return
@@ -213,10 +213,10 @@ fun postCookTimerAlert(context: Context, state: CookTimerState) {
         // The one notification worth reading without unlocking the phone.
         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         .setAutoCancel(true)
-        .setContentIntent(openCookMode(context, state.recipeId))
+        .setContentIntent(openCookMode(context, state.recipeId, REQUEST_OPEN))
         .build()
 
-    notify(context, DONE_NOTIFICATION_ID, notification)
+    postNotification(context, DONE_NOTIFICATION_ID, notification)
 }
 
 /**
@@ -252,7 +252,7 @@ private fun ringIntent(context: Context): Intent? {
  * than caught, so a cook who refused notifications gets a timer that still counts on screen
  * instead of something that looks like a crash.
  */
-private fun notify(context: Context, id: Int, notification: android.app.Notification) {
+internal fun postNotification(context: Context, id: Int, notification: android.app.Notification) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
         PackageManager.PERMISSION_GRANTED
@@ -371,7 +371,7 @@ private fun cancelAlarm(context: Context) {
         ?.cancel(broadcast(context, ACTION_COOK_TIMER_FIRE, REQUEST_FIRE))
 }
 
-private fun broadcast(context: Context, action: String, requestCode: Int): PendingIntent =
+internal fun broadcast(context: Context, action: String, requestCode: Int): PendingIntent =
     PendingIntent.getBroadcast(
         context,
         requestCode,
@@ -386,7 +386,7 @@ private fun broadcast(context: Context, action: String, requestCode: Int): Pendi
  * naming the activity: the activity is in `:androidApp` and this is not, and the route it
  * maps to is already `WebRoutes`' business.
  */
-private fun openCookMode(context: Context, recipeId: Long): PendingIntent? {
+internal fun openCookMode(context: Context, recipeId: Long, requestCode: Int): PendingIntent? {
     val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         ?.apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -395,7 +395,7 @@ private fun openCookMode(context: Context, recipeId: Long): PendingIntent? {
         ?: return null
     return PendingIntent.getActivity(
         context,
-        REQUEST_OPEN,
+        requestCode,
         intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
@@ -421,7 +421,7 @@ private fun timerIcon(context: Context): Int {
  * second copy here would be one more thing to keep in step for no gain. The fallback is a
  * platform icon rather than nothing: a notification with no small icon is not posted at all.
  */
-private fun smallIcon(context: Context): Int {
+internal fun smallIcon(context: Context): Int {
     val id = context.resources.getIdentifier("ic_notification", "drawable", context.packageName)
     return if (id != 0) id else android.R.drawable.ic_lock_idle_alarm
 }

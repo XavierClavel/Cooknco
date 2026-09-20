@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    An ingredient that has gone in: the same box, filled, with the tick cut out of it.
+
+    One path with an even-odd fill rather than a tick drawn over a box, because the whole
+    drawable is tinted a single colour by the row — so a tick painted on top would be the
+    colour of the box it sits on. Cut out, it is the shade showing through, which is legible
+    whichever way round that shade is.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="20dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M5,3h14a2,2 0 0 1 2,2v14a2,2 0 0 1 -2,2H5a2,2 0 0 1 -2,-2V5a2,2 0 0 1 2,-2zM10.1,17.3l-4.3,-4.3 1.5,-1.4 2.8,2.8 6.5,-6.5 1.4,1.5z" />
+</vector>

@@ -322,8 +322,12 @@ private fun CookModeContent(
                                     amount = used.amount,
                                     servings = servings,
                                     recipeYield = recipe.yield ?: 1,
-                                    checked = used.index in checkedIngredients,
-                                    onToggle = { onToggleIngredient(used.index) },
+                                    // By where the row sits in the step, not by which of the
+                                    // recipe's ingredients it is: the notification ticks the
+                                    // same list from the other end, and a step is allowed to
+                                    // use one ingredient twice. See CookModeViewModel.
+                                    checked = position in checkedIngredients,
+                                    onToggle = { onToggleIngredient(position) },
                                     showDivider = position < stepIngredients.lastIndex,
                                 )
                             }
