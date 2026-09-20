@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.xavierclavel.cooknco.data.AppLanguage
-import com.xavierclavel.cooknco.data.AppLocale
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.di.initFor
 import com.xavierclavel.cooknco.platform.ACTION_COOK_TIMER_FIRE
@@ -13,7 +12,6 @@ import com.xavierclavel.cooknco.platform.ACTION_COOK_TIMER_TOGGLE
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -49,7 +47,7 @@ class CookTimerReceiver : BroadcastReceiver() {
                 // Before anything is drawn. On a process started by the alarm, nothing has
                 // resolved the language yet, and the notification would come out in the
                 // handset's rather than the one the account chose. See [AppLanguage].
-                AppGraph.devicePreferences.language.first()?.let { AppLanguage.set(AppLocale.of(it)) }
+                AppLanguage.restore(AppGraph.devicePreferences)
                 val timer = AppGraph.cookTimer
                 when (action) {
                     ACTION_COOK_TIMER_TOGGLE -> timer.toggle()

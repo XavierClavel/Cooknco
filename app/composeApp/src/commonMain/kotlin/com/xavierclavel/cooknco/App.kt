@@ -5,7 +5,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.data.AppUnits
@@ -25,15 +24,18 @@ fun App() {
     // Read once, above everything: a language change recomposes the whole tree, which is
     // exactly what it should do — every screen is written in it.
     val language by AppLanguage.current.collectAsState()
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { AppLanguage.restore(AppGraph.devicePreferences, scope) }
+    LaunchedEffect(Unit) { AppLanguage.restore(AppGraph.devicePreferences) }
     // The ladder the account reads amounts on, and the catalogue that converts onto it.
     // Restored from the last session first so the first recipe draws in the right units
-    // rather than in metric until settings are opened, and the catalogue refreshed behind
+    // rather than in metric until the account answers, and the catalogue refreshed behind
     // it — the packaged copy is complete, so nothing waits for that.
+    //
+    // Both are only a head start. What the account actually carries is asked for as soon as
+    // there is a session to ask under — see the sync in [AppNavigation] — and neither
+    // restore writes over it if it gets there first.
     LaunchedEffect(Unit) {
-        AppUnits.restore(AppGraph.devicePreferences, scope)
-        AppUnits.refresh(AppGraph.unitRepository, scope)
+        AppUnits.restore(AppGraph.devicePreferences)
+        AppUnits.refresh(AppGraph.unitRepository)
     }
     // A timer started in an earlier process is still counting — its deadline outlived it.
     // Read back here, before cook mode is reachable, so the screen opens on the real one

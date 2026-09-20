@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.xavierclavel.cooknco.data.AppLanguage
-import com.xavierclavel.cooknco.data.AppLocale
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.di.initFor
 import com.xavierclavel.cooknco.platform.ACTION_COOK_SESSION_NEXT
@@ -16,7 +15,6 @@ import com.xavierclavel.cooknco.platform.EXTRA_INGREDIENT
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -50,7 +48,7 @@ class CookSessionReceiver : BroadcastReceiver() {
                 // Before anything is drawn: on a process started by this broadcast nothing has
                 // resolved the language, and the step would come out headed in the handset's
                 // rather than the one the account chose. See [AppLanguage].
-                AppGraph.devicePreferences.language.first()?.let { AppLanguage.set(AppLocale.of(it)) }
+                AppLanguage.restore(AppGraph.devicePreferences)
                 val session = AppGraph.cookSession
                 when (action) {
                     ACTION_COOK_SESSION_NEXT -> session.next().join()

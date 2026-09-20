@@ -9,6 +9,7 @@ class AuthRepository(
     private val authApi: AuthApi,
     private val tokenDataStore: TokenDataStore,
     private val pushRepository: PushRepository,
+    private val devicePreferences: DevicePreferences,
 ) {
     val tokenFlow: Flow<String?> = tokenDataStore.tokenFlow
 
@@ -40,6 +41,10 @@ class AuthRepository(
             runCatching { authApi.logout(token) }
         }
         tokenDataStore.clearToken()
+        // And what that account read in. It is cached on the handset so a relaunch draws
+        // the right units and words straight away, which is exactly what would otherwise
+        // hand them to whoever signs in next. See [AccountSettings.forget].
+        AccountSettings.forget(devicePreferences)
     }
 
     suspend fun getCurrentUser(): UserInfo? {

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.xavierclavel.cooknco.data.AccountSettings
 import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.data.AppUnitSystem
 import com.xavierclavel.cooknco.data.AppUnits
@@ -94,13 +95,12 @@ class UserSettingsViewModel(
             userRepo.getSettings()
                 .onSuccess { settings ->
                     val locale = AccountLocale.entries.firstOrNull { it.code.equals(settings.locale, ignoreCase = true) }
-                    // The account's language is the app's: adopted as soon as it is known,
-                    // so a phone in English opens an account that reads French in French.
-                    locale?.let { AppLanguage.set(AppLocale.of(it.code), devicePreferences, viewModelScope) }
-                    // Same rule for the ladder: what the account reads in is what every
-                    // recipe screen in the app draws in, from this moment on
+                    // The account's language is the app's, and so is its ladder: what the
+                    // account reads in is what every screen draws in, from this moment on.
+                    // Through [AccountSettings] rather than applied here, because the same
+                    // adoption runs at sign-in and two copies of it would drift.
+                    AccountSettings.adopt(settings, devicePreferences)
                     val unitSystem = AppUnitSystem.of(settings.unitSystem)
-                    AppUnits.set(unitSystem, devicePreferences, viewModelScope)
                     _uiState.update {
                         it.copy(
                             autoAcceptFollowRequests = settings.autoAcceptFollowRequests,
@@ -125,14 +125,32 @@ class UserSettingsViewModel(
 
     fun toggleMailNotifications() = updateAndSave { it.copy(mailNotificationsEnabled = !it.mailNotificationsEnabled) }
 
+    /**
+     * Applies a ladder at once, and puts it back if the account would not take it.
+     *
+     * The rollback is the point: what is applied here is remembered on the handset and read
+     * by every recipe screen, so a save that did not land would otherwise leave the app
+     * drawing on a ladder the account does not carry — for this session and every one
+     * after it, since the cache outlives the process.
+     */
     fun selectUnitSystem(system: AppUnitSystem) {
-        AppUnits.set(system, devicePreferences, viewModelScope)
-        updateAndSave { it.copy(unitSystem = system) }
+        val previous = AppUnits.system.value
+        AppUnits.set(system, devicePreferences)
+        updateAndSave(revert = {
+            AppUnits.set(previous, devicePreferences)
+            _uiState.update { it.copy(unitSystem = previous) }
+        }) { it.copy(unitSystem = system) }
     }
 
+    /** The same, for the language — which the app is written in as well as written to in. */
     fun selectLocale(locale: AccountLocale) {
-        AppLanguage.set(AppLocale.of(locale.code), devicePreferences, viewModelScope)
-        updateAndSave { it.copy(accountLocale = locale) }
+        val previous = AppLanguage.current.value
+        val previousAccountLocale = _uiState.value.accountLocale
+        AppLanguage.set(AppLocale.of(locale.code), devicePreferences)
+        updateAndSave(revert = {
+            AppLanguage.set(previous, devicePreferences)
+            _uiState.update { it.copy(accountLocale = previousAccountLocale) }
+        }) { it.copy(accountLocale = locale) }
     }
 
     /**
@@ -182,12 +200,21 @@ class UserSettingsViewModel(
         }
     }
 
-    private fun updateAndSave(transform: (UserSettingsUiState) -> UserSettingsUiState) {
+    private fun updateAndSave(
+        revert: (() -> Unit)? = null,
+        transform: (UserSettingsUiState) -> UserSettingsUiState,
+    ) {
         _uiState.update(transform)
-        save()
+        save(revert)
     }
 
-    fun save() {
+    /**
+     * Sends the whole settings object.
+     *
+     * [revert] undoes what was applied ahead of the answer, for the two settings the app
+     * acts on the moment they are picked rather than only when the server agrees.
+     */
+    fun save(revert: (() -> Unit)? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
             val state = _uiState.value
@@ -206,6 +233,7 @@ class UserSettingsViewModel(
                     _uiState.update { it.copy(isSaving = false, saved = true) }
                 }
                 .onFailure { err ->
+                    revert?.invoke()
                     _uiState.update { it.copy(isSaving = false, error = err.message ?: "Failed to save") }
                 }
         }

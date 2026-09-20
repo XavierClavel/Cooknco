@@ -71,4 +71,18 @@ class DevicePreferences(private val dataStore: DataStore<Preferences>) {
     suspend fun setUnitSystem(code: String) {
         dataStore.edit { it[unitSystemKey] = code }
     }
+
+    /**
+     * Forgets the two values above, which are the account's rather than the handset's.
+     *
+     * Called on sign-out ([AccountSettings.forget]). Push and the exact-alarm asking are
+     * deliberately not cleared: they describe this phone, and they mean the same thing
+     * whoever is holding it.
+     */
+    suspend fun clearAccountSettings() {
+        dataStore.edit {
+            it.remove(languageKey)
+            it.remove(unitSystemKey)
+        }
+    }
 }
