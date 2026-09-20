@@ -4,6 +4,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.xavierclavel.cooknco.data.AppVersionRepository
 import com.xavierclavel.cooknco.data.AuthRepository
+import com.xavierclavel.cooknco.data.CookSession
+import com.xavierclavel.cooknco.data.CookSessionStore
 import com.xavierclavel.cooknco.data.CookTimer
 import com.xavierclavel.cooknco.data.CookTimerStore
 import com.xavierclavel.cooknco.data.CookbookRepository
@@ -65,6 +67,13 @@ object AppGraph {
      * notification action arriving on a process that has no screens at all.
      */
     val cookTimer: CookTimer by lazy { CookTimer(CookTimerStore(preferences)) }
+
+    /**
+     * The recipe being cooked, step by step. Here for the same reason the timer is, only
+     * more so: the notification that carries it is also what moves it, so the one thing that
+     * is guaranteed to be running when it changes is a broadcast receiver with no screens.
+     */
+    val cookSession: CookSession by lazy { CookSession(CookSessionStore(preferences)) }
 
     private val appVersionApi by lazy { AppVersionApi(ApiClient.httpClient) }
     private val authApi by lazy { AuthApi(ApiClient.httpClient) }

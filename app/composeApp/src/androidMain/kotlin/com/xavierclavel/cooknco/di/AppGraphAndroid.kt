@@ -3,7 +3,7 @@ package com.xavierclavel.cooknco.di
 import android.content.Context
 import com.xavierclavel.cooknco.data.createAuthDataStore
 import com.xavierclavel.cooknco.platform.captureAppVersion
-import com.xavierclavel.cooknco.platform.captureCookTimerContext
+import com.xavierclavel.cooknco.platform.captureCookModeContext
 
 /**
  * Wires the object graph from an Android [Context]. Keeps DataStore off the
@@ -15,6 +15,6 @@ fun AppGraph.initFor(context: Context) {
     captureAppVersion(context)
     // Same reason: the cook timer is driven from common code, and posting its notification
     // or setting its alarm needs a context that code has no way to get hold of.
-    captureCookTimerContext(context)
+    captureCookModeContext(context)
     init { createAuthDataStore(context) }
 }

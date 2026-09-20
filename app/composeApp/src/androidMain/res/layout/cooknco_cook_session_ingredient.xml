@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One ingredient of the step, to be ticked off as it goes in — the shade's copy of the row
+    on the cook mode screen, and the reason that notification is a custom view at all.
+
+    The whole row is the target rather than the box: hands are busy, the phone is on a worktop
+    at arm's length, and a 20dp box is not something to aim at. Which is also why the row is
+    taller than the line of text it holds.
+
+    The box is tinted with the handset's accent, like the controls and the progress bar — see
+    cooknco_cook_session.xml. Both of its drawables are white, so the tint is the only colour.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cooknco_ingredient_row"
+    android:layout_width="match_parent"
+    android:layout_height="40dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <ImageView
+        android:id="@+id/cooknco_ingredient_box"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="12dp"
+        android:contentDescription="@null"
+        android:src="@drawable/cooknco_tick_box"
+        android:tint="?android:attr/colorAccent" />
+
+    <TextView
+        android:id="@+id/cooknco_ingredient_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.Compat.Notification" />
+</LinearLayout>

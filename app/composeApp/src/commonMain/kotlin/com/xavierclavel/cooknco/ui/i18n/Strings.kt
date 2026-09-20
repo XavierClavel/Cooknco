@@ -381,8 +381,30 @@ interface Strings {
 
     // ── Cook mode ─────────────────────────────────────────────────────────────
     fun stepOf(step: Int, total: Int): String
+    /**
+     * The same count as [stepOf], for somewhere that is not shouting it.
+     *
+     * [stepOf] is the screen's label and is set in capitals to sit above the step; this one
+     * is a line of the notification, next to the recipe's title, and reads as a sentence.
+     */
+    fun stepProgress(step: Int, total: Int): String
     val nextStep: String
+    val previousStep: String
     val finish: String
+    /**
+     * What the cook session's notification calls its timer button, for a screen reader
+     * rather than for the eye — the button itself is a mark. See `CookSessionNotifier`.
+     */
+    val startTimer: String
+    /** The ingredients of a step past the few the shade has room for. */
+    fun andMoreIngredients(count: Int): String
+    /**
+     * One tick box of the notification's checklist, said aloud.
+     *
+     * A row there is a line of text with a picture of a box beside it, so a screen reader is
+     * told what the box is showing — which is the whole state of the thing being pressed.
+     */
+    fun ingredientTicked(line: String, ticked: Boolean): String
     fun nextIs(step: String): String
     val timerLabel: String
     val usedInThisStep: String
@@ -448,6 +470,10 @@ interface Strings {
     val timerChannelDescription: String
     val timerDoneChannelName: String
     val timerDoneChannelDescription: String
+
+    // ── The recipe being cooked, in the same list ─────────────────────────────
+    val cookSessionChannelName: String
+    val cookSessionChannelDescription: String
 }
 
 /**

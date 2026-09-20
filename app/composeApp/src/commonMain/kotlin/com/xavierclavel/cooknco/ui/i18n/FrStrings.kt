@@ -463,7 +463,13 @@ object FrStrings : Strings {
     override val nothingCookedWithThis = "Rien n'a encore été cuisiné avec. Ajoutez-le à une recette et il apparaîtra ici."
 
     override fun stepOf(step: Int, total: Int) = "ÉTAPE $step SUR $total"
+    override fun stepProgress(step: Int, total: Int) = "Étape $step sur $total"
     override val nextStep = "Étape suivante"
+    override val previousStep = "Étape précédente"
+    override val startTimer = "Démarrer le minuteur"
+    override fun andMoreIngredients(count: Int) = "+$count autres"
+    override fun ingredientTicked(line: String, ticked: Boolean) =
+        if (ticked) "$line, coché" else "$line, non coché"
     override val finish = "Terminer"
     override fun nextIs(step: String) = "Ensuite : $step"
     override val timerLabel = "Minuteur"
@@ -527,4 +533,8 @@ object FrStrings : Strings {
     override val timerChannelDescription = "Le décompte d'un minuteur lancé en mode cuisson."
     override val timerDoneChannelName = "Sonnerie du minuteur"
     override val timerDoneChannelDescription = "Sonne quand un minuteur du mode cuisson arrive à zéro."
+
+    override val cookSessionChannelName = "Recette en cours"
+    override val cookSessionChannelDescription =
+        "L'étape en cours, pour suivre une recette sans ouvrir l'application."
 }

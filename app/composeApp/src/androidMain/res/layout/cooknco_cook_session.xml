@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The expanded cook session notification, drawn by the app rather than by the standard
+    template.
+
+    It is a custom view for one reason: a notification cannot hold a checkbox any other way.
+    The standard template offers text and up to three action buttons, and ticking an
+    ingredient off as it goes into the pan is neither — it is a list of things to press, one
+    per line. So the body below is `RemoteViews`, filled in CookSessionNotifier.android.kt,
+    and the header, the app name and the step count above it are still the system's.
+
+    Two things about it:
+
+    * **It is read in the order the screen is read in**: how far through, what to do, what goes
+      in, and the way on at the foot — where cook mode puts its own Back and Next, and where a
+      thumb holding the phone already is.
+    * **Nothing here names a colour.** The controls and the tick boxes take
+      `?android:attr/colorAccent`, which is the handset's own accent, resolved against the
+      shade's theme when it inflates this — the same colour the progress bar below comes out
+      in, and the colour every other notification's controls are. The text takes androidx's
+      notification appearances, which follow the shade into dark mode. A value written here
+      would be a guess about a surface this app does not own and cannot see.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="2dp"
+    android:paddingBottom="4dp">
+
+    <!-- How far through the recipe, as the collapsed notification shows it too. Fed by
+         setProgressBar: this is the step, not the timer, and it moves once per press. -->
+    <ProgressBar
+        android:id="@+id/cooknco_session_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:max="100" />
+
+    <TextView
+        android:id="@+id/cooknco_session_step"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:textAppearance="@style/TextAppearance.Compat.Notification.Title" />
+
+    <!-- Only on a step that has one, and only ever what it is: the countdown belongs to the
+         timer's own notification, which appears below this one once the button is pressed. -->
+    <TextView
+        android:id="@+id/cooknco_session_timer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.Compat.Notification.Info" />
+
+    <!-- One cooknco_cook_session_ingredient per line, added at runtime: the count is the
+         step's, and a layout cannot hold a variable number of anything. Capped, because a
+         custom view is clipped from the bottom when it outgrows the expanded notification and
+         the controls are below it — see CookSessionNotifier.MAX_INGREDIENT_ROWS. -->
+    <LinearLayout
+        android:id="@+id/cooknco_session_ingredients"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="vertical" />
+
+    <!-- What did not fit, as a count. -->
+    <TextView
+        android:id="@+id/cooknco_session_more"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.Compat.Notification.Info" />
+
+    <LinearLayout
+        android:id="@+id/cooknco_session_controls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <!-- The two that move through the recipe are drawn rather than typed. An arrow taken
+             from the system font is set on a text baseline at whatever size and height that
+             font gives it, which is neither the size nor the height of the tick and the
+             stopwatch beside it; a vector is the size it is told and centred in its box.
+             autoMirrored, so they still point the way the reading does in a right-to-left
+             language. -->
+        <ImageView
+            android:id="@+id/cooknco_session_previous"
+            style="@style/CookncoNotificationControlIcon"
+            android:src="@drawable/cooknco_arrow_previous" />
+
+        <TextView
+            android:id="@+id/cooknco_session_timer_start"
+            style="@style/CookncoNotificationControl" />
+
+        <ImageView
+            android:id="@+id/cooknco_session_next"
+            style="@style/CookncoNotificationControlIcon"
+            android:src="@drawable/cooknco_arrow_next" />
+
+        <TextView
+            android:id="@+id/cooknco_session_finish"
+            style="@style/CookncoNotificationControl" />
+    </LinearLayout>
+</LinearLayout>
