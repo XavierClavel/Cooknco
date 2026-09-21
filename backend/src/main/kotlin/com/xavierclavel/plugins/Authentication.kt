@@ -83,24 +83,6 @@ fun Application.configureAuthentication() {
                 }
             }
         }
-        /**
-         * The same admin gate as `admin-session`, for a client that has no cookie jar.
-         *
-         * A bearer token *is* a session id — [RedisService.getSession] reads both out of the
-         * same keyspace, and `POST /auth/login` hands the id it set the cookie to straight
-         * back in the body — so this asks the store exactly what the cookie provider asks it,
-         * and an account demoted out of ADMIN loses both at once. Declared separately rather
-         * than folded into `bearer-auth`, so that a route naming that one cannot quietly
-         * acquire an admin check it never asked for.
-         */
-        bearer("admin-bearer") {
-            authenticate { tokenCredential ->
-                redisService.getAdminSession(tokenCredential.token)?.let { session ->
-                    redisService.touchSession(tokenCredential.token)
-                    UserIdPrincipal(session.userId.toString())
-                }
-            }
-        }
         oauth("auth-oauth-google") {
             // Configure oauth authentication
             urlProvider = { "${configuration.backend.url}/auth/callback-oauth-google" }

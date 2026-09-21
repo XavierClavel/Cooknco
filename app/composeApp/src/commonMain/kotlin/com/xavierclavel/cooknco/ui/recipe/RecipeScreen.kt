@@ -140,11 +140,12 @@ fun RecipeScreen(
     recipeId: Long,
     currentUserId: Long,
     /**
-     * Whether the signed-in account moderates this product, which is the only thing the
-     * export is offered to. The gate that counts is the server's — the routes behind it
-     * refuse anyone else — this one keeps an action nobody else can complete off the sheet.
+     * Whether the signed-in account may use the premium features, which today is the
+     * export and nothing else. The gate that counts is the server's — the route behind it
+     * refuses anyone else — this one keeps an action nobody else can complete off the
+     * sheet.
      */
-    isAdmin: Boolean,
+    canExport: Boolean,
     onNavigateToEdit: (Long) -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateToUser: (Long) -> Unit = {},
@@ -176,7 +177,7 @@ fun RecipeScreen(
                 recipe = recipe,
                 uiState = uiState,
                 isOwner = viewModel.isOwner,
-                isAdmin = isAdmin,
+                canExport = canExport,
                 onToggleLike = viewModel::toggleLike,
                 onShare = {
                     linkSharer.share(recipe.title, WebRoutes.urlFor(WebRoutes.Shareable.RECIPE, recipe.id))
@@ -238,8 +239,8 @@ private fun RecipeContent(
     recipe: RecipeInfo,
     uiState: RecipeUiState,
     isOwner: Boolean,
-    /** Site admin — see [RecipeScreen]. */
-    isAdmin: Boolean,
+    /** Premium — see [RecipeScreen]. */
+    canExport: Boolean,
     onToggleLike: () -> Unit,
     onShare: () -> Unit,
     onExport: () -> Unit,
@@ -462,7 +463,7 @@ private fun RecipeContent(
                 RecipeActionSheet(
                     recipe = recipe,
                     isOwner = isOwner,
-                    isAdmin = isAdmin,
+                    canExport = canExport,
                     onExport = onExport,
                     onShare = onShare,
                     onEdit = onEdit,
@@ -1023,7 +1024,7 @@ private fun Modifier.dashedNavyBorder(radius: Dp): Modifier = drawWithContent {
 private fun RecipeActionSheet(
     recipe: RecipeInfo,
     isOwner: Boolean,
-    isAdmin: Boolean,
+    canExport: Boolean,
     onShare: () -> Unit,
     onExport: () -> Unit,
     onEdit: () -> Unit,
@@ -1046,10 +1047,11 @@ private fun RecipeActionSheet(
             if (!isOwner) {
                 add(SheetAction(label = s.reportRecipe, onClick = onReport, icon = Icons.Outlined.Flag))
             }
-            // Admins only: an export reads its subject straight from an id, with none of
-            // the visibility filtering the rest of the API applies, so the route behind
-            // this is closed to everyone else.
-            if (isAdmin) {
+            // Subscribers only: the export is what a premium account buys, and the route
+            // behind this refuses everyone else. It prints only what the caller may read,
+            // so an account that reaches it cannot print a recipe this screen would not
+            // have shown them either.
+            if (canExport) {
                 add(SheetAction(label = s.exportRecipePdf, onClick = onExport, icon = Icons.Outlined.FileDownload))
             }
             if (isOwner) {
@@ -1104,7 +1106,7 @@ fun RecipeScreenPreview() {
                 recipe = previewRecipe,
                 uiState = RecipeUiState(recipe = previewRecipe, selectedYield = 8, isLoading = false),
                 isOwner = true,
-                isAdmin = true,
+                canExport = true,
                 onToggleLike = {},
                 onShare = {},
                 onExport = {},

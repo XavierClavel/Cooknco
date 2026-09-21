@@ -75,9 +75,11 @@ async function isAdminOfCookbook(cookbookId) {
 /**
  * Saves a whole cookbook as a PDF: a cover, then a page per recipe.
  *
- * Admin-only, and the backend enforces it: the button lives inside `<admin-only>`. A
- * cookbook past the backend's bound is refused rather than printed short, which reaches
- * the caller as a rejection like any other.
+ * Premium, and the backend enforces it: the button lives inside `<premium-only>`. The
+ * book comes back holding the recipes the caller may read and no others, so a member
+ * without moderation rights never prints a hidden one. A cookbook past the backend's
+ * bound is refused rather than printed short, which reaches the caller as a rejection
+ * like any other.
  */
 async function downloadCookbook(id) {
   return await downloadPdf(`/export/cookbook/${id}?locale=${getLocale()}`, `cookbook-${id}.pdf`)

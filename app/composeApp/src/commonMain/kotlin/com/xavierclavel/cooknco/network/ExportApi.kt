@@ -23,10 +23,10 @@ class ExportedDocument(val filename: String, val bytes: ByteArray)
 /**
  * `GET /export/…`, the same two routes the backoffice's export buttons call.
  *
- * Admin-only on the server, and the app only offers it to admins — but the gate that
- * matters is that one: an export reads its subject straight from an id, with none of the
- * visibility filtering the rest of the API applies. The token authenticates it as a bearer,
- * which is what the `admin-bearer` provider exists for; the web app sends a cookie instead.
+ * Premium on the server, and the app only offers it to accounts that hold it — but the
+ * gate that matters is that one, and so is the filtering behind it: what comes back holds
+ * only what the caller may read. The token authenticates the call as a bearer, which is
+ * all a native client can send; the web app sends a cookie instead.
  */
 class ExportApi(private val client: HttpClient) {
 

@@ -3,6 +3,8 @@ package com.xavierclavel.services
 import at.favre.lib.crypto.bcrypt.BCrypt
 import com.xavierclavel.exceptions.BadRequestCause
 import com.xavierclavel.exceptions.BadRequestException
+import com.xavierclavel.exceptions.ForbiddenCause
+import com.xavierclavel.exceptions.ForbiddenException
 import com.xavierclavel.exceptions.NotFoundCause
 import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.exceptions.UnauthorizedCause
@@ -247,6 +249,52 @@ class UserService: KoinComponent {
 
     fun setRole(id: Long, role: UserRole) =
         getEntityById(id).setRole(role).updateAndGet().toInfo()
+
+    /**
+     * The account behind a premium feature's request, or a refusal.
+     *
+     * The one place a premium gate is spelled out, so that adding a second paid feature is
+     * a call to this and not a second opinion about what premium means. Read from the row
+     * rather than from the session: a session is created at sign-in and cached in Redis for
+     * thirty days, so a grant made this afternoon would otherwise reach the user whenever
+     * they next logged out — and a revocation would take just as long to bite.
+     *
+     * @throws ForbiddenException when the account holds no running grant and does not
+     *   moderate the product (see [User.hasPremiumAccess])
+     */
+    fun checkPremiumAccess(userId: Long): User =
+        getEntityById(userId).also {
+            if (!it.hasPremiumAccess()) throw ForbiddenException(ForbiddenCause.PREMIUM_REQUIRED)
+        }
+
+    /**
+     * Makes an account premium, for good or until [until].
+     *
+     * @param until when a timed grant ends, or null for one with no end
+     * @throws BadRequestException when [until] has already passed — a grant that is over
+     *   before it is made is a mistyped year rather than a decision, and accepting it would
+     *   report success while changing nothing an operator can see.
+     */
+    fun grantPremium(id: Long, until: LocalDateTime?): UserInfo {
+        if (until != null && !until.isAfter(LocalDateTime.now())) {
+            throw BadRequestException(BadRequestCause.PREMIUM_EXPIRY_IN_THE_PAST)
+        }
+        val user = getEntityById(id)
+        if (until == null) user.grantPremiumForever() else user.grantPremiumUntil(until)
+        return user.updateAndGet().toInfo()
+    }
+
+    /** Ends a grant of either kind, now. See [User.revokePremium]. */
+    fun revokePremium(id: Long): UserInfo =
+        getEntityById(id).revokePremium().updateAndGet().toInfo()
+
+    fun countPremiumUsers() =
+        QUser()
+            .or()
+                .isPremiumForever.eq(true)
+                .premiumUntil.gt(LocalDateTime.now())
+            .endOr()
+            .findCount()
 
     fun resetPassword(token: String, password: String) {
         val user = findByToken(token)

@@ -11,6 +11,7 @@ import org.koin.core.component.inject
 import shared.enums.AccountStatus
 import shared.enums.IngredientType
 import shared.enums.LogLevel
+import shared.enums.PremiumStatus
 import shared.enums.ReportTargetType
 import shared.enums.Sort
 import shared.enums.TimeGranularity
@@ -46,6 +47,7 @@ class AdminService: KoinComponent {
             unverifiedUsersCount = userService.countUnverifiedUsers(),
             suspendedUsersCount = userService.countSuspendedUsers(),
             bannedUsersCount = userService.countBannedUsers(),
+            premiumUsersCount = userService.countPremiumUsers(),
             recipesCount = recipeService.countAll(),
             hiddenRecipesCount = recipeService.countHidden(),
             ingredientsCount = ingredientService.countAll(),
@@ -162,11 +164,13 @@ class AdminService: KoinComponent {
     /**
      * @param query matched against the username, or against the exact mail address when it
      *   looks like one — mail is stored encrypted, so it is only searchable by exact match
+     * @param premium which kind of grant to keep, as [User.premiumStatus] reports it
      */
     fun searchUsers(
         query: String?,
         role: UserRole?,
         status: AccountStatus?,
+        premium: PremiumStatus?,
         paging: Paging,
     ): Pair<Int, List<AdminUserInfo>> {
         val ebeanQuery = QUser()
@@ -177,6 +181,7 @@ class AdminService: KoinComponent {
             }
             .apply { if (role != null) this.role.eq(role) }
             .applyStatus(status)
+            .applyPremium(premium)
 
         val count = ebeanQuery.findCount()
         val users = ebeanQuery
@@ -201,6 +206,20 @@ class AdminService: KoinComponent {
         AccountStatus.SUSPENDED -> this.isBanned.eq(false).suspendedUntil.gt(LocalDateTime.now())
         AccountStatus.UNVERIFIED -> this.notSuspended().isVerified.eq(false)
         AccountStatus.ACTIVE -> this.notSuspended().isVerified.eq(true)
+    }
+
+    /** Mirrors the precedence in `User.premiumStatus()`, for the same reason [applyStatus] does. */
+    private fun QUser.applyPremium(premium: PremiumStatus?): QUser = when (premium) {
+        null -> this
+        PremiumStatus.FOREVER -> this.isPremiumForever.eq(true)
+        PremiumStatus.UNTIL -> this.isPremiumForever.eq(false).premiumUntil.gt(LocalDateTime.now())
+        // Both a grant that never was and one that has run out: that is what NONE means on
+        // the row, and an operator filtering for it is looking for who to grant or re-grant.
+        PremiumStatus.NONE -> this.isPremiumForever.eq(false)
+            .or()
+                .premiumUntil.isNull()
+                .premiumUntil.le(LocalDateTime.now())
+            .endOr()
     }
 
     private fun QUser.notSuspended(): QUser =

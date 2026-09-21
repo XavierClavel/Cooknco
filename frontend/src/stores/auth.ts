@@ -9,6 +9,9 @@ export const useAuthStore = defineStore('auth', {
     id: null,
     iconVersion: null,
     isAdmin: false,
+    // Whether the premium features are open to this account. Straight off the backend,
+    // which already answers true for an admin, so nothing here decides what premium means.
+    isPremium: false,
   }),
   actions: {
     logout() {
@@ -16,6 +19,8 @@ export const useAuthStore = defineStore('auth', {
       this.username = null;
       this.id = null;
       this.iconVersion = null;
+      this.isAdmin = false;
+      this.isPremium = false;
     },
     login() {
       this.checkAuth()
@@ -35,6 +40,7 @@ export const useAuthStore = defineStore('auth', {
         this.id = response.data.id
         this.iconVersion = response.data.version
         this.isAdmin = response.data.role == 'ADMIN'
+        this.isPremium = response.data.isPremium === true
         // Not awaited: the language the account saved is worth applying, but nothing on the
         // page is waiting for it and the cookie has already given us a usable one
         applyAccountLocale()

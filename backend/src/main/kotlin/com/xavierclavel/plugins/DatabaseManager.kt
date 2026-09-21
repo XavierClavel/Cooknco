@@ -56,6 +56,13 @@ object DatabaseManager {
         // either end, and nothing else clears them — a recipe's own delete is soft, so its
         // steps and their links outlive it
         QRecipeStepIngredient(),
+        // Before all three tables it points at, and before `users` in particular: nothing
+        // else clears `added_by_id`. The recipe it hangs off is soft-deleted, so the row
+        // survives that, and the account that *added* it owns no collection of these — a
+        // user adding somebody else's recipe to a cookbook therefore leaves a row the wipe
+        // then trips over when it reaches `users`, with an error naming a constraint that
+        // has nothing to do with whatever test is running
+        QCookbookRecipe(),
         QRecipe(),
         QRecipeIngredient(),
         QUser(),
@@ -64,7 +71,6 @@ object DatabaseManager {
         QLike(),
         QCookbook(),
         QCookbookUser(),
-        QCookbookRecipe(),
         QDietaryRestrictions(),
         // Owned by nobody: mail wordings and document layouts reference no other row
         QEmailTemplate(),

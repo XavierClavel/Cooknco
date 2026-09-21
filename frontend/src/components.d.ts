@@ -23,6 +23,7 @@ declare module 'vue' {
     InteractiblePictoInfo: typeof import('./components/InteractiblePictoInfo.vue')['default']
     LegalDocument: typeof import('./components/LegalDocument.vue')['default']
     PictoInfo: typeof import('./components/PictoInfo.vue')['default']
+    PremiumOnly: typeof import('./components/PremiumOnly.vue')['default']
     Recipe: typeof import('./components/Recipe.vue')['default']
     RecipeFilter: typeof import('./components/RecipeFilter.vue')['default']
     RecipesList: typeof import('./components/RecipesList.vue')['default']

@@ -40,6 +40,9 @@ enum class ForbiddenCause(val key: String) {
     MUST_BE_COOKBOOK_ADMINISTRATOR("must_be_cookbook_administrator"),
     NOT_ALLOWED_TO_DEMOTE_LAST_ADMIN("not_allowed_to_demote_last_admin"),
     NOT_ALLOWED_TO_MODERATE_ADMIN("not_allowed_to_moderate_admin"),
+    // The account holds no running premium grant, and the feature asked for is one of the
+    // ones a subscription opens. See `User.hasPremiumAccess`.
+    PREMIUM_REQUIRED("premium_required"),
 }
 
 enum class NotFoundCause(val key: String) {
@@ -119,5 +122,10 @@ enum class BadRequestCause (val key: String) {
     APP_VERSION_INVALID("app_version_invalid"),
     APP_VERSION_MINIMUM_ABOVE_LATEST("app_version_minimum_above_latest"),
     APP_VERSION_STORE_URL_INVALID("app_version_store_url_invalid"),
+
+    // A grant that says neither "forever" nor "until when" - refused rather than read as
+    // either one, since both readings hand out something nobody asked for.
+    PREMIUM_GRANT_HAS_NO_TERM("premium_grant_has_no_term"),
+    PREMIUM_EXPIRY_IN_THE_PAST("premium_expiry_in_the_past"),
 
 }

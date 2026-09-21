@@ -12,6 +12,18 @@ data class UserInfo(
     val version: Long,
     val username: String,
     val role: String = "USER",
+    /**
+     * Whether the premium features are open to this account — the PDF export today.
+     *
+     * A flag rather than something derived here, unlike [isAdmin]: what premium means is a
+     * grant with an end date behind it, and the one place that can say whether it is still
+     * running is the backend. It already answers true for an admin, so nothing in the app
+     * has to remember that they are not asked to subscribe.
+     *
+     * Defaulted false so a build of this app older than the field is simply not offered
+     * the export, rather than failing to parse the response.
+     */
+    val isPremium: Boolean = false,
     val joinDate: Long,
     val bio: String,
     val recipesCount: Int,

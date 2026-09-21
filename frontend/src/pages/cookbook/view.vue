@@ -55,13 +55,13 @@
           ></action-button>
         </v-col>
         <v-col cols="12" sm="auto" >
-          <admin-only>
+          <premium-only>
             <action-button
               icon="mdi-tray-arrow-down"
               :text="`${$t('export_pdf')}`"
               :action="() => onExport()"
             ></action-button>
-          </admin-only>
+          </premium-only>
         </v-col>
         <v-col cols="12" sm="auto" >
           <v-dialog max-width="500">

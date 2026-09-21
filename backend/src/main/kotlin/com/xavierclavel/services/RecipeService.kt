@@ -108,25 +108,29 @@ class RecipeService: KoinComponent {
      * and the addition order is a fact about the cookbook's history that no reader of the
      * printed copy can see. Soft-deleted recipes drop out on their own — Ebean applies the
      * flag to its own queries — which is right, because a deleted recipe is gone rather
-     * than hidden. A moderator-hidden one is kept, matching the single-recipe export: both
-     * are behind the admin gate, and what the cookbook holds is what it prints.
+     * than hidden.
      *
      * A typed `-to-many` predicate rather than the `EXISTS` [filterByCookbook] uses: that
      * one exists because the join double-counts against the like aggregate in [findList],
      * and there is no aggregate here. The owner is fetched because every sheet prints a
-     * byline; the collections load per recipe, which is what a bounded, admin-only export
-     * run once can afford — the print itself costs orders of magnitude more.
+     * byline; the collections load per recipe, which is what a bounded export run once can
+     * afford — the print itself costs orders of magnitude more.
      *
      * @param limit how many rows to read at most. Callers asking whether a cookbook is
      *   within a bound pass the bound plus one and compare, which answers that in the one
      *   query that also fetches the recipes — rather than counting first and then reading,
      *   which loads nothing extra but can disagree with itself if a recipe is added in
      *   between.
+     * @param visibleTo the account the book is being read for, whose visibility rules every
+     *   recipe in it must pass. Null prints what the cookbook holds, hidden rows and all,
+     *   and is only ever the moderator export — *not* an anonymous reader, who could not
+     *   have got this far: every path here has a session behind it.
      */
-    fun findByCookbook(cookbookId: Long, limit: Int): List<Recipe> =
+    fun findByCookbook(cookbookId: Long, limit: Int, visibleTo: Long? = null): List<Recipe> =
         QRecipe()
             .owner.fetch()
             .cookbooks.cookbook.id.eq(cookbookId)
+            .apply { if (visibleTo != null) filterByVisibility(visibleTo) }
             .orderBy().title.asc()
             .setMaxRows(limit)
             .findList()

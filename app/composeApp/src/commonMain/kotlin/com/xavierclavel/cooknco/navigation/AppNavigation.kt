@@ -189,7 +189,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             RecipeScreen(
                 recipeId = recipeId,
                 currentUserId = currentUserId,
-                isAdmin = (authState as? AuthState.Authenticated)?.user?.isAdmin == true,
+                canExport = (authState as? AuthState.Authenticated)?.user?.isPremium == true,
                 onNavigateToEdit = { id -> navController.navigate("recipe/$id/edit") },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },
@@ -295,7 +295,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             CookbookScreen(
                 cookbookId = cookbookId,
                 currentUserId = currentUserId,
-                isSiteAdmin = (authState as? AuthState.Authenticated)?.user?.isAdmin == true,
+                canExport = (authState as? AuthState.Authenticated)?.user?.isPremium == true,
                 onNavigateToEdit = { id -> navController.navigate("cookbook/$id/edit") },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToRecipe = { recipeId -> navController.navigate("recipe/$recipeId") },
