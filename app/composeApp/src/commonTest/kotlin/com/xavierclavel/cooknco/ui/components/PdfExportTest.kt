@@ -16,11 +16,12 @@ import kotlin.test.assertTrue
  */
 class PdfExportTest {
 
-    private fun user(role: String) = UserInfo(
+    private fun user(role: String = "USER", isPremium: Boolean = false) = UserInfo(
         id = 1L,
         version = 1L,
         username = "someone",
         role = role,
+        isPremium = isPremium,
         joinDate = 0L,
         bio = "",
         recipesCount = 0,
@@ -30,8 +31,20 @@ class PdfExportTest {
         followsCount = 0,
     )
 
+    /**
+     * The export is offered on one flag, and the backend sets it — including for an admin,
+     * who holds no grant but passes every premium gate. Nothing here re-derives that, so
+     * the app cannot come to a different answer than the route it is about to call, and a
+     * response that says nothing leaves the export unoffered rather than unparsed.
+     */
     @Test
-    fun only_an_admin_is_offered_an_export() {
+    fun only_a_premium_account_is_offered_an_export() {
+        assertTrue(user(isPremium = true).isPremium)
+        assertFalse(user().isPremium)
+    }
+
+    @Test
+    fun the_role_still_says_who_moderates() {
         assertTrue(user("ADMIN").isAdmin)
         assertFalse(user("USER").isAdmin)
         // Whatever the backend grows next is not an admin here, which is the safe way round:

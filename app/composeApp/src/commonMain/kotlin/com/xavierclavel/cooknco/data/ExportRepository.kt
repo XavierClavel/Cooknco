@@ -5,7 +5,7 @@ import com.xavierclavel.cooknco.network.ExportedDocument
 import kotlinx.coroutines.flow.first
 
 /**
- * The PDF exports, which only an admin's session can obtain.
+ * The PDF exports, which only a premium account can obtain.
  *
  * The language and the ladder are read here rather than passed in by each caller: they are
  * whatever the app is currently showing ([AppLanguage], [AppUnits]), and a sheet that

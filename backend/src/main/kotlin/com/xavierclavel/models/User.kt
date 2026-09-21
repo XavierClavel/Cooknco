@@ -8,6 +8,7 @@ import shared.dto.UserSettingsDTO
 import shared.infodto.AdminUserInfo
 import shared.infodto.UserInfo
 import shared.enums.AccountStatus
+import shared.enums.PremiumStatus
 import shared.enums.UnitSystem
 import shared.enums.UserRole
 import shared.overviewdto.UserOverview
@@ -73,6 +74,27 @@ class User (
      */
     @DbDefault("false")
     var mailNotificationsEnabled: Boolean = false,
+
+    /**
+     * Premium with no end, as an operator grants it.
+     *
+     * Two columns rather than one, on the shape [isBanned] and [suspendedUntil] already
+     * have: a permanent grant and a timed one are different things, and squeezing them
+     * into one nullable date would need a sentinel — a year 9999 that reads as a real
+     * expiry to every query, every listing and every operator looking at the row.
+     *
+     * Set here, they cannot contradict each other either: forever wins, exactly as a ban
+     * wins over a running suspension, so there is no state a reader has to resolve.
+     */
+    @DbDefault("false")
+    var isPremiumForever: Boolean = false,
+
+    /**
+     * When a timed grant runs out. Null means no timed grant was ever made — not that one
+     * is running — so a date in the past is a grant that has lapsed and is kept rather
+     * than cleared: it is what tells an operator the account *was* premium until then.
+     */
+    var premiumUntil: LocalDateTime? = null,
 
     //Moderation
     @DbDefault("false")
@@ -191,6 +213,7 @@ class User (
             version = this.imageVersion,
             username = this.username,
             role = this.role,
+            isPremium = this.hasPremiumAccess(),
             joinDate = this.joinDate.toEpochSecond(ZoneOffset.UTC),
             bio = this.bio,
             recipesCount = this.recipes.size,
@@ -252,6 +275,61 @@ class User (
     /** True while a temporary suspension is still running. */
     fun isSuspended(): Boolean = suspendedUntil?.isAfter(LocalDateTime.now()) == true
 
+    /** True while a grant of either kind is running. A lapsed one is not premium. */
+    fun isPremium(): Boolean = isPremiumForever || premiumUntil?.isAfter(LocalDateTime.now()) == true
+
+    /**
+     * Whether a premium feature is open to this account — the single rule every gate asks,
+     * and the value `UserInfo.isPremium` carries to the clients so that what a screen
+     * offers and what a route allows cannot drift apart.
+     *
+     * An ADMIN passes without a grant. They already reach the whole backoffice, the export
+     * was theirs alone before any of this existed, and making them buy a subscription to
+     * keep a tool they moderate with would be a regression dressed as a rule.
+     */
+    fun hasPremiumAccess(): Boolean = role == UserRole.ADMIN || isPremium()
+
+    fun premiumStatus(): PremiumStatus = when {
+        isPremiumForever -> PremiumStatus.FOREVER
+        premiumUntil?.isAfter(LocalDateTime.now()) == true -> PremiumStatus.UNTIL
+        else -> PremiumStatus.NONE
+    }
+
+    /**
+     * Grants premium with no end.
+     *
+     * Clears any running expiry, so the row says one thing: an account granted forever
+     * after a trial is not one whose trial is still counting down.
+     */
+    fun grantPremiumForever() = this.apply {
+        isPremiumForever = true
+        premiumUntil = null
+    }
+
+    /**
+     * Grants premium until [until].
+     *
+     * Also clears a permanent grant, which is what makes this the way to *shorten* one:
+     * an operator who granted forever by mistake replaces it with a date rather than
+     * having to revoke first and re-grant.
+     */
+    fun grantPremiumUntil(until: LocalDateTime) = this.apply {
+        isPremiumForever = false
+        premiumUntil = until
+    }
+
+    /**
+     * Ends premium now, of either kind.
+     *
+     * The expiry is wiped rather than set to now: a revocation is somebody deciding this
+     * account has no grant, which is exactly what null means, and leaving a date behind
+     * would show the backoffice a trial that ran out on a day nothing happened on.
+     */
+    fun revokePremium() = this.apply {
+        isPremiumForever = false
+        premiumUntil = null
+    }
+
     fun accountStatus(): AccountStatus = when {
         isBanned -> AccountStatus.BANNED
         isSuspended() -> AccountStatus.SUSPENDED
@@ -288,6 +366,8 @@ class User (
         isBanned = this.isBanned,
         suspendedUntil = this.suspendedUntil?.toEpochSecond(ZoneOffset.UTC),
         moderationNote = this.moderationNote,
+        premiumStatus = this.premiumStatus(),
+        premiumUntil = this.premiumUntil?.toEpochSecond(ZoneOffset.UTC),
         bio = this.bio,
         locale = this.locale,
         isAccountPublic = this.isAccountPublic,

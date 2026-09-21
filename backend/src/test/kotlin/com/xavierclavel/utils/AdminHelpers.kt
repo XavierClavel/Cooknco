@@ -24,6 +24,7 @@ import shared.dto.EmailTemplateKeyDTO
 import shared.dto.EmailTestDTO
 import shared.dto.LogPage
 import shared.dto.ModerationReasonDTO
+import shared.dto.PremiumGrantDTO
 import shared.dto.ReportDTO
 import shared.dto.ReportResolutionDTO
 import shared.dto.SearchResult
@@ -119,12 +120,14 @@ suspend fun HttpClient.listAdminUsers(
     query: String? = null,
     role: UserRole? = null,
     status: String? = null,
+    premium: String? = null,
 ): SearchResult<AdminUserInfo> =
     this.get("$ADMIN_URL/users") {
         url {
             query?.let { parameters.append("query", it) }
             role?.let { parameters.append("role", it.name) }
             status?.let { parameters.append("status", it) }
+            premium?.let { parameters.append("premium", it) }
         }
     }.let {
         assertEquals(HttpStatusCode.OK, it.status)
@@ -157,6 +160,31 @@ suspend fun HttpClient.setUserRoleRaw(id: Long, role: UserRole) =
     this.put("$ADMIN_URL/users/$id/role/${role.name}")
 
 suspend fun HttpClient.deleteUserAsAdminRaw(id: Long) = this.delete("$ADMIN_URL/users/$id")
+
+/**
+ * @param until epoch seconds, or null for a grant with no end when [forever] is set — and
+ *   for the malformed body the endpoint has to refuse when it is not.
+ */
+suspend fun HttpClient.grantPremiumRaw(id: Long, forever: Boolean = false, until: Long? = null) =
+    this.post("$ADMIN_URL/users/$id/premium") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(PremiumGrantDTO(forever = forever, until = until))
+    }
+
+suspend fun HttpClient.grantPremium(id: Long, forever: Boolean = false, until: Long? = null): AdminUserInfo =
+    this.grantPremiumRaw(id, forever, until).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminUserInfo>(it.bodyAsText())
+    }
+
+suspend fun HttpClient.revokePremiumRaw(id: Long) = this.delete("$ADMIN_URL/users/$id/premium")
+
+suspend fun HttpClient.revokePremium(id: Long): AdminUserInfo =
+    this.revokePremiumRaw(id).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        json.decodeFromString<AdminUserInfo>(it.bodyAsText())
+    }
 
 // --------------------------------------------------------------------- recipes
 

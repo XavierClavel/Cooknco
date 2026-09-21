@@ -19,6 +19,12 @@
           <option value="SUSPENDED">{{ $t('admin_status_suspended') }}</option>
           <option value="BANNED">{{ $t('admin_status_banned') }}</option>
         </select>
+        <select v-model="filters.premium" class="select" style="width:150px" @change="reset">
+          <option :value="null">{{ $t('admin_all_premium') }}</option>
+          <option value="NONE">{{ $t('admin_premium_none') }}</option>
+          <option value="UNTIL">{{ $t('admin_premium_until') }}</option>
+          <option value="FOREVER">{{ $t('admin_premium_forever') }}</option>
+        </select>
         <span class="spacer"></span>
         <button class="btn icon" :title="$t('admin_refresh')" @click="reload"><ui-icon name="refresh" /></button>
       </div>
@@ -33,6 +39,7 @@
               <th>{{ $t('mail') }}</th>
               <th>{{ $t('status') }}</th>
               <th>{{ $t('role') }}</th>
+              <th>{{ $t('admin_premium') }}</th>
               <th class="right">{{ $t('recipes') }}</th>
               <th class="right">{{ $t('admin_reports') }}</th>
               <th>{{ $t('admin_joined') }}</th>
@@ -47,6 +54,13 @@
                   <ui-thumb :src="userIconUrl(u.id, u.version)" round
                             :initials="initials(u.username)" :tint="tint(u.username)" />
                   <span class="truncate">{{ u.username }}</span>
+                  <!-- Next to the name rather than only in its own column: scanning the list
+                       for who pays is the common read, and a column further right is not
+                       where the eye already is. The tooltip is on the wrapper, not the svg:
+                       `title` on an <svg> is an attribute and shows nothing. -->
+                  <span v-if="u.premiumStatus !== 'NONE'" class="premium-mark" :title="premiumTitle(u)">
+                    <ui-icon name="star" :size="14" />
+                  </span>
                 </div>
               </td>
               <td class="muted small">{{ u.mail }}</td>
@@ -65,6 +79,24 @@
                   <option value="USER">USER</option>
                   <option value="ADMIN">ADMIN</option>
                 </select>
+              </td>
+              <td>
+                <template v-if="u.premiumStatus === 'NONE'">
+                  <span class="subtle">—</span>
+                  <!-- A grant that has run out reads as none, with the day it ended still
+                       there: that is what says the account used to pay. -->
+                  <div v-if="u.premiumUntil" class="small subtle nowrap">
+                    {{ $t('admin_premium_expired_on') }} {{ fmtDate(u.premiumUntil) }}
+                  </div>
+                </template>
+                <template v-else>
+                  <span class="badge accent">
+                    <ui-icon name="star" :size="11" />{{ $t(`admin_premium_${u.premiumStatus.toLowerCase()}`) }}
+                  </span>
+                  <div v-if="u.premiumUntil" class="small subtle nowrap">
+                    {{ $t('admin_until') }} {{ fmtDate(u.premiumUntil) }}
+                  </div>
+                </template>
               </td>
               <td class="right tnum">{{ u.recipesCount }}</td>
               <td class="right tnum">
@@ -86,6 +118,12 @@
                     <button class="btn icon" :title="$t('admin_ban')" :disabled="u.role === 'ADMIN'"
                             @click="open(u, 'ban')"><ui-icon name="ban" /></button>
                   </template>
+                  <button v-if="u.premiumStatus === 'NONE'" class="btn icon" :title="$t('admin_grant_premium')"
+                          :disabled="busyId === u.id"
+                          @click="open(u, 'premium')"><ui-icon name="star" /></button>
+                  <button v-else class="btn icon" :title="$t('admin_revoke_premium')"
+                          :disabled="busyId === u.id"
+                          @click="open(u, 'unpremium')"><ui-icon name="starOff" /></button>
                   <button class="btn icon danger-hover" :title="$t('delete')" :disabled="u.role === 'ADMIN'"
                           @click="open(u, 'delete')"><ui-icon name="trash" /></button>
                 </span>
@@ -136,6 +174,40 @@
       </template>
     </ui-modal>
 
+    <!-- premium -->
+    <ui-modal v-model="dialog.premium" :title="`${$t('admin_grant_premium')} — ${selected?.username ?? ''}`">
+      <div class="col" style="gap:12px">
+        <label class="field">
+          <span>{{ $t('admin_premium_term') }}</span>
+          <select v-model="premiumTerm" class="select">
+            <option value="UNTIL">{{ $t('admin_premium_until') }}</option>
+            <option value="FOREVER">{{ $t('admin_premium_forever') }}</option>
+          </select>
+        </label>
+        <label v-if="premiumTerm === 'UNTIL'" class="field">
+          <span>{{ $t('admin_premium_until_date') }}</span>
+          <input v-model="premiumUntil" class="input" type="date" :min="today" />
+        </label>
+        <p class="small muted">{{ $t('admin_premium_hint') }}</p>
+      </div>
+      <template #actions>
+        <button class="btn" @click="dialog.premium = false">{{ $t('cancel') }}</button>
+        <button class="btn primary" :disabled="premiumTerm === 'UNTIL' && !premiumUntil"
+                @click="confirmPremium">{{ $t('admin_grant_premium') }}</button>
+      </template>
+    </ui-modal>
+
+    <!-- end premium -->
+    <ui-modal v-model="dialog.unpremium" :title="$t('admin_revoke_premium')">
+      <div class="col" style="gap:12px">
+        <p>{{ $t('admin_revoke_premium_confirm', {username: selected?.username}) }}</p>
+      </div>
+      <template #actions>
+        <button class="btn" @click="dialog.unpremium = false">{{ $t('cancel') }}</button>
+        <button class="btn danger" @click="confirmRevokePremium">{{ $t('admin_revoke_premium') }}</button>
+      </template>
+    </ui-modal>
+
     <!-- delete -->
     <ui-modal v-model="dialog.delete" :title="$t('admin_delete_account')">
       <div class="col" style="gap:12px">
@@ -154,7 +226,8 @@
 import {onMounted, reactive, ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {
-  banUser, deleteUser, errorKey, listUsers, reinstateUser, setRole, suspendUser, verifyUser,
+  banUser, deleteUser, errorKey, grantPremium, listUsers, reinstateUser, revokePremium, setRole,
+  suspendUser, verifyUser,
 } from '../lib/api'
 import {fmtAgo, fmtDate} from '../lib/format'
 import {userIconUrl} from '../lib/images'
@@ -173,17 +246,27 @@ const page = ref(1)
 const size = ref(25)
 const total = ref(0)
 const busyId = ref<number | null>(null)
-const filters = reactive<{query: string; role: string | null; status: string | null}>({
-  query: '', role: null, status: null,
+const filters = reactive<{query: string; role: string | null; status: string | null; premium: string | null}>({
+  query: '', role: null, status: null, premium: null,
 })
 
 const selected = ref<any>(null)
-const dialog = reactive({suspend: false, ban: false, delete: false})
+const dialog = reactive({suspend: false, ban: false, delete: false, premium: false, unpremium: false})
 const days = ref(7)
 const reason = ref('')
+const premiumTerm = ref<'UNTIL' | 'FOREVER'>('UNTIL')
+/** `yyyy-mm-dd`, which is what a date input reads and writes. */
+const premiumUntil = ref('')
+const today = new Date().toISOString().slice(0, 10)
 
 const statusTone = (s: string) =>
   s === 'BANNED' ? 'danger' : s === 'SUSPENDED' ? 'warn' : s === 'UNVERIFIED' ? 'info' : 'ok'
+
+/** What the star next to a name says on hover: which grant, and when it ends. */
+const premiumTitle = (u: any) => {
+  const term = t(`admin_premium_${u.premiumStatus.toLowerCase()}`)
+  return u.premiumStatus === 'UNTIL' ? `${term} — ${t('admin_until')} ${fmtDate(u.premiumUntil)}` : term
+}
 
 const initials = (name: string) => (name || '?').slice(0, 2).toUpperCase()
 /** Stable per-name tint behind the initials, for accounts with no picture. */
@@ -230,11 +313,29 @@ async function changeRole(user: any, role: string) {
   } finally { busyId.value = null }
 }
 
-function open(user: any, which: 'suspend' | 'ban' | 'delete') {
+function open(user: any, which: 'suspend' | 'ban' | 'delete' | 'premium' | 'unpremium') {
   selected.value = user
   reason.value = ''
   days.value = 7
+  premiumTerm.value = 'UNTIL'
+  premiumUntil.value = ''
   dialog[which] = true
+}
+
+const confirmPremium = () => {
+  const u = selected.value
+  const term = premiumTerm.value
+  const date = premiumUntil.value
+  dialog.premium = false
+  // End of the chosen day, UTC: an operator picking today means "through today", and
+  // midnight would be a grant that expired before they finished reading the dialog.
+  const until = term === 'FOREVER' ? null : Math.floor(Date.parse(`${date}T23:59:59Z`) / 1000)
+  run(u, () => grantPremium(u.id, until))
+}
+
+const confirmRevokePremium = () => {
+  const u = selected.value; dialog.unpremium = false
+  run(u, () => revokePremium(u.id))
 }
 
 const confirmSuspend = () => {
@@ -262,4 +363,5 @@ onMounted(reload)
 .filters { gap: 8px; flex-wrap: wrap; }
 .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .sm-select { height: 27px; font-size: 12.5px; width: 92px; }
+.premium-mark { display: inline-flex; color: var(--c-accent); flex: none; }
 </style>

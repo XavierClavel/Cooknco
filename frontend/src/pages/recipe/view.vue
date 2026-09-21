@@ -96,7 +96,7 @@
         @click="onShareButtonClick"
         elevation="2"
       ></v-btn>
-      <admin-only>
+      <premium-only>
         <v-btn
           icon="mdi-tray-arrow-down"
           color="background"
@@ -107,7 +107,7 @@
           @click="onDownloadButtonClick"
           elevation="2"
         ></v-btn>
-      </admin-only>
+      </premium-only>
       <report-dialog v-if="!isOwner" target-type="RECIPE" :target-id="Number(recipeId)">
         <template #activator="{props}">
           <v-btn

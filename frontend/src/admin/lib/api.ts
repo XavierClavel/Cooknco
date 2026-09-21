@@ -52,6 +52,13 @@ export const banUser = (id: number, reason: string) => api.post(`/admin/users/${
 export const reinstateUser = (id: number) => api.post(`/admin/users/${id}/reinstate`)
 export const verifyUser = (id: number) => api.post(`/admin/users/${id}/verify`)
 export const deleteUser = (id: number) => api.delete(`/admin/users/${id}`)
+/**
+ * @param until epoch seconds, or null for a grant with no end. The backend refuses a body
+ *   that says neither, so the caller has to have made the choice.
+ */
+export const grantPremium = (id: number, until: number | null) =>
+  api.post(`/admin/users/${id}/premium`, until === null ? {forever: true} : {until})
+export const revokePremium = (id: number) => api.delete(`/admin/users/${id}/premium`)
 
 // ------------------------------------------------------------------ recipes
 export const listRecipes = (f: Record<string, unknown>, page: number, size: number) =>

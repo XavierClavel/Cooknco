@@ -265,6 +265,61 @@ stubbing the renderer, so the export tests assert on PDFs Chromium actually prod
 bound itself is tested against a mock engine instead (`GotenbergPdfRendererTest`), because a
 real renderer answers too fast to hold two prints open at once.
 
+## Premium is two columns, and the gate reads the row
+
+An account is premium **for good** (`users.is_premium_forever`) or **until a date**
+(`users.premium_until`), and today an operator is the only thing that sets either — from the
+backoffice users tab, `POST /admin/users/{id}/premium`. There is no billing yet; that is the
+point of the shape. Everything downstream of a subscription is built and used against a hand
+grant, and a payment provider's webhook, when there is one, calls `UserService.grantPremium`
+rather than growing a second idea of what premium means.
+
+Two columns rather than one nullable date, on the shape `is_banned` / `suspended_until`
+already has. A single date would need a sentinel for "no end" — a year 9999 that reads as a
+real expiry to every query, every listing and every operator looking at the row. Set as two,
+they cannot contradict each other: forever wins, exactly as a ban wins over a running
+suspension, and `User.premiumStatus()` resolves the precedence the way `accountStatus()`
+does. A grant that has run out reads `NONE` with its date still there — that is what tells an
+operator the account *used to* pay — while a revocation clears the date, because it is
+somebody deciding there is no grant rather than one that ended on a day nothing happened on.
+
+Three things not to undo:
+
+- **The gate reads the row, never the session.** `UserService.checkPremiumAccess` is the one
+  place premium is spelled out, and a second paid feature calls it rather than forming a
+  second opinion. A session is cached in Redis for thirty days, so a grant made this
+  afternoon would otherwise reach the user whenever they next signed out — and a revocation
+  would take just as long to bite.
+- **An ADMIN passes without a grant**, and `UserInfo.isPremium` says so. One flag, one rule:
+  what a screen offers and what a route allows cannot drift apart, and no client re-derives
+  who premium applies to. The *grant* is a separate thing and rides on `AdminUserInfo`
+  (`premiumStatus`, `premiumUntil`), which is what the backoffice manages and what
+  `AdminOverview.premiumUsersCount` counts — admins excluded, or the only figure that says
+  how many people pay for this product would be inflated by the people who do not.
+- **The refusal is a 403 with a cause**, not a 401. A caller that is signed in and refused
+  needs to be told to subscribe, not to log in again.
+
+### Opening the PDF export changed what it may contain
+
+The export is the first feature a subscription pays for, and it used to read its subject
+straight from an id with none of the visibility filtering the rest of the API applies —
+which was safe only because nobody but a moderator could ask. `ExportController` now sends
+every non-admin caller through `RecipeService.getById` and `CookbookService.getCookbook`, and
+passes `visibleTo` down to `ExportService.generateCookbookPDF`, or a subscription would buy
+the moderator-hidden recipes, the ones private profiles keep, and every recipe of a cookbook
+nobody outside it can open. An ADMIN still prints the subject as it stands: what the
+backoffice previews and what a moderator looks into are the whole of it.
+
+A book is filtered twice over — the cookbook has to be one the caller may open, and so does
+each recipe in it — and a recipe they may not read is **dropped rather than refused**. A paid
+feature that fails because of somebody else's moderation is worse than one that prints what
+the subscriber may read. The `maxCookbookRecipes` bound is counted after the filtering, so a
+refusal is about the book they would actually get.
+
+`visibleTo = null` means "print it as it stands" and belongs to the moderator path alone — it
+is *not* an anonymous reader, who cannot reach any of this: every export has a session behind
+it.
+
 ## The mobile version gate fails open, on purpose
 
 `app_versions` holds at most one row per `AppPlatform`, and **a platform with no row is not

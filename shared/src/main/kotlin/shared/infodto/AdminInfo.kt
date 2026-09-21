@@ -6,6 +6,7 @@ import shared.enums.AmountUnit
 import shared.enums.IngredientType
 import shared.enums.Locale
 import shared.enums.MeasurementType
+import shared.enums.PremiumStatus
 import shared.enums.UserRole
 import shared.overviewdto.UserOverview
 
@@ -17,6 +18,12 @@ data class AdminOverview(
     val unverifiedUsersCount: Int,
     val suspendedUsersCount: Int,
     val bannedUsersCount: Int,
+    /**
+     * Accounts holding a running grant. Admins are not counted: they pass every premium
+     * gate without one, so counting them would inflate the only figure that says how many
+     * people this product is paid for by.
+     */
+    val premiumUsersCount: Int = 0,
     val recipesCount: Int,
     val hiddenRecipesCount: Int,
     val ingredientsCount: Int,
@@ -46,6 +53,15 @@ data class AdminUserInfo(
     val isBanned: Boolean,
     val suspendedUntil: Long? = null,
     val moderationNote: String = "",
+    /**
+     * The grant itself, rather than `UserInfo.isPremium`'s "may use the premium features":
+     * an operator manages what was given out, so a lapsed grant reads [PremiumStatus.NONE]
+     * with the date it ran out still next to it, and an ADMIN with no grant of their own
+     * reads NONE here while every premium gate lets them through.
+     */
+    val premiumStatus: PremiumStatus = PremiumStatus.NONE,
+    /** When a timed grant ends — or ended. Null for a permanent grant and for none at all. */
+    val premiumUntil: Long? = null,
     val bio: String,
     /** Null while nothing has reported one for this account — see `User.locale`. */
     val locale: Locale? = null,

@@ -5,6 +5,7 @@ import com.xavierclavel.utils.logger
 import io.ktor.client.request.get
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -26,6 +27,8 @@ import main.com.xavierclavel.utils.getAdminUser
 import main.com.xavierclavel.utils.getLogs
 import main.com.xavierclavel.utils.getLogsRaw
 import main.com.xavierclavel.utils.getMe
+import main.com.xavierclavel.utils.grantPremium
+import main.com.xavierclavel.utils.grantPremiumRaw
 import main.com.xavierclavel.utils.getTrends
 import main.com.xavierclavel.utils.getTrendsRaw
 import main.com.xavierclavel.utils.getRecipe
@@ -37,6 +40,7 @@ import main.com.xavierclavel.utils.listAdminUsers
 import main.com.xavierclavel.utils.listRecipes
 import main.com.xavierclavel.utils.login
 import main.com.xavierclavel.utils.reinstateUserRaw
+import main.com.xavierclavel.utils.revokePremium
 import main.com.xavierclavel.utils.setUserRoleRaw
 import main.com.xavierclavel.utils.suspendUserRaw
 import main.com.xavierclavel.utils.unhideRecipe
@@ -47,6 +51,7 @@ import shared.enums.AmountUnit
 import shared.enums.AccountStatus
 import shared.enums.IngredientType
 import shared.enums.Locale
+import shared.enums.PremiumStatus
 import com.xavierclavel.services.AdminService
 import shared.enums.LogLevel
 import shared.enums.ReportTargetType
@@ -55,8 +60,11 @@ import shared.enums.UserRole
 import shared.infodto.LogEntryInfo
 import shared.infodto.RecipeInfo
 import shared.utils.URL.ADMIN_URL
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -244,6 +252,148 @@ class AdminControllerTest : ApplicationTest() {
             client.deleteUserAsAdminRaw(userId).apply { assertEquals(HttpStatusCode.OK, status) }
             assertTrue(client.listAdminUsers().items.none { it.id == userId })
         }
+    }
+
+    // ----------------------------------------------------------------- premium
+
+    @Test
+    fun `granting premium for good, and taking it back`() = runTest {
+        var userId: Long = 0
+        runAsUser1 { userId = client.getMe().id }
+        runAsAdmin {
+            client.grantPremium(userId, forever = true).apply {
+                assertEquals(PremiumStatus.FOREVER, premiumStatus)
+                assertNull(premiumUntil)
+            }
+            client.revokePremium(userId).apply {
+                assertEquals(PremiumStatus.NONE, premiumStatus)
+                assertNull(premiumUntil)
+            }
+        }
+    }
+
+    @Test
+    fun `granting premium until a date keeps the date`() = runTest {
+        var userId: Long = 0
+        runAsUser1 { userId = client.getMe().id }
+        val until = LocalDateTime.now().plusDays(30).withNano(0).toEpochSecond(ZoneOffset.UTC)
+        runAsAdmin {
+            client.grantPremium(userId, until = until).apply {
+                assertEquals(PremiumStatus.UNTIL, premiumStatus)
+                assertEquals(until, premiumUntil)
+            }
+        }
+    }
+
+    /**
+     * The one combination a form can produce by accident — a date left in a field after the
+     * "forever" toggle was flipped — resolves to the permanent grant and leaves nothing
+     * counting down behind it.
+     */
+    @Test
+    fun `forever wins over a date sent alongside it`() = runTest {
+        var userId: Long = 0
+        runAsUser1 { userId = client.getMe().id }
+        runAsAdmin {
+            client.grantPremium(userId, forever = true, until = LocalDateTime.now().plusDays(1).toEpochSecond(ZoneOffset.UTC))
+                .apply {
+                    assertEquals(PremiumStatus.FOREVER, premiumStatus)
+                    assertNull(premiumUntil)
+                }
+        }
+    }
+
+    /** A dated grant replaces a permanent one, which is how an operator shortens a mistake. */
+    @Test
+    fun `a date replaces a grant made for good`() = runTest {
+        var userId: Long = 0
+        runAsUser1 { userId = client.getMe().id }
+        val until = LocalDateTime.now().plusDays(7).withNano(0).toEpochSecond(ZoneOffset.UTC)
+        runAsAdmin {
+            client.grantPremium(userId, forever = true)
+            client.grantPremium(userId, until = until).apply {
+                assertEquals(PremiumStatus.UNTIL, premiumStatus)
+                assertEquals(until, premiumUntil)
+            }
+        }
+    }
+
+    @Test
+    fun `a grant that says neither forever nor until when is refused`() = runTest {
+        var userId: Long = 0
+        runAsUser1 { userId = client.getMe().id }
+        runAsAdmin {
+            client.grantPremiumRaw(userId).apply {
+                assertEquals(HttpStatusCode.BadRequest, status)
+                assertContains(bodyAsText(), "premium_grant_has_no_term")
+            }
+            assertEquals(PremiumStatus.NONE, client.getAdminUser(userId).premiumStatus)
+        }
+    }
+
+    /** A mistyped year would report success and change nothing an operator can see. */
+    @Test
+    fun `a grant that has already run out is refused`() = runTest {
+        var userId: Long = 0
+        runAsUser1 { userId = client.getMe().id }
+        runAsAdmin {
+            client.grantPremiumRaw(userId, until = LocalDateTime.now().minusDays(1).toEpochSecond(ZoneOffset.UTC))
+                .apply {
+                    assertEquals(HttpStatusCode.BadRequest, status)
+                    assertContains(bodyAsText(), "premium_expiry_in_the_past")
+                }
+        }
+    }
+
+    @Test
+    fun `users can be filtered by the grant they hold`() = runTest {
+        var user1: Long = 0
+        var user2: Long = 0
+        runAsUser1 { user1 = client.getMe().id }
+        runAsUser2 { user2 = client.getMe().id }
+        runAsAdmin {
+            client.grantPremium(user1, forever = true)
+            client.grantPremium(user2, until = LocalDateTime.now().plusDays(3).toEpochSecond(ZoneOffset.UTC))
+
+            assertEquals(listOf(user1), client.listAdminUsers(premium = "FOREVER").items.map { it.id })
+            assertEquals(listOf(user2), client.listAdminUsers(premium = "UNTIL").items.map { it.id })
+            // Only the admin is left, who holds no grant of their own
+            assertTrue(client.listAdminUsers(premium = "NONE").items.none { it.id == user1 || it.id == user2 })
+        }
+    }
+
+    /**
+     * An admin passes every premium gate without a grant, and the figure that says how many
+     * people pay for this product must not count them.
+     */
+    @Test
+    fun `the overview counts subscribers and not the admins`() = runTest {
+        var userId: Long = 0
+        runAsUser1 { userId = client.getMe().id }
+        runAsAdmin {
+            assertEquals(0, client.getAdminOverview().premiumUsersCount)
+            client.grantPremium(userId, forever = true)
+            assertEquals(1, client.getAdminOverview().premiumUsersCount)
+        }
+    }
+
+    /**
+     * What the clients gate on. An admin reads premium without holding a grant, because the
+     * gate lets them through — one flag, one rule, and no screen offering a button its route
+     * would refuse.
+     */
+    @Test
+    fun `a subscriber and an admin both read as premium on their own profile`() = runTest {
+        var userId: Long = 0
+        runAsUser1 {
+            userId = client.getMe().id
+            assertFalse(client.getMe().isPremium)
+        }
+        runAsAdmin {
+            assertTrue(client.getMe().isPremium)
+            client.grantPremium(userId, forever = true)
+        }
+        runAsUser1 { assertTrue(client.getMe().isPremium) }
     }
 
     // ----------------------------------------------------------------- recipes

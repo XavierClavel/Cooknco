@@ -83,11 +83,12 @@ fun CookbookScreen(
     cookbookId: Long,
     currentUserId: Long,
     /**
-     * Whether the signed-in account moderates this product — not whether it administers
-     * this cookbook, which is [CookbookUiState.isAdmin] and a different thing entirely.
-     * Only the first is offered the export; see [com.xavierclavel.cooknco.ui.recipe.RecipeScreen].
+     * Whether the signed-in account may use the premium features — not whether it
+     * administers this cookbook, which is [CookbookUiState.isAdmin] and a different thing
+     * entirely. Only the first is offered the export; see
+     * [com.xavierclavel.cooknco.ui.recipe.RecipeScreen].
      */
-    isSiteAdmin: Boolean,
+    canExport: Boolean,
     onNavigateToEdit: (Long) -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateToRecipe: (Long) -> Unit = {},
@@ -118,7 +119,7 @@ fun CookbookScreen(
                 recipes = uiState.recipes,
                 members = uiState.members,
                 isAdmin = uiState.isAdmin,
-                isSiteAdmin = isSiteAdmin,
+                canExport = canExport,
                 currentUserId = currentUserId,
                 error = uiState.error,
                 onLeave = viewModel::confirmLeave,
@@ -181,8 +182,8 @@ private fun CookbookContent(
     recipes: List<CookbookRecipeInfo>,
     members: List<CookbookUserInfo>,
     isAdmin: Boolean,
-    /** Site admin, not cookbook admin — see [CookbookScreen]. */
-    isSiteAdmin: Boolean,
+    /** Premium, not cookbook admin — see [CookbookScreen]. */
+    canExport: Boolean,
     currentUserId: Long,
     error: String?,
     onLeave: () -> Unit,
@@ -209,10 +210,11 @@ private fun CookbookContent(
                         if (isAdmin) {
                             add(SheetAction(label = s.editCookbook, onClick = onEdit, icon = Icons.Outlined.Edit))
                         }
-                        // Site admins only: the export prints every recipe the book holds,
-                        // reading each straight from its id, so the route behind it is
-                        // closed to everyone else — including this cookbook's own admins.
-                        if (isSiteAdmin) {
+                        // Subscribers only: the export is what a premium account buys, and
+                        // the route behind it refuses everyone else — including this
+                        // cookbook's own admins. What comes back holds the recipes the
+                        // caller may read and no others, so nothing here has to filter.
+                        if (canExport) {
                             add(
                                 SheetAction(
                                     label = s.exportCookbookPdf,
@@ -610,7 +612,7 @@ fun CookbookContentPreview() {
                 recipes = previewRecipes,
                 members = previewMembers,
                 isAdmin = true,
-                isSiteAdmin = true,
+                canExport = true,
                 currentUserId = 1L,
                 error = null,
                 onLeave = {},
@@ -632,7 +634,7 @@ fun CookbookContentMemberPreview() {
                 recipes = previewRecipes,
                 members = previewMembers,
                 isAdmin = false,
-                isSiteAdmin = false,
+                canExport = false,
                 currentUserId = 2L,
                 error = null,
                 onLeave = {},

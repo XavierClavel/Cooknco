@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <addColumn tableName="users">
+            <column name="is_premium_forever" type="boolean" defaultValue="false" notnull="true"/>
+            <column name="premium_until" type="localdatetime"/>
+        </addColumn>
+    </changeSet>
+</migration>

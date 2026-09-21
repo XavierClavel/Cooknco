@@ -46,7 +46,7 @@ async function deleteRecipe(id) {
 /**
  * Saves a recipe as a PDF.
  *
- * Admin-only, and the backend enforces it: the button lives inside `<admin-only>`.
+ * Premium, and the backend enforces it: the button lives inside `<premium-only>`.
  */
 async function downloadRecipe(id) {
   return await downloadPdf(`/export/recipe/${id}?locale=${getLocale()}`, `recipe-${id}.pdf`)

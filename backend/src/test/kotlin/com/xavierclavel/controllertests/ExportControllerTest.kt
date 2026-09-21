@@ -18,6 +18,7 @@ import main.com.xavierclavel.utils.exportCookbookRaw
 import main.com.xavierclavel.utils.exportRecipe
 import main.com.xavierclavel.utils.exportRecipeRaw
 import main.com.xavierclavel.utils.getCookbookRecipes
+import main.com.xavierclavel.utils.hideRecipe
 import main.com.xavierclavel.utils.pageInContents
 import main.com.xavierclavel.utils.readPdfImages
 import main.com.xavierclavel.utils.readPdfPages
@@ -26,17 +27,21 @@ import main.com.xavierclavel.utils.sampleCookbookDto
 import main.com.xavierclavel.utils.savePdfTemplateRaw
 import main.com.xavierclavel.utils.sessionToken
 import main.com.xavierclavel.utils.testImageBytes
+import main.com.xavierclavel.utils.updateSettings
 import main.com.xavierclavel.utils.uploadRecipeImage
 import org.junit.jupiter.api.Test
 import shared.dto.CookbookDTO
 import shared.dto.RecipeDTO
+import shared.dto.UserSettingsDTO
 import shared.enums.AmountUnit
 import shared.enums.UnitSystem
 import shared.enums.Locale
 import shared.enums.PdfDocumentKind
+import shared.enums.Visibility
 import shared.infodto.CookbookInfo
 import shared.infodto.RecipeInfo
 import shared.utils.URL.EXPORT_URL
+import java.time.LocalDateTime
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -62,6 +67,20 @@ class ExportControllerTest : ApplicationTest() {
         tips = "Serve warm",
     )
 
+    /**
+     * A grant written straight onto the row rather than through `/admin/users/{id}/premium`:
+     * what is under test here is the gate, and going through the endpoint would make every
+     * one of these tests fail for the endpoint's reasons as well as their own.
+     */
+    private fun grantPremiumForever(mail: String) {
+        userService.getEntityById(userService.findByMail(mail).id).grantPremiumForever().update()
+    }
+
+    /** The same, dated — including with a date already past, which the endpoint refuses. */
+    private fun grantPremiumUntil(mail: String, until: LocalDateTime) {
+        userService.getEntityById(userService.findByMail(mail).id).grantPremiumUntil(until).update()
+    }
+
     // ----------------------------------------------------------- authorisation
 
     @Test
@@ -72,20 +91,75 @@ class ExportControllerTest : ApplicationTest() {
     }
 
     @Test
-    fun `export is closed to regular users, including on their own recipes`() = runTest {
+    fun `export is closed to an account with no subscription, including on its own recipes`() = runTest {
         var recipe: RecipeInfo? = null
         runAsUser1 {
             recipe = client.createRecipe()
-            client.exportRecipeRaw(recipe!!.id).apply { assertEquals(HttpStatusCode.Unauthorized, status) }
+            client.exportRecipeRaw(recipe!!.id).apply {
+                assertEquals(HttpStatusCode.Forbidden, status)
+                // A cause the client can act on: the caller is signed in and needs to
+                // subscribe, not to log in again
+                assertContains(bodyAsText(), "premium_required")
+            }
         }
         // and the recipe is still exportable by an admin, so the refusal is about the caller
         runAsAdmin { client.exportRecipeRaw(recipe!!.id).apply { assertEquals(HttpStatusCode.OK, status) } }
     }
 
+    @Test
+    fun `a subscriber exports`() = runTest {
+        grantPremiumForever(USER1)
+        runAsUser1 {
+            val recipe = client.createRecipe(fullRecipe)
+            client.exportRecipeRaw(recipe.id).apply { assertEquals(HttpStatusCode.OK, status) }
+        }
+    }
+
+    @Test
+    fun `a grant that has not run out yet exports`() = runTest {
+        grantPremiumUntil(USER1, LocalDateTime.now().plusDays(1))
+        runAsUser1 {
+            val recipe = client.createRecipe(fullRecipe)
+            client.exportRecipeRaw(recipe.id).apply { assertEquals(HttpStatusCode.OK, status) }
+        }
+    }
+
+    /**
+     * The whole point of a dated grant: it stops on its own, with nothing running to notice.
+     * Written straight onto the row because the endpoint refuses a date already past — which
+     * is a different rule, tested where it lives.
+     */
+    @Test
+    fun `a grant that has run out is no grant`() = runTest {
+        grantPremiumUntil(USER1, LocalDateTime.now().minusMinutes(1))
+        runAsUser1 {
+            val recipe = client.createRecipe(fullRecipe)
+            client.exportRecipeRaw(recipe.id).apply { assertEquals(HttpStatusCode.Forbidden, status) }
+        }
+    }
+
+    /**
+     * A revoked grant bites on the next request rather than at the next sign-in: the gate
+     * reads the row, not the session it was authenticated with — and that session lives for
+     * thirty days.
+     */
+    @Test
+    fun `a grant revoked mid-session stops the very next export`() = runTest {
+        grantPremiumForever(USER1)
+        runAsUser1 {
+            val recipe = client.createRecipe(fullRecipe)
+            client.exportRecipeRaw(recipe.id).apply { assertEquals(HttpStatusCode.OK, status) }
+
+            userService.revokePremium(userService.findByMail(USER1).id)
+
+            client.exportRecipeRaw(recipe.id).apply { assertEquals(HttpStatusCode.Forbidden, status) }
+        }
+    }
+
     /**
      * The app's way in. It holds a session token and no cookie jar, so the export it offers
-     * its admins reaches the same routes over `Authorization: Bearer` — see the
-     * `admin-bearer` provider in `configureAuthentication`.
+     * reaches the same routes over `Authorization: Bearer` — see the `bearer-auth` provider
+     * in `configureAuthentication`.
      *
      * Deliberately driven from a client that has never signed in, so the token is the only
      * thing that can be authenticating the call.
@@ -108,13 +182,70 @@ class ExportControllerTest : ApplicationTest() {
     }
 
     @Test
-    fun `a regular user's bearer token exports nothing`() = runTest {
+    fun `an unsubscribed user's bearer token exports nothing`() = runTest {
         var recipe: RecipeInfo? = null
         runAsAdmin { recipe = client.createRecipe() }
         val token = newNoRedirectClient().sessionToken(USER1, password)
 
         newNoRedirectClient().exportRecipeRaw(recipe!!.id, token = token).apply {
-            assertEquals(HttpStatusCode.Unauthorized, status)
+            assertEquals(HttpStatusCode.Forbidden, status)
+        }
+    }
+
+    /** The app's way in again, for the caller the feature is actually sold to. */
+    @Test
+    fun `a subscriber exports with a bearer token`() = runTest {
+        var recipe: RecipeInfo? = null
+        runAsUser1 { recipe = client.createRecipe(fullRecipe) }
+        grantPremiumForever(USER1)
+        val token = newNoRedirectClient().sessionToken(USER1, password)
+
+        newNoRedirectClient().exportRecipeRaw(recipe!!.id, token = token).apply {
+            assertEquals(HttpStatusCode.OK, status)
+        }
+    }
+
+    // ------------------------------------------------------------ what it may contain
+
+    /**
+     * The constraint a subscription brought with it. An export used to read its subject
+     * straight from an id because only moderators could ask; a paid feature that kept doing
+     * that would sell the recipes a private account keeps to anyone who subscribed.
+     */
+    @Test
+    fun `a subscriber cannot export a recipe they cannot see`() = runTest {
+        var recipe: RecipeInfo? = null
+        runAsUser2 {
+            client.updateSettings(UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+            recipe = client.createRecipe(fullRecipe)
+        }
+        grantPremiumForever(USER1)
+        runAsUser1 {
+            client.exportRecipeRaw(recipe!!.id).apply { assertEquals(HttpStatusCode.Forbidden, status) }
+        }
+        // and the same recipe still prints for a moderator, so the refusal is about the subject
+        runAsAdmin { client.exportRecipeRaw(recipe!!.id).apply { assertEquals(HttpStatusCode.OK, status) } }
+    }
+
+    @Test
+    fun `a subscriber cannot export a recipe moderation has hidden`() = runTest {
+        var recipe: RecipeInfo? = null
+        runAsUser2 { recipe = client.createRecipe(fullRecipe) }
+        runAsAdmin { client.hideRecipe(recipe!!.id, "spam") }
+        grantPremiumForever(USER1)
+        runAsUser1 {
+            client.exportRecipeRaw(recipe!!.id).apply { assertEquals(HttpStatusCode.Forbidden, status) }
+        }
+    }
+
+    /** What a moderator looks into is the whole of it, which is why they are not filtered. */
+    @Test
+    fun `an admin still exports a hidden recipe`() = runTest {
+        var recipe: RecipeInfo? = null
+        runAsUser2 { recipe = client.createRecipe(fullRecipe) }
+        runAsAdmin {
+            client.hideRecipe(recipe!!.id, "spam")
+            client.exportRecipeRaw(recipe!!.id).apply { assertEquals(HttpStatusCode.OK, status) }
         }
     }
 
@@ -330,13 +461,70 @@ class ExportControllerTest : ApplicationTest() {
     }
 
     /**
-     * Membership is not what opens the export: a cookbook is every member's, and printing
-     * one prints recipes whose owners never agreed to be handed out as a file.
+     * Membership is not what opens the export — a subscription is. A member without one
+     * gets the refusal that names what to do about it.
      */
     @Test
-    fun `cookbook export is closed to its own members`() = runTestAsUser {
+    fun `cookbook export is closed to an unsubscribed member`() = runTestAsUser {
         val cookbook = cookbookOf("Chocolate cake")
-        client.exportCookbookRaw(cookbook.id).apply { assertEquals(HttpStatusCode.Unauthorized, status) }
+        client.exportCookbookRaw(cookbook.id).apply {
+            assertEquals(HttpStatusCode.Forbidden, status)
+            assertContains(bodyAsText(), "premium_required")
+        }
+    }
+
+    @Test
+    fun `a subscriber exports a cookbook they can open`() = runTest {
+        grantPremiumForever(USER1)
+        runAsUser1 {
+            val cookbook = cookbookOf("Chocolate cake")
+            client.exportCookbookRaw(cookbook.id).apply { assertEquals(HttpStatusCode.OK, status) }
+        }
+    }
+
+    @Test
+    fun `a subscriber cannot export a cookbook they cannot open`() = runTest {
+        var cookbook: CookbookInfo? = null
+        runAsUser2 { cookbook = client.createCookbook(CookbookDTO(title = "Privé", visibility = Visibility.PRIVATE)) }
+        grantPremiumForever(USER1)
+        runAsUser1 {
+            client.exportCookbookRaw(cookbook!!.id).apply { assertEquals(HttpStatusCode.Forbidden, status) }
+        }
+    }
+
+    /**
+     * The book is filtered recipe by recipe as well as as a whole: being in somebody's
+     * cookbook is one of the things that makes a recipe visible to them, and a recipe
+     * moderation has hidden is past all of that.
+     *
+     * Printed short rather than refused — a paid feature that fails because of somebody
+     * else's moderation is worse than one that prints what the subscriber may read.
+     */
+    @Test
+    fun `a hidden recipe drops out of a subscriber's book and stays in a moderator's`() = runTest {
+        var kept: RecipeInfo? = null
+        var hidden: RecipeInfo? = null
+        runAsUser2 {
+            kept = client.createRecipe(fullRecipe.copy(title = "Almond tart"))
+            hidden = client.createRecipe(fullRecipe.copy(title = "Burnt offering"))
+        }
+        var cookbook: CookbookInfo? = null
+        runAsUser1 {
+            cookbook = client.createCookbook()
+            client.addCookbookRecipe(cookbook!!.id, kept!!.id)
+            client.addCookbookRecipe(cookbook!!.id, hidden!!.id)
+        }
+        runAsAdmin { client.hideRecipe(hidden!!.id, "spam") }
+
+        grantPremiumForever(USER1)
+        runAsUser1 {
+            val text = readPdfText(client.exportCookbook(cookbook!!.id))
+            assertContains(text, "Almond tart")
+            assertFalse("Burnt offering" in text, "a hidden recipe was printed into a subscriber's book")
+        }
+        runAsAdmin {
+            assertContains(readPdfText(client.exportCookbook(cookbook!!.id)), "Burnt offering")
+        }
     }
 
     // ------------------------------------------------------------------ output

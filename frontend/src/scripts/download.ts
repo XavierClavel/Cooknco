@@ -8,8 +8,8 @@ export {
  * Fetches a PDF export and hands it to the browser as a download.
  *
  * Rejects on failure rather than logging, so the caller can tell the user the download did
- * not happen — every export here is admin-only and the backend enforces that, so a refusal
- * is something the operator needs to see rather than a state to render around.
+ * not happen — the buttons are only shown to an account the export is open to, so a
+ * refusal is something the user needs to see rather than a state to render around.
  *
  * @param path the export endpoint, below the API root
  * @param fallbackName what to save as when the response names nothing

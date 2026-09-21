@@ -75,9 +75,8 @@ class ExportService: KoinComponent {
      * The sheet for a recipe, as PDF.
      *
      * @param unitSystem which ladder to print the amounts on. A parameter rather than a
-     *   lookup of whoever asked: a sheet is a thing to print and hand over, and the export
-     *   is admin-only, so what it should read in is the caller's to say — the same reason
-     *   [locale] is one.
+     *   lookup of whoever asked: a sheet is a thing to print and hand over, so what it
+     *   should read in is the caller's to say — the same reason [locale] is one.
      * @param body the layout to use, or null for the one in service. The backoffice passes
      *   the draft sitting in its editor, so a preview shows what an operator is about to
      *   save rather than what is saved.
@@ -126,17 +125,22 @@ class ExportService: KoinComponent {
      * long one.
      *
      * @param body the layout to use, or null for the one in service. See [generatePDF].
+     * @param visibleTo the account the book is being printed for, whose visibility rules
+     *   every recipe in it must pass. Null prints the book as it stands and belongs to the
+     *   moderator export alone — see [RecipeService.findByCookbook].
      */
     suspend fun generateCookbookPDF(
         cookbook: CookbookInfo,
         locale: Locale,
         unitSystem: UnitSystem = UnitSystem.DEFAULT,
         body: String? = null,
+        visibleTo: Long? = null,
     ): ByteArray {
         val max = configuration.pdf.maxCookbookRecipes
         // One more than the bound, so the same read that fetches the book also says whether
-        // it is over it.
-        val entities = recipeService.findByCookbook(cookbook.id, max + 1)
+        // it is over it. The bound is counted after the filtering, so a subscriber is
+        // refused over the book they would actually get rather than over its full length.
+        val entities = recipeService.findByCookbook(cookbook.id, max + 1, visibleTo)
         if (entities.size > max) throw BadRequestException(BadRequestCause.COOKBOOK_TOO_LARGE_TO_EXPORT)
 
         val cover = pictureOf(ImageBucket.COOKBOOK, cookbook.id, cookbook.version, "cookbook ${cookbook.id}")

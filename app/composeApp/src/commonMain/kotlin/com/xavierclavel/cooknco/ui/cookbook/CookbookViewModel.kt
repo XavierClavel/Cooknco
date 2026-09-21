@@ -31,7 +31,7 @@ data class CookbookUiState(
     val showDeleteConfirm: Boolean = false,
     val isDeleting: Boolean = false,
     val deleted: Boolean = false,
-    /** Only ever moves for an admin: nobody else is offered the action that starts it. */
+    /** Only ever moves for a subscriber: nobody else is offered the action that starts it. */
     val export: PdfExportState = PdfExportState(),
 )
 

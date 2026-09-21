@@ -177,6 +177,12 @@ begin
   select count(*) into n from recipes_steps;
   if n <> 5 then raise exception 'the old steps were destroyed: % rows left', n; end if;
 
+  -- 1.52: premium exists, and nobody was handed one. A default that came out true, or a
+  -- date backfilled from anywhere, would open the PDF export to the whole install base on
+  -- deploy.
+  select count(*) into n from users where is_premium_forever or premium_until is not null;
+  if n <> 0 then raise exception '% accounts came out of the migration premium', n; end if;
+
   raise notice 'ALL ASSERTIONS PASSED';
 end $$;
 SQL

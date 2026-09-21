@@ -40,7 +40,7 @@ data class RecipeUiState(
      */
     val cookbooks: List<CookbookRecipeStatus> = emptyList(),
     val cookbookPicker: CookbookPickerState? = null,
-    /** Only ever moves for an admin: nobody else is offered the action that starts it. */
+    /** Only ever moves for a subscriber: nobody else is offered the action that starts it. */
     val export: PdfExportState = PdfExportState(),
 ) {
     /** Whether the recipe is filed anywhere, which is what the bookmark shows. */
