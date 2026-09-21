@@ -61,6 +61,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.xavierclavel.cooknco.ui.components.PdfExportHost
+import com.xavierclavel.cooknco.ui.components.PremiumLockDialog
+import com.xavierclavel.cooknco.ui.components.premiumSheetAction
 import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.ui.theme.stickerSwitchSpec
@@ -85,8 +87,8 @@ fun CookbookScreen(
     /**
      * Whether the signed-in account may use the premium features — not whether it
      * administers this cookbook, which is [CookbookUiState.isAdmin] and a different thing
-     * entirely. Only the first is offered the export; see
-     * [com.xavierclavel.cooknco.ui.recipe.RecipeScreen].
+     * entirely. Only the first has the export unlocked, and the rest are shown it locked;
+     * see [com.xavierclavel.cooknco.ui.recipe.RecipeScreen].
      */
     canExport: Boolean,
     onNavigateToEdit: (Long) -> Unit,
@@ -197,6 +199,8 @@ private fun CookbookContent(
 ) {
     val s = strings()
     var showMenu by remember { mutableStateOf(false) }
+    /** The label of the locked row that was tapped, which is what its dialog names. */
+    var lockedFeature by remember { mutableStateOf<String?>(null) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
@@ -210,19 +214,20 @@ private fun CookbookContent(
                         if (isAdmin) {
                             add(SheetAction(label = s.editCookbook, onClick = onEdit, icon = Icons.Outlined.Edit))
                         }
-                        // Subscribers only: the export is what a premium account buys, and
-                        // the route behind it refuses everyone else — including this
-                        // cookbook's own admins. What comes back holds the recipes the
-                        // caller may read and no others, so nothing here has to filter.
-                        if (canExport) {
-                            add(
-                                SheetAction(
-                                    label = s.exportCookbookPdf,
-                                    onClick = onExport,
-                                    icon = Icons.Outlined.FileDownload,
-                                )
+                        // Shown to everyone, and locked for those who have not paid for
+                        // it: the export is what a premium account buys, and the route
+                        // behind it refuses the rest — including this cookbook's own
+                        // admins. What comes back holds the recipes the caller may read
+                        // and no others, so nothing here has to filter.
+                        add(
+                            premiumSheetAction(
+                                label = s.exportCookbookPdf,
+                                icon = Icons.Outlined.FileDownload,
+                                isPremium = canExport,
+                                onUse = onExport,
+                                onLocked = { lockedFeature = s.exportCookbookPdf },
                             )
-                        }
+                        )
                         add(
                             SheetAction(
                                 label = s.leaveCookbook,
@@ -401,6 +406,12 @@ private fun CookbookContent(
                 )
             }
         }
+    }
+
+    // Outside the list, like the confirmations the screen above mounts: it is a dialog,
+    // and the sheet it is opened from has dismissed itself by the time it is up.
+    lockedFeature?.let { feature ->
+        PremiumLockDialog(feature = feature, onDismissRequest = { lockedFeature = null })
     }
 }
 
