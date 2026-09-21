@@ -522,6 +522,11 @@ object FrStrings : Strings {
     override val reportTargetGone = "Ce contenu n'existe plus."
     override val reportFailed = "Votre signalement n'a pas pu être envoyé."
 
+    override val premiumLocked = "Fonctionnalité premium"
+    override val premiumFeatureTitle = "Une fonctionnalité premium"
+    override fun premiumFeatureMessage(feature: String) =
+        "« $feature » est réservé aux comptes premium."
+
     override val exportRecipePdf = "Exporter en PDF"
     override val exportCookbookPdf = "Exporter le carnet en PDF"
     override val preparingPdf = "Préparation du PDF…"

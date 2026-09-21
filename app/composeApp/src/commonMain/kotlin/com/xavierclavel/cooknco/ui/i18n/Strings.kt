@@ -453,7 +453,17 @@ interface Strings {
     val reportTargetGone: String
     val reportFailed: String
 
-    // ── Exporting a PDF, which only an admin is offered ───────────────────────
+    // ── Premium, and what a locked feature says when it is tapped ─────────────
+    /** The padlock on a locked action sheet row, for a screen reader. */
+    val premiumLocked: String
+    val premiumFeatureTitle: String
+    /**
+     * Names the feature that was tapped rather than saying "this feature": the sheet is
+     * gone by the time the dialog is up, so the row it came from cannot be pointed at.
+     */
+    fun premiumFeatureMessage(feature: String): String
+
+    // ── Exporting a PDF, which a premium account is offered ───────────────────
     val exportRecipePdf: String
     val exportCookbookPdf: String
     val preparingPdf: String

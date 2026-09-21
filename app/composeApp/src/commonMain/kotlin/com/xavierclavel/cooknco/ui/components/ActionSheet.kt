@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,9 +39,10 @@ import com.xavierclavel.cooknco.ui.theme.sheetScrim
 /**
  * One line of a [StickerActionSheet].
  *
- * [destructive] is the only styling a caller gets to choose, and it is a property of the
- * action rather than a colour argument: the sheet decides what destructive looks like, so
- * deleting a recipe and deleting a cookbook cannot end up different reds.
+ * [destructive] and [locked] are the only styling a caller gets to choose, and they are
+ * properties of the action rather than colour arguments: the sheet decides what each looks
+ * like, so deleting a recipe and deleting a cookbook cannot end up different reds, and two
+ * locked features cannot end up two different kinds of unavailable.
  */
 data class SheetAction(
     val label: String,
@@ -50,6 +53,16 @@ data class SheetAction(
      * same text indent as one with, so a partly-iconned sheet does not come out ragged.
      */
     val icon: ImageVector? = null,
+    /**
+     * Shown dimmed, behind a padlock, and still tappable — a locked row is how a feature
+     * this account cannot use is advertised rather than hidden.
+     *
+     * The sheet does not decide what tapping one does: an action that is locked is expected
+     * to carry an [onClick] that explains the lock, not one that runs the feature and is
+     * refused. Which is why this dims rather than disables — a row nothing happens on reads
+     * as a broken sheet, and leaves the person no way to find out why.
+     */
+    val locked: Boolean = false,
 )
 
 /**
@@ -117,6 +130,7 @@ fun StickerActionSheet(
                             ActionSheetRow(
                                 label = action.label,
                                 icon = action.icon,
+                                locked = action.locked,
                                 textColor = if (action.destructive) MaterialTheme.colorScheme.error else CookncoNavy,
                                 onClick = { onDismissRequest(); action.onClick() },
                             )
@@ -148,8 +162,13 @@ private fun ActionSheetRow(
     label: String,
     onClick: () -> Unit,
     icon: ImageVector? = null,
+    locked: Boolean = false,
     textColor: Color = CookncoNavy,
 ) {
+    val s = strings()
+    // Faded rather than greyed: the sheet is cream, so a grey would read as a second colour
+    // in it. The same navy at half strength reads as the same row, turned down.
+    val tint = if (locked) textColor.copy(alpha = 0.45f) else textColor
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -162,10 +181,22 @@ private fun ActionSheetRow(
         // A Box either way, so the labels line up whether or not a given action has an icon.
         Box(modifier = Modifier.size(22.dp), contentAlignment = Alignment.Center) {
             if (icon != null) {
-                Icon(imageVector = icon, contentDescription = null, tint = textColor)
+                Icon(imageVector = icon, contentDescription = null, tint = tint)
             }
         }
-        Text(text = label, fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = textColor)
+        Text(text = label, fontSize = 15.5.sp, fontWeight = FontWeight.Bold, color = tint)
+        if (locked) {
+            // On the trailing edge, so the row still opens with what it does and the lock
+            // qualifies it — and the leading icon stays what it was, so a locked export and
+            // an unlocked one are recognisably the same action.
+            Spacer(Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.Outlined.Lock,
+                contentDescription = s.premiumLocked,
+                tint = tint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 

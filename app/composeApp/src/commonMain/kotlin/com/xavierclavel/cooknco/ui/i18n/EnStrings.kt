@@ -513,6 +513,11 @@ object EnStrings : Strings {
     override val reportTargetGone = "This content no longer exists."
     override val reportFailed = "Your report could not be sent."
 
+    override val premiumLocked = "Premium feature"
+    override val premiumFeatureTitle = "A premium feature"
+    override fun premiumFeatureMessage(feature: String) =
+        "“$feature” is reserved for premium accounts."
+
     override val exportRecipePdf = "Export as PDF"
     override val exportCookbookPdf = "Export the cookbook as PDF"
     override val preparingPdf = "Preparing the PDF…"

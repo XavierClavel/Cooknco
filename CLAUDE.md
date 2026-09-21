@@ -299,6 +299,24 @@ Three things not to undo:
 - **The refusal is a 403 with a cause**, not a 401. A caller that is signed in and refused
   needs to be told to subscribe, not to log in again.
 
+### In the app, a paid feature is shown locked rather than hidden
+
+The export sits on the recipe and cookbook action sheets for everybody. Without a grant the
+row is dimmed behind a padlock, and tapping it says which feature it was and that premium
+opens it (`premiumSheetAction`, `PremiumLockDialog`). Hiding it instead — which is how it
+shipped — leaves the people who might pay for it the only ones never told it exists: nothing
+else in the app names what a subscription buys.
+
+What a locked row must never do is call the feature and be refused. The route answers a
+non-subscriber `403`, so a row still wired to the export would spend a print's worth of
+waiting to arrive at "the PDF could not be prepared" — a failure's wording for something
+working exactly as intended. `premiumSheetAction` therefore *replaces* the action rather
+than decorating it, and both screens go through it so they cannot come to different ideas of
+what locked means. `PremiumLockTest` holds that.
+
+The dialog offers no way to subscribe, because there is none yet. When there is something to
+sell, it is the one place a call to action goes.
+
 ### Opening the PDF export changed what it may contain
 
 The export is the first feature a subscription pays for, and it used to read its subject

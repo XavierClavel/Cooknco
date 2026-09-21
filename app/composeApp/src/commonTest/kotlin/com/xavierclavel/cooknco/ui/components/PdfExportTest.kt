@@ -11,8 +11,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The two decisions the export makes with no screen and no server involved: who is offered
- * one, and what a refusal is called.
+ * The two decisions the export makes with no screen and no server involved: who it is
+ * unlocked for, and what a refusal is called. What a locked row then does is
+ * [PremiumLockTest].
  */
 class PdfExportTest {
 
@@ -32,13 +33,14 @@ class PdfExportTest {
     )
 
     /**
-     * The export is offered on one flag, and the backend sets it — including for an admin,
+     * The export is unlocked on one flag, and the backend sets it — including for an admin,
      * who holds no grant but passes every premium gate. Nothing here re-derives that, so
      * the app cannot come to a different answer than the route it is about to call, and a
-     * response that says nothing leaves the export unoffered rather than unparsed.
+     * response that says nothing leaves the export locked rather than unparsed. Locked, not
+     * hidden: the row is on the sheet either way, and says why it will not open.
      */
     @Test
-    fun only_a_premium_account_is_offered_an_export() {
+    fun only_a_premium_account_has_the_export_unlocked() {
         assertTrue(user(isPremium = true).isPremium)
         assertFalse(user().isPremium)
     }

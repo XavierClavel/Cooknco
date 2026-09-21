@@ -86,6 +86,8 @@ import com.xavierclavel.cooknco.ui.components.StepImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.cookbook.AddToCookbookSheet
 import com.xavierclavel.cooknco.ui.components.PdfExportHost
+import com.xavierclavel.cooknco.ui.components.PremiumLockDialog
+import com.xavierclavel.cooknco.ui.components.premiumSheetAction
 import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.network.ReportTargetType
@@ -142,8 +144,8 @@ fun RecipeScreen(
     /**
      * Whether the signed-in account may use the premium features, which today is the
      * export and nothing else. The gate that counts is the server's — the route behind it
-     * refuses anyone else — this one keeps an action nobody else can complete off the
-     * sheet.
+     * refuses anyone else — this one decides whether the sheet's export runs or explains
+     * itself. False does not hide it: see [com.xavierclavel.cooknco.ui.components.premiumSheetAction].
      */
     canExport: Boolean,
     onNavigateToEdit: (Long) -> Unit,
@@ -264,6 +266,8 @@ private fun RecipeContent(
     var selectedTab by rememberSaveable { mutableStateOf(RecipeTab.INGREDIENTS) }
     var showMenu by rememberSaveable { mutableStateOf(false) }
     var showReport by rememberSaveable { mutableStateOf(false) }
+    /** The label of the locked row that was tapped, which is what its dialog names. */
+    var lockedFeature by rememberSaveable { mutableStateOf<String?>(null) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -465,6 +469,7 @@ private fun RecipeContent(
                     isOwner = isOwner,
                     canExport = canExport,
                     onExport = onExport,
+                    onExportLocked = { lockedFeature = s.exportRecipePdf },
                     onShare = onShare,
                     onEdit = onEdit,
                     onDelete = onDelete,
@@ -585,6 +590,10 @@ private fun RecipeContent(
             targetLabel = recipe.title,
             onDismissRequest = { showReport = false },
         )
+    }
+
+    lockedFeature?.let { feature ->
+        PremiumLockDialog(feature = feature, onDismissRequest = { lockedFeature = null })
     }
 }
 
@@ -1027,6 +1036,7 @@ private fun RecipeActionSheet(
     canExport: Boolean,
     onShare: () -> Unit,
     onExport: () -> Unit,
+    onExportLocked: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onReport: () -> Unit,
@@ -1047,13 +1057,20 @@ private fun RecipeActionSheet(
             if (!isOwner) {
                 add(SheetAction(label = s.reportRecipe, onClick = onReport, icon = Icons.Outlined.Flag))
             }
-            // Subscribers only: the export is what a premium account buys, and the route
-            // behind this refuses everyone else. It prints only what the caller may read,
-            // so an account that reaches it cannot print a recipe this screen would not
-            // have shown them either.
-            if (canExport) {
-                add(SheetAction(label = s.exportRecipePdf, onClick = onExport, icon = Icons.Outlined.FileDownload))
-            }
+            // Shown to everyone, and locked for those who have not paid for it: the
+            // export is what a premium account buys, and the route behind it refuses the
+            // rest. Tapping it locked explains that instead of spending a print's wait on
+            // a 403. What comes back holds only what the caller may read, so an account
+            // that does reach it cannot print a recipe this screen would not have shown.
+            add(
+                premiumSheetAction(
+                    label = s.exportRecipePdf,
+                    icon = Icons.Outlined.FileDownload,
+                    isPremium = canExport,
+                    onUse = onExport,
+                    onLocked = onExportLocked,
+                )
+            )
             if (isOwner) {
                 add(SheetAction(label = s.editRecipe, onClick = onEdit, icon = Icons.Outlined.Edit))
                 add(
