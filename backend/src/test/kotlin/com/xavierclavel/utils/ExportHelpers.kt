@@ -2,6 +2,12 @@ package main.com.xavierclavel.utils
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import kotlinx.serialization.json.Json
+import shared.infodto.CooklangImportInfo
+import shared.utils.URL.RECIPE_URL
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsBytes
@@ -121,3 +127,34 @@ fun readPdfImages(pdf: ByteArray): List<ByteArray> =
 /** The pixel size of an embedded picture, to tell a full-frame upload from a small default. */
 fun dimensionsOfPdfImage(image: ByteArray): Pair<Int, Int> =
     ImageIO.read(ByteArrayInputStream(image)).let { it.width to it.height }
+
+// ------------------------------------------------------------------- cooklang
+
+/** See [exportRecipeRaw] for [token]. */
+suspend fun HttpClient.exportRecipeAsCooklangRaw(
+    recipeId: Long,
+    locale: Locale? = null,
+    token: String? = null,
+): HttpResponse =
+    this.get("$EXPORT_URL/recipe/$recipeId/cooklang") {
+        token?.let { bearerAuth(it) }
+        url { locale?.let { parameters.append("locale", it.name) } }
+    }
+
+suspend fun HttpClient.exportRecipeAsCooklang(recipeId: Long, locale: Locale? = null): String =
+    this.exportRecipeAsCooklangRaw(recipeId, locale).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        it.bodyAsText()
+    }
+
+suspend fun HttpClient.importCooklangRaw(source: String, locale: Locale? = null): HttpResponse =
+    this.post("$RECIPE_URL/import/cooklang") {
+        setBody(source)
+        url { locale?.let { parameters.append("locale", it.name) } }
+    }
+
+suspend fun HttpClient.importCooklang(source: String, locale: Locale? = null): CooklangImportInfo =
+    this.importCooklangRaw(source, locale).let {
+        assertEquals(HttpStatusCode.OK, it.status)
+        Json.decodeFromString<CooklangImportInfo>(it.bodyAsText())
+    }

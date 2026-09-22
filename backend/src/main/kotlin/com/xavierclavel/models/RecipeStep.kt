@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import com.xavierclavel.models.jointables.RecipeStepIngredient
+import shared.dto.RECIPE_STEP_TEXT_MAX_LENGTH
 import shared.dto.RecipeDTO
 
 /**
@@ -44,7 +45,7 @@ class RecipeStep(
     @ManyToOne
     var recipe: Recipe? = null,
 
-    @Column(length = 255)
+    @Column(length = RECIPE_STEP_TEXT_MAX_LENGTH)
     var text: String = "",
 
     /** Null means no timer, which is what nearly every step means. See [RecipeDTO.RecipeStepDTO]. */

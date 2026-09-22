@@ -1,6 +1,6 @@
 import apiClient from '@/plugins/axios.js';
 import {getLocale} from "@/scripts/localization";
-import {downloadPdf} from "@/scripts/download";
+import {downloadFile, downloadPdf} from "@/scripts/download";
 
 export {
   getRecipe,
@@ -9,6 +9,8 @@ export {
   updateRecipe,
   deleteRecipe,
   downloadRecipe,
+  downloadRecipeAsCooklang,
+  importCooklang,
 }
 
 async function getRecipe(id) {
@@ -50,4 +52,36 @@ async function deleteRecipe(id) {
  */
 async function downloadRecipe(id) {
   return await downloadPdf(`/export/recipe/${id}?locale=${getLocale()}`, `recipe-${id}.pdf`)
+}
+
+/**
+ * Saves a recipe as a Cooklang file.
+ *
+ * Premium like the PDF, and enforced the same way: the button lives inside `<premium-only>`
+ * and the route refuses anyone else. No `unitSystem` — a `.cook` file is loaded by another
+ * app rather than read by a person, so it goes out in the units it was written in and
+ * whatever opens it converts for whoever is looking.
+ */
+async function downloadRecipeAsCooklang(id) {
+  return await downloadFile(
+    `/export/recipe/${id}/cooklang?locale=${getLocale()}`,
+    `recipe-${id}.cook`,
+    'text/x-cooklang',
+  )
+}
+
+/**
+ * Reads a Cooklang file and answers with the recipe to fill the editor in with.
+ *
+ * Saves nothing — see `CooklangService` — so what comes back is what the editor should show,
+ * not a recipe that now exists. Open to any signed-in account, unlike the export: getting a
+ * collection *into* the product is not what a subscription is for.
+ *
+ * Posted as text rather than as a form: the body is the file, and there is nothing else to
+ * send with it.
+ */
+async function importCooklang(source: string) {
+  return await apiClient.post(`/recipe/import/cooklang?locale=${getLocale()}`, source, {
+    headers: {'Content-Type': 'text/plain'},
+  })
 }

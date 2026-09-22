@@ -519,6 +519,15 @@ object EnStrings : Strings {
         "“$feature” is reserved for premium accounts."
 
     override val exportRecipePdf = "Export as PDF"
+    override val exportRecipeCooklang = "Export as Cooklang"
+    override val importCooklang = "Import a Cooklang file"
+    override val importCooklangHint = "Fills the form in from a .cook file. Nothing already typed is replaced."
+    override val importCooklangDone = "The file was imported. Check it over before saving."
+    override fun importCooklangUnmatched(count: Int) =
+        "$count ingredient(s) came through as free text, because the catalogue holds no obvious match."
+    override val importCooklangSplit = "A step was longer than one step may be, and was split in two."
+    override val importCooklangEmpty = "There is no recipe in this file."
+    override val importCooklangFailed = "This file could not be imported."
     override val exportCookbookPdf = "Export the cookbook as PDF"
     override val preparingPdf = "Preparing the PDF…"
     override val exportFailedTitle = "Export failed"

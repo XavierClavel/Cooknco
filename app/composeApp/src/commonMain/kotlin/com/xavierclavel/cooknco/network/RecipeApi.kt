@@ -4,6 +4,7 @@ import com.xavierclavel.cooknco.network.dto.IngredientSearchResult
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
+import com.xavierclavel.cooknco.network.dto.CooklangImportDto
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.dto.UnitInfo
 import io.ktor.client.HttpClient
@@ -107,6 +108,27 @@ class RecipeApi(private val client: HttpClient) {
             throw ApiException(response.status, response.bodyAsText())
         }
         return response.body()
+    }
+
+    /**
+     * Reads a Cooklang file and answers with the recipe it describes, **saving nothing**.
+     *
+     * Needs no subscription, unlike the export: getting a collection *into* the product is
+     * not what premium is for. The body is the file itself — there is nothing to send with
+     * it — and the locale is what the ingredients are looked up in, so a French file
+     * imported by a French app finds French ingredients.
+     */
+    suspend fun importCooklang(token: String, source: String, locale: String): CooklangImportDto {
+        val response = client.post("$base/recipe/import/cooklang") {
+            bearerAuth(token)
+            contentType(ContentType.Text.Plain)
+            parameter("locale", locale)
+            setBody(source)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+        return response.decodeJsonText()
     }
 
     suspend fun updateRecipe(id: Long, token: String, dto: RecipeSaveDto): RecipeInfo {

@@ -8,6 +8,37 @@
 
     <v-form @submit.prevent="submit" class="mx-auto" ref="form">
 
+      <!--
+        Only while creating. An import fills blanks and appends, so on an existing recipe it
+        would read as "add this file to that recipe" - which is a thing to want, and not what
+        anyone would expect a button labelled "import" to do.
+      -->
+      <div v-if="recipeId == null" class="d-flex align-center mb-4">
+        <v-btn
+          prepend-icon="mdi-file-upload-outline"
+          variant="tonal"
+          :loading="importing"
+          @click="cooklangInput?.click()"
+        >{{ $t('import_cooklang') }}</v-btn>
+        <span class="text-caption ml-3">{{ $t('import_cooklang_hint') }}</span>
+        <input
+          ref="cooklangInput"
+          type="file"
+          accept=".cook,text/plain"
+          class="d-none"
+          @change="onCooklangFileSelected"
+        />
+      </div>
+
+      <v-alert
+        v-if="importMessage"
+        type="info"
+        variant="tonal"
+        class="mb-4"
+        closable
+        @click:close="importMessage = null"
+      >{{ importMessage }}</v-alert>
+
       <v-text-field
         v-model="recipe.title"
         :label="`${$t('title')}`"
@@ -280,7 +311,7 @@
 import { ref } from 'vue';
 import draggable from 'vuedraggable';
 import { useRoute } from 'vue-router';
-import {getRecipe, createRecipe, updateRecipe} from "@/scripts/recipes";
+import {getRecipe, createRecipe, updateRecipe, importCooklang} from "@/scripts/recipes";
 import {defaultImageRecipe, toErrorMessage, toViewRecipe} from "@/scripts/common";
 import {searchIngredients} from "@/scripts/ingredients";
 import EditablePicture from "@/components/EditablePicture.vue";
@@ -300,6 +331,9 @@ let recipeId = ref(route.query.id)
 const ready = ref(false)
 const editablePicture = ref(null)
 const errorMessage = ref(null)
+const importMessage = ref(null)
+const importing = ref(false)
+const cooklangInput = ref(null)
 
 const autocompleteList = ref([])
 const queryList = ref([])
@@ -482,6 +516,89 @@ async function submit() {
   }
 
   toViewRecipe(recipeId.value)
+}
+
+/**
+ * Fills the editor in from a Cooklang file.
+ *
+ * **Nothing already written is overwritten.** A field that has been filled in keeps what was
+ * typed, and ingredients and steps are appended — the same rule the app's scanner follows,
+ * and for the same reason: an import that replaced the form would make a mis-picked file
+ * cost whatever had been written, while one that only adds is undone by deleting some rows.
+ *
+ * The parsing is the backend's, not this page's. A `.cook` file has to be matched against the
+ * ingredient catalogue to be worth anything, and that is a query rather than a guess — so
+ * what comes back is already the recipe, with the rows the catalogue placed carrying its ids
+ * and the rest left as free text.
+ */
+async function onCooklangFileSelected(event) {
+  const file = event.target.files?.[0]
+  // Cleared straight away so that picking the same file twice fires `change` both times.
+  event.target.value = ''
+  if (!file) return
+
+  importing.value = true
+  importMessage.value = null
+  try {
+    const {data} = await importCooklang(await file.text())
+    prefillFrom(data)
+  } catch (error) {
+    console.log(error)
+    errorMessage.value = toErrorMessage(error)
+  } finally {
+    importing.value = false
+  }
+}
+
+/** See [onCooklangFileSelected]. `imported` is a `CooklangImportInfo`. */
+function prefillFrom(imported) {
+  const parsed = imported.recipe
+  const blank = (value) => value == null || value === ''
+
+  if (blank(recipe.value.title)) recipe.value.title = parsed.title
+  if (blank(recipe.value.description)) recipe.value.description = parsed.description
+  if (blank(recipe.value.tips)) recipe.value.tips = parsed.tips
+  if (blank(recipe.value.yield)) recipe.value.yield = parsed.yield
+  if (blank(recipe.value.preparationTime)) recipe.value.preparationTime = parsed.preparationTime
+  if (blank(recipe.value.cookingTime)) recipe.value.cookingTime = parsed.cookingTime
+  if (blank(recipe.value.cookingTemperature)) recipe.value.cookingTemperature = parsed.cookingTemperature
+  if (blank(recipe.value.dishClass)) recipe.value.dishClass = parsed.dishClass
+
+  // The row positions a step points at are positions in the *imported* list, so they shift by
+  // however many ingredients the form already held.
+  const offset = recipe.value.ingredients.length
+  parsed.ingredients.forEach((item, index) => {
+    recipe.value.ingredients.push({
+      ingredient: {
+        id: item.id,
+        name: imported.ingredientNames[index] ?? item.customName,
+        // Unknown for a row the catalogue placed until the picker asks; a free-text row has
+        // no capability data at all, which is what lets it keep the unit the file named.
+        allowedTypes: undefined,
+        isCustom: item.id == null,
+      },
+      amount: item.amount,
+      unit: findUnitOption(item.unit),
+      complement: item.complement ?? "",
+    })
+    queryList.value.push(imported.ingredientNames[index] ?? item.customName ?? '')
+    autocompleteList.value.push([])
+  })
+
+  const steps = parsed.steps.map((step) => ({
+    ...step,
+    ingredients: (step.ingredients ?? []).map((it) => ({...it, index: it.index + offset})),
+  }))
+  // The one step a new form starts on is a placeholder, not something somebody wrote.
+  const existing = recipe.value.steps.filter((it) => it.text)
+  recipe.value.steps = [...existing, ...steps]
+
+  const notes = []
+  if (imported.unmatchedIngredients > 0) {
+    notes.push(t('import_cooklang_unmatched', {count: imported.unmatchedIngredients}))
+  }
+  if (imported.stepsWereSplit) notes.push(t('import_cooklang_split'))
+  importMessage.value = notes.length ? notes.join(' ') : t('import_cooklang_done')
 }
 
 // Not awaited with the units: nothing on this page reads it until an ingredient is picked,

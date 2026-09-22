@@ -287,11 +287,23 @@ class RecipeViewModel(
      * refuses past that, so a double tap would answer the second one with a failure dialog
      * over a perfectly good export.
      */
-    fun exportPdf() {
+    fun exportPdf() = export { exportRepo.exportRecipe(recipeId) }
+
+    /**
+     * The same recipe as a Cooklang file.
+     *
+     * Shares the export state, and so the spinner, the failure dialog and the save picker,
+     * with the PDF: the two differ in what comes back and in nothing the user can see while
+     * it is being fetched. Which picker the document then opens is decided by its own
+     * `mimeType` — see [com.xavierclavel.cooknco.ui.components.PdfExportHost].
+     */
+    fun exportCooklang() = export { exportRepo.exportRecipeAsCooklang(recipeId) }
+
+    private fun export(fetch: suspend () -> Result<com.xavierclavel.cooknco.network.ExportedDocument>) {
         if (_uiState.value.export.isExporting) return
         viewModelScope.launch {
             _uiState.update { it.copy(export = PdfExportState(isExporting = true)) }
-            exportRepo.exportRecipe(recipeId)
+            fetch()
                 .onSuccess { document -> _uiState.update { it.copy(export = PdfExportState(document = document)) } }
                 .onFailure { error ->
                     _uiState.update { it.copy(export = PdfExportState(error = pdfExportFailure(error))) }

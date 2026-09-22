@@ -1,5 +1,7 @@
 package com.xavierclavel.cooknco.network
 
+import com.xavierclavel.cooknco.platform.COOKLANG_MIME_TYPE
+import com.xavierclavel.cooknco.platform.PDF_MIME_TYPE
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -18,7 +20,16 @@ import io.ktor.http.isSuccess
  * recipe's own title into it (`ExportService.filenameOf`), and a file the user is about to
  * save somewhere should be called what the web app's download is called.
  */
-class ExportedDocument(val filename: String, val bytes: ByteArray)
+class ExportedDocument(
+    val filename: String,
+    val bytes: ByteArray,
+    /**
+     * What the file is, for the platform's save picker. Carried on the document rather than
+     * decided where it is saved, because the only thing that knows which export this was is
+     * the call that asked for it.
+     */
+    val mimeType: String = PDF_MIME_TYPE,
+)
 
 /**
  * `GET /export/…`, the same two routes the backoffice's export buttons call.
@@ -39,6 +50,31 @@ class ExportApi(private val client: HttpClient) {
         unitSystem: String,
     ): ExportedDocument =
         export("$base/export/recipe/$recipeId", token, locale, unitSystem, "recipe-$recipeId.pdf")
+
+    /**
+     * The same recipe as a Cooklang file.
+     *
+     * No `unitSystem`, unlike the two above: a `.cook` file is loaded by another app rather
+     * than read by a person, so it goes out in the units the recipe was written in and
+     * whatever opens it converts for whoever is looking. Premium on the server exactly as
+     * the PDF is.
+     */
+    suspend fun exportRecipeAsCooklang(
+        token: String,
+        recipeId: Long,
+        locale: String,
+    ): ExportedDocument {
+        val response = client.get("$base/export/recipe/$recipeId/cooklang") {
+            bearerAuth(token)
+            parameter("locale", locale)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return ExportedDocument(
+            filename = response.filename() ?: "recipe-$recipeId.cook",
+            bytes = response.readRawBytes(),
+            mimeType = COOKLANG_MIME_TYPE,
+        )
+    }
 
     suspend fun exportCookbook(
         token: String,

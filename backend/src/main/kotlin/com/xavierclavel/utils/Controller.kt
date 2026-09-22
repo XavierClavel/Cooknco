@@ -11,6 +11,7 @@ import shared.enums.Locale
 import shared.enums.Sort
 import io.ebean.Paging
 import io.ktor.http.ContentType
+import io.ktor.http.withCharset
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
@@ -149,17 +150,37 @@ suspend fun RoutingContext.receiveImage(maxBytes: Long? = null): Pair<BufferedIm
  * Stops one byte past the limit rather than trusting the declared `Content-Length`, so what is
  * held in memory is bounded whatever the caller said it was sending — or said nothing at all,
  * as a chunked body does.
+ *
+ * @param cause what the caller is told when there was more. Pictures are what this bounded
+ *   first and are still its default, but the refusal has to name what was actually too big:
+ *   an oversized recipe file told it was an image is an error nobody can act on.
  */
-private fun InputStream.readBounded(limit: Long?): ByteArray {
+fun InputStream.readBounded(
+    limit: Long?,
+    cause: BadRequestCause = BadRequestCause.IMAGE_TOO_LARGE,
+): ByteArray {
     if (limit == null) return readBytes()
     val bytes = readNBytes((limit + 1).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
-    if (bytes.size > limit) throw BadRequestException(BadRequestCause.IMAGE_TOO_LARGE)
+    if (bytes.size > limit) throw BadRequestException(cause)
     return bytes
 }
 
 suspend fun RoutingCall.respondPDF(filename: String, content: ByteArray) {
     response.header("Content-Disposition", "attachment; filename=\"$filename\"")
     respondBytes(content, contentType = ContentType.Application.Pdf)
+}
+
+/**
+ * A text document the caller is meant to save rather than read in the browser.
+ *
+ * UTF-8 is stated on the content type rather than left to the default, because the file is
+ * full of recipe titles and ingredient names: a `.cook` written by this product routinely
+ * carries accents, and a reader that guesses Latin-1 turns them into mojibake in a file
+ * somebody is about to keep.
+ */
+suspend fun RoutingCall.respondTextFile(filename: String, content: String, contentType: ContentType) {
+    response.header("Content-Disposition", "attachment; filename=\"$filename\"")
+    respondBytes(content.toByteArray(Charsets.UTF_8), contentType = contentType.withCharset(Charsets.UTF_8))
 }
 
 suspend fun RoutingContext.checkUserEditionRights(userId: Long) {

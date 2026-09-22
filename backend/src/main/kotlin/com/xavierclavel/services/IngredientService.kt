@@ -21,6 +21,7 @@ import com.xavierclavel.utils.DbTransaction.updateAndGet
 import com.xavierclavel.utils.sqlStringLiteral
 import shared.enums.AmountUnit
 import shared.enums.Locale
+import java.text.Normalizer
 import shared.enums.Sort
 import shared.infodto.IngredientInfo
 
@@ -213,6 +214,71 @@ class IngredientService: KoinComponent {
         }
 
         return Pair(query.findCount(), query.setPaging(paging).findList().map{it.toInfo()})
+    }
+
+    /**
+     * The catalogue entries named exactly by any of [names], in [locale].
+     *
+     * "Exactly" in the sense the scanner means it: case and accents aside, and a trailing
+     * plural aside, because a file says "Pommes" where the catalogue says "pomme". Nothing
+     * looser belongs here — [search] is fuzzy by design, so that it can find "farine" from
+     * "fari", and its best answer to "sel" is a salt of some kind rather than salt. An
+     * ingredient quietly replaced by a near neighbour reads as correct and is wrong in the
+     * nutrition, so a name this does not place is left to the caller as free text.
+     *
+     * One query for the whole list rather than one each: an import matches every ingredient
+     * of a recipe at once. `unaccent` and `lower` are PostgreSQL's, which no query bean
+     * predicate expresses — the column is named through `Alias` and the names are bound, as
+     * `raw()` requires.
+     *
+     * @return the matching entries, keyed by the folded name they were found under. Both the
+     *   singular and the plural of a hit are keys of it, so a caller looks up whichever form
+     *   it holds without folding twice.
+     */
+    fun findByNames(names: Collection<String>, locale: Locale): Map<String, IngredientInfo> {
+        val wanted = names.map { fold(it) }.filter { it.isNotBlank() }.toSet()
+        if (wanted.isEmpty()) return emptyMap()
+
+        // Both forms of each name, so that the catalogue's singular is found from a file's
+        // plural and the other way round. The comparison below is what decides; this only
+        // has to be a superset of it.
+        val candidates = wanted.flatMap { listOf(it, it.removeSuffix("s"), it + "s") }.toSet()
+        val placeholders = candidates.joinToString(",") { "?" }
+
+        val found = QIngredient()
+            .and()
+                .translations.locale.eq(locale)
+                .raw(
+                    "lower(unaccent(${QIngredient.Alias.translations.name})) in ($placeholders)",
+                    *candidates.toTypedArray(),
+                )
+            .endAnd()
+            .findList()
+
+        val byName = mutableMapOf<String, IngredientInfo>()
+        found.forEach { ingredient ->
+            val name = ingredient.translations.find { it.locale == locale }?.name ?: return@forEach
+            val key = fold(name).removeSuffix("s")
+            val info = ingredient.toInfo()
+            // Singular and plural both point at it. `putIfAbsent`, so that two catalogue
+            // entries differing only by a plural do not silently take each other's place —
+            // the first is kept and the second stays unmatched, which is free text rather
+            // than the wrong ingredient.
+            byName.putIfAbsent(key, info)
+            byName.putIfAbsent(key + "s", info)
+        }
+        return byName
+    }
+
+    /** Case, accents and surrounding space removed — the form names are compared in. */
+    private fun fold(value: String): String =
+        DIACRITICS.replace(Normalizer.normalize(value.trim(), Normalizer.Form.NFD), "")
+            .lowercase()
+            .replace(Regex("\\s+"), " ")
+
+    private companion object {
+        /** Combining marks, which is what an accent decomposes into under NFD. */
+        private val DIACRITICS = Regex("\\p{Mn}+")
     }
 
 

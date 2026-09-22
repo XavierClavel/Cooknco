@@ -27,6 +27,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.network.ApiException
 import com.xavierclavel.cooknco.network.ExportedDocument
+import com.xavierclavel.cooknco.platform.COOKLANG_MIME_TYPE
+import com.xavierclavel.cooknco.platform.PDF_MIME_TYPE
 import com.xavierclavel.cooknco.platform.rememberDocumentSaver
 import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.stringsFor
@@ -81,10 +83,16 @@ fun PdfExportHost(
     onErrorDismissed: () -> Unit,
 ) {
     val s = strings()
-    val saver = rememberDocumentSaver()
+    // One launcher per kind, both registered from the first composition rather than one
+    // rebuilt when a document arrives: Android registers the create-document contract with
+    // the type it is for, and a launcher that appeared in the same recomposition as the
+    // document it has to save is one racing its own registration.
+    val pdfSaver = rememberDocumentSaver(PDF_MIME_TYPE)
+    val cooklangSaver = rememberDocumentSaver(COOKLANG_MIME_TYPE)
 
     LaunchedEffect(state.document) {
         val document = state.document ?: return@LaunchedEffect
+        val saver = if (document.mimeType == COOKLANG_MIME_TYPE) cooklangSaver else pdfSaver
         saver.save(document.filename, document.bytes)
         onSaved()
     }

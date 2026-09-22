@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Flag
@@ -198,6 +199,7 @@ fun RecipeScreen(
                 onStartCooking = { onNavigateToCookMode(recipe.id, uiState.selectedYield) },
                 onNavigateToIngredient = onNavigateToIngredient,
                 onExport = viewModel::exportPdf,
+                onExportCooklang = viewModel::exportCooklang,
             )
         }
     }
@@ -246,6 +248,7 @@ private fun RecipeContent(
     onToggleLike: () -> Unit,
     onShare: () -> Unit,
     onExport: () -> Unit,
+    onExportCooklang: () -> Unit,
     onEdit: () -> Unit,
     onAddToCookbook: () -> Unit,
     onDelete: () -> Unit,
@@ -470,6 +473,8 @@ private fun RecipeContent(
                     canExport = canExport,
                     onExport = onExport,
                     onExportLocked = { lockedFeature = s.exportRecipePdf },
+                    onExportCooklang = onExportCooklang,
+                    onExportCooklangLocked = { lockedFeature = s.exportRecipeCooklang },
                     onShare = onShare,
                     onEdit = onEdit,
                     onDelete = onDelete,
@@ -1037,6 +1042,8 @@ private fun RecipeActionSheet(
     onShare: () -> Unit,
     onExport: () -> Unit,
     onExportLocked: () -> Unit,
+    onExportCooklang: () -> Unit,
+    onExportCooklangLocked: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onReport: () -> Unit,
@@ -1069,6 +1076,18 @@ private fun RecipeActionSheet(
                     isPremium = canExport,
                     onUse = onExport,
                     onLocked = onExportLocked,
+                )
+            )
+            // The same recipe in a form another cooking app can open, rather than one a
+            // person can hold. Premium and locked by the same rule: it is the recipe
+            // leaving the product either way.
+            add(
+                premiumSheetAction(
+                    label = s.exportRecipeCooklang,
+                    icon = Icons.Outlined.Description,
+                    isPremium = canExport,
+                    onUse = onExportCooklang,
+                    onLocked = onExportCooklangLocked,
                 )
             )
             if (isOwner) {
@@ -1127,6 +1146,7 @@ fun RecipeScreenPreview() {
                 onToggleLike = {},
                 onShare = {},
                 onExport = {},
+                onExportCooklang = {},
                 onEdit = {},
                 onAddToCookbook = {},
                 onDelete = {},
