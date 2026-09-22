@@ -104,7 +104,19 @@
           class="mb-10 text-h6"
           min-height="70px"
           min-width="70px"
+          :title="`${$t('export_pdf')}`"
           @click="onDownloadButtonClick"
+          elevation="2"
+        ></v-btn>
+        <v-btn
+          icon="mdi-file-code-outline"
+          color="background"
+          flat
+          class="mb-10 text-h6"
+          min-height="70px"
+          min-width="70px"
+          :title="`${$t('export_cooklang')}`"
+          @click="onDownloadCooklangButtonClick"
           elevation="2"
         ></v-btn>
       </premium-only>
@@ -332,7 +344,7 @@
 
 <script lang="ts" setup>
 import { useRoute } from 'vue-router';
-import {deleteRecipe, downloadRecipe, getRecipe} from "@/scripts/recipes";
+import {deleteRecipe, downloadRecipe, downloadRecipeAsCooklang, getRecipe} from "@/scripts/recipes";
 import {ref} from "vue";
 import {
   defaultImageIngredient,
@@ -453,6 +465,13 @@ const onShareButtonClick = () => {
 
 const onDownloadButtonClick = () => {
   downloadRecipe(recipeId).catch(function (error) {
+    console.log(error)
+    notify(t('unknown_error'))
+  })
+}
+
+const onDownloadCooklangButtonClick = () => {
+  downloadRecipeAsCooklang(recipeId).catch(function (error) {
     console.log(error)
     notify(t('unknown_error'))
   })

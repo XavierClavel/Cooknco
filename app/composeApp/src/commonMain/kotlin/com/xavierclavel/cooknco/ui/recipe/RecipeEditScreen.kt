@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.DragIndicator
+import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -92,6 +93,8 @@ import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.network.dto.displayName
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberCameraCapture
+import com.xavierclavel.cooknco.platform.COOKLANG_PICKER_MIME_TYPES
+import com.xavierclavel.cooknco.platform.rememberTextFilePicker
 import com.xavierclavel.cooknco.platform.rememberRecipeScanner
 import kotlinx.coroutines.delay
 import com.xavierclavel.cooknco.platform.rememberImagePicker
@@ -288,6 +291,13 @@ fun RecipeEditScreen(
     // from a lazy item is unregistered the moment that item scrolls out of the viewport,
     // and the result of a scan that was already running would then have nowhere to arrive.
     val scanner = rememberRecipeScanner(onScanned = viewModel::onScanned)
+    // Remembered here for the same reason, and for a second one: the picker opens a window
+    // of the system's, so this composition can be stopped and restarted while the file is
+    // being chosen.
+    val cooklangPicker = rememberTextFilePicker(
+        mimeTypes = COOKLANG_PICKER_MIME_TYPES,
+        onPicked = viewModel::importCooklang,
+    )
 
     LaunchedEffect(uiState.saved) {
         if (uiState.saved) {
@@ -301,6 +311,15 @@ fun RecipeEditScreen(
         if (uiState.scanMessage != null) {
             delay(4000)
             viewModel.dismissScanMessage()
+        }
+    }
+
+    // The same, for an import. Longer, because what it has to say is longer: a count of the
+    // ingredients the catalogue did not hold is a line to read rather than a word to notice.
+    LaunchedEffect(uiState.importMessage) {
+        if (uiState.importMessage != null) {
+            delay(6000)
+            viewModel.dismissImportMessage()
         }
     }
 
@@ -337,12 +356,13 @@ fun RecipeEditScreen(
             // recipe yet, and a button that publishes what it calls a draft is worse than
             // no button. PUBLISH at the end of the wizard is the only save.
             //
-            // Scanning is the only thing behind the "···", and it is offered on a recipe
-            // being written rather than on one being edited: what a scan does to the editor
-            // is add to it, and a page dropped into a recipe that already exists is far more
-            // likely to be a mistake than an intention. With nothing else in the menu, an
-            // editor opened on an existing recipe therefore has no button at all rather than
-            // one that opens an empty sheet.
+            // Behind the "···" are the two ways of filling the editor in from somewhere
+            // else — a scanned page and a Cooklang file — and both are offered on a recipe
+            // being written rather than on one being edited: what they do to the editor is
+            // add to it, and a page or a file dropped into a recipe that already exists is
+            // far more likely to be a mistake than an intention. With nothing else in the
+            // menu, an editor opened on an existing recipe therefore has no button at all
+            // rather than one that opens an empty sheet.
             if (uiState.recipeId == null) {
                 val menuFill by animateColorAsState(
                     targetValue = if (menuOpen) CookncoNavy else CookncoBackground,
@@ -366,19 +386,30 @@ fun RecipeEditScreen(
         }
 
         if (menuOpen) {
-            // The sheet explains the scan rather than merely naming it: "we'll fill in what
-            // we can read" is the whole contract — the editor is still where the recipe is
-            // written, and the scan is a first draft of it rather than a result to accept or
-            // reject. That is also why there is no review screen between the two: what would
-            // be reviewed is exactly the form underneath.
+            // The sheet explains the two rather than merely naming them: "we fill in what we
+            // can read, and nothing already typed is replaced" is the whole contract — the
+            // editor is still where the recipe is written, and either way in produces a first
+            // draft of it rather than a result to accept or reject. That is also why there is
+            // no review screen after them: what would be reviewed is exactly the form
+            // underneath. One sentence serves both because it is the same promise; only the
+            // source differs, a page held up to a camera or a file somebody sent.
+            //
+            // The import carries no padlock, unlike the export it is the reverse of. Getting
+            // a collection *into* the product is how somebody arrives with it, and charging
+            // at the door is the wrong toll.
             StickerActionSheet(
                 title = s.newRecipe,
-                subtitle = s.scanARecipeSubtitle,
+                subtitle = s.newRecipeSubtitle,
                 actions = listOf(
                     SheetAction(
                         label = s.scanARecipe,
                         onClick = scanner::launch,
                         icon = Icons.Outlined.DocumentScanner,
+                    ),
+                    SheetAction(
+                        label = s.importCooklang,
+                        onClick = cooklangPicker::launch,
+                        icon = Icons.Outlined.FileOpen,
                     ),
                 ),
                 onDismissRequest = { menuOpen = false },
@@ -411,11 +442,18 @@ fun RecipeEditScreen(
             }
         }
 
-        // ── Scan status ──────────────────────────────────────────────────────
-        // The scan happens in a window of its own and what it reads lands across three of
-        // the four steps, so it reports here rather than beside the menu that started it:
-        // by the time there is anything to say, whatever opened the scanner is gone.
-        if (uiState.isScanning || uiState.scanMessage != null) {
+        // ── Scan and import status ───────────────────────────────────────────
+        // Both happen in a window of their own and what they read lands across three of the
+        // four steps, so they report here rather than beside the menu that started them: by
+        // the time there is anything to say, whatever opened the scanner or the picker is
+        // gone.
+        //
+        // One strip for the two, because only one of them can be running: the menu is the
+        // only way into either and it closes on the way, and the view models refuse a second
+        // start while one is in flight.
+        val busy = uiState.isScanning || uiState.isImporting
+        val statusMessage = uiState.scanMessage ?: uiState.importMessage
+        if (busy || statusMessage != null) {
             StickerCard(
                 modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 10.dp),
                 shape = RoundedCornerShape(14.dp),
@@ -426,7 +464,7 @@ fun RecipeEditScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(9.dp),
                 ) {
-                    if (uiState.isScanning) {
+                    if (busy) {
                         CircularProgressIndicator(
                             color = CookncoNavy,
                             strokeWidth = 2.dp,
@@ -434,10 +472,10 @@ fun RecipeEditScreen(
                         )
                     }
                     Text(
-                        text = uiState.scanMessage ?: s.scanning,
+                        text = statusMessage ?: if (uiState.isImporting) s.importing else s.scanning,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (uiState.scanMessage != null) CookncoOrange else CookncoNavy,
+                        color = if (statusMessage != null) CookncoOrange else CookncoNavy,
                         lineHeight = 17.sp,
                     )
                 }

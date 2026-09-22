@@ -12,6 +12,7 @@ import com.xavierclavel.services.DefaultImageService
 import com.xavierclavel.services.DeviceService
 import com.xavierclavel.services.EmailTemplateService
 import com.xavierclavel.services.EncryptionService
+import com.xavierclavel.services.CooklangService
 import com.xavierclavel.services.ExportService
 import com.xavierclavel.services.GotenbergPdfRenderer
 import com.xavierclavel.services.FollowService
@@ -107,6 +108,7 @@ abstract class ApplicationTest: KoinTest {
                 single { ImageUploadTicketService() }
                 single { DefaultImageService() }
                 single { ExportService() }
+                single { CooklangService() }
                 single { LikeService() }
                 single { MailService() }
                 single { CookbookService() }

@@ -3,6 +3,9 @@ package com.xavierclavel.controllers
 import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.models.User
 import com.xavierclavel.services.CookbookService
+import com.xavierclavel.services.CooklangService
+import com.xavierclavel.services.CooklangService.Companion.COOKLANG_EXTENSION
+import com.xavierclavel.services.CooklangService.Companion.COOKLANG_MEDIA_TYPE
 import com.xavierclavel.services.ExportService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.UserService
@@ -10,10 +13,12 @@ import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.respondPDF
+import com.xavierclavel.utils.respondTextFile
 import shared.enums.Locale
 import shared.enums.UnitSystem
 import shared.enums.UserRole
 import shared.utils.URL.EXPORT_URL
+import io.ktor.http.ContentType
 import io.ktor.server.auth.authenticate
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.RoutingContext
@@ -47,10 +52,12 @@ object ExportController: Controller(EXPORT_URL) {
     val recipeService : RecipeService by inject(RecipeService::class.java)
     val cookbookService : CookbookService by inject(CookbookService::class.java)
     val userService : UserService by inject(UserService::class.java)
+    val cooklangService : CooklangService by inject(CooklangService::class.java)
 
     override fun Route.routes() {
         authenticate("auth-session", "bearer-auth") {
             exportRecipe()
+            exportRecipeAsCooklang()
             exportCookbook()
         }
     }
@@ -71,6 +78,37 @@ object ExportController: Controller(EXPORT_URL) {
             if (caller.role == UserRole.ADMIN) recipeService.getEntityById(id).toInfo(locale)
             else recipeService.getById(caller.id, id, locale)
         call.respondPDF(exportService.filenameOf(recipe), exportService.generatePDF(recipe, locale, unitSystem))
+    }
+
+    /**
+     * The same recipe as a [Cooklang](https://cooklang.org) file.
+     *
+     * Premium and filtered exactly as the sheet is — it is the same recipe leaving the
+     * product, in a form another app can read rather than one a person can hold, and neither
+     * of those is a reason to show more of it.
+     *
+     * No `unitSystem`, unlike the PDF. A `.cook` file is not read, it is *loaded*: whatever
+     * opens it converts for whoever is looking, so converting here would bake one reader's
+     * ladder into a file with no reader yet. The amounts go out in the units the recipe was
+     * written in, which is the only lossless thing to do with them.
+     *
+     * There is no cookbook equivalent, deliberately. The format describes one recipe and has
+     * no container for a collection, so a book would have to leave as an archive of files —
+     * a different kind of response, and a different thing to have to explain. The PDF is what
+     * exports a book today.
+     */
+    private fun Route.exportRecipeAsCooklang() = get("/recipe/{id}/cooklang") {
+        val caller = premiumCaller()
+        val id = getPathId()
+        val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
+        val recipe =
+            if (caller.role == UserRole.ADMIN) recipeService.getEntityById(id).toInfo(locale)
+            else recipeService.getById(caller.id, id, locale)
+        call.respondTextFile(
+            filename = exportService.filenameOf(recipe, COOKLANG_EXTENSION),
+            content = cooklangService.write(recipe, locale, origin = cooklangService.originOf(recipe.id)),
+            contentType = ContentType.parse(COOKLANG_MEDIA_TYPE),
+        )
     }
 
     /**

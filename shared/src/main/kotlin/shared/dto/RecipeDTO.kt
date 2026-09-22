@@ -115,3 +115,12 @@ data class RecipeDTO (
 }
 
 const val CUSTOM_INGREDIENT_NAME_MAX_LENGTH = 50
+
+/**
+ * How much text one step may hold, and the width of `recipe_steps.text`.
+ *
+ * Stated here rather than only on the column so that the one place a step is built from text
+ * nobody typed into this product — a Cooklang import — can cut a long paragraph into steps
+ * that fit instead of failing at insert time. See `CooklangService.splitStep`.
+ */
+const val RECIPE_STEP_TEXT_MAX_LENGTH = 255

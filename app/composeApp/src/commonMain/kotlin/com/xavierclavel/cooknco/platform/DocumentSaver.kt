@@ -17,5 +17,19 @@ fun interface DocumentSaver {
     fun save(filename: String, bytes: ByteArray)
 }
 
+/**
+ * @param mimeType what kind of file the picker is being opened for. Defaulted to the PDF the
+ *   exports started as, so that every existing caller means exactly what it did before, and
+ *   passed explicitly by the ones saving something else — a `.cook` file, today. Android puts
+ *   it on the create-document contract; iOS exports a file URL and has no use for it.
+ */
 @Composable
-expect fun rememberDocumentSaver(): DocumentSaver
+expect fun rememberDocumentSaver(mimeType: String = PDF_MIME_TYPE): DocumentSaver
+
+const val PDF_MIME_TYPE = "application/pdf"
+
+/**
+ * Cooklang's own convention — the format has no registered media type. `text/plain` would be
+ * true and would also invite the picker to treat the file as something to read.
+ */
+const val COOKLANG_MIME_TYPE = "text/x-cooklang"

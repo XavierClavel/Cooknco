@@ -29,9 +29,13 @@ private fun ByteArray.toNSData(): NSData {
  * The picker exports a file rather than bytes, so the document is written to the temporary
  * directory first and handed over from there. Exporting *moves* it, which is the right way
  * round for a staging file: what the picker does not take, iOS reclaims on its own.
+ *
+ * The MIME type is unused here: the picker reads the kind off the file it is given, and the
+ * name it is given carries the extension. It is a parameter because Android's contract needs
+ * one.
  */
 @Composable
-actual fun rememberDocumentSaver(): DocumentSaver = remember {
+actual fun rememberDocumentSaver(mimeType: String): DocumentSaver = remember {
     DocumentSaver { filename, bytes ->
         // Last segment only: the name arrives in a response header, and it must not be able
         // to write anywhere but the directory chosen here.

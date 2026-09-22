@@ -173,6 +173,29 @@ data class RecipeSaveDto(
     val tips: String,
 )
 
+/**
+ * A Cooklang file, read into what the editor should be filled in with.
+ *
+ * Nothing was saved: the backend parses and hands back the recipe, and the ordinary create
+ * route is what writes it once the cook has looked at it. So [recipe] is a [RecipeSaveDto] —
+ * literally what this app would post to save — rather than a shape of its own.
+ */
+@Serializable
+data class CooklangImportDto(
+    val recipe: RecipeSaveDto,
+    /**
+     * What each of [recipe]'s ingredients is called, in that order.
+     *
+     * Positional, on the same reasoning as [RecipeStepIngredientInfo.index]: none of these
+     * rows has an id yet, so a position is the only thing both sides can agree on inside one
+     * request. It is here because a row the catalogue placed carries an id and no name, and
+     * the editor has to print something.
+     */
+    val ingredientNames: List<String> = emptyList(),
+    val unmatchedIngredients: Int = 0,
+    val stepsWereSplit: Boolean = false,
+)
+
 @Serializable
 data class RecipeIngredientSaveDto(
     val id: Long? = null,

@@ -315,9 +315,12 @@ interface Strings {
     val theBasics: String
     val theBasicsSubtitle: String
 
+    // The editor's overflow menu: the two ways of filling it in from somewhere else.
+    // The subtitle heads both of them, because the promise they make is the same one.
+    val newRecipeSubtitle: String
+
     // Scanning a printed recipe into the editor.
     val scanARecipe: String
-    val scanARecipeSubtitle: String
     val scanning: String
     val scanFoundNothing: String
     val scanFailed: String
@@ -466,6 +469,25 @@ interface Strings {
     // ── Exporting a PDF, which a premium account is offered ───────────────────
     val exportRecipePdf: String
     val exportCookbookPdf: String
+    /**
+     * The same recipe as a Cooklang file — the format other cooking apps read, rather than
+     * a sheet to print. Named as a format and not as "export", so the two rows on the sheet
+     * say what tells them apart.
+     */
+    val exportRecipeCooklang: String
+
+    // ── Importing a Cooklang file, which needs no subscription ────────────────
+    val importCooklang: String
+    val importing: String
+    val importCooklangDone: String
+    /**
+     * How many ingredients arrived as free text. They work; they simply carry no nutrition
+     * and no search will find them, which is worth one sentence and not a warning.
+     */
+    fun importCooklangUnmatched(count: Int): String
+    val importCooklangSplit: String
+    val importCooklangEmpty: String
+    val importCooklangFailed: String
     val preparingPdf: String
     val exportFailedTitle: String
     val exportFailed: String

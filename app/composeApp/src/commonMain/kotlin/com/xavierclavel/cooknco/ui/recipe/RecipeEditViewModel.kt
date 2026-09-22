@@ -16,6 +16,8 @@ import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.dto.RecipeStepIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
+import com.xavierclavel.cooknco.network.dto.CooklangImportDto
+import com.xavierclavel.cooknco.network.ApiException
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientSaveDto
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
@@ -182,8 +184,11 @@ data class RecipeEditUiState(
      * that have already been filled in.
      */
     val isScanning: Boolean = false,
+    val isImporting: Boolean = false,
     /** What the last scan came to, shown once and dismissed. */
     val scanMessage: String? = null,
+    /** What the last Cooklang import did, said once. See [RecipeEditViewModel.importCooklang]. */
+    val importMessage: String? = null,
 )
 
 class RecipeEditViewModel(
@@ -357,6 +362,106 @@ class RecipeEditViewModel(
 
         if (added.isNotEmpty()) matchScannedIngredients(from = _uiState.value.ingredients.size - added.size)
     }
+
+    /**
+     * Fills the editor in from a Cooklang file the cook picked.
+     *
+     * **Nothing already written is overwritten**, exactly as a scan does not: a field that
+     * has been filled in keeps what was typed, and ingredients and steps are appended. That
+     * is what makes importing a second file work, and what makes picking the wrong one cost
+     * a few deleted rows rather than everything typed so far.
+     *
+     * Unlike a scan, the ingredients arrive already matched: the backend has the catalogue
+     * and does the lookup while it parses, so there is no second pass here and no per-row
+     * request. A row it could not place comes through as free text, which is a working
+     * ingredient rather than a wrong one — [CooklangImportDto.unmatchedIngredients] is how
+     * many, and it is worth a sentence rather than a warning.
+     */
+    fun importCooklang(source: String) {
+        if (_uiState.value.isImporting) return
+        // Set before the coroutine, not inside it: the card is tappable until this flips, so
+        // raising it a dispatch later leaves a window in which a second tap starts a second
+        // import of the same file.
+        _uiState.update { it.copy(isImporting = true, importMessage = null, error = null) }
+        viewModelScope.launch {
+            repo.importCooklang(source)
+                .onSuccess { imported -> prefillFromImport(imported) }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(isImporting = false, importMessage = importFailure(error))
+                    }
+                }
+        }
+    }
+
+    private fun prefillFromImport(imported: CooklangImportDto) {
+        val s = copy()
+        val parsed = imported.recipe
+        // Positions in the *imported* list, so they shift by whatever the form already held.
+        val offset = _uiState.value.ingredients.size
+
+        val added = parsed.ingredients.mapIndexed { index, item ->
+            val name = imported.ingredientNames.getOrNull(index) ?: item.customName.orEmpty()
+            EditIngredient(
+                ingredientId = item.id,
+                // Exactly one of the two, which is what the save path insists on.
+                customName = if (item.id == null) customName(name) else null,
+                ingredientName = name,
+                query = name,
+                unit = item.unit,
+                amount = item.amount,
+                complement = item.complement.orEmpty(),
+            )
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                title = state.title.ifBlank { parsed.title },
+                description = state.description.ifBlank { parsed.description },
+                dishClass = state.dishClass,
+                yield = state.yield.ifBlank { parsed.yield?.toString().orEmpty() },
+                prepTime = state.prepTime.ifBlank { parsed.preparationTime?.toString().orEmpty() },
+                cookTime = state.cookTime.ifBlank { parsed.cookingTime?.toString().orEmpty() },
+                cookTemp = state.cookTemp.ifBlank { parsed.cookingTemperature?.toString().orEmpty() },
+                tips = state.tips.ifBlank { parsed.tips },
+                ingredients = state.ingredients + added,
+                steps = state.steps + parsed.steps.map { step ->
+                    StepItem(
+                        id = newStepId(),
+                        text = step.text,
+                        durationSeconds = step.durationSeconds,
+                        // The file said how long, so the timer is the file's rather than
+                        // something read back out of the wording - which is why this does
+                        // not go through StepDurations as a scanned step does.
+                        durationTouched = step.durationSeconds != null,
+                        attachments = setOfNotNull(StepAttachment.TIMER.takeIf { step.durationSeconds != null }),
+                    )
+                },
+                isImporting = false,
+                importMessage = listOfNotNull(
+                    s.importCooklangUnmatched(imported.unmatchedIngredients)
+                        .takeIf { imported.unmatchedIngredients > 0 },
+                    s.importCooklangSplit.takeIf { imported.stepsWereSplit },
+                ).ifEmpty { listOf(s.importCooklangDone) }.joinToString(" "),
+                error = null,
+            )
+        }
+    }
+
+    /**
+     * What to tell the cook when a file did not import.
+     *
+     * Only the cause they can act on is named — a file with no recipe in it, which means
+     * they picked the wrong one. Everything else is one apology, because "try again" is the
+     * only advice there is for it.
+     */
+    private fun importFailure(throwable: Throwable): String {
+        val s = copy()
+        val body = (throwable as? ApiException)?.body ?: throwable.message ?: return s.importCooklangFailed
+        return if ("cooklang_file_empty" in body) s.importCooklangEmpty else s.importCooklangFailed
+    }
+
+    fun dismissImportMessage() = _uiState.update { it.copy(importMessage = null) }
 
     /** The scanner could not be reached, or read nothing off the page. */
     fun reportScanFailure() = _uiState.update { it.copy(scanMessage = copy().scanFailed) }

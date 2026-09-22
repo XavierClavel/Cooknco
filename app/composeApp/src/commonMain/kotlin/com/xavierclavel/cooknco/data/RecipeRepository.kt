@@ -4,6 +4,7 @@ import com.xavierclavel.cooknco.network.IngredientSort
 import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.RecipeSort
+import com.xavierclavel.cooknco.network.dto.CooklangImportDto
 import com.xavierclavel.cooknco.network.dto.IngredientSearchResult
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
@@ -27,6 +28,18 @@ class RecipeRepository(
     suspend fun createRecipe(dto: RecipeSaveDto): Result<RecipeInfo> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         recipeApi.createRecipe(token, dto)
+    }
+
+    /**
+     * Reads a Cooklang file into the recipe the editor should show. Saves nothing.
+     *
+     * The language is read here rather than passed in, as the exports' is: it is whatever
+     * the app is currently in, and it decides which names the ingredient catalogue is
+     * searched under.
+     */
+    suspend fun importCooklang(source: String): Result<CooklangImportDto> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        recipeApi.importCooklang(token, source, AppLanguage.current.value.code)
     }
 
     suspend fun updateRecipe(id: Long, dto: RecipeSaveDto): Result<RecipeInfo> = runCatching {

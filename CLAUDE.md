@@ -338,6 +338,69 @@ refusal is about the book they would actually get.
 is *not* an anonymous reader, who cannot reach any of this: every export has a session behind
 it.
 
+## Cooklang is the recipe leaving, and coming back
+
+`GET /export/recipe/{id}/cooklang` writes a recipe as a [Cooklang](https://cooklang.org) file
+and `POST /recipe/import/cooklang` reads one back (`CooklangService`). The two are built to be
+each other's inverse, and `CooklangControllerTest` holds them to it on a **full** round trip —
+out, back in, and saved through the ordinary create route, because an import that produces a
+recipe the editor cannot then save would pass every parsing test and be useless.
+
+**The export is premium and the import is not**, which is the one asymmetry to keep. Getting a
+collection *into* the product is how somebody arrives with it, and charging at the door is the
+wrong toll; getting it out again is what a subscription buys, exactly as the PDF is. The import
+is also the safer half to open, because it writes no row at all — see below.
+
+### An import returns a recipe, it does not create one
+
+`POST /recipe/import/cooklang` answers with the `RecipeDTO` the editor should be filled in
+with, and saves nothing. Creating it there would mean a second copy of the five ordered steps
+`RecipeController.createRecipe` performs, and the last of those settles it: an import that
+saved would notify every follower of a recipe its owner has not read yet. So an import ends
+where a scan does — in the editor, in front of the cook who brought the file — and both
+clients follow the scanner's rule that **it adds and never takes away** (`prefillFromImport`,
+`RecipeEditImportTest`).
+
+### The save path refuses three things a `.cook` file says happily
+
+All three are resolved in `CooklangService.toRecipe` rather than left to fail at the end,
+because a recipe that arrives and then cannot be saved is the worst of the outcomes:
+
+- **An amount and a unit imply each other** (`validateAmount`). `@eggs{3}` names no unit, so a
+  bare count becomes `AmountUnit.UNIT`; an amount that is zero or unreadable takes its unit
+  with it.
+- **A step's claims must add up to its row's amount** (`validateStepIngredients`). The row's
+  amount is therefore *derived* — the sum of what the steps claimed — so the two agree by
+  construction. Where they cannot (an ingredient declared up front *and* used in a step, or
+  units that will not reconcile), the step keeps the link and states no share: "uses flour" is
+  true, and the amount is still on the row.
+- **A catalogue entry may not be measurable the way the file measured it** (`resolveIngredient`).
+  The file holds the recipe somebody wants to cook, so the amount wins and the row stays free
+  text rather than the amount being dropped to keep a link nobody asked for.
+
+An unknown unit keeps **both halves** of what was said: `@garlic{2%cloves}` is a count of 2 with
+"cloves" in the complement. Dropping the word leaves "2 garlic" and dropping the number leaves
+"garlic, cloves"; both read as correct and neither is.
+
+### What the format cannot say, and what is done about it
+
+- **A `.cook` file has no ingredient list** — its list *is* what the steps mention. So an
+  ingredient no step claims is written on a line of its own before the method, and a line whose
+  annotations leave no prose behind is read back as ingredients without becoming a step. That
+  pairing is what makes the two directions inverses rather than nearly so.
+- **There is no container for a collection**, so there is no cookbook equivalent and the PDF
+  stays the way to export a book. A zip of files is a different kind of response and a different
+  thing to explain.
+- **A paragraph has no length limit and `recipe_steps.text` has 255** — so a long one is cut at
+  a sentence, never truncated, and `stepsWereSplit` says so. It is recorded where the cut is
+  made: nothing about the finished list says whether two steps were once one paragraph.
+- **A captured timer is not also spelled back into the wording.** Doing both would have the next
+  export write a second timer after it, and a round trip that grows a sentence each time.
+
+The parser lives on the backend alone. `shared` is JVM-only and the app is a separate Gradle
+build, so a parser in either client would be a second copy — and it needs the ingredient
+catalogue anyway, which is a query rather than a guess. Clients pick a file and post it.
+
 ## The mobile version gate fails open, on purpose
 
 `app_versions` holds at most one row per `AppPlatform`, and **a platform with no row is not

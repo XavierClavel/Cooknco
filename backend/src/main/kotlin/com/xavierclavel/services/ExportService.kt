@@ -205,19 +205,21 @@ class ExportService: KoinComponent {
      * rather than sent as it was typed. A title that survives none of that — emoji only,
      * say — falls back to the id, because a nameless download is worse than an ugly one.
      */
-    fun filenameOf(recipe: RecipeInfo): String = filename(recipe.title, "recipe-${recipe.id}")
+    fun filenameOf(recipe: RecipeInfo, extension: String = "pdf"): String =
+        filename(recipe.title, "recipe-${recipe.id}", extension)
 
     /** The same, for a book. See [filenameOf]. */
-    fun filenameOf(cookbook: CookbookInfo): String = filename(cookbook.title, "cookbook-${cookbook.id}")
+    fun filenameOf(cookbook: CookbookInfo, extension: String = "pdf"): String =
+        filename(cookbook.title, "cookbook-${cookbook.id}", extension)
 
-    private fun filename(title: String, fallback: String): String {
+    private fun filename(title: String, fallback: String, extension: String): String {
         val slug = Normalizer.normalize(title.lowercase(), Normalizer.Form.NFD)
             .replace(DIACRITICS, "")
             .replace(NOT_SLUG, "-")
             .trim('-')
             .take(60)
             .trim('-')
-        return "${slug.ifEmpty { fallback }}.pdf"
+        return "${slug.ifEmpty { fallback }}.$extension"
     }
 
     // -------------------------------------------------------------------- values

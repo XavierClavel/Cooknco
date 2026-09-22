@@ -23,6 +23,11 @@ class ExportRepository(
         exportApi.exportRecipe(requireToken(), recipeId, locale(), unitSystem())
     }
 
+    /** The same recipe as a Cooklang file. No ladder: see [ExportApi.exportRecipeAsCooklang]. */
+    suspend fun exportRecipeAsCooklang(recipeId: Long): Result<ExportedDocument> = runCatching {
+        exportApi.exportRecipeAsCooklang(requireToken(), recipeId, locale())
+    }
+
     suspend fun exportCookbook(cookbookId: Long): Result<ExportedDocument> = runCatching {
         exportApi.exportCookbook(requireToken(), cookbookId, locale(), unitSystem())
     }

@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
  * bytes waiting to be written are held beside the launcher rather than passed through it.
  */
 @Composable
-actual fun rememberDocumentSaver(): DocumentSaver {
+actual fun rememberDocumentSaver(mimeType: String): DocumentSaver {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -31,7 +31,7 @@ actual fun rememberDocumentSaver(): DocumentSaver {
     // never a second save waiting behind it.
     val pending = remember { arrayOfNulls<ByteArray>(1) }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { uri ->
         val bytes = pending[0]
         pending[0] = null
         // Null is the user backing out of the picker, which is not a failure and has

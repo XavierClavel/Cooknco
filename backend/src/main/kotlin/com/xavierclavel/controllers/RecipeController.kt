@@ -2,6 +2,9 @@ package com.xavierclavel.controllers
 
 import com.xavierclavel.controllers.AuthController.getOptionalSessionId
 import com.xavierclavel.controllers.AuthController.getSessionUserId
+import com.xavierclavel.exceptions.BadRequestCause
+import com.xavierclavel.exceptions.BadRequestException
+import com.xavierclavel.services.CooklangService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.NotificationService
 import com.xavierclavel.services.RecipeIngredientService
@@ -13,7 +16,9 @@ import com.xavierclavel.utils.getIdPathVariable
 import com.xavierclavel.utils.getIdPathVariableSet
 import com.xavierclavel.utils.getLocale
 import com.xavierclavel.utils.getPaging
+import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getPathId
+import com.xavierclavel.utils.readBounded
 import com.xavierclavel.utils.getSort
 import com.xavierclavel.utils.logger
 import shared.RecipeFilter
@@ -24,6 +29,7 @@ import shared.utils.URL.RECIPE_URL
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveStream
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -38,12 +44,14 @@ object RecipeController: Controller(RECIPE_URL) {
     val userService: UserService by inject(UserService::class.java)
     val imageService: ImageService by inject(ImageService::class.java)
     val notificationService: NotificationService by inject(NotificationService::class.java)
+    val cooklangService: CooklangService by inject(CooklangService::class.java)
 
     override fun Route.routes() {
         getRecipe()
         listRecipes()
         authenticate("auth-session", "bearer-auth") {
             createRecipe()
+            importCooklang()
             updateRecipe()
             deleteRecipe()
         }
@@ -96,6 +104,37 @@ object RecipeController: Controller(RECIPE_URL) {
         // Fans out in the background: see NotificationService.
         notificationService.onRecipeCreated(recipeService.getEntityById(recipe.id))
         call.respond(HttpStatusCode.Created, recipeInfo)
+    }
+
+    /**
+     * Reads a [Cooklang](https://cooklang.org) file and answers with the recipe it describes,
+     * **without saving anything**.
+     *
+     * The response is the same [RecipeDTO] the editor would post back to create a recipe, so
+     * an import ends where a scan does: filled into the editor, in front of the cook who
+     * brought the file, to be checked and saved by the ordinary route. Nothing else would be
+     * safe to leave open — see below — and nothing else would be honest, since a `.cook` file
+     * written by another app names ingredients this catalogue may not hold.
+     *
+     * **Signed in is the whole gate, deliberately.** The export is what a subscription pays
+     * for; getting a recipe *in* is how somebody arrives with their collection, and charging
+     * for that would be charging at the door. It is also the safer half to open: this route
+     * writes no row, so it is not a way to fill the database, and the body it reads is bounded
+     * ([CooklangService.MAX_IMPORT_BYTES]) rather than trusted — a declared `Content-Length`
+     * is a claim, and a chunked body makes none at all.
+     *
+     * @param locale which language to look the ingredients up in, since the file names them in
+     *   whatever it was written in. EN by default, as everywhere else.
+     */
+    private fun Route.importCooklang() = post("/import/cooklang") {
+        val source = call.receiveStream().readBounded(CooklangService.MAX_IMPORT_BYTES, BadRequestCause.COOKLANG_FILE_TOO_LARGE)
+            .toString(Charsets.UTF_8)
+        val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
+        val parsed = cooklangService.parse(source)
+        // "There was nothing in it" is the only verdict a cook holding a file can act on, so
+        // it is the only one this refuses for. Anything it could read at all comes back.
+        if (parsed.isEmpty) throw BadRequestException(BadRequestCause.COOKLANG_FILE_EMPTY)
+        call.respond(HttpStatusCode.OK, cooklangService.toRecipe(parsed, locale))
     }
 
     private fun Route.updateRecipe() = put("/{id}") {

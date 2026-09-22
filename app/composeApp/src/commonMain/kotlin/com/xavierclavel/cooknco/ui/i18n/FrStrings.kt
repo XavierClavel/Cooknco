@@ -356,8 +356,10 @@ object FrStrings : Strings {
     override val theBasics = "Les bases"
     override val theBasicsSubtitle = "Seul le titre est obligatoire — le reste peut attendre."
 
+    override val newRecipeSubtitle =
+        "Photographiez une page ou choisissez un fichier .cook : on remplit ce qu'on arrive à lire, sans rien remplacer de ce qui est déjà saisi."
+
     override val scanARecipe = "Scanner une recette"
-    override val scanARecipeSubtitle = "Photographiez une page, on remplit ce qu'on arrive à lire."
     override val scanning = "Lecture de la page…"
     override val scanFoundNothing = "Aucune recette n'a pu être lue sur cette page."
     override val scanFailed = "Le scanner n'est pas disponible sur cet appareil."
@@ -528,6 +530,15 @@ object FrStrings : Strings {
         "« $feature » est réservé aux comptes premium."
 
     override val exportRecipePdf = "Exporter en PDF"
+    override val exportRecipeCooklang = "Exporter en Cooklang"
+    override val importCooklang = "Importer un fichier Cooklang"
+    override val importing = "Lecture du fichier…"
+    override val importCooklangDone = "Le fichier a été importé. Vérifiez-le avant d'enregistrer."
+    override fun importCooklangUnmatched(count: Int) =
+        "$count ingrédient(s) sont arrivés en texte libre, faute de correspondance évidente dans le catalogue."
+    override val importCooklangSplit = "Une étape dépassait la longueur maximale et a été coupée en deux."
+    override val importCooklangEmpty = "Ce fichier ne contient aucune recette."
+    override val importCooklangFailed = "Ce fichier n'a pas pu être importé."
     override val exportCookbookPdf = "Exporter le carnet en PDF"
     override val preparingPdf = "Préparation du PDF…"
     override val exportFailedTitle = "Échec de l'export"
