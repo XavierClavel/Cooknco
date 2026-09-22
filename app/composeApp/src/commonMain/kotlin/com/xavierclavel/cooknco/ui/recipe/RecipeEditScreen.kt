@@ -40,8 +40,9 @@ import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DocumentScanner
-import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.DragIndicator
+import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -93,14 +94,14 @@ import com.xavierclavel.cooknco.network.dto.displayName
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberCameraCapture
 import com.xavierclavel.cooknco.platform.COOKLANG_PICKER_MIME_TYPES
-import com.xavierclavel.cooknco.platform.RecipeScannerLauncher
-import com.xavierclavel.cooknco.platform.TextFilePickerLauncher
 import com.xavierclavel.cooknco.platform.rememberTextFilePicker
 import com.xavierclavel.cooknco.platform.rememberRecipeScanner
 import kotlinx.coroutines.delay
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.RecipeImage
+import com.xavierclavel.cooknco.ui.components.SheetAction
 import com.xavierclavel.cooknco.ui.components.StepImage
+import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -284,12 +285,41 @@ fun RecipeEditScreen(
     val s = strings()
     val uiState by viewModel.uiState.collectAsState()
     var currentStep by rememberSaveable { mutableIntStateOf(0) }
+    var menuOpen by remember { mutableStateOf(false) }
     val steps = EditorStep.entries
+    // Remembered here rather than inside the step that offers it: a launcher registered
+    // from a lazy item is unregistered the moment that item scrolls out of the viewport,
+    // and the result of a scan that was already running would then have nowhere to arrive.
+    val scanner = rememberRecipeScanner(onScanned = viewModel::onScanned)
+    // Remembered here for the same reason, and for a second one: the picker opens a window
+    // of the system's, so this composition can be stopped and restarted while the file is
+    // being chosen.
+    val cooklangPicker = rememberTextFilePicker(
+        mimeTypes = COOKLANG_PICKER_MIME_TYPES,
+        onPicked = viewModel::importCooklang,
+    )
 
     LaunchedEffect(uiState.saved) {
         if (uiState.saved) {
             val id = uiState.recipeId ?: return@LaunchedEffect
             onSaved(id)
+        }
+    }
+
+    // Said once. It describes the scan that just happened, and the next tap is a new one.
+    LaunchedEffect(uiState.scanMessage) {
+        if (uiState.scanMessage != null) {
+            delay(4000)
+            viewModel.dismissScanMessage()
+        }
+    }
+
+    // The same, for an import. Longer, because what it has to say is longer: a count of the
+    // ingredients the catalogue did not hold is a line to read rather than a word to notice.
+    LaunchedEffect(uiState.importMessage) {
+        if (uiState.importMessage != null) {
+            delay(6000)
+            viewModel.dismissImportMessage()
         }
     }
 
@@ -325,6 +355,65 @@ fun RecipeEditScreen(
             // The mockup's "Save draft" pill is not here: nothing saves a half-filled
             // recipe yet, and a button that publishes what it calls a draft is worse than
             // no button. PUBLISH at the end of the wizard is the only save.
+            //
+            // Behind the "···" are the two ways of filling the editor in from somewhere
+            // else — a scanned page and a Cooklang file — and both are offered on a recipe
+            // being written rather than on one being edited: what they do to the editor is
+            // add to it, and a page or a file dropped into a recipe that already exists is
+            // far more likely to be a mistake than an intention. With nothing else in the
+            // menu, an editor opened on an existing recipe therefore has no button at all
+            // rather than one that opens an empty sheet.
+            if (uiState.recipeId == null) {
+                val menuFill by animateColorAsState(
+                    targetValue = if (menuOpen) CookncoNavy else CookncoBackground,
+                    animationSpec = stickerSwitchSpec(),
+                    label = "editor_menu_fill",
+                )
+                val menuContent by animateColorAsState(
+                    targetValue = if (menuOpen) CookncoWhite else CookncoNavy,
+                    animationSpec = stickerSwitchSpec(),
+                    label = "editor_menu_content",
+                )
+                StickerIconButton(
+                    onClick = { menuOpen = true },
+                    shadowOffset = 3.dp,
+                    fillColor = menuFill,
+                    contentColor = menuContent,
+                ) {
+                    Icon(Icons.Outlined.MoreHoriz, contentDescription = s.more)
+                }
+            }
+        }
+
+        if (menuOpen) {
+            // The sheet explains the two rather than merely naming them: "we fill in what we
+            // can read, and nothing already typed is replaced" is the whole contract — the
+            // editor is still where the recipe is written, and either way in produces a first
+            // draft of it rather than a result to accept or reject. That is also why there is
+            // no review screen after them: what would be reviewed is exactly the form
+            // underneath. One sentence serves both because it is the same promise; only the
+            // source differs, a page held up to a camera or a file somebody sent.
+            //
+            // The import carries no padlock, unlike the export it is the reverse of. Getting
+            // a collection *into* the product is how somebody arrives with it, and charging
+            // at the door is the wrong toll.
+            StickerActionSheet(
+                title = s.newRecipe,
+                subtitle = s.newRecipeSubtitle,
+                actions = listOf(
+                    SheetAction(
+                        label = s.scanARecipe,
+                        onClick = scanner::launch,
+                        icon = Icons.Outlined.DocumentScanner,
+                    ),
+                    SheetAction(
+                        label = s.importCooklang,
+                        onClick = cooklangPicker::launch,
+                        icon = Icons.Outlined.FileOpen,
+                    ),
+                ),
+                onDismissRequest = { menuOpen = false },
+            )
         }
 
         // ── Progress segments ────────────────────────────────────────────────
@@ -348,6 +437,46 @@ fun RecipeEditScreen(
                         fontWeight = FontWeight.Bold,
                         color = if (index <= currentStep) CookncoNavy else CookncoGreenDark,
                         modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
+        }
+
+        // ── Scan and import status ───────────────────────────────────────────
+        // Both happen in a window of their own and what they read lands across three of the
+        // four steps, so they report here rather than beside the menu that started them: by
+        // the time there is anything to say, whatever opened the scanner or the picker is
+        // gone.
+        //
+        // One strip for the two, because only one of them can be running: the menu is the
+        // only way into either and it closes on the way, and the view models refuse a second
+        // start while one is in flight.
+        val busy = uiState.isScanning || uiState.isImporting
+        val statusMessage = uiState.scanMessage ?: uiState.importMessage
+        if (busy || statusMessage != null) {
+            StickerCard(
+                modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 10.dp),
+                shape = RoundedCornerShape(14.dp),
+                shadowOffset = 4.dp,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    if (busy) {
+                        CircularProgressIndicator(
+                            color = CookncoNavy,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    Text(
+                        text = statusMessage ?: if (uiState.isImporting) s.importing else s.scanning,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (statusMessage != null) CookncoOrange else CookncoNavy,
+                        lineHeight = 17.sp,
                     )
                 }
             }
@@ -443,16 +572,6 @@ fun RecipeEditScreen(
 private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel, modifier: Modifier = Modifier) {
     val s = strings()
     var picking by remember { mutableStateOf<RecipeNumber?>(null) }
-    // Remembered out here rather than inside the item that uses it: a launcher registered
-    // from a lazy item is unregistered the moment that item scrolls out of the viewport, and
-    // the result of a scan that was already running would then have nowhere to arrive.
-    val scanner = rememberRecipeScanner(onScanned = viewModel::onScanned)
-    // Remembered out here for the same reason the scanner is: a launcher registered from a
-    // lazy item is unregistered the moment that item scrolls away.
-    val cooklangPicker = rememberTextFilePicker(
-        mimeTypes = COOKLANG_PICKER_MIME_TYPES,
-        onPicked = viewModel::importCooklang,
-    )
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
@@ -460,13 +579,6 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
     ) {
         item {
             StepHeading(title = s.theBasics, subtitle = s.theBasicsSubtitle)
-        }
-        // Offered on a recipe being written, not on one being edited: what a scan does to
-        // the editor is add to it, and a page dropped into a recipe that already exists is
-        // far more likely to be a mistake than an intention.
-        if (uiState.recipeId == null) {
-            item { ScanCard(uiState = uiState, scanner = scanner, viewModel = viewModel) }
-            item { ImportCard(uiState = uiState, picker = cooklangPicker, viewModel = viewModel) }
         }
         item {
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
@@ -622,141 +734,6 @@ private fun totalTimeLabel(state: RecipeEditUiState, s: Strings): String {
 }
 
 /** One row of the TIMES & YIELD card: name and hint, then a −/value/+ pill. */
-/**
- * The way into the scanner, at the top of a recipe being started.
- *
- * It sits above the title field rather than behind a menu because it is only worth anything
- * before anything has been typed, and because it has to explain itself: "we'll fill in what
- * we can read" is the whole contract — the editor is still where the recipe is written, and
- * the scan is a first draft of it rather than a result to accept or reject. That is also why
- * there is no review screen between the two: what would be reviewed is exactly the form
- * underneath.
- */
-@Composable
-private fun ScanCard(
-    uiState: RecipeEditUiState,
-    scanner: RecipeScannerLauncher,
-    viewModel: RecipeEditViewModel,
-    modifier: Modifier = Modifier,
-) {
-    val s = strings()
-
-    StickerCard(modifier = modifier.fillMaxWidth().padding(bottom = 10.dp), shadowOffset = 6.dp) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = !uiState.isScanning) { scanner.launch() }
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                if (uiState.isScanning) {
-                    CircularProgressIndicator(color = CookncoNavy, strokeWidth = 2.5.dp, modifier = Modifier.size(22.dp))
-                } else {
-                    Icon(
-                        Icons.Outlined.DocumentScanner,
-                        contentDescription = null,
-                        tint = CookncoNavy,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-                Text(
-                    text = if (uiState.isScanning) s.scanning else s.scanARecipe,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CookncoNavy,
-                )
-            }
-            Text(
-                text = uiState.scanMessage ?: s.scanARecipeSubtitle,
-                fontSize = 12.5.sp,
-                color = if (uiState.scanMessage != null) CookncoOrange else CookncoNavy.copy(alpha = 0.6f),
-                lineHeight = 17.sp,
-            )
-        }
-    }
-
-    // Said once. It describes the scan that just happened, and the next tap is a new one.
-    LaunchedEffect(uiState.scanMessage) {
-        if (uiState.scanMessage != null) {
-            delay(4000)
-            viewModel.dismissScanMessage()
-        }
-    }
-}
-
-/**
- * The way into a Cooklang import, under the scanner and shaped like it.
- *
- * The same card as the scan, because it is the same offer: a first draft of a recipe, filled
- * into the form underneath rather than shown on a review screen. Only the source differs — a
- * page held up to a camera, or a file somebody sent.
- *
- * Offered only on a recipe being started, as the scan is: an import adds, so dropping a file
- * into a recipe that already exists is far likelier to be a mistake than an intention.
- *
- * It carries no padlock. Getting a collection *into* the product is free; it is the export
- * that a subscription pays for.
- */
-@Composable
-private fun ImportCard(
-    uiState: RecipeEditUiState,
-    picker: TextFilePickerLauncher,
-    viewModel: RecipeEditViewModel,
-    modifier: Modifier = Modifier,
-) {
-    val s = strings()
-
-    StickerCard(modifier = modifier.fillMaxWidth().padding(bottom = 10.dp), shadowOffset = 6.dp) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = !uiState.isImporting) { picker.launch() }
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                if (uiState.isImporting) {
-                    CircularProgressIndicator(color = CookncoNavy, strokeWidth = 2.5.dp, modifier = Modifier.size(22.dp))
-                } else {
-                    Icon(
-                        Icons.Outlined.FileOpen,
-                        contentDescription = null,
-                        tint = CookncoNavy,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-                Text(
-                    text = s.importCooklang,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CookncoNavy,
-                )
-            }
-            Text(
-                text = uiState.importMessage ?: s.importCooklangHint,
-                fontSize = 12.5.sp,
-                color = if (uiState.importMessage != null) CookncoOrange else CookncoNavy.copy(alpha = 0.6f),
-                lineHeight = 17.sp,
-            )
-        }
-    }
-
-    // Said once, like the scan's: it describes the import that just happened.
-    LaunchedEffect(uiState.importMessage) {
-        if (uiState.importMessage != null) {
-            delay(6000)
-            viewModel.dismissImportMessage()
-        }
-    }
-}
-
 @Composable
 private fun NumberStepperRow(
     number: RecipeNumber,

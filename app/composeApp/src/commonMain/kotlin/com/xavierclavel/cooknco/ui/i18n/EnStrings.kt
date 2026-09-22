@@ -346,8 +346,10 @@ object EnStrings : Strings {
     override val theBasics = "The basics"
     override val theBasicsSubtitle = "Only the title is required — the rest can wait."
 
+    override val newRecipeSubtitle =
+        "Photograph a page or pick a .cook file — we'll fill in what we can read, and nothing already typed is replaced."
+
     override val scanARecipe = "Scan a recipe"
-    override val scanARecipeSubtitle = "Photograph a page and we'll fill in what we can read."
     override val scanning = "Reading the page…"
     override val scanFoundNothing = "No recipe could be read on that page."
     override val scanFailed = "The scanner isn't available on this device."
@@ -521,7 +523,7 @@ object EnStrings : Strings {
     override val exportRecipePdf = "Export as PDF"
     override val exportRecipeCooklang = "Export as Cooklang"
     override val importCooklang = "Import a Cooklang file"
-    override val importCooklangHint = "Fills the form in from a .cook file. Nothing already typed is replaced."
+    override val importing = "Reading the file…"
     override val importCooklangDone = "The file was imported. Check it over before saving."
     override fun importCooklangUnmatched(count: Int) =
         "$count ingredient(s) came through as free text, because the catalogue holds no obvious match."

@@ -315,9 +315,12 @@ interface Strings {
     val theBasics: String
     val theBasicsSubtitle: String
 
+    // The editor's overflow menu: the two ways of filling it in from somewhere else.
+    // The subtitle heads both of them, because the promise they make is the same one.
+    val newRecipeSubtitle: String
+
     // Scanning a printed recipe into the editor.
     val scanARecipe: String
-    val scanARecipeSubtitle: String
     val scanning: String
     val scanFoundNothing: String
     val scanFailed: String
@@ -475,7 +478,7 @@ interface Strings {
 
     // ── Importing a Cooklang file, which needs no subscription ────────────────
     val importCooklang: String
-    val importCooklangHint: String
+    val importing: String
     val importCooklangDone: String
     /**
      * How many ingredients arrived as free text. They work; they simply carry no nutrition
