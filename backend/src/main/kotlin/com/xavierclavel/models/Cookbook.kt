@@ -1,6 +1,7 @@
 package com.xavierclavel.models
 
 import com.xavierclavel.models.jointables.CookbookRecipe
+import com.xavierclavel.services.CookbookService
 import com.xavierclavel.models.jointables.CookbookUser
 import shared.dto.CookbookDTO
 import shared.enums.Visibility
@@ -58,16 +59,21 @@ class Cookbook (
         this.visibility = cookbookDTO.visibility
     }
 
-    fun toInfo() = CookbookInfo(
+    /**
+     * @param recipesCount and the membership counted by the caller, not read off `recipes` and
+     *   `users`. Both are collections, so a listing reading them costs two round trips per
+     *   cookbook — see `CookbookService.countRecipesByCookbook` and `membershipOf`, and
+     *   `CookbookFetchPlanTest`, which is what keeps them in use.
+     */
+    fun toInfo(recipesCount: Int, membership: CookbookService.Membership) = CookbookInfo(
         id = this.id,
         version = this.imageVersion,
         title = this.title,
         visibility = this.visibility,
         description = this.description,
-        recipesCount = this.recipes.size,
-        usersCount = this.users.size,
-        members = this.users.take(10).map { it.user.toOverview() }
-    ,
+        recipesCount = recipesCount,
+        usersCount = membership.count,
+        members = membership.shown,
     )
     fun toOverview() = CookbookOverview(
         id = this.id,

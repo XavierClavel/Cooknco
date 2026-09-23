@@ -22,6 +22,7 @@ import main.com.xavierclavel.utils.leaveCookbook
 import main.com.xavierclavel.utils.listCookbooks
 import main.com.xavierclavel.utils.listRecipes
 import org.junit.jupiter.api.Test
+import shared.infodto.CookbookInfo
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -151,6 +152,26 @@ class CookbookControllerTest : ApplicationTest() {
         val result = client.getCookbook(cookbook.id)
         assertEquals(3, result.usersCount)
         assertEquals(2, result.recipesCount)
+        // The count and the names come from two different queries, so they are asserted together:
+        // the names are cut at CookbookInfo.MEMBERS_SHOWN and the count must survive the cut
+        assertEquals(3, result.members.size)
+        assertEquals(
+            client.getCookbookUsers(cookbook.id).map { it.username }.toSet(),
+            result.members.map { it.username }.toSet(),
+        )
+    }
+
+    /** A cookbook with more members than it names still says how many there are. */
+    @Test
+    fun `a cookbook names only its first members and counts them all`() = runTestAsAdmin {
+        val cookbook = client.createCookbook()
+        repeat(CookbookInfo.MEMBERS_SHOWN + 2) {
+            client.addCookbookUser(cookbook.id, client.createUser().id, false)
+        }
+
+        val result = client.getCookbook(cookbook.id)
+        assertEquals(CookbookInfo.MEMBERS_SHOWN + 3, result.usersCount, "the creator counts too")
+        assertEquals(CookbookInfo.MEMBERS_SHOWN, result.members.size)
     }
 
     @Test

@@ -189,11 +189,7 @@ class AdminService: KoinComponent {
             .setPaging(paging)
             .findList()
 
-        val reportCounts = moderationService.countReportsAgainstUsers(users.map { it.id })
-        return Pair(
-            count,
-            users.map { it.toAdminInfo(userService.readMail(it), reportCounts[it.id] ?: 0) },
-        )
+        return Pair(count, moderationService.adminInfoOfUsers(users))
     }
 
     fun getUser(id: Long): AdminUserInfo =
@@ -257,14 +253,17 @@ class AdminService: KoinComponent {
             .adminSort(sort)
 
         val count = ebeanQuery.findCount()
-        val recipes = ebeanQuery.setPaging(paging).findList()
-        val reportCounts = moderationService.countPendingReportsOn(ReportTargetType.RECIPE, recipes.map { it.id })
-        return Pair(count, recipes.map { it.toAdminInfo(reportCounts[it.id] ?: 0) })
+        val recipes = ebeanQuery
+            // The table states each recipe's author, so the owner is joined in. See
+            // `RecipeService.findList`: the counts below cannot be, and are resolved per page.
+            .owner.fetch()
+            .setPaging(paging)
+            .findList()
+        return Pair(count, moderationService.adminInfoOfRecipes(recipes))
     }
 
     fun getRecipe(id: Long): AdminRecipeInfo =
-        recipeService.getEntityById(id)
-            .toAdminInfo(moderationService.countPendingReportsOn(ReportTargetType.RECIPE, id))
+        moderationService.adminInfoOf(recipeService.getEntityById(id))
 
     private fun QRecipe.adminSort(sort: Sort): QRecipe = when (sort) {
         Sort.NAME_ASCENDING -> this.orderBy().title.asc()
@@ -310,12 +309,15 @@ class AdminService: KoinComponent {
             .findList()
 
         val usage = ingredientService.countRecipesByIngredient(ingredients.map { it.id })
+        // An entry's names are a collection, so they are resolved for the page rather than read per
+        // row — see `IngredientService.namesOf`
+        val names = ingredientService.namesOf(ingredients.map { it.id })
         return Pair(
             count,
             ingredients.map {
                 AdminIngredientInfo(
                     id = it.id,
-                    name = it.translations.associate { t -> t.locale to t.name },
+                    name = names[it.id].orEmpty(),
                     type = it.type,
                     calories = it.calories,
                     recipesCount = usage[it.id] ?: 0,

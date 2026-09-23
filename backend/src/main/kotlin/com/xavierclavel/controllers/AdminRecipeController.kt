@@ -66,7 +66,7 @@ object AdminRecipeController: Controller("recipes") {
         val locale = getStringQueryParam("locale")
             ?.let { enumValueOfIgnoreCase<Locale>(it) }
             ?: Locale.EN
-        call.respond(recipeService.getEntityById(getPathId()).toInfo(locale))
+        call.respond(recipeService.describe(recipeService.getEntityById(getPathId()), locale))
     }
 
     private fun Route.hideRecipe() = post("/{id}/hide") {

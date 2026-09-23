@@ -152,7 +152,7 @@ class ExportService: KoinComponent {
                 "recipe ${recipe.id}",
             )
         }
-        val recipes = entities.map { it.toInfo(locale) }
+        val recipes = recipeService.describeAll(entities, locale)
         val template = body ?: pdfTemplateService.bodyOf(PdfDocumentKind.COOKBOOK, locale)
         val assets = buildMap {
             put(FONT, robotoFont)

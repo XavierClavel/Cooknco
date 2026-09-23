@@ -9,6 +9,7 @@ import com.xavierclavel.models.Recipe
 import com.xavierclavel.models.RecipeStep
 import com.xavierclavel.models.User
 import com.xavierclavel.models.jointables.query.QCookbookRecipe
+import com.xavierclavel.models.jointables.query.QLike
 import com.xavierclavel.models.query.QRecipe
 import io.ebean.DB
 import com.xavierclavel.models.jointables.query.QRecipeStepIngredient
@@ -35,6 +36,8 @@ import org.koin.core.component.inject
 
 class RecipeService: KoinComponent {
     val userService: UserService by inject()
+    val likeService: LikeService by inject()
+    val ingredientService: IngredientService by inject()
 
     fun countAll() =
         QRecipe().findCount()
@@ -56,7 +59,11 @@ class RecipeService: KoinComponent {
         recipeFilter: RecipeFilter,
     ) : List<RecipeOverview> {
 
-        return QRecipe()
+        val recipes = QRecipe()
+            // Every row states its author, so the owner is joined in rather than lazy-loaded. A
+            // `-to-one` batch-loads, so this saves one query per page rather than one per row —
+            // which is also why no fetch-plan test would catch its removal.
+            .owner.fetch()
             .fetch(QRecipe.Alias.likes.toString(), "count(*)", FetchConfig.ofLazy()) // Aggregate likes
             .filter(recipeFilter)
             .filterOutDeletion(requestorId)
@@ -65,7 +72,12 @@ class RecipeService: KoinComponent {
             .setPaging(paging)
             .sort(sort, recipeFilter)
             .findList()
-            .map { it.toOverview() }
+
+        // The aggregate above is what `sort` orders by; it does *not* reach the mapper. Ebean drops
+        // a `-to-many` from the fetch plan once `maxRows` is set, so `recipe.likes` is unloaded here
+        // however it was asked for, and reading its size would cost a query per row.
+        val likes = likeService.countLikesByRecipe(recipes.map { it.id })
+        return recipes.map { it.toOverview(likesCount = likes[it.id] ?: 0) }
     }
 
 
@@ -113,8 +125,13 @@ class RecipeService: KoinComponent {
      * A typed `-to-many` predicate rather than the `EXISTS` [filterByCookbook] uses: that
      * one exists because the join double-counts against the like aggregate in [findList],
      * and there is no aggregate here. The owner is fetched because every sheet prints a
-     * byline; the collections load per recipe, which is what a bounded export run once can
-     * afford — the print itself costs orders of magnitude more.
+     * byline; the steps and ingredients load per recipe, which is what a bounded export run once
+     * can afford — the print itself costs orders of magnitude more. That is the one read path here
+     * deliberately left scaling with its rows, so it has no guard in `RecipeFetchPlanTest`: the
+     * `maxRows` this sets is exactly what stops Ebean fetching those collections, and getting them
+     * back would mean loading the book twice or assigning the rows onto the beans by hand. What
+     * does *not* scale is what `describeAll` adds — the like counts and the ingredient names — both
+     * resolved for the whole book at once.
      *
      * @param limit how many rows to read at most. Callers asking whether a cookbook is
      *   within a bound pass the bound plus one and compare, which answers that in the one
@@ -193,8 +210,27 @@ class RecipeService: KoinComponent {
             .id.eq(recipeId)
             .filterOutDeletion(userId)
             .findOne()
-            ?.toInfo(locale)
+            ?.let { describe(it, locale) }
             ?: throw NotFoundException(NotFoundCause.RECIPE_NOT_FOUND)
+
+    /**
+     * One recipe's [RecipeInfo], with its like count resolved the way a list resolves a page of
+     * them — so a single read and a listing cannot come to different numbers.
+     */
+    fun describe(recipe: Recipe, locale: Locale): RecipeInfo = describeAll(listOf(recipe), locale).single()
+
+    /** [describe] for several recipes, at a fixed cost whatever the list holds. */
+    fun describeAll(recipes: List<Recipe>, locale: Locale): List<RecipeInfo> {
+        val likes = likeService.countLikesByRecipe(recipes.map { it.id })
+        // Every line naming a catalogue entry reads what it is called, which lives in a collection
+        // on the entry rather than on its row. Resolved once for the whole list: it is a query per
+        // line otherwise, and the lines of a cookbook export run into the hundreds.
+        val catalogueNames = ingredientService.namesOf(
+            recipes.flatMap { recipe -> recipe.ingredients.mapNotNull { it.ingredient?.id } }.toSet(),
+            locale,
+        )
+        return recipes.map { it.toInfo(locale, likesCount = likes[it.id] ?: 0, catalogueNames = catalogueNames) }
+    }
 
     fun getById(userId: Long?, recipeId: Long, locale: Locale) : RecipeInfo {
         if (!existsById(recipeId, userId)) throw NotFoundException(NotFoundCause.RECIPE_NOT_FOUND)
@@ -219,13 +255,13 @@ class RecipeService: KoinComponent {
     fun createRecipe(recipeDTO: RecipeDTO, owner: User): RecipeInfo {
         val recipe = Recipe().mergeDTO(recipeDTO).setOwner(owner).insertAndGet()
         saveSteps(recipe.id, recipeDTO.steps)
-        return getEntityById(recipe.id).toInfo(Locale.EN)
+        return describe(getEntityById(recipe.id), Locale.EN)
     }
 
     fun updateRecipe(id: Long, recipeDTO: RecipeDTO): RecipeInfo {
         getEntityById(id).mergeDTO(recipeDTO).update()
         saveSteps(id, recipeDTO.steps)
-        return getEntityById(id).toInfo(Locale.EN)
+        return describe(getEntityById(id), Locale.EN)
     }
 
     /**
@@ -301,8 +337,8 @@ class RecipeService: KoinComponent {
      */
     fun tryDelete(id: Long) {
         val recipe = getEntityById(id)
-        val recipeInfo = recipe.toInfo(Locale.EN)
-        val referenced = recipeInfo.likesCount > 0 || QCookbookRecipe().recipe.id.eq(recipe.id).exists()
+        val referenced = QLike().recipe.id.eq(recipe.id).exists() ||
+            QCookbookRecipe().recipe.id.eq(recipe.id).exists()
         logger.info { "Deleting recipe ${recipe.id} (${recipe.title}); has references: $referenced" }
         if (referenced) return
         recipe.delete()

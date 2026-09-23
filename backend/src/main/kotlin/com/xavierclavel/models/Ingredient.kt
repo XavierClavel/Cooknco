@@ -4,6 +4,7 @@ import com.xavierclavel.models.localization.LocalizedIngredientName
 import shared.dto.IngredientDTO
 import shared.enums.AmountUnit
 import shared.enums.IngredientType
+import shared.enums.Locale
 import shared.enums.MeasurementType
 import shared.infodto.IngredientInfo
 import shared.utils.UnitCapabilities
@@ -96,7 +97,14 @@ class Ingredient (
         return this
     }
 
-    fun toInfo() = IngredientInfo(
+    /**
+     * @param names what this ingredient is called, per language, resolved by
+     *   [com.xavierclavel.services.IngredientService.namesOf] rather than read off [translations].
+     *   An ingredient has no name of its own, so a catalogue listing reading the collection costs a
+     *   round trip per entry — and a paged one cannot fetch it: Ebean drops a `-to-many` from the
+     *   plan as soon as `maxRows` is set. `IngredientFetchPlanTest` is what keeps this in use.
+     */
+    fun toInfo(names: Map<Locale, String>) = IngredientInfo(
         id = this.id,
         type = this.type,
 
@@ -116,6 +124,6 @@ class Ingredient (
         defaultUnit = this.defaultUnit,
         allowedTypes = this.allowedTypes(),
 
-        name = translations.associate { it.locale to it.name },
+        name = names,
     )
 }

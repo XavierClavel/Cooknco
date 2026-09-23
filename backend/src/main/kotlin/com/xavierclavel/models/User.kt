@@ -212,7 +212,14 @@ class User (
 
     fun setRole(role: UserRole) = this.apply { this.role = role }
 
-    fun toInfo() =
+    /**
+     * @param counts the five figures a profile states, resolved by
+     *   [com.xavierclavel.services.UserService.countsOf] rather than read off the five collections
+     *   they name. Reading them costs five round trips per account, which a listing pays per row —
+     *   see `UserFetchPlanTest`, and the note on `LinkPreviewService.publicUser`, which avoids this
+     *   DTO for exactly that reason.
+     */
+    fun toInfo(counts: UserCounts) =
         UserInfo(
             id = this.id,
             version = this.imageVersion,
@@ -221,11 +228,11 @@ class User (
             isPremium = this.hasPremiumAccess(),
             joinDate = this.joinDate.toEpochSecond(ZoneOffset.UTC),
             bio = this.bio,
-            recipesCount = this.recipes.size,
-            likesCount = this.likes.size,
-            cookbooksCount = this.cookbooks.size,
-            followersCount = this.followers.count { !it.pending },
-            followsCount = this.follows.count { !it.pending },
+            recipesCount = counts.recipes,
+            likesCount = counts.likes,
+            cookbooksCount = counts.cookbooks,
+            followersCount = counts.followers,
+            followsCount = counts.follows,
         )
 
     fun toOverview() = UserOverview(
@@ -360,7 +367,8 @@ class User (
         moderationNote = ""
     }
 
-    fun toAdminInfo(mail: String, reportsAgainstCount: Int) = AdminUserInfo(
+    /** @param counts resolved by the caller, for the reason [toInfo] gives. */
+    fun toAdminInfo(mail: String, reportsAgainstCount: Int, counts: UserCounts) = AdminUserInfo(
         id = this.id,
         version = this.imageVersion,
         username = this.username,
@@ -378,11 +386,11 @@ class User (
         isAccountPublic = this.isAccountPublic,
         joinDate = this.joinDate.toEpochSecond(ZoneOffset.UTC),
         lastActivityDate = this.lastActivityDate.toEpochSecond(ZoneOffset.UTC),
-        recipesCount = this.recipes.size,
-        likesCount = this.likes.size,
-        cookbooksCount = this.cookbooks.size,
-        followersCount = this.followers.count { !it.pending },
-        followsCount = this.follows.count { !it.pending },
+        recipesCount = counts.recipes,
+        likesCount = counts.likes,
+        cookbooksCount = counts.cookbooks,
+        followersCount = counts.followers,
+        followsCount = counts.follows,
         reportsAgainstCount = reportsAgainstCount,
     )
 

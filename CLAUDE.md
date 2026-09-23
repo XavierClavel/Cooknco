@@ -187,13 +187,34 @@ real columns (`custom_name`, not `customName`).
 
 Fetch the associations the mapping code reads, up front, instead of letting them lazy-load per row.
 A `findList()` honours only a **single `-to-many` fetch path**: every other collection is silently
-dropped from the plan and lazy-loads one query per row (`findOne` is unaffected). When a list DTO
-needs several collections, query each from the child side and group it back by parent id.
+dropped from the plan and lazy-loads one query per row (`findOne` is unaffected).
 
-Nothing enforces this automatically here — unlike `backend-zourite-api`, which fails the build on it
-via custom detekt rules. `backend/src/main` and `mail-service/src/main` currently hold no violations,
-so any string property path or `DB.sqlQuery` you find in a diff is new and should be sent back. Test
-sources are out of scope: fixtures may set up rows with raw SQL.
+**A paged query fetches no collection at all.** `setPaging` / `setMaxRows` drops *every* `-to-many`
+from the plan — Ebean cannot `limit` a join that multiplies rows — and it does so whether the path
+was asked for as a join or as a secondary query: `fetchQuery()` measured identical to `fetchLazy()`
+in this build. Since every listing here is paged, **no fetch path will save a listing**, and an
+aggregate does not either: `fetch(path, "count(*)")` still leaves `collection.size` lazy-loading, so
+the one in `RecipeService.findList` serves `orderBy count(...)` and nothing else. `-to-one` paths are
+unaffected and worth fetching (`.owner.fetch()`); they batch-load anyway, so the saving is one query
+per page rather than per row.
+
+So a list DTO stating a collection's size or naming its first few rows **asks the child side for it,
+grouped by parent id**, and the service hands the answer to the mapper rather than the mapper reading
+the entity. `utils/GroupedCounts.kt` (`countByParent`) is the shared shape for the counts; the
+`describe` / `describeAll` pair on `RecipeService`, `UserService`, `CookbookService` and
+`IngredientService` is where each DTO is built, single reads going through the same code as pages so
+the two cannot come to different numbers.
+
+`FetchPlanTest` (`backend/src/test/.../utils/FetchPlanTest.kt`) is what enforces it — unlike
+`backend-zourite-api`, which fails the build on it via custom detekt rules, this is a test per read
+path, comparing the query count at few rows against many rather than hardcoding a number. A new
+listing gets one. The cookbook export is the single deliberate exception, and `findByCookbook`'s KDoc
+says why.
+
+Nothing enforces the query-bean rules above automatically. `backend/src/main` and
+`mail-service/src/main` currently hold no violations, so any string property path or `DB.sqlQuery`
+you find in a diff is new and should be sent back. Test sources are out of scope: fixtures may set up
+rows with raw SQL.
 
 Reference: [`Pictarine/backend-zourite-api` — `docs/product-v2/ebean-patterns.md`](https://github.com/Pictarine/backend-zourite-api/blob/develop/docs/product-v2/ebean-patterns.md)
 (that project's Kotlin query beans call the alias `_alias`; ours are Java beans and use `Q<Entity>.Alias`).

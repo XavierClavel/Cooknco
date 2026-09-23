@@ -95,12 +95,12 @@ object AdminPdfController: Controller("documents") {
             PdfDocumentKind.RECIPE -> {
                 val recipe = dto.subjectId?.let { recipeService.getEntityById(it) }
                     ?: recipeService.findMostRecent()
-                exportService.generatePDF(recipe.toInfo(locale), locale, body = dto.body)
+                exportService.generatePDF(recipeService.describe(recipe, locale), locale, body = dto.body)
             }
             PdfDocumentKind.COOKBOOK -> {
                 val cookbook = dto.subjectId?.let { cookbookService.getEntityById(it) }
                     ?: cookbookService.findMostRecent()
-                exportService.generateCookbookPDF(cookbook.toInfo(), locale, body = dto.body)
+                exportService.generateCookbookPDF(cookbookService.describe(cookbook), locale, body = dto.body)
             }
         }
 
