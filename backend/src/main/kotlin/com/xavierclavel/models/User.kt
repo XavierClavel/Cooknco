@@ -115,8 +115,14 @@ class User (
      * last seen the day it joined rather than as never seen at all. That is the one case
      * where it legitimately equals [joinDate]; every other one was the stamp not being
      * written, which is the bug this used to have.
+     *
+     * Defaulted *from* [joinDate] rather than from a second `LocalDateTime.now()`, so that
+     * "equals the join date" is true by construction. Two `now()` calls differ by nanoseconds
+     * and Postgres keeps microseconds, so they agreed only until the pair happened to
+     * straddle one — which made the test of that case fail a few runs in a thousand, on a
+     * diff that had nothing to do with it.
      */
-    var lastActivityDate: LocalDateTime = LocalDateTime.now(),
+    var lastActivityDate: LocalDateTime = joinDate,
 
     @OneToMany(mappedBy = "owner", cascade = [CascadeType.ALL], orphanRemoval = true)
     var recipes: Set<Recipe> = setOf(),

@@ -4,6 +4,7 @@ import com.xavierclavel.models.Device
 import com.xavierclavel.models.query.QDevice
 import com.xavierclavel.utils.DbTransaction.updateAndGet
 import com.xavierclavel.utils.logger
+import io.ebean.DB
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import shared.dto.DeviceRegistrationDTO
@@ -44,6 +45,13 @@ class DeviceService: KoinComponent {
             // build it is now rather than as the one it first registered under
             existing.appVersion = dto.appVersion.trim()
             existing.locale = locale
+            // `lastSeenAt` is `@WhenModified`, so it is stamped by the update rather than
+            // by the call — and Ebean issues no update at all for a bean nothing changed.
+            // A launch reporting exactly what the row already says is the common case once
+            // an install settles on a build, and without this it wrote nothing: the column
+            // would mean "last changed" and `AppVersionService.reach` would drop a handset
+            // in daily use out of its window for having been consistent for 90 days.
+            DB.markAsDirty(existing)
             existing.updateAndGet()
             if (moved) logger.info { "Device ${existing.id} re-registered to user $userId" }
             return existing

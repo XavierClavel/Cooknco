@@ -445,6 +445,42 @@ class AppVersionControllerTest : ApplicationTest() {
         }
     }
 
+    /**
+     * The claim `DeviceService.register` makes: an install that updated is counted as the
+     * build it is now, rather than lingering next to itself at the one it first reported.
+     */
+    @Test
+    fun `an install that updated is counted once, at the build it is now`() = runTest {
+        runAsUser1 {
+            client.registerDevice("phone", appVersion = "1.2.0")
+            client.registerDevice("phone", appVersion = "1.6.0")
+        }
+
+        runAsAdmin {
+            val reach = client.appVersionReach(AppPlatform.ANDROID, minimum = "1.4.0")
+
+            assertEquals(1, reach.devices)
+            assertEquals(listOf("1.6.0"), reach.distribution.map { it.version })
+            assertEquals(0, reach.blockedDevices)
+        }
+    }
+
+    /**
+     * The window is what keeps replaced handsets from inflating a floor's cost, and the
+     * only thing that puts a device back inside it is a launch. A launch that reports
+     * exactly what the row already says is still a launch.
+     */
+    @Test
+    fun `a launch that changes nothing still keeps the install inside the window`() = runTest {
+        runAsUser1 { client.registerDevice("phone", appVersion = "1.2.0") }
+        backdate("phone", days = 200)
+        runAsUser1 { client.registerDevice("phone", appVersion = "1.2.0") }
+
+        runAsAdmin {
+            assertEquals(1, client.appVersionReach(AppPlatform.ANDROID, minimum = "1.4.0").devices)
+        }
+    }
+
     /** The list a floor is chosen from: newest build first, and the unreadable one last. */
     @Test
     fun `the distribution is ordered newest first, numerically, with unknown last`() = runTest {
