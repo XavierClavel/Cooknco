@@ -83,6 +83,17 @@ suspend fun HttpClient.getMe(): UserInfo {
     }
 }
 
+suspend fun HttpClient.editUser(userDTO: UserDTO): UserInfo {
+    this.put(USER_URL) {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(userDTO)
+    }.apply {
+        assertEquals(HttpStatusCode.OK, status)
+        return Json.decodeFromString<UserInfo>(bodyAsText())
+    }
+}
+
 suspend fun HttpClient.deleteUser(id: Long) {
     this.delete("$USER_URL/$id").apply {
         assertEquals(HttpStatusCode.OK, status)

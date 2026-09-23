@@ -15,6 +15,7 @@ import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getStringQueryParam
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.logEdit
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -54,6 +55,9 @@ object AdminUserController: Controller("users") {
         deleteUser()
     }
 
+    /** A moderation reason is optional, and a line ending in a bare colon reads as truncated. */
+    private fun String.orUnstated() = ifBlank { "no reason given" }
+
     private fun Route.searchUsers() = get {
         val paging = getPaging()
         val (count, users) = adminService.searchUsers(
@@ -79,7 +83,9 @@ object AdminUserController: Controller("users") {
             throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_DEMOTE_LAST_ADMIN)
         }
         userService.setRole(id, role)
-        call.respond(adminService.getUser(id))
+        val user = adminService.getUser(id)
+        logEdit { "User $id (${user.username}) given the role $role" }
+        call.respond(user)
     }
 
     /**
@@ -105,39 +111,59 @@ object AdminUserController: Controller("users") {
         // an operator saves and reloads has to come back the day they picked.
         val until = if (dto.forever) null else LocalDateTime.ofEpochSecond(dto.until!!, 0, ZoneOffset.UTC)
         userService.grantPremium(id, until)
-        call.respond(adminService.getUser(id))
+        val user = adminService.getUser(id)
+        logEdit {
+            "User $id (${user.username}) granted premium ${if (dto.forever) "for good" else "until $until"}"
+        }
+        call.respond(user)
     }
 
     /** Ends a grant of either kind, now. Nothing is refunded and nothing else changes. */
     private fun Route.revokePremium() = delete("/{id}/premium") {
         val id = getPathId()
         userService.revokePremium(id)
-        call.respond(adminService.getUser(id))
+        val user = adminService.getUser(id)
+        logEdit { "User $id (${user.username}) had their premium revoked" }
+        call.respond(user)
     }
 
     private fun Route.suspendUser() = post("/{id}/suspend") {
         val dto = call.receive<SuspensionDTO>()
-        call.respond(moderationService.suspendUser(getPathId(), dto.days, dto.reason))
+        val user = moderationService.suspendUser(getPathId(), dto.days, dto.reason)
+        logEdit {
+            "User ${user.id} (${user.username}) suspended for ${dto.days} day(s): ${dto.reason.orUnstated()}"
+        }
+        call.respond(user)
     }
 
     private fun Route.banUser() = post("/{id}/ban") {
         val dto = call.receive<ModerationReasonDTO>()
-        call.respond(moderationService.banUser(getPathId(), dto.reason))
+        val user = moderationService.banUser(getPathId(), dto.reason)
+        logEdit { "User ${user.id} (${user.username}) banned: ${dto.reason.orUnstated()}" }
+        call.respond(user)
     }
 
     private fun Route.reinstateUser() = post("/{id}/reinstate") {
-        call.respond(moderationService.reinstateUser(getPathId()))
+        val user = moderationService.reinstateUser(getPathId())
+        logEdit { "User ${user.id} (${user.username}) reinstated" }
+        call.respond(user)
     }
 
     private fun Route.verifyUser() = post("/{id}/verify") {
-        call.respond(moderationService.verifyUser(getPathId()))
+        val user = moderationService.verifyUser(getPathId())
+        logEdit { "User ${user.id} (${user.username}) verified" }
+        call.respond(user)
     }
 
     private fun Route.deleteUser() = delete("/{id}") {
         val id = getPathId()
         // Deleting yourself here would leave the caller holding a dead session
-        if (id == getSessionUserId()) throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_MODERATE_ADMIN)
+        val actorId = getSessionUserId()
+        if (id == actorId) throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_MODERATE_ADMIN)
+        // Named before the deletion: afterwards there is no row left to read it off.
+        val username = adminService.getUser(id).username
         moderationService.deleteUser(id)
+        logEdit { "User $id ($username) deleted" }
         call.respond(HttpStatusCode.OK)
     }
 }

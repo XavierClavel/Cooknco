@@ -6,6 +6,7 @@ import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getPathId
+import com.xavierclavel.utils.logEdit
 import shared.utils.URL.RECIPE_NOTES_URL
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -39,6 +40,7 @@ object RecipeNotesController: Controller(RECIPE_NOTES_URL) {
         val notes = call.receive<String>()
         if (recipeNotesService.notesExists(recipeId, userId)) throw BadRequestException(BadRequestCause.INVALID_REQUEST)
         val recipeNotes = recipeNotesService.createNotes(recipeId, userId, notes)
+        logEdit { "Notes on recipe $recipeId created" }
         call.respond(recipeNotes)
     }
 
@@ -47,6 +49,7 @@ object RecipeNotesController: Controller(RECIPE_NOTES_URL) {
         val userId = getSessionUserId()
         val notes = call.receive<String>()
         val recipeNotes = recipeNotesService.updateNotes(recipeId, userId, notes)
+        logEdit { "Notes on recipe $recipeId edited" }
         call.respond(recipeNotes)
     }
 
@@ -54,6 +57,7 @@ object RecipeNotesController: Controller(RECIPE_NOTES_URL) {
         val recipeId = getPathId()
         val userId = getSessionUserId()
         val recipeNotes = recipeNotesService.deleteNotes(recipeId, userId)
+        logEdit { "Notes on recipe $recipeId deleted" }
         call.respond(recipeNotes)
     }
 

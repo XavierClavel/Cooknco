@@ -192,6 +192,13 @@ class UserService: KoinComponent {
             .update()
     }
 
+    /**
+     * Just the name, for the label the session carries — a whole user read would be a row too
+     * many on a path that runs once a day per session. See [com.xavierclavel.plugins.SessionData].
+     */
+    fun findUsername(id: Long): String? =
+        QUser().id.eq(id).select(QUser.Alias.username).findOne()?.username
+
     fun deleteUserById(userId: Long): Int {
         detachReports(userId)
         detachNotifications(userId)

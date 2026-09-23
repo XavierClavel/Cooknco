@@ -1,6 +1,7 @@
 package com.xavierclavel.plugins
 
 import shared.enums.UserRole
+import com.xavierclavel.services.UserService
 import shared.infodto.UserInfo
 import io.lettuce.core.ExperimentalLettuceCoroutinesApi
 import io.lettuce.core.RedisClient
@@ -10,14 +11,30 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 @Serializable
 data class SessionData(
     val userId: Long,
     val role: UserRole,
+    /**
+     * What the account was called when it signed in, carried so that the edit trail can name
+     * a user without a query — [com.xavierclavel.utils.logEdit] reads this session anyway.
+     *
+     * Deliberately **not** kept in step with the row. A username can be changed
+     * (`UserService.editUser`), nothing refreshes an open session, and `touchSession` slides
+     * the expiry on every active day, so a name that goes stale here stays stale until that
+     * user signs out. Renames are rare and a slightly wrong name in the backoffice is worth
+     * more than cache invalidation in the session store; what makes that safe is that the
+     * trail always carries [userId] beside it, and that one cannot drift. Read the id, treat
+     * the name as a label.
+     *
+     * Defaulted because sessions written before this field existed are still in Redis.
+     */
+    val username: String = "",
 ) {
     companion object {
-        fun from(user: UserInfo) = SessionData(user.id, user.role)
+        fun from(user: UserInfo) = SessionData(user.id, user.role, user.username)
     }
 }
 
@@ -100,6 +117,10 @@ data class AnsweredDecisionData(
 )
 
 class RedisService(redisUrl: String): KoinComponent {
+    // Lazily, and only reached from touchSession: UserService does not know about this class,
+    // so there is no cycle, and nothing is resolved while Koin is still starting up.
+    private val userService: UserService by inject()
+
     companion object {
         /** Idle timeout: a session survives this long without activity. */
         const val SESSION_TTL = 30L * 24 * 60 * 60
@@ -147,6 +168,13 @@ class RedisService(redisUrl: String): KoinComponent {
         const val IMAGE_UPLOAD_TICKET_TTL = 10L * 60
     }
 
+    /**
+     * Payloads here outlive the build that wrote them — a session lasts thirty days — so an
+     * unknown key is something a neighbouring or previous version added, not a reason to
+     * throw and sign somebody out.
+     */
+    private val redisJson = Json { ignoreUnknownKeys = true }
+
     private val client = RedisClient.create(redisUrl)
     private val connection = client.connect()
 
@@ -156,7 +184,7 @@ class RedisService(redisUrl: String): KoinComponent {
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun createSession(sessionId: String, user: UserInfo) {
         val json = SessionData.from(user)
-        redis.setex("session:$sessionId", SESSION_TTL, Json.encodeToString(json))
+        redis.setex("session:$sessionId", SESSION_TTL, redisJson.encodeToString(json))
         // Reverse index, so moderation can revoke every session an account holds
         redis.sadd(userSessionsKey(user.id), sessionId)
         redis.expire(userSessionsKey(user.id), SESSION_TTL)
@@ -165,14 +193,32 @@ class RedisService(redisUrl: String): KoinComponent {
     /**
      * Slides the session expiry back to [SESSION_TTL] so that an active user is never logged out.
      * Returns true when the TTL was actually extended, so the caller knows to re-emit the cookie.
+     *
+     * Also the point at which [SessionData.username] catches up with the row. The rewrite is
+     * already happening here and the guard above lets it through at most once a day per session,
+     * so refreshing the label costs one indexed read a day rather than a query per write — and,
+     * unlike syncing every session of an account when it is renamed, it is a pull nobody has to
+     * remember to trigger. A rename is therefore visible in the trail within a day of use, not
+     * merely whenever the user next signs out.
+     *
+     * `setex` rather than `expire`, because the value is changing too and the two must not be
+     * separate steps: a crash between them would leave a session on the old TTL.
      */
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun touchSession(sessionId: String): Boolean {
         val key = "session:$sessionId"
         val ttl = redis.ttl(key) ?: return false
         if (ttl <= 0 || ttl > SESSION_TTL - REFRESH_THRESHOLD) return false
-        redis.expire(key, SESSION_TTL)
-        getSession(sessionId)?.let { redis.expire(userSessionsKey(it.userId), SESSION_TTL) }
+        val data = getSession(sessionId)
+        if (data == null) {
+            redis.expire(key, SESSION_TTL)
+            return true
+        }
+        // Keeps the name it has if the row cannot be read: a label is never worth failing a
+        // request that is only here to have its expiry slid forward.
+        val username = userService.findUsername(data.userId) ?: data.username
+        redis.setex(key, SESSION_TTL, redisJson.encodeToString(data.copy(username = username)))
+        redis.expire(userSessionsKey(data.userId), SESSION_TTL)
         return true
     }
 
@@ -212,7 +258,7 @@ class RedisService(redisUrl: String): KoinComponent {
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun getSession(sessionId: String): SessionData? {
         val json = redis.get("session:${sessionId}") ?: return null
-        return Json.decodeFromString<SessionData>(json)
+        return redisJson.decodeFromString<SessionData>(json)
     }
 
     suspend fun isUserAdmin(sessionId: String): Boolean =
@@ -232,7 +278,7 @@ class RedisService(redisUrl: String): KoinComponent {
      */
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun createPendingAuthorization(id: String, data: PendingAuthorizationData) {
-        redis.setex("oauth-pending:$id", PENDING_AUTHORIZATION_TTL, Json.encodeToString(data))
+        redis.setex("oauth-pending:$id", PENDING_AUTHORIZATION_TTL, redisJson.encodeToString(data))
     }
 
     /** Reads the pending request and forgets it, so an Allow cannot be replayed. */
@@ -241,24 +287,24 @@ class RedisService(redisUrl: String): KoinComponent {
         val key = "oauth-pending:$id"
         val json = redis.get(key) ?: return null
         redis.del(key)
-        return Json.decodeFromString<PendingAuthorizationData>(json)
+        return redisJson.decodeFromString<PendingAuthorizationData>(json)
     }
 
     /** Records what a consent form was answered with, for as long as it could be posted again. */
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun rememberDecision(id: String, data: AnsweredDecisionData) {
-        redis.setex("oauth-decided:$id", PENDING_AUTHORIZATION_TTL, Json.encodeToString(data))
+        redis.setex("oauth-decided:$id", PENDING_AUTHORIZATION_TTL, redisJson.encodeToString(data))
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun getDecision(id: String): AnsweredDecisionData? {
         val json = redis.get("oauth-decided:$id") ?: return null
-        return Json.decodeFromString<AnsweredDecisionData>(json)
+        return redisJson.decodeFromString<AnsweredDecisionData>(json)
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun createAuthorizationCode(code: String, data: AuthorizationCodeData) {
-        redis.setex("oauth-code:$code", AUTHORIZATION_CODE_TTL, Json.encodeToString(data))
+        redis.setex("oauth-code:$code", AUTHORIZATION_CODE_TTL, redisJson.encodeToString(data))
     }
 
     /**
@@ -271,23 +317,23 @@ class RedisService(redisUrl: String): KoinComponent {
         val key = "oauth-code:$code"
         val json = redis.get(key) ?: return null
         redis.del(key)
-        return Json.decodeFromString<AuthorizationCodeData>(json)
+        return redisJson.decodeFromString<AuthorizationCodeData>(json)
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun createAccessToken(token: String, data: OAuthTokenData) {
-        redis.setex("oauth-access:$token", ACCESS_TOKEN_TTL, Json.encodeToString(data))
+        redis.setex("oauth-access:$token", ACCESS_TOKEN_TTL, redisJson.encodeToString(data))
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun getAccessToken(token: String): OAuthTokenData? {
         val json = redis.get("oauth-access:$token") ?: return null
-        return Json.decodeFromString<OAuthTokenData>(json)
+        return redisJson.decodeFromString<OAuthTokenData>(json)
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun createRefreshToken(token: String, data: OAuthTokenData) {
-        redis.setex("oauth-refresh:$token", REFRESH_TOKEN_TTL, Json.encodeToString(data))
+        redis.setex("oauth-refresh:$token", REFRESH_TOKEN_TTL, redisJson.encodeToString(data))
     }
 
     /**
@@ -299,12 +345,12 @@ class RedisService(redisUrl: String): KoinComponent {
         val key = "oauth-refresh:$token"
         val json = redis.get(key) ?: return null
         redis.del(key)
-        return Json.decodeFromString<OAuthTokenData>(json)
+        return redisJson.decodeFromString<OAuthTokenData>(json)
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun createImageUploadTicket(ticket: String, data: ImageUploadTicketData) {
-        redis.setex("image-ticket:$ticket", IMAGE_UPLOAD_TICKET_TTL, Json.encodeToString(data))
+        redis.setex("image-ticket:$ticket", IMAGE_UPLOAD_TICKET_TTL, redisJson.encodeToString(data))
     }
 
     /** Reads a ticket and destroys it, so a URL that has been posted to is spent. */
@@ -313,7 +359,7 @@ class RedisService(redisUrl: String): KoinComponent {
         val key = "image-ticket:$ticket"
         val json = redis.get(key) ?: return null
         redis.del(key)
-        return Json.decodeFromString<ImageUploadTicketData>(json)
+        return redisJson.decodeFromString<ImageUploadTicketData>(json)
     }
 
 }

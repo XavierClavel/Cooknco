@@ -316,23 +316,32 @@ object AuthController: Controller(AUTH_URL) {
         return header.removePrefix("Bearer ").trim()
     }
 
-    suspend fun ApplicationCall.getBearerTokenUserId(): Long? {
+    suspend fun ApplicationCall.getBearerTokenUserId(): Long? = getBearerTokenSession()?.userId
+
+    suspend fun ApplicationCall.getBearerTokenSession(): SessionData? {
         val token = getBearerToken() ?: return null
-        return redisService.getSessionUserId(token)
+        return redisService.getSession(token)
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
-    suspend fun RoutingContext.getOptionalSessionId(): Long? {
-        val tokenUserId = call.getBearerTokenUserId()
-        if (tokenUserId != null) {
-            return tokenUserId
+    suspend fun RoutingContext.getOptionalSessionId(): Long? = getOptionalSession()?.userId
+
+    /**
+     * The whole session rather than just the id, for callers that also want what the account
+     * was called — the edit trail does, and this is the read it was already making.
+     */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun RoutingContext.getOptionalSession(): SessionData? {
+        val fromToken = call.getBearerTokenSession()
+        if (fromToken != null) {
+            return fromToken
         }
         val session = call.sessions.get<UserSession>() ?: return null
-        val userId = redisService.getSessionUserId(session.sessionId)
-        if (userId == null) {
+        val data = redisService.getSession(session.sessionId)
+        if (data == null) {
             call.sessions.clear<UserSession>()
         }
-        return userId
+        return data
     }
 
     @OptIn(ExperimentalLettuceCoroutinesApi::class)

@@ -2,13 +2,14 @@ package com.xavierclavel.controllers
 
 import com.xavierclavel.services.IngredientService
 import com.xavierclavel.utils.Controller
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.utils.getLocale
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getQuery
 import com.xavierclavel.utils.getSort
 import com.xavierclavel.utils.json
-import com.xavierclavel.utils.logger
+import com.xavierclavel.utils.logEdit
 import shared.dto.AbsorbCustomIngredientDTO
 import shared.dto.AbsorbCustomIngredientResult
 import shared.dto.IngredientDTO
@@ -16,6 +17,7 @@ import shared.dto.SearchResult
 import shared.infodto.CustomIngredientUsage
 import shared.infodto.IngredientInfo
 import shared.utils.URL.INGREDIENT_URL
+import shared.enums.Locale
 import shared.enums.Sort
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
@@ -60,16 +62,18 @@ object IngredientController: Controller(INGREDIENT_URL) {
         val id = getPathId()
         val dto = call.receive<AbsorbCustomIngredientDTO>()
         val result = ingredientService.absorbCustomIngredient(id, dto.name)
-        logger.info {
-            "Absorbed ${result.convertedRows} custom ingredient rows named '${dto.name}' into ingredient $id" +
-                ", skipped ${result.skippedRows} whose unit it does not allow"
+        logEdit {
+            "Ingredient $id absorbed ${result.convertedRows} custom row(s) named '${dto.name}'" +
+            ", skipping ${result.skippedRows} whose unit it does not allow"
         }
         call.respond(result)
     }
 
     private fun Route.createIngredient() = post {
         val ingredientDTO = call.receive<IngredientDTO>()
-        call.respond(HttpStatusCode.Created, ingredientService.createIngredient(ingredientDTO))
+        val ingredient = ingredientService.createIngredient(ingredientDTO)
+        logEdit { "Ingredient ${ingredient.id} (${ingredient.label()}) created" }
+        call.respond(HttpStatusCode.Created, ingredient)
     }
 
     private fun Route.createIngredientsBatch() = post("/batch") {
@@ -77,6 +81,9 @@ object IngredientController: Controller(INGREDIENT_URL) {
         for (ingredient in ingredientsDTO) {
             ingredientService.createIngredient(ingredient)
         }
+        // One line for the batch, not one per row: an import of the catalogue would otherwise
+        // be the only thing left in a 5 000-line buffer.
+        logEdit { "${ingredientsDTO.size} ingredient(s) created in one batch" }
         call.respond(HttpStatusCode.Created)
     }
 
@@ -84,12 +91,14 @@ object IngredientController: Controller(INGREDIENT_URL) {
         val id = getPathId()
         val ingredientDTO = call.receive<IngredientDTO>()
         val ingredient = ingredientService.updateIngredient(id, ingredientDTO)
+        logEdit { "Ingredient $id (${ingredient.label()}) edited" }
         call.respond(ingredient)
     }
 
     private fun Route.deleteIngredient() = delete("/{id}") {
         val id = getPathId()
         val result = ingredientService.deleteById(id)
+        if (result) logEdit { "Ingredient $id deleted" }
         return@delete if (result) call.respond(HttpStatusCode.OK)
             else call.respond(HttpStatusCode.NotFound)
     }
@@ -108,6 +117,10 @@ object IngredientController: Controller(INGREDIENT_URL) {
         val result = ingredientService.findById(id) ?: return@get call.respond(HttpStatusCode.NotFound)
         call.respond(result)
     }
+
+    /** An ingredient is named once per locale, and a log line wants one name. */
+    private fun IngredientInfo.label(): String =
+        name[Locale.EN] ?: name.values.firstOrNull() ?: "unnamed"
 
     private fun Route.getCount() = get("/count") {
         call.respond(ingredientService.countAll())
