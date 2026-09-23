@@ -11,12 +11,14 @@ import main.com.xavierclavel.utils.createCookbook
 import main.com.xavierclavel.utils.createRecipe
 import main.com.xavierclavel.utils.createUser
 import main.com.xavierclavel.utils.deleteCookbook
+import main.com.xavierclavel.utils.deleteCookbookRaw
 import main.com.xavierclavel.utils.deleteCookbookRecipe
 import main.com.xavierclavel.utils.deleteCookbookUser
 import main.com.xavierclavel.utils.getCookbook
 import main.com.xavierclavel.utils.getCookbookRaw
 import main.com.xavierclavel.utils.getCookbookRecipes
 import main.com.xavierclavel.utils.getCookbookUsers
+import main.com.xavierclavel.utils.getMe
 import main.com.xavierclavel.utils.getRecipeUserCookbooks
 import main.com.xavierclavel.utils.leaveCookbook
 import main.com.xavierclavel.utils.listCookbooks
@@ -40,6 +42,31 @@ class CookbookControllerTest : ApplicationTest() {
         val users = client.getCookbookUsers(cookbook.id)
         assertEquals(1, users.size)
         assertEquals(true, users.first().isAdmin)
+    }
+
+    /**
+     * A cookbook is written to by its administrators and nobody else. `deleteCookbook` used to
+     * check nothing at all, so any account could destroy any cookbook — and it is the one write
+     * here that cannot be undone, since the rows go with it.
+     */
+    @Test
+    fun `a cookbook may only be deleted by one of its administrators`() = runTest {
+        var cookbookId = 0L
+        runAsUser1 { cookbookId = client.createCookbook().id }
+
+        // A stranger to the cookbook.
+        runAsUser2 {
+            assertEquals(HttpStatusCode.Forbidden, client.deleteCookbookRaw(cookbookId).status)
+        }
+        // And a member who is not an administrator of it.
+        var user2Id = 0L
+        runAsUser2 { user2Id = client.getMe().id }
+        runAsUser1 { client.addCookbookUser(cookbookId, user2Id, isAdmin = false) }
+        runAsUser2 {
+            assertEquals(HttpStatusCode.Forbidden, client.deleteCookbookRaw(cookbookId).status)
+        }
+
+        runAsUser1 { client.assertCookbookExists(cookbookId) }
     }
 
     @Test

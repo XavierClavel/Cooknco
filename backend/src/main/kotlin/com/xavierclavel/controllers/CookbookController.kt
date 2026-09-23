@@ -17,6 +17,7 @@ import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getQuery
 import com.xavierclavel.utils.getSort
+import com.xavierclavel.utils.checkCookbookAdminRights
 import com.xavierclavel.utils.handleDeletion
 import com.xavierclavel.utils.logger
 import shared.dto.CookbookDTO
@@ -28,7 +29,6 @@ import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
-import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -125,7 +125,7 @@ object CookbookController: Controller(COOKBOOK_URL) {
 
     private fun Route.updateCookbook() = put("/{id}") {
         val id = getPathId()
-        checkIfAdminOfCookbook(id)
+        checkCookbookAdminRights(id)
         val cookbookDTO = call.receive<CookbookDTO>()
         val cookbook = cookbookService.updateCookbook(id, cookbookDTO)
         call.respond(cookbook)
@@ -133,6 +133,7 @@ object CookbookController: Controller(COOKBOOK_URL) {
 
     private fun Route.deleteCookbook() = delete("/{id}") {
         val id = getPathId()
+        checkCookbookAdminRights(id)
         val cookbook = cookbookService.getEntityById(id)
         imageService.deleteImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion)
         handleDeletion(cookbookService.deleteCookbook(id))
@@ -140,7 +141,7 @@ object CookbookController: Controller(COOKBOOK_URL) {
 
     private fun Route.addCookbookUser() = post("/{id}/user/{user}") {
         val cookbookId = getPathId()
-        checkIfAdminOfCookbook(cookbookId)
+        checkCookbookAdminRights(cookbookId)
         val userId = getIdPathVariable("user") ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
         val role = getBooleanQueryParam("role") ?: false
         cookbookService.addUserToCookbook(cookbookId, userId, role)
@@ -149,7 +150,7 @@ object CookbookController: Controller(COOKBOOK_URL) {
 
     private fun Route.setCookbookUsers() = put("/{id}/users") {
         val cookbookId = getPathId()
-        checkIfAdminOfCookbook(cookbookId)
+        checkCookbookAdminRights(cookbookId)
         val userInput = call.receive<List<CookbookUserDTO>>()
         cookbookService.setCookbookUsers(cookbookId, userInput)
         call.respond(HttpStatusCode.OK)
@@ -158,7 +159,7 @@ object CookbookController: Controller(COOKBOOK_URL) {
     private fun Route.deleteCookbookUser() = delete("/{id}/user/{user}") {
         val cookbookId = getPathId()
         val userId = getIdPathVariable("user") ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
-        checkIfAdminOfCookbook(cookbookId)
+        checkCookbookAdminRights(cookbookId)
         handleDeletion(cookbookService.removeUserFromCookbook(cookbookId, userId))
     }
 
@@ -186,12 +187,6 @@ object CookbookController: Controller(COOKBOOK_URL) {
             throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_REMOVE_RECIPE)
         }
         handleDeletion(cookbookService.removeRecipeFromCookbook(cookbookId, recipeId))
-    }
-
-    private suspend fun RoutingContext.checkIfAdminOfCookbook(cookbookId: Long) {
-        if (!cookbookService.isAdminOfCookbook(cookbookId, getSessionUserId())) {
-            throw ForbiddenException(ForbiddenCause.MUST_BE_COOKBOOK_ADMINISTRATOR)
-        }
     }
 
 }
