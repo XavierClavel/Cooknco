@@ -4,6 +4,7 @@ import com.xavierclavel.logging.LogBuffer
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getStringQueryParam
+import com.xavierclavel.utils.logEdit
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -79,6 +80,8 @@ object AdminLogController: Controller("logs") {
     /** Empties the buffer, so an operator can watch a reproduction from a clean slate. */
     private fun Route.clearLogs() = delete {
         LogBuffer.clear()
+        // After the wipe, so the line survives it and the buffer says who emptied it.
+        logEdit { "Log buffer cleared" }
         call.respond(HttpStatusCode.OK)
     }
 

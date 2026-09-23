@@ -20,7 +20,7 @@ import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.readBounded
 import com.xavierclavel.utils.getSort
-import com.xavierclavel.utils.logger
+import com.xavierclavel.utils.logEdit
 import shared.RecipeFilter
 import shared.dto.RecipeDTO
 import shared.enums.DishClass
@@ -99,7 +99,7 @@ object RecipeController: Controller(RECIPE_URL) {
         // exist as rows able to point at each other.
         recipeIngredientService.linkStepIngredients(recipe.id, recipeDto.steps)
         val recipeInfo = recipeService.getRawById(recipe.id, getSessionUserId(), Locale.EN)
-        logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) created by user ${user.username}"}
+        logEdit { "Recipe ${recipeInfo.id} (${recipeInfo.title}) created" }
         // After the ingredients, so the recipe a follower is sent to is a finished one.
         // Fans out in the background: see NotificationService.
         notificationService.onRecipeCreated(recipeService.getEntityById(recipe.id))
@@ -156,7 +156,7 @@ object RecipeController: Controller(RECIPE_URL) {
         recipeIngredientService.replaceRecipeIngredients(recipeId, ingredients)
         recipeIngredientService.linkStepIngredients(recipeId, recipeDto.steps)
         val recipeInfo = recipeService.getRawById(recipeId, getSessionUserId(), Locale.EN)
-        logger.info{"Recipe ${recipeInfo.id} (${recipeInfo.title}) edited by user ${recipe.owner.username}"}
+        logEdit { "Recipe ${recipeInfo.id} (${recipeInfo.title}) edited" }
         call.respond(HttpStatusCode.OK, recipeInfo)
     }
 
@@ -166,7 +166,7 @@ object RecipeController: Controller(RECIPE_URL) {
         checkRecipeEditionRights(recipe.owner!!.id)
         recipeService.tagRecipeForDeletion(recipeId)
         recipeService.tryDelete(recipeId)
-        logger.info{"Recipe ${recipe.id} (${recipe.title}) deleted by user ${recipe.owner.username}"}
+        logEdit { "Recipe ${recipe.id} (${recipe.title}) deleted" }
         call.respond(HttpStatusCode.OK)
     }
 

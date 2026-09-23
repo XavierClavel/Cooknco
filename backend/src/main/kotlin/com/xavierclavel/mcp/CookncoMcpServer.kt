@@ -17,6 +17,7 @@ import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Configuration
+import com.xavierclavel.utils.logEdit
 import com.xavierclavel.utils.logger
 import io.ebean.Paging
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -450,7 +451,7 @@ object CookncoMcpServer {
         val recipe = recipeService.createRecipe(recipeDto, owner)
         recipeIngredientService.replaceRecipeIngredients(recipe.id, ingredients)
         val created = recipeService.getRawById(recipe.id, userId, Locale.EN)
-        logger.info { "Recipe ${created.id} (${created.title}) created by user ${owner.username} over MCP" }
+        logEdit(userId, owner.username) { "Recipe ${created.id} (${created.title}) created over MCP" }
         // After the ingredients, so what a follower is sent points at a finished recipe.
         notificationService.onRecipeCreated(recipeService.getEntityById(recipe.id))
         return payload.encodeToString(created.toWriteResult())
@@ -486,7 +487,7 @@ object CookncoMcpServer {
         val recipeDto = arguments.toRecipeDTO(current)
         recipeIngredientService.updateRecipeIngredients(recipeId, recipeDto)
         val updated = recipeService.updateRecipe(recipeId, recipeDto)
-        logger.info { "Recipe ${updated.id} (${updated.title}) edited by user ${current.owner.username} over MCP" }
+        logEdit(userId, current.owner.username) { "Recipe ${updated.id} (${updated.title}) edited over MCP" }
         return payload.encodeToString(recipeService.getRawById(recipeId, userId, Locale.EN).toWriteResult())
     }
 
@@ -513,7 +514,7 @@ object CookncoMcpServer {
         recipeService.tagRecipeForDeletion(recipeId)
         recipeService.tryDelete(recipeId)
         val erased = recipeService.findEntityById(recipeId) == null
-        logger.info { "Recipe $recipeId (${recipe.title}) deleted by user ${recipe.owner.username} over MCP" }
+        logEdit(userId, recipe.owner.username) { "Recipe $recipeId (${recipe.title}) deleted over MCP" }
         return payload.encodeToString(
             DeletionResult(
                 recipeId = recipeId,
@@ -646,7 +647,7 @@ object CookncoMcpServer {
         // checkRecipeEditionRights is made by the ticket service, at both ends of the ticket.
         val recipe = recipeService.getRawById(recipeId, userId, Locale.EN)
         val uploadUrl = imageUploadTicketService.mintRecipeTicket(userId, recipeId)
-        logger.info { "Image upload ticket issued for recipe $recipeId by user ${recipe.owner.username} over MCP" }
+        logEdit(userId, recipe.owner.username) { "Recipe $recipeId issued an image upload ticket over MCP" }
 
         return payload.encodeToString(
             ImageUploadTicketResult(

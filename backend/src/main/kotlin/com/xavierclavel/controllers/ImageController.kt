@@ -14,7 +14,7 @@ import com.xavierclavel.utils.checkCookbookAdminRights
 import com.xavierclavel.utils.checkRecipeEditionRights
 import com.xavierclavel.utils.checkUserEditionRights
 import com.xavierclavel.utils.getPathId
-import com.xavierclavel.utils.logger
+import com.xavierclavel.utils.logEdit
 import com.xavierclavel.utils.receiveImage
 import shared.enums.ImageBucket
 import shared.utils.Filepath.COOKBOOKS_IMG_PATH
@@ -105,6 +105,7 @@ object ImageController: Controller(IMAGE_URL) {
         checkRecipeEditionRights(recipeService.getRecipeOwner(id).id)
         val (image, metadata) = receiveImage()
         saveRecipeImage(id, image, metadata)
+        logEdit { "Recipe $id given a picture" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -121,7 +122,7 @@ object ImageController: Controller(IMAGE_URL) {
         val redeemed = imageUploadTicketService.redeemRecipeTicket(ticket)
         val (image, metadata) = receiveImage(maxBytes = imageUploadTicketService.maxUploadBytes)
         saveRecipeImage(redeemed.recipeId, image, metadata)
-        logger.info { "Recipe ${redeemed.recipeId} was given a picture by user ${redeemed.userId} over an upload ticket" }
+        logEdit(redeemed.userId) { "Recipe ${redeemed.recipeId} given a picture over an upload ticket" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -153,6 +154,7 @@ object ImageController: Controller(IMAGE_URL) {
         imageService.saveImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion + 1, ImageBucket.COOKBOOK.size, image, metadata)
         cookbook.increaseVersion()
         imageService.deleteImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion - 1)
+        logEdit { "Cookbook $id given a picture" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -164,6 +166,7 @@ object ImageController: Controller(IMAGE_URL) {
         imageService.saveImage(USERS_IMG_PATH, id, user.imageVersion + 1, ImageBucket.USER.size, image, metadata)
         user.increaseVersion()
         imageService.deleteImage(USERS_IMG_PATH, id, user.imageVersion - 1)
+        logEdit { "User $id given an icon" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -188,6 +191,7 @@ object ImageController: Controller(IMAGE_URL) {
         )
         step.increaseImageVersion()
         imageService.deleteImage(RECIPE_STEPS_IMG_PATH, id, step.imageVersion - 1)
+        logEdit { "Step $id of recipe ${step.recipe!!.id} given a picture" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -207,6 +211,7 @@ object ImageController: Controller(IMAGE_URL) {
         // first one under that name keeps showing it until the entry is evicted. One stale
         // thumbnail on one device, against a wrong picture on all of them.
         step.clearImageVersion()
+        logEdit { "Step $id of recipe ${step.recipe!!.id} lost its picture" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -216,6 +221,7 @@ object ImageController: Controller(IMAGE_URL) {
         checkRecipeEditionRights(recipeService.getRecipeOwner(id).id)
         imageService.deleteImage(RECIPES_IMG_PATH, id, recipe.imageVersion)
         recipe.increaseVersion()
+        logEdit { "Recipe $id lost its picture" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -225,6 +231,7 @@ object ImageController: Controller(IMAGE_URL) {
         val cookbook = cookbookService.getEntityById(id)
         imageService.deleteImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion)
         cookbook.increaseVersion()
+        logEdit { "Cookbook $id lost its picture" }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -234,6 +241,7 @@ object ImageController: Controller(IMAGE_URL) {
         val user = userService.getEntityById(id)
         imageService.deleteImage(USERS_IMG_PATH, id, user.imageVersion)
         user.increaseVersion()
+        logEdit { "User $id lost their icon" }
         call.respond(HttpStatusCode.OK)
     }
 

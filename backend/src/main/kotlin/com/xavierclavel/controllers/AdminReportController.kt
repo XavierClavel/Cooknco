@@ -7,6 +7,7 @@ import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getPathId
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.logEdit
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -46,6 +47,9 @@ object AdminReportController: Controller("reports") {
 
     private fun Route.resolveReport() = post("/{id}/resolve") {
         val resolution = call.receive<ReportResolutionDTO>()
-        call.respond(moderationService.resolveReport(getPathId(), getSessionUserId(), resolution))
+        val moderatorId = getSessionUserId()
+        val report = moderationService.resolveReport(getPathId(), moderatorId, resolution)
+        logEdit { "Report ${report.id} resolved as ${resolution.action}" }
+        call.respond(report)
     }
 }

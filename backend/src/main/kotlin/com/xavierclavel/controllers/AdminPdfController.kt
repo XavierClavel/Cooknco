@@ -1,5 +1,6 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.exceptions.NotFoundCause
 import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.services.CookbookService
@@ -9,6 +10,7 @@ import com.xavierclavel.services.RecipeService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.getEnumPathParam
 import com.xavierclavel.utils.getPathVariable
+import com.xavierclavel.utils.logEdit
 import com.xavierclavel.utils.respondPDF
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
@@ -54,20 +56,23 @@ object AdminPdfController: Controller("documents") {
     }
 
     private fun Route.saveTemplate() = put("/{key}/{locale}") {
-        call.respond(
-            pdfTemplateService.save(
-                key = key(),
-                locale = getEnumPathParam<Locale>("locale"),
-                dto = call.receive<PdfTemplateDTO>(),
-            )
+        val locale = getEnumPathParam<Locale>("locale")
+        val saved = pdfTemplateService.save(
+            key = key(),
+            locale = locale,
+            dto = call.receive<PdfTemplateDTO>(),
         )
+        logEdit { "Document layout '${key()}' edited in $locale" }
+        call.respond(saved)
     }
 
     /** Drops the saved layout for one locale, putting the packaged one back in service. */
     private fun Route.restoreTemplate() = delete("/{key}/{locale}") {
-        if (!pdfTemplateService.restore(key(), getEnumPathParam<Locale>("locale"))) {
+        val locale = getEnumPathParam<Locale>("locale")
+        if (!pdfTemplateService.restore(key(), locale)) {
             call.respond(HttpStatusCode.NotFound)
         } else {
+            logEdit { "Document layout '${key()}' restored to the packaged one in $locale" }
             call.respond(pdfTemplateService.describe(key()))
         }
     }

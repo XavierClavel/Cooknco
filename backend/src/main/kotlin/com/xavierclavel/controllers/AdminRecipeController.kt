@@ -1,5 +1,6 @@
 package com.xavierclavel.controllers
 
+import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.RecipeService
@@ -12,6 +13,7 @@ import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getSort
 import com.xavierclavel.utils.getStringQueryParam
 import com.xavierclavel.utils.json
+import com.xavierclavel.utils.logEdit
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -71,15 +73,25 @@ object AdminRecipeController: Controller("recipes") {
 
     private fun Route.hideRecipe() = post("/{id}/hide") {
         val dto = call.receive<ModerationReasonDTO>()
-        call.respond(moderationService.hideRecipe(getPathId(), dto.reason))
+        val recipe = moderationService.hideRecipe(getPathId(), dto.reason)
+        logEdit {
+            "Recipe ${recipe.id} (${recipe.title}) hidden: ${dto.reason.ifBlank { "no reason given" }}"
+        }
+        call.respond(recipe)
     }
 
     private fun Route.unhideRecipe() = post("/{id}/unhide") {
-        call.respond(moderationService.unhideRecipe(getPathId()))
+        val recipe = moderationService.unhideRecipe(getPathId())
+        logEdit { "Recipe ${recipe.id} (${recipe.title}) unhidden" }
+        call.respond(recipe)
     }
 
     private fun Route.deleteRecipe() = delete("/{id}") {
-        moderationService.deleteRecipe(getPathId())
+        val id = getPathId()
+        // Named before the deletion: afterwards there is no row left to read it off.
+        val title = adminService.getRecipe(id).title
+        moderationService.deleteRecipe(id)
+        logEdit { "Recipe $id ($title) deleted by moderation" }
         call.respond(HttpStatusCode.OK)
     }
 }

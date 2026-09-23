@@ -219,6 +219,54 @@ rows with raw SQL.
 Reference: [`Pictarine/backend-zourite-api` — `docs/product-v2/ebean-patterns.md`](https://github.com/Pictarine/backend-zourite-api/blob/develop/docs/product-v2/ebean-patterns.md)
 (that project's Kotlin query beans call the alias `_alias`; ours are Java beans and use `Q<Entity>.Alias`).
 
+## Every write logs one line, through `logEdit`
+
+A route that changes something calls `logEdit { "<what happened>" }` (`utils/Logger.kt`)
+once it has happened. That trail is who created, edited, deleted, hid, banned, granted or
+swept what. Reads do not log, and neither do the POSTs that write nothing — the mail and
+document previews, and the Cooklang import, which answers with a recipe and saves no row.
+
+What holds it up:
+
+- **It has a logger of its own** (`com.xavierclavel.EditActions`), not the shared `logger`.
+  The backoffice logs tab filters by logger name — its dropdown is `LogPage.loggers`, and it
+  shows the last dotted segment — so the name is what makes the trail readable at all; mixed
+  into the general log it is a needle in 5 000 lines of whatever the server was doing. It is
+  still an ordinary logger under logback's root, so the lines also reach stdout and the
+  60-day rolling file on the log volume, which is where an audit older than a restart lives.
+- **The actor is the caller, and no route gets to say who that is.** `logEdit` is an extension
+  on `RoutingContext` and reads the session itself, so there is no parameter to hand the wrong
+  id to. That is not hypothetical tidiness: the lines this replaced named the *owner* of what
+  was written, which files a moderator hiding somebody's recipe under its author. It costs one
+  Redis read per write, on top of the one the route has usually already done.
+  It resolves through `getOptionalSession`, which returns null rather than throwing: the call
+  happens after the write, so a missing session must cost a worse log line and never turn a
+  request that succeeded into a 401.
+- **The id identifies, the name beside it is only a label.** `SessionData` carries the username,
+  so a line reads `by user 7 (alice)` off the read that resolves the caller anyway rather than
+  costing a query. It catches up with the row in `RedisService.touchSession`, which is already
+  rewriting that session and is gated to once a day — so a rename shows up in the trail within a
+  day of use, for one indexed read a day rather than one per write. **Pull, not push**: nothing
+  at the rename site has to remember to fan out to an account's sessions, which is the failure
+  this codebase keeps finding (see the cookbook rights check). The lag is real and bounded, and
+  affordable only because the id is on every line and never drifts — read the id, treat the name
+  as decoration. `EditLogTest` pins both halves: not immediately, and then yes.
+- **Five writes pass their actor explicitly**, through `logEdit(actorId, actorName?) { … }`, and they are
+  the whole of the exception: the four MCP tools, which are not routes and are handed the
+  account their token belongs to, and the ticketed image upload, which sits outside the
+  `authenticate` block by design and takes its actor from the ticket.
+- **It goes after the write, and only if there was one.** A line emitted before the rights
+  check outlives the 403 that follows it, and one emitted on a delete that matched nothing
+  claims a row that was never there — hence the `if (deleted)` guards around `handleDeletion`.
+
+Naming something that is about to be deleted is the one case that reads backwards: the
+username or title is taken *before* the call, because afterwards there is no row to read it
+off, and only the `logEdit` waits for the write.
+
+`EditLogTest` holds the parts a refactor breaks silently — the logger, the actor, and the two
+cases that must leave nothing behind. It deliberately does not pin the wording, which is prose
+for an operator. Nothing enforces that a *new* route logs at all, so that is a review question.
+
 ## PDF exports are HTML, printed by Chromium
 
 The recipe sheet is **not** laid out in Kotlin. `ExportService` fills a Mustache layout in
