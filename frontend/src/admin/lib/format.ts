@@ -24,10 +24,19 @@ export function fmtAgo(epochSeconds?: number | null): string {
   return fmtDate(epochSeconds)
 }
 
+/**
+ * A log line's full stamp, ISO-ordered: `2026-09-23 14:32:01.123`.
+ *
+ * The date is not redundant with the live tail. The ring buffer holds 5000 entries, which
+ * on a quiet deployment is several days, so a bare time cannot say which night an error
+ * came from — and a line copied out of the pane into a ticket carries its date with it,
+ * which a day separator above it would not.
+ */
 export function fmtLogTime(epochMillis: number): string {
   const d = new Date(epochMillis)
   const pad = (n: number, w = 2) => String(n).padStart(w, '0')
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return `${date} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
 }
 
 /**

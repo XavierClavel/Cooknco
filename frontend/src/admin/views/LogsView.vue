@@ -191,7 +191,8 @@ onUnmounted(closeStream)
 }
 .line {
   display: grid;
-  grid-template-columns: 88px 46px 150px 1fr;
+  /* `ch` in a monospace pane is exactly one character, so the stamp cannot wrap */
+  grid-template-columns: 24ch 46px 150px 1fr;
   gap: 10px;
   align-items: baseline;
   white-space: pre-wrap;
