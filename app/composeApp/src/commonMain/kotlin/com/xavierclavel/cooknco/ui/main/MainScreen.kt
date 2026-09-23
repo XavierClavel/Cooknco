@@ -12,6 +12,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.OfflineBanner
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.cookbook.CookbooksScreen
 import com.xavierclavel.cooknco.ui.cookbook.CookbooksViewModel
@@ -107,12 +109,19 @@ fun MainScreen(
     Scaffold(
         modifier = modifier,
         bottomBar = {
-            MainBottomBar(
-                selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it },
-                onCreateClick = { onNavigateToEditRecipe(null) },
-                user = user,
-            )
+            // Above the bar rather than under the status bar: every tab applies its own
+            // top inset (they render standalone through other routes too), so a banner up
+            // there would be drawn behind one of them. Down here it is on every tab, in
+            // front of all of them, and fights nothing.
+            Column {
+                OfflineBanner()
+                MainBottomBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = { selectedTab = it },
+                    onCreateClick = { onNavigateToEditRecipe(null) },
+                    user = user,
+                )
+            }
         },
         // Green everywhere behind content, cream only inside cards — the one background
         // every tab shares, so it lives here rather than being repeated per screen.

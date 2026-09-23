@@ -501,6 +501,26 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
     }
 
     /**
+     * Brings the offline copy of this cook's recipes up to date, once there is a session.
+     *
+     * Started and then left to itself: it fetches nothing the screens are waiting on, reports
+     * nothing, and a launch that cannot reach the server simply has it do nothing. Keyed on
+     * [signedIn] like the rest, so it runs once per session rather than on every recomposition
+     * — and [AppGraph.offlineSync] refuses a second run of its own accord anyway, which is
+     * what makes the refresh gestures safe to add later.
+     *
+     * The pictures on disk are read back first, before anything is drawn: [OfflineImages.resolve]
+     * answers from memory because composition cannot suspend, so a launch that skipped this
+     * would draw every pinned recipe from its URL and find no network behind it.
+     */
+    LaunchedEffect(signedIn) {
+        if (!signedIn) return@LaunchedEffect
+        AppGraph.offlineImages.refresh()
+        val userId = (authState as? AuthState.Authenticated)?.user?.id ?: return@LaunchedEffect
+        AppGraph.offlineSync.sync(userId)
+    }
+
+    /**
      * Registers this device once there is an account to register it against, and again on
      * every launch: a token can be rotated while the app is not running, in which case
      * `onNewToken` fired with no session to send it under.

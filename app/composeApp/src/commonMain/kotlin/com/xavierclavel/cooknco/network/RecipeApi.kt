@@ -45,9 +45,52 @@ enum class RecipeSort(val value: String) {
     MOST_LIKED("LIKES_DESCENDING"),
 }
 
+/**
+ * Which of a cook's three collections a list is asking for.
+ *
+ * All three are filters on the one `GET /recipe` (`RecipeFilter`), not three endpoints — and
+ * they are sent one at a time because the backend ORs its additive filters together, so
+ * asking for two at once would answer with their union rather than their intersection. The
+ * offline sync walks them in this order, cheapest and most important first.
+ */
+enum class RecipeScope(val parameter: String) {
+    /** Recipes this cook wrote. */
+    OWN("user"),
+    /** Recipes this cook liked. */
+    LIKED("likedBy"),
+    /** Every recipe in every cookbook this cook belongs to, in one query rather than per book. */
+    COOKBOOKS("cookbookUser"),
+}
+
 class RecipeApi(private val client: HttpClient) {
 
     private val base = ApiClient.BASE_URL
+
+    /**
+     * One page of one of the cook's three collections, most recently created first.
+     *
+     * Sorted by date rather than by anything cleverer because the offline store keeps the
+     * most recent [com.xavierclavel.cooknco.data.OFFLINE_LIST_LIMIT] of each: a bound is only
+     * meaningful against an order, and "the ones they added last" is the one a cook can
+     * predict.
+     */
+    suspend fun listRecipesIn(
+        scope: RecipeScope,
+        userId: Long,
+        token: String,
+        page: Int,
+        size: Int = 20,
+    ): List<RecipeOverview> {
+        val response = client.get("$base/recipe") {
+            bearerAuth(token)
+            parameter(scope.parameter, userId)
+            parameter("sort", "DATE_DESCENDING")
+            parameter("page", page)
+            parameter("size", size)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
 
     suspend fun listRecipes(
         token: String,

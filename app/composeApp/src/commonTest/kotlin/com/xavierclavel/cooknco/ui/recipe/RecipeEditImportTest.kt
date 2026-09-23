@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.ui.recipe
 
 import androidx.lifecycle.viewModelScope
 import com.xavierclavel.cooknco.data.RecipeRepository
+import com.xavierclavel.cooknco.data.testOfflineStore
 import com.xavierclavel.cooknco.data.TokenDataStore
 import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.data.createPreferencesDataStore
@@ -248,7 +249,7 @@ class RecipeEditImportTest {
         }
         val api = RecipeApi(HttpClient(engine))
         return RecipeEditViewModel(
-            repo = RecipeRepository(api, tokens),
+            repo = RecipeRepository(api, tokens, testOfflineStore().first),
             unitRepo = UnitRepository(api),
             recipeId = null,
             userId = 1L,

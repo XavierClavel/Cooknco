@@ -6,17 +6,27 @@ import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.network.dto.McpClientInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
+import com.xavierclavel.cooknco.network.isOffline
 import kotlinx.coroutines.flow.first
 
 class UserRepository(
     private val userApi: UserApi,
     private val tokenDataStore: TokenDataStore,
+    private val offlineStore: OfflineStore,
 ) {
     private suspend fun token(): String? = tokenDataStore.tokenFlow.first()
     private suspend fun requireToken(): String = token() ?: throw IllegalStateException("Not authenticated")
 
-    suspend fun getUser(userId: Long): Result<UserInfo> = runCatching {
-        userApi.getUser(userId)
+    /**
+     * A profile. Offline, only the signed-in cook's own — it is the only one stored, and it is
+     * the only profile that has anything behind it to show.
+     */
+    suspend fun getUser(userId: Long): Result<UserInfo> {
+        val result = OfflineState.observe(runCatching { userApi.getUser(userId) })
+        val error = result.exceptionOrNull() ?: return result
+        if (!error.isOffline) return result
+        val session = offlineStore.readSession()?.takeIf { it.id == userId } ?: return result
+        return Result.success(session)
     }
 
     suspend fun updateUser(username: String, bio: String): Result<UserInfo> = runCatching {
@@ -55,12 +65,29 @@ class UserRepository(
         userApi.declineFollowRequest(requireToken(), followerId)
     }
 
+    /**
+     * A profile grid, page by page — and offline, the whole of whichever list was stored.
+     *
+     * The store keeps each list in the order the server sent it, so page zero can be answered
+     * with all of it and every later page with nothing. That is what the paging above this
+     * reads as "there is no more", which is true: there is no more on this phone.
+     *
+     * Only for the cook's own profile. Somebody else's recipes were never pinned, and
+     * answering their grid with this one's would be showing the wrong person's cooking.
+     */
     suspend fun getUserRecipes(
         profileUserId: Long,
         page: Int,
         liked: Boolean = false,
-    ): Result<List<RecipeOverview>> = runCatching {
-        userApi.getUserRecipes(token(), profileUserId, page, liked = liked)
+    ): Result<List<RecipeOverview>> {
+        val result = OfflineState.observe(runCatching {
+            userApi.getUserRecipes(token(), profileUserId, page, liked = liked)
+        })
+        val error = result.exceptionOrNull() ?: return result
+        if (!error.isOffline) return result
+        if (offlineStore.readIndex()?.userId != profileUserId) return result
+        val lists = offlineStore.readLists() ?: return result
+        return Result.success(if (page > 0) emptyList() else if (liked) lists.liked else lists.own)
     }
 
     suspend fun getMcpClients(): Result<List<McpClientInfo>> = runCatching {

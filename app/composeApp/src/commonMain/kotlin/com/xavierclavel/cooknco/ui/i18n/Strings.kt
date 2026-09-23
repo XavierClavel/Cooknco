@@ -456,6 +456,34 @@ interface Strings {
     val reportTargetGone: String
     val reportFailed: String
 
+    // ── No network, and what the app is showing instead ───────────────────────
+    /**
+     * The banner over content that came off this phone rather than off the server.
+     *
+     * It names the age of what is on screen, and that is the part that matters. Content of
+     * unstated age is worse than an error: nothing on the screen would otherwise tell a cook
+     * that the recipe in front of them is the version from before the correction they made
+     * last night.
+     */
+    fun offlineShowingSaved(age: String): String
+    /** When the store has never been written — there is nothing to say how old it is. */
+    val offlineShowingSavedUnknown: String
+    /** Ages, for the banner above. Deliberately coarse: nobody needs the minute. */
+    val offlineJustNow: String
+    fun offlineHoursAgo(hours: Int): String
+    fun offlineDaysAgo(days: Int): String
+    /** A recipe reached offline that this phone was not keeping. */
+    val offlineRecipeNotSaved: String
+    /** Any action that writes, tapped with no network. */
+    val offlineCannotDoThat: String
+
+    // ── Keeping recipes on the phone, from the settings screen ────────────────
+    val offlineSettingsTitle: String
+    val offlineSettingsSubtitle: String
+    fun offlineSettingsHolding(recipes: Int, megabytes: Int): String
+    val offlineSyncNow: String
+    val offlineSyncing: String
+
     // ── Premium, and what a locked feature says when it is tapped ─────────────
     /** The padlock on a locked action sheet row, for a screen reader. */
     val premiumLocked: String

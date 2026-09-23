@@ -515,6 +515,22 @@ object EnStrings : Strings {
     override val reportTargetGone = "This content no longer exists."
     override val reportFailed = "Your report could not be sent."
 
+    override fun offlineShowingSaved(age: String) = "No connection — showing recipes saved $age"
+    override val offlineShowingSavedUnknown = "No connection — showing what is saved on this phone"
+    override val offlineJustNow = "just now"
+    override fun offlineHoursAgo(hours: Int) = if (hours <= 1) "an hour ago" else "$hours hours ago"
+    override fun offlineDaysAgo(days: Int) = if (days <= 1) "yesterday" else "$days days ago"
+    override val offlineRecipeNotSaved = "This recipe is not saved on this phone."
+    override val offlineCannotDoThat = "You need a connection to do that."
+
+    override val offlineSettingsTitle = "Keep my recipes on this phone"
+    override val offlineSettingsSubtitle =
+        "Your recipes, your likes and your cookbooks stay readable without a connection."
+    override fun offlineSettingsHolding(recipes: Int, megabytes: Int) =
+        "$recipes recipes saved · $megabytes MB"
+    override val offlineSyncNow = "Update now"
+    override val offlineSyncing = "Updating…"
+
     override val premiumLocked = "Premium feature"
     override val premiumFeatureTitle = "A premium feature"
     override fun premiumFeatureMessage(feature: String) =

@@ -12,7 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.network.ApiClient
+import com.xavierclavel.cooknco.data.ImageUrls
+import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 
 @Composable
@@ -33,7 +34,7 @@ fun UserAvatar(
             modifier = Modifier.fillMaxSize(0.75f),
         )
         AsyncImage(
-            model = "${ApiClient.IMAGE_URL}/users/$userId-v$version.webp",
+            model = AppGraph.offlineImages.resolve(ImageUrls.user(userId, version)),
             contentDescription = contentDescription,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),

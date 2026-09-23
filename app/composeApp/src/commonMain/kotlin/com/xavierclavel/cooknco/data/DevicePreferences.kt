@@ -27,6 +27,7 @@ class DevicePreferences(private val dataStore: DataStore<Preferences>) {
     private val exactAlarmsAskedKey = booleanPreferencesKey("exact_alarms_asked")
     private val languageKey = stringPreferencesKey("app_language")
     private val unitSystemKey = stringPreferencesKey("unit_system")
+    private val offlineRecipesKey = booleanPreferencesKey("offline_recipes")
 
     val pushEnabled: Flow<Boolean> = dataStore.data.map { it[pushEnabledKey] ?: true }
 
@@ -45,6 +46,24 @@ class DevicePreferences(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setExactAlarmsAsked() {
         dataStore.edit { it[exactAlarmsAskedKey] = true }
+    }
+
+    /**
+     * Whether this handset keeps the cook's recipes on it for when there is no network.
+     *
+     * A device property like [pushEnabled], and for the same reason: the storage it takes is
+     * this phone's, and the same account on a tablet with 16 GB free should be able to answer
+     * differently from one on a phone that is full.
+     *
+     * Defaults to on. A cook who has never opened the settings screen is the one this feature
+     * is for — somebody who finds out their recipes are unreachable while standing in a
+     * kitchen has found out too late, and a switch they had to know about beforehand would
+     * have been off exactly then. Turning it off empties the store.
+     */
+    val offlineRecipes: Flow<Boolean> = dataStore.data.map { it[offlineRecipesKey] ?: true }
+
+    suspend fun setOfflineRecipes(enabled: Boolean) {
+        dataStore.edit { it[offlineRecipesKey] = enabled }
     }
 
     /**

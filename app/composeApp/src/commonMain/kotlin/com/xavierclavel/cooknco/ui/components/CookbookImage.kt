@@ -13,7 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.network.ApiClient
+import com.xavierclavel.cooknco.data.ImageUrls
+import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 
@@ -35,7 +36,7 @@ fun CookbookImage(
             modifier = Modifier.size(48.dp),
         )
         AsyncImage(
-            model = "${ApiClient.IMAGE_URL}/cookbooks/$cookbookId-v$version.webp",
+            model = AppGraph.offlineImages.resolve(ImageUrls.cookbook(cookbookId, version)),
             contentDescription = contentDescription,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),

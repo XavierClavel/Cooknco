@@ -11,6 +11,9 @@ import com.xavierclavel.cooknco.data.CookTimerStore
 import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.DevicePreferences
 import com.xavierclavel.cooknco.data.ExportRepository
+import com.xavierclavel.cooknco.data.OfflineImages
+import com.xavierclavel.cooknco.data.OfflineStore
+import com.xavierclavel.cooknco.data.OfflineSync
 import com.xavierclavel.cooknco.data.PushRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.ReportRepository
@@ -26,6 +29,7 @@ import com.xavierclavel.cooknco.network.NotificationApi
 import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.ReportApi
 import com.xavierclavel.cooknco.network.UserApi
+import com.xavierclavel.cooknco.platform.offlineRoot
 
 /**
  * Single object graph for the app, replacing the per-ViewModel `Context` plumbing
@@ -62,6 +66,18 @@ object AppGraph {
     val devicePreferences: DevicePreferences by lazy { DevicePreferences(preferences) }
 
     /**
+     * The recipes kept on this device, as files.
+     *
+     * Deliberately *not* in [preferences]: DataStore rewrites its whole file on every edit, so
+     * a few hundred recipes in it would be paid for on every read of the token. See
+     * [OfflineStore].
+     */
+    val offlineStore: OfflineStore by lazy { OfflineStore(offlineRoot()) }
+
+    /** The pinned pictures, and what to hand Coil for one. See [OfflineImages]. */
+    val offlineImages: OfflineImages by lazy { OfflineImages(offlineStore, ApiClient.httpClient) }
+
+    /**
      * The cook mode timer. Lives here rather than in a view model because it outlives every
      * screen: it is still counting with cook mode closed, and it is reached from a
      * notification action arriving on a process that has no screens at all.
@@ -91,10 +107,20 @@ object AppGraph {
      */
     val pushRepository by lazy { PushRepository(notificationApi, tokenDataStore) }
 
-    val authRepository by lazy { AuthRepository(authApi, tokenDataStore, pushRepository, devicePreferences) }
-    val userRepository by lazy { UserRepository(userApi, tokenDataStore) }
-    val recipeRepository by lazy { RecipeRepository(recipeApi, tokenDataStore) }
-    val cookbookRepository by lazy { CookbookRepository(cookbookApi, tokenDataStore) }
+    val authRepository by lazy {
+        AuthRepository(authApi, tokenDataStore, pushRepository, devicePreferences, offlineStore)
+    }
+    val userRepository by lazy { UserRepository(userApi, tokenDataStore, offlineStore) }
+    val recipeRepository by lazy { RecipeRepository(recipeApi, tokenDataStore, offlineStore) }
+    val cookbookRepository by lazy { CookbookRepository(cookbookApi, tokenDataStore, offlineStore) }
+
+    /**
+     * Keeps the offline copy up to date. Asked at launch, at sign-in and on a pull to refresh;
+     * it decides for itself whether there is anything to do. See [OfflineSync].
+     */
+    val offlineSync by lazy {
+        OfflineSync(recipeApi, cookbookApi, tokenDataStore, offlineStore, offlineImages, devicePreferences)
+    }
     val unitRepository by lazy { UnitRepository(recipeApi) }
     val reportRepository by lazy { ReportRepository(reportApi, tokenDataStore) }
 

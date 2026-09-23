@@ -225,6 +225,50 @@ fun UserSettingsScreen(
                     }
                 }
 
+                // ── Offline ──────────────────────────────────────────────────────
+                Column {
+                    SettingsSectionLabel(s.offlineSettingsTitle)
+                    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            SettingsToggleRow(
+                                title = s.offlineSettingsTitle,
+                                description = s.offlineSettingsSubtitle,
+                                checked = uiState.offlineRecipes,
+                                onCheckedChange = { viewModel.toggleOfflineRecipes() },
+                                modifier = Modifier.padding(14.dp),
+                            )
+                            if (uiState.offlineRecipes) {
+                                HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(enabled = !uiState.isSyncingOffline) {
+                                            viewModel.syncOfflineNow()
+                                        }
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = s.offlineSettingsHolding(
+                                            uiState.offlineRecipeCount,
+                                            uiState.offlineMegabytes,
+                                        ),
+                                        fontSize = 12.sp,
+                                        color = CookncoNavy.copy(alpha = 0.7f),
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = if (uiState.isSyncingOffline) s.offlineSyncing else s.offlineSyncNow,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CookncoNavy,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (uiState.error != null) {
                     Text(
                         text = uiState.error!!,

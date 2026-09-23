@@ -524,6 +524,25 @@ object FrStrings : Strings {
     override val reportTargetGone = "Ce contenu n'existe plus."
     override val reportFailed = "Votre signalement n'a pas pu être envoyé."
 
+    override fun offlineShowingSaved(age: String) =
+        "Pas de connexion — recettes enregistrées $age"
+    override val offlineShowingSavedUnknown =
+        "Pas de connexion — affichage de ce qui est enregistré sur ce téléphone"
+    override val offlineJustNow = "à l'instant"
+    override fun offlineHoursAgo(hours: Int) =
+        if (hours <= 1) "il y a une heure" else "il y a $hours heures"
+    override fun offlineDaysAgo(days: Int) = if (days <= 1) "hier" else "il y a $days jours"
+    override val offlineRecipeNotSaved = "Cette recette n'est pas enregistrée sur ce téléphone."
+    override val offlineCannotDoThat = "Une connexion est nécessaire pour cela."
+
+    override val offlineSettingsTitle = "Garder mes recettes sur ce téléphone"
+    override val offlineSettingsSubtitle =
+        "Vos recettes, vos coups de cœur et vos carnets restent lisibles sans connexion."
+    override fun offlineSettingsHolding(recipes: Int, megabytes: Int) =
+        "$recipes recettes enregistrées · $megabytes Mo"
+    override val offlineSyncNow = "Mettre à jour"
+    override val offlineSyncing = "Mise à jour…"
+
     override val premiumLocked = "Fonctionnalité premium"
     override val premiumFeatureTitle = "Une fonctionnalité premium"
     override fun premiumFeatureMessage(feature: String) =
