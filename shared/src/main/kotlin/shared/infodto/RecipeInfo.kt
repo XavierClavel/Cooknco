@@ -64,6 +64,10 @@ data class RecipeInfo (
         owner = this.owner,
         likesCount = this.likesCount,
         creationDate = this.creationDate,
+        // Zero rather than null, because the overview's is not nullable: a list is read by
+        // clients that diff on it, and "the server did not say" is not an answer they can
+        // act on — it would read as a recipe that changes on every sync.
+        editionDate = this.editionDate ?: 0,
         isHidden = this.isHidden,
     )
 }

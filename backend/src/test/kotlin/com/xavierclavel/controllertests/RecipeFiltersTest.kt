@@ -10,12 +10,15 @@ import shared.infodto.RecipeInfo
 import shared.infodto.UserInfo
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import main.com.xavierclavel.utils.addCookbookRecipe
 import main.com.xavierclavel.utils.addCookbookUser
 import main.com.xavierclavel.utils.createCookbook
 import main.com.xavierclavel.utils.createIngredient
 import main.com.xavierclavel.utils.createLike
 import main.com.xavierclavel.utils.createRecipe
+import main.com.xavierclavel.utils.recipeDTO
+import main.com.xavierclavel.utils.updateRecipe
 import main.com.xavierclavel.utils.follow
 import main.com.xavierclavel.utils.getMe
 import main.com.xavierclavel.utils.getRecipe
@@ -23,6 +26,38 @@ import main.com.xavierclavel.utils.listRecipes
 import main.com.xavierclavel.utils.unfollow
 
 class RecipeFiltersTest : ApplicationTest() {
+
+    /**
+     * The overview carries when the recipe was last edited, and the number moves when it is.
+     *
+     * The mobile app's offline store diffs on this and on nothing else, so a list that does not
+     * carry it leaves a client with two choices, both bad: refetch every recipe it holds on
+     * every sync, or never refresh one. `version` cannot stand in — it is the *image* version
+     * and moves only when the picture does, which the second half of this test is about.
+     */
+    @Test
+    fun `recipe overviews carry an edition date that moves with an edit`() = runTest {
+        runAsAdmin {
+            val recipe = client.createRecipe()
+            val before = client.listRecipes(user = client.getMe().id).single()
+            assertTrue(before.editionDate > 0, "a recipe has been edited into existence at least")
+            assertEquals(recipe.version, before.version)
+
+            client.updateRecipe(recipe.id, recipeDTO.copy(title = "My recipe, corrected"))
+
+            val after = client.listRecipes(user = client.getMe().id).single()
+            assertTrue(
+                after.editionDate >= before.editionDate,
+                "an edit moves the edition date: ${before.editionDate} -> ${after.editionDate}",
+            )
+            assertEquals("My recipe, corrected", after.title)
+            assertEquals(
+                before.version,
+                after.version,
+                "and leaves the picture's version alone, which is why the two are separate fields",
+            )
+        }
+    }
 
     @Test
     fun `filter recipes by liked`() = runTest {
