@@ -747,6 +747,24 @@ Tests build the schema from the entity model (`ddlMode: dropCreate`), so they ne
 `backend/src/main/resources/dbmigration`. After changing entities or writing a migration, run
 `scripts/verify-migrations.sh` to exercise the SQL and backfills against a throwaway Postgres.
 
+### A pull request runs all three suites
+
+`tests.yml` runs the JVM suite (`./gradlew build`), the frontend's `vite build` and the app's
+`:composeApp:testAndroidHostTest` on every PR to `develop` and `master` — the same tasks their
+merge will run, before the merge rather than after it. Until it existed a red test was reported
+by `build.yml` on the trunk, with the deploy that push triggered already rolling the cluster,
+or by the app's publication workflow, which is worse: it failed a release rather than a review.
+
+It carries **no path filter**, unlike the two workflows around it. A workflow skipped by one
+leaves its checks *pending* rather than green, so making any of these a required check would
+deadlock a docs-only PR; and a filter that disagreed with `build.yml`'s `paths-ignore` would let
+a PR go green without running what its own merge runs. The three jobs are parallel, so an
+unfiltered run costs runner minutes and not wall clock.
+
+The migration SQL is still outside all of it, for the reason above — and
+`scripts/verify-migrations.sh` cannot close that gap in CI, being pinned to one migration range
+with seed data written for it. It stays a hand-run check.
+
 ### A new table goes in `DatabaseManager.getTables()`
 
 That list is what wipes the database between tests (`ApplicationTest.cleanDb`), and **it is
