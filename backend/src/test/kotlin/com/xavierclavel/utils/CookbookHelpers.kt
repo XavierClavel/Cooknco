@@ -91,11 +91,13 @@ suspend fun HttpClient.assertCookbookDoesNotExist(id:Long) {
 }
 
 suspend fun HttpClient.deleteCookbook(id: Long) {
-    this.delete("$COOKBOOK_URL/$id")
+    this.deleteCookbookRaw(id)
         .apply {
             assertEquals(HttpStatusCode.OK, status)
         }
 }
+
+suspend fun HttpClient.deleteCookbookRaw(id: Long) = this.delete("$COOKBOOK_URL/$id")
 
 suspend fun HttpClient.addCookbookUser(cookbookId: Long, userId: Long, isAdmin: Boolean) {
     this.addCookbookUserRaw(cookbookId, userId, isAdmin)

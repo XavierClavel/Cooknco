@@ -1,10 +1,7 @@
 package com.xavierclavel.controllers
 
-import com.xavierclavel.controllers.AuthController.getSessionUserId
 import com.xavierclavel.exceptions.BadRequestCause
 import com.xavierclavel.exceptions.BadRequestException
-import com.xavierclavel.exceptions.ForbiddenCause
-import com.xavierclavel.exceptions.ForbiddenException
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DefaultImageService
 import com.xavierclavel.services.ImageService
@@ -13,6 +10,7 @@ import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.RecipeStepService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Controller
+import com.xavierclavel.utils.checkCookbookAdminRights
 import com.xavierclavel.utils.checkRecipeEditionRights
 import com.xavierclavel.utils.checkUserEditionRights
 import com.xavierclavel.utils.getPathId
@@ -147,6 +145,9 @@ object ImageController: Controller(IMAGE_URL) {
 
     private fun Route.uploadCookbookImage() = post("/cookbooks/{id}") {
         val id = getPathId()
+        // Before the body is read, as on every other upload here: a caller who may not write
+        // this cookbook should be refused without first sending a picture.
+        checkCookbookAdminRights(id)
         val (image, metadata) = receiveImage()
         val cookbook = cookbookService.getEntityById(id)
         imageService.saveImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion + 1, ImageBucket.COOKBOOK.size, image, metadata)
@@ -220,8 +221,8 @@ object ImageController: Controller(IMAGE_URL) {
 
     private fun Route.deleteCookbookImage() = delete("/cookbooks/{id}") {
         val id = getPathId()
+        checkCookbookAdminRights(id)
         val cookbook = cookbookService.getEntityById(id)
-        if (!cookbookService.isAdminOfCookbook(id, getSessionUserId())) throw ForbiddenException(ForbiddenCause.MUST_BE_COOKBOOK_ADMINISTRATOR)
         imageService.deleteImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion)
         cookbook.increaseVersion()
         call.respond(HttpStatusCode.OK)

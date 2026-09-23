@@ -48,6 +48,9 @@ suspend fun HttpClient.uploadStepImage(stepId: Long, bytes: ByteArray = testImag
 suspend fun HttpClient.deleteStepImage(stepId: Long): HttpResponse =
     this.delete("$IMAGE_URL/recipe-steps/$stepId")
 
+suspend fun HttpClient.deleteCookbookImage(cookbookId: Long): HttpResponse =
+    this.delete("$IMAGE_URL/cookbooks/$cookbookId")
+
 /**
  * Posts a picture to an upload URL a ticket was minted for, the way a client holding one does.
  *

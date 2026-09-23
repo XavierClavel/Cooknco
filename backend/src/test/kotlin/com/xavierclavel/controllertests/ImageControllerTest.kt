@@ -7,11 +7,14 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import main.com.xavierclavel.utils.createCookbook
 import main.com.xavierclavel.utils.createRecipe
 import main.com.xavierclavel.utils.getRecipe
 import main.com.xavierclavel.utils.callToolOk
 import main.com.xavierclavel.utils.sessionToken
+import main.com.xavierclavel.utils.deleteCookbookImage
 import main.com.xavierclavel.utils.deleteStepImage
+import main.com.xavierclavel.utils.uploadCookbookImage
 import main.com.xavierclavel.utils.uploadRecipeImage
 import main.com.xavierclavel.utils.uploadStepImage
 import main.com.xavierclavel.utils.uploadToTicketUrl
@@ -129,6 +132,22 @@ class ImageControllerTest : ApplicationTest() {
         runAsUser2 {
             assertEquals(HttpStatusCode.Forbidden, client.uploadStepImage(stepId).status)
             assertEquals(HttpStatusCode.Forbidden, client.deleteStepImage(stepId).status)
+        }
+    }
+
+    /**
+     * A cookbook's picture is one of its administrators' to set, exactly as its title is.
+     * `uploadCookbookImage` checked nothing at all — and read the body before it would have,
+     * so a refused caller uploaded the whole file first. The check now runs before the body,
+     * which is also what lets this assert without a real picture.
+     */
+    @Test
+    fun `a cookbook's picture may only be set by one of its administrators`() = runTest {
+        var cookbookId = 0L
+        runAsUser1 { cookbookId = client.createCookbook().id }
+        runAsUser2 {
+            assertEquals(HttpStatusCode.Forbidden, client.uploadCookbookImage(cookbookId).status)
+            assertEquals(HttpStatusCode.Forbidden, client.deleteCookbookImage(cookbookId).status)
         }
     }
 

@@ -7,6 +7,7 @@ import com.xavierclavel.exceptions.BadRequestCause
 import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.exceptions.ForbiddenCause
 import com.xavierclavel.exceptions.ForbiddenException
+import com.xavierclavel.services.CookbookService
 import shared.enums.Locale
 import shared.enums.Sort
 import io.ebean.Paging
@@ -27,6 +28,7 @@ import io.ktor.utils.io.jvm.javaio.toInputStream
 import java.awt.image.BufferedImage
 import java.io.InputStream
 import javax.imageio.ImageIO
+import org.koin.java.KoinJavaComponent.inject
 
 abstract class Controller(val base: String = "") {
     fun serve(route: Route) = route.run {
@@ -193,4 +195,25 @@ suspend fun RoutingContext.checkRecipeEditionRights(recipeOwner: Long) {
     val currentUser = getSessionUserId()
     if (recipeOwner == currentUser) return
     throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_EDIT_RECIPE)
+}
+
+private val cookbookService: CookbookService by inject(CookbookService::class.java)
+
+/**
+ * Refuses anyone but an administrator of the cookbook.
+ *
+ * Here rather than in [com.xavierclavel.controllers.CookbookController], where it used to be
+ * private, because a cookbook is written to from two controllers: its pictures live on
+ * [com.xavierclavel.controllers.ImageController], which had a hand-rolled copy of this and a
+ * route that forgot one. A check each caller spells out for itself is a check a new route can
+ * be written without — which is exactly how `deleteCookbook` and `uploadCookbookImage` came to
+ * be reachable by anybody with an account.
+ *
+ * Unlike the two above it this one has to ask the database: cookbook membership is a row, not
+ * an owner column, so there is nothing the caller can pass in that would not itself have to be
+ * looked up first.
+ */
+suspend fun RoutingContext.checkCookbookAdminRights(cookbookId: Long) {
+    if (cookbookService.isAdminOfCookbook(cookbookId, getSessionUserId())) return
+    throw ForbiddenException(ForbiddenCause.MUST_BE_COOKBOOK_ADMINISTRATOR)
 }
