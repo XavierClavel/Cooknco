@@ -1,0 +1,191 @@
+name: Tests
+
+# Runs the suites a merge is about to run, before the merge instead of after it.
+#
+# Nothing looked at a pull request until now. `build.yml` runs `./gradlew build` — tests
+# included — on every push to `develop`, and `android-internal-develop.yml` runs the app's unit
+# tests there too, but both fire *after* the PR has landed on the trunk: by the time a red test
+# is reported, the deploy that same push triggered is already rolling the cluster, and the app
+# failure has failed a publication rather than a review.
+on:
+  pull_request:
+    # `develop` is where PRs land. `master` only ever receives merges from `develop`, so its
+    # PRs carry already-tested code — running it again is cheap and still catches a merge
+    # somebody resolved by hand.
+    branches: [ "develop", "master" ]
+  workflow_dispatch:
+
+# Deliberately unfiltered, unlike `build.yml` and `manifests.yml`:
+#
+#   - A workflow skipped by a path filter leaves its checks **pending for ever** rather than
+#     green. The day one of these is made a required check, a docs-only PR could never merge.
+#   - A filter here would have to agree with `build.yml`'s `paths-ignore`, or a PR could go
+#     green without having run what its own merge is about to run. Two filters drift; one
+#     unconditional gate cannot.
+#
+# The three jobs run in parallel, so an unfiltered run costs runner minutes, never wall clock.
+
+# Nothing here writes: no image, no tag, no cluster, no release.
+permissions:
+  contents: read
+
+concurrency:
+  # And because nothing is written, superseding a run when the branch is pushed again only
+  # frees a runner — unlike the trunk build, which serialises instead of cancelling.
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # `backend`, `shared` and `mail-service`. The suite needs a Docker daemon: ebean-test starts a
+  # Postgres container, and the export tests print real PDFs through a `gotenberg/gotenberg:8`
+  # one rather than stubbing the renderer. `ubuntu-latest` ships one — on a runner without it
+  # every test in the suite fails at once, for the same reason.
+  jvm:
+    name: JVM tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          # 17, the version `build.yml` compiles the trunk on. A PR green on another JDK would
+          # say nothing about the build that follows its merge.
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # The same key as `build.yml`'s, on purpose: a run may restore caches written on its own
+      # ref or on the PR's base branch, so a PR starts from whatever the last trunk build left
+      # instead of re-downloading the dependency graph on every push to a branch. Changing the
+      # key there without changing it here costs a cold cache and nothing else.
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # `build`, not `test`: it is the task `build.yml` runs, so this job is green exactly when
+      # the trunk build will be. It also compiles every module's main sources, which `test`
+      # alone does only for the ones some test happens to reach.
+      - name: Gradle build
+        run: ./gradlew build --no-daemon
+
+      # A failed Ktor test prints which assertion failed; the HTML report says what the server
+      # answered. Without it the only way to read a CI failure is to reproduce it locally — and
+      # the image tests, at least, do not fail the same way on an arm64 machine.
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jvm-test-reports
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # No test suite on this side: `vite build` is what the project verifies a change with, and it
+  # is what the image build runs.
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          # `lts/*` is what `frontend/Dockerfile` builds the image on (`node:lts-alpine`).
+          node-version: 'lts/*'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci` rather than the Dockerfile's `npm install`: it installs the lockfile exactly,
+      # so a PR cannot pass on a resolution the image build would not reproduce, and it says so
+      # loudly when `package.json` and the lockfile have drifted apart.
+      - name: Install dependencies
+        run: npm ci
+
+      # `npm run lint` is deliberately absent: it is `eslint . --fix` over a codebase the config
+      # was never enforced on, so it rewrites ~75 unrelated files and would fail here on all of
+      # them. Applying that formatting is its own commit, not a gate on everybody else's.
+      - name: Build
+        run: npm run build
+
+  # The app is its own Gradle build under `app/`, depends on none of the modules above, and
+  # `build.yml` ignores `app/**` entirely — so this is the only thing that will look at an app
+  # change before `android-internal-develop.yml` compiles it for the Play Store.
+  app:
+    name: App unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          # Every Android checkout is deep: Gradle derives `versionCode` from the commit count
+          # and a shallow clone counts a handful. Nothing here publishes, so a wrong number
+          # would be harmless — the rule stays absolute rather than growing an exception a
+          # reader has to check for before trusting the next one.
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          # 21: `app/` is Gradle 9.4.1 / AGP 9.2.1, independent of the backend's 17.
+          java-version: '21'
+          distribution: 'temurin'
+
+      # `packages: ''` overrides the action's default of `tools platform-tools`. Google removed
+      # the obsolete `tools` package from the SDK repository, so the default makes the action
+      # throw — after it has accepted the licences, which is the only part this build needs it
+      # for. AGP downloads the platform and build-tools it wants once they are in place.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      # Caches `~/.gradle`, which is per-user rather than per-build, so this reads what the
+      # app's publication workflow left on `develop`. It validates every wrapper jar in the
+      # workspace, of which this repository has two.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        working-directory: app
+        run: chmod +x gradlew
+
+      # `commonTest` runs on the JVM through the KMP library plugin's `withHostTest {}`, so this
+      # needs no emulator. The instrumented tests in `:androidApp` do, and are not run here —
+      # the same task and the same reason as the publication workflow.
+      - name: Unit tests
+        working-directory: app
+        run: ./gradlew :composeApp:testAndroidHostTest --no-daemon
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-test-reports
+          path: |
+            app/composeApp/build/reports/tests/
+            app/composeApp/build/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
