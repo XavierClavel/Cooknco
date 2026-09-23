@@ -55,6 +55,39 @@ import shared.dto.SessionDto
 import java.util.UUID
 import kotlin.text.trim
 
+/**
+ * Google's userinfo document, read leniently.
+ *
+ * OpenID Connect lets a provider return any claim it likes, and Google returns more than the
+ * two this needs: an account belonging to a Workspace carries `hd`, the domain it belongs to.
+ * The default [Json] refuses an unknown key, so a Workspace sign-in threw before `sub` had
+ * been looked at and was answered `oauth_failed` — a returning account as readily as a new
+ * one, from the app as well as the web. Personal accounts carry no `hd` and went through
+ * untouched, which is what made it read as a failure of account creation.
+ *
+ * Ignoring what we do not understand is what this codebase does everywhere it reads a
+ * document somebody else writes — see `registrationJson` in [OAuthController], which RFC 7591
+ * requires it of, and [com.xavierclavel.services.FcmAccessTokens].
+ */
+private val googleUserinfoJson = Json { ignoreUnknownKeys = true }
+
+/**
+ * Google's answer to the userinfo request, or null when it cannot be read.
+ *
+ * Lenient about the claims it does not know and strict about the two it does: `sub` names the
+ * account and `email` is what an account is created with, so a document missing either is
+ * still refused rather than turned into a user with holes in it.
+ *
+ * `internal` so that `GoogleUserinfoTest` reads real payloads through the same parser the
+ * callback uses — a test carrying a [Json] of its own would pass while this one refused.
+ */
+internal fun parseGoogleUserinfo(data: String): GoogleOauthDto? =
+    try {
+        googleUserinfoJson.decodeFromString<GoogleOauthDto>(data)
+    } catch (e: SerializationException) {
+        null
+    }
+
 object AuthController: Controller(AUTH_URL) {
     val userService: UserService by inject(UserService::class.java)
     val redisService: RedisService by inject(RedisService::class.java)
@@ -165,9 +198,7 @@ object AuthController: Controller(AUTH_URL) {
         val data = applicationHttpClient.get("https://openidconnect.googleapis.com/v1/userinfo") {
             bearerAuth(oauthToken)
         }.bodyAsText()
-        val response = try {
-            Json.decodeFromString<GoogleOauthDto>(data)
-        } catch (e: SerializationException) {
+        val response = parseGoogleUserinfo(data) ?: run {
             logger.info {"Failed to parse the following data: $data"}
             throw UnauthorizedException(UnauthorizedCause.OAUTH_FAILED)
         }
