@@ -172,6 +172,7 @@ class Recipe (
         owner = this.owner!!.toOverview(),
         likesCount = likesCount,
         creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),
+        editionDate = this.modificationDate.toEpochSecond(ZoneOffset.UTC),
         isHidden = this.isHidden,
     )
 

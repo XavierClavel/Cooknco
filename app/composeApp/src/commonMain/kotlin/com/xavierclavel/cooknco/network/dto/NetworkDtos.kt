@@ -79,6 +79,16 @@ data class RecipeOverview(
     val owner: RecipeOwner,
     val likesCount: Int,
     val creationDate: Long,
+    /**
+     * When the recipe was last edited — `shared.overviewdto.RecipeOverview.editionDate`.
+     *
+     * The offline store diffs on this and on nothing else: [version] is the *picture's*
+     * version and moves only when the picture does, so a recipe whose text changed and whose
+     * photo did not is indistinguishable by it. Zero from a backend that predates the field,
+     * which reads as "never edited" and so as "nothing to refetch" — the safe way round for a
+     * copy we already hold.
+     */
+    val editionDate: Long = 0,
 )
 
 @Serializable
@@ -108,6 +118,15 @@ data class RecipeInfo(
     val steps: List<RecipeStepInfo> = emptyList(),
     val tips: String = "",
     val creationDate: Long,
+    /**
+     * When the recipe was last edited. See [RecipeOverview.editionDate].
+     *
+     * Nullable, unlike the overview's, because `shared.infodto.RecipeInfo` declares it that
+     * way and kotlinx writes an explicit `null` — which a non-null `Long` here would refuse to
+     * parse, taking the whole recipe with it. Nothing reads it; the sync diffs on the
+     * overview's.
+     */
+    val editionDate: Long? = null,
     val likesCount: Int,
 )
 

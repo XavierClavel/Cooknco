@@ -74,6 +74,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.data.AppUnits
+import com.xavierclavel.cooknco.data.OfflineState
 import com.xavierclavel.cooknco.navigation.WebRoutes
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
@@ -82,6 +83,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.platform.rememberLinkSharer
 import com.xavierclavel.cooknco.ui.components.LikeCount
+import com.xavierclavel.cooknco.ui.components.OfflineBanner
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.StepImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
@@ -166,14 +168,24 @@ fun RecipeScreen(
 
     val recipe = uiState.recipe
 
+    val offline by OfflineState.isOffline.collectAsState()
+
     Surface(modifier = modifier.fillMaxSize(), color = CookncoGreen) {
+        Column(Modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
             }
 
+            // "Not saved on this phone" is a different fact from "something went wrong", and
+            // it is one the cook can act on — go and find signal, or open one that is saved.
+            // The repository has already tried the store by the time this is drawn.
             uiState.error != null && recipe == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(uiState.error!!, color = CookncoNavy, modifier = Modifier.padding(16.dp))
+                Text(
+                    text = if (offline) s.offlineRecipeNotSaved else uiState.error!!,
+                    color = CookncoNavy,
+                    modifier = Modifier.padding(16.dp),
+                )
             }
 
             recipe != null -> RecipeContent(
@@ -200,7 +212,10 @@ fun RecipeScreen(
                 onNavigateToIngredient = onNavigateToIngredient,
                 onExport = viewModel::exportPdf,
                 onExportCooklang = viewModel::exportCooklang,
+                modifier = Modifier.weight(1f),
             )
+        }
+        OfflineBanner()
         }
     }
 

@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.ui.recipe
 
 import com.xavierclavel.cooknco.data.RecipeRepository
+import com.xavierclavel.cooknco.data.testOfflineStore
 import com.xavierclavel.cooknco.data.ScannedIngredient
 import com.xavierclavel.cooknco.data.ScannedRecipe
 import com.xavierclavel.cooknco.data.TokenDataStore
@@ -309,7 +310,7 @@ class RecipeEditScanTest {
         val client = HttpClient(engine)
         val api = RecipeApi(client)
         return RecipeEditViewModel(
-            repo = RecipeRepository(api, TokenDataStore(createPreferencesDataStore(storeFile.toString()))),
+            repo = RecipeRepository(api, TokenDataStore(createPreferencesDataStore(storeFile.toString())), testOfflineStore().first),
             unitRepo = UnitRepository(api),
             recipeId = null,
             userId = 1L,

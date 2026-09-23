@@ -38,9 +38,14 @@ class AuthRepositoryLogoutTest {
 
     private lateinit var engine: MockEngine
 
+    private val offlineRoot = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
+        "cooknco-offline-${Random.nextLong()}"
+    private val offlineStore = OfflineStore(offlineRoot)
+
     @AfterTest
     fun deleteStore() {
         FileSystem.SYSTEM.delete(storeFile, mustExist = false)
+        FileSystem.SYSTEM.deleteRecursively(offlineRoot, mustExist = false)
     }
 
     @Test
@@ -128,6 +133,7 @@ class AuthRepositoryLogoutTest {
             tokenDataStore = tokens,
             pushRepository = PushRepository(NotificationApi(client), tokens),
             devicePreferences = devicePreferences(),
+            offlineStore = offlineStore,
         )
     }
 }

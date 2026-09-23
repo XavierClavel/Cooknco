@@ -13,7 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.xavierclavel.cooknco.network.ApiClient
+import com.xavierclavel.cooknco.data.ImageUrls
+import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
 import com.xavierclavel.cooknco.ui.theme.CookncoGreenLight
 
@@ -28,7 +29,7 @@ fun StepImage(
     // without one shows nothing rather than a stand-in for something that was never there.
     // Callers check [RecipeStepInfo.imageVersion] before asking for it.
     AsyncImage(
-        model = "${ApiClient.IMAGE_URL}/recipe-steps/$stepId-v$version.webp",
+        model = AppGraph.offlineImages.resolve(ImageUrls.step(stepId, version)),
         contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
         modifier = modifier,
@@ -43,11 +44,13 @@ fun RecipeImage(
     modifier: Modifier = Modifier,
     thumbnail: Boolean = true,
 ) {
-    val url = if (thumbnail) {
-        "${ApiClient.IMAGE_URL}/recipes-thumbnails/$recipeId-v$version.webp"
-    } else {
-        "${ApiClient.IMAGE_URL}/recipes/$recipeId-v$version.webp"
-    }
+    // Whatever the offline store holds for it, or the URL when it holds nothing. A pinned
+    // recipe's picture is a file this app owns rather than a cache entry it hopes survives —
+    // see [com.xavierclavel.cooknco.data.OfflineImages].
+    val url = AppGraph.offlineImages.resolve(
+        if (thumbnail) ImageUrls.recipeThumbnail(recipeId, version)
+        else ImageUrls.recipe(recipeId, version)
+    )
     Box(
         modifier = modifier.background(CookncoGreenLight),
         contentAlignment = Alignment.Center,

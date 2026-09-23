@@ -47,6 +47,12 @@ data class UserSettingsUiState(
     val unitSystem: AppUnitSystem = AppUnitSystem.METRIC,
     val mailNotificationsEnabled: Boolean = false,
     val pushEnabled: Boolean = true,
+    /** Whether this handset keeps the cook's recipes readable without a connection. */
+    val offlineRecipes: Boolean = true,
+    /** How many recipes are held, and what they take — the line under the switch. */
+    val offlineRecipeCount: Int = 0,
+    val offlineMegabytes: Int = 0,
+    val isSyncingOffline: Boolean = false,
     /** How many MCP clients this account has approved — the badge on the "MCP access" row. */
     val mcpClientCount: Int = 0,
     val isLoading: Boolean = true,
@@ -90,6 +96,7 @@ class UserSettingsViewModel(
                 _uiState.update { it.copy(mcpClientCount = clients.size) }
             }
         }
+        viewModelScope.launch { readOfflineState() }
         viewModelScope.launch {
             val pushEnabled = devicePreferences.pushEnabled.first()
             userRepo.getSettings()
@@ -151,6 +158,53 @@ class UserSettingsViewModel(
             AppLanguage.set(previous, devicePreferences)
             _uiState.update { it.copy(accountLocale = previousAccountLocale) }
         }) { it.copy(accountLocale = locale) }
+    }
+
+    /**
+     * Switches whether this handset keeps the cook's recipes on it.
+     *
+     * Turning it off empties the store on the spot rather than letting it age out. Somebody
+     * who switches this off is telling the app to stop using their storage, and a directory
+     * that quietly kept a few hundred recipes until the next sync noticed would be ignoring
+     * that. Turning it on syncs immediately, for the mirror-image reason: the switch is only
+     * believable if the recipes are there when it is flipped.
+     */
+    fun toggleOfflineRecipes() {
+        val enabled = !_uiState.value.offlineRecipes
+        _uiState.update { it.copy(offlineRecipes = enabled) }
+        viewModelScope.launch {
+            devicePreferences.setOfflineRecipes(enabled)
+            if (enabled) syncOfflineNow() else {
+                AppGraph.offlineStore.clear()
+                AppGraph.offlineImages.refresh()
+                readOfflineState()
+            }
+        }
+    }
+
+    /** "Update now", for a cook about to go somewhere without signal and not waiting for luck. */
+    fun syncOfflineNow() {
+        if (_uiState.value.isSyncingOffline) return
+        _uiState.update { it.copy(isSyncingOffline = true) }
+        viewModelScope.launch {
+            AppGraph.offlineStore.readSession()?.let { AppGraph.offlineSync.sync(it.id) }
+            readOfflineState()
+            _uiState.update { it.copy(isSyncingOffline = false) }
+        }
+    }
+
+    private suspend fun readOfflineState() {
+        val enabled = devicePreferences.offlineRecipes.first()
+        val index = AppGraph.offlineStore.readIndex()
+        val bytes = AppGraph.offlineStore.sizeBytes()
+        _uiState.update {
+            it.copy(
+                offlineRecipes = enabled,
+                offlineRecipeCount = index?.recipes?.size ?: 0,
+                // Rounded up, so a store holding something never reads as holding nothing.
+                offlineMegabytes = ((bytes + 1_048_575) / 1_048_576).toInt(),
+            )
+        }
     }
 
     /**

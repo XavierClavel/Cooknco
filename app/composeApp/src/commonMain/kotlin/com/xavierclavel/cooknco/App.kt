@@ -6,11 +6,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.disk.DiskCache
+import coil3.network.ktor3.KtorNetworkFetcherFactory
+import coil3.request.crossfade
 import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.data.AppUnits
 import com.xavierclavel.cooknco.data.UpdateRequirement
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.navigation.AppNavigation
+import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.platform.rememberUrlOpener
 import com.xavierclavel.cooknco.ui.auth.AuthViewModel
 import com.xavierclavel.cooknco.ui.i18n.LocalStrings
@@ -21,6 +27,33 @@ import com.xavierclavel.cooknco.ui.update.UpdateRequiredScreen
 
 @Composable
 fun App() {
+    /**
+     * Coil's loader, stated rather than defaulted.
+     *
+     * Two reasons to spell it out. The **disk cache** otherwise lands in
+     * `FileSystem.SYSTEM_TEMPORARY_DIRECTORY` at whatever size that version of Coil picked —
+     * a location the system may empty and a size nobody here chose; it is moved next to the
+     * offline store and given a stated bound. This is still only a cache, for everything the
+     * sync did *not* pin (avatars, the feed's thumbnails): a pinned picture is a file this app
+     * owns, and is resolved before Coil is ever asked — see [com.xavierclavel.cooknco.data.OfflineImages].
+     *
+     * And the **network client** is this app's, so image requests share the one connection
+     * pool and the one configuration rather than running on a second client Coil builds for
+     * itself.
+     */
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .components { add(KtorNetworkFetcherFactory(ApiClient.httpClient)) }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(AppGraph.offlineStore.imagesDir.parent!! / "image-cache")
+                    .maxSizeBytes(IMAGE_CACHE_BYTES)
+                    .build()
+            }
+            .crossfade(true)
+            .build()
+    }
+
     // Read once, above everything: a language change recomposes the whole tree, which is
     // exactly what it should do — every screen is written in it.
     val language by AppLanguage.current.collectAsState()
@@ -91,3 +124,12 @@ fun App() {
     }
     }
 }
+
+/**
+ * What Coil may keep for pictures nobody pinned.
+ *
+ * Small on purpose: the pictures that have to survive are not in here, they are files the
+ * offline store owns. This is for the feed and for avatars, where evicting one costs a
+ * re-download nobody notices.
+ */
+private const val IMAGE_CACHE_BYTES = 64L * 1024 * 1024
