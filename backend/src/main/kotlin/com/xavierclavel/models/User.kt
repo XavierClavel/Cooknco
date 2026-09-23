@@ -106,6 +106,16 @@ class User (
     var moderationNote: String = "",
 
     var joinDate: LocalDateTime = LocalDateTime.now(),
+    /**
+     * When the account last signed in — stamped by
+     * [com.xavierclavel.services.UserService.registerUserActivity] on every session
+     * creation, and by nothing else.
+     *
+     * It starts at the account's creation, so an account that has never signed in reads as
+     * last seen the day it joined rather than as never seen at all. That is the one case
+     * where it legitimately equals [joinDate]; every other one was the stamp not being
+     * written, which is the bug this used to have.
+     */
     var lastActivityDate: LocalDateTime = LocalDateTime.now(),
 
     @OneToMany(mappedBy = "owner", cascade = [CascadeType.ALL], orphanRemoval = true)
@@ -201,11 +211,6 @@ class User (
     }
 
     fun setRole(role: UserRole) = this.apply { this.role = role }
-
-    fun registerNewActivity() =
-        this.apply {
-            lastActivityDate = LocalDateTime.now()
-        }
 
     fun toInfo() =
         UserInfo(

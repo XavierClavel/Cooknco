@@ -2,6 +2,7 @@ package main.com.xavierclavel.controllertests
 
 import com.xavierclavel.ApplicationTest
 import com.xavierclavel.exceptions.UnauthorizedCause
+import io.ebean.DB
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import main.com.xavierclavel.utils.login
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.assertDoesNotThrow
 import shared.enums.EmailTemplateKind
 import shared.events.UserCreatedEvent
 import shared.events.UserMailRequestedEvent
+import java.time.LocalDateTime
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -138,5 +140,48 @@ class AuthControllerTest : ApplicationTest() {
         assertEquals(mail, encryptionService.decrypt(actualSecond.encryptedRecipient))
     }
 
+    /**
+     * The backoffice's "last seen" column reads `users.last_activity_date`, and the stamp
+     * used to be set on a loaded entity that was never saved — so the column kept the value
+     * it was inserted with and every account read as last seen the day it joined.
+     *
+     * Backdating the row is what makes that visible: a sign-in seconds after a signup leaves
+     * the stamp and the join date within a millisecond of each other whether it is written
+     * or not. Raw SQL to set it up, as test fixtures are allowed to.
+     */
+    @Test
+    fun `signing in stamps the account's last connection`() = runTest {
+        val password = UUID.randomUUID().toString()
+        val mail = "returning@mail.com"
+        val user = client.signup(mail = mail, password = password)
+        client.verifyUser(userService.getEntityById(user.id).token)
+
+        DB.sqlUpdate("update users set last_activity_date = last_activity_date - interval '30 days' where id = :id")
+            .setParameter("id", user.id)
+            .execute()
+        val backdated = userService.getEntityById(user.id).lastActivityDate
+
+        client.login(mail, password).apply { assertEquals(HttpStatusCode.OK, status) }
+
+        val stamped = userService.getEntityById(user.id).lastActivityDate
+        assertTrue(stamped.isAfter(backdated), "signing in left last_activity_date at ${'$'}stamped")
+        assertTrue(
+            stamped.isAfter(LocalDateTime.now().minusMinutes(1)),
+            "last_activity_date should be the moment of the sign-in, was ${'$'}stamped",
+        )
+    }
+
+    /**
+     * The one case where the two dates legitimately agree: the column is seeded at creation,
+     * so an account that has never signed in reads as last seen the day it joined rather
+     * than as never seen at all.
+     */
+    @Test
+    fun `an account that never signed in reads as last seen the day it joined`() = runTest {
+        val user = client.signup(mail = "fresh@mail.com", password = UUID.randomUUID().toString())
+        userService.getEntityById(user.id).apply {
+            assertEquals(joinDate, lastActivityDate)
+        }
+    }
 
 }

@@ -29,7 +29,6 @@ import shared.enums.EmailTemplateKind
 import shared.events.EventProducer
 import shared.events.UserCreatedEvent
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 import java.util.UUID
 
 class UserService: KoinComponent {
@@ -46,7 +45,7 @@ class UserService: KoinComponent {
     //Defined as users who logged in in the last 30 days
     fun countActiveUsers() =
         QUser()
-            .where().lastActivityDate.gt(LocalDateTime.now(ZoneOffset.UTC).minusMonths(1))
+            .where().lastActivityDate.gt(LocalDateTime.now().minusMonths(1))
             .findCount()
 
     fun getEntityById(userId: Long) : User =
@@ -172,7 +171,20 @@ class UserService: KoinComponent {
         return currentUser.merge(userDTO).updateAndGet().toInfo()
     }
 
-    fun registerUserActivity(id: Long) = getEntityById(id).registerNewActivity()
+    /**
+     * Stamps the account's last connection. Called on every session creation — a password
+     * sign-in, a Google one, and the session a Google signup opens straight away.
+     *
+     * A bulk update rather than a loaded entity, for correctness as much as for the query
+     * it saves: this used to read the row and set the field on the returned object without
+     * ever saving it, so the column kept the value it was inserted with and the backoffice
+     * showed every account as last seen the day it joined.
+     */
+    fun registerUserActivity(id: Long) {
+        QUser().id.eq(id)
+            .asUpdate().set(QUser.Alias.lastActivityDate, LocalDateTime.now())
+            .update()
+    }
 
     fun deleteUserById(userId: Long): Int {
         detachReports(userId)
