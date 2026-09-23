@@ -82,7 +82,16 @@ class Device(
 
     var createdAt: LocalDateTime = LocalDateTime.now(),
 
-    /** Touched on every re-registration, which clients do at each launch. */
+    /**
+     * Touched on every re-registration, which clients do at each launch.
+     *
+     * `@WhenModified` stamps it when the row is *updated*, and Ebean updates nothing for a
+     * bean whose properties all match what was loaded — so a launch that reports the same
+     * build, locale and account as last time writes nothing on its own.
+     * `DeviceService.register` marks the row dirty for exactly that case; without it this
+     * column would mean "last changed" and the reach window would age out the steadiest
+     * installs first.
+     */
     @WhenModified
     var lastSeenAt: LocalDateTime = LocalDateTime.now(),
 
