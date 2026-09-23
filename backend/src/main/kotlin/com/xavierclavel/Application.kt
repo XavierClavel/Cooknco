@@ -44,6 +44,8 @@ import io.ktor.server.request.path
 import io.ktor.server.response.respond
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
+import io.ktor.util.cio.ChannelWriteException
+import io.ktor.utils.io.ClosedWriteChannelException
 import org.koin.core.context.GlobalContext.startKoin
 import org.koin.ktor.ext.inject
 
@@ -93,6 +95,19 @@ fun Application.module() {
         exception<BadRequestException> { call, error ->
             call.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")
         }
+        // A client that hangs up mid-response, which is neither a fault nor something it can
+        // be told about: the status line left before it did, so there is no status left to
+        // set. Both shapes the disconnect arrives in are named, and nothing wider: a plain
+        // IOException from a route is a real failure and belongs in the handler below.
+        //
+        // Caught rather than merely not answered because the log tail is where this happens
+        // constantly — the backoffice reopens its EventSource on every filter change — and
+        // an ERROR there is worse than noise. It goes into the ring buffer, the tail that
+        // replaces the closed one replays it as though the server had broken, and the
+        // overview's "errors in logs" alert counts it. Watching the logs must not be what
+        // makes them look bad.
+        exception<ChannelWriteException> { call, error -> logClientGone(call, error) }
+        exception<ClosedWriteChannelException> { call, error -> logClientGone(call, error) }
         exception<Throwable> { call, error ->
             logger.error { "Call to ${call.request.path()} failed with error ${error.stackTraceToString()}" }
             call.respond(HttpStatusCode.InternalServerError, error.message ?: "Unknown error")
@@ -107,6 +122,15 @@ fun Application.module() {
     val userService: UserService by inject()
     userService.setupDefaultAdmin()
 
+}
+
+/**
+ * A departed client, logged at debug so it stays out of the ring buffer the backoffice
+ * reads — and so a stream that really is failing can still be looked into by raising the
+ * level.
+ */
+private fun logClientGone(call: ApplicationCall, error: Throwable) {
+    logger.debug { "Call to ${call.request.path()} ended when the client disconnected: ${error.message}" }
 }
 
 //Controllers declaration
