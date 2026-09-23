@@ -130,19 +130,30 @@ class Recipe (
         this.imageVersion = 0
     }.update()
 
-    fun toInfo(locale: Locale) = RecipeInfo(
+    /**
+     * @param likesCount how many accounts have liked this, counted by the caller.
+     *
+     * Not `likes.size`: reading the collection is a query, and every path that maps more than one
+     * recipe would pay it per row. `LikeService.countLikesByRecipe` answers for a whole page at
+     * once, and `RecipeFetchPlanTest` is what keeps it that way.
+     *
+     * @param catalogueNames what each catalogue ingredient is called in [locale], by ingredient id,
+     *   for the same reason — see [com.xavierclavel.models.jointables.RecipeIngredient.toInfo].
+     */
+    fun toInfo(locale: Locale, likesCount: Int, catalogueNames: Map<Long, String>) = RecipeInfo(
         id = this.id,
         version = this.imageVersion,
         title = title,
         description = description,
         dishClass = dishClass,
         steps = steps.sortedBy { it.sortOrder }.map { it.toDto() },
-        ingredients = ingredients.sortedBy { it.sortOrder }.map { it.toInfo(locale) },
+        ingredients = ingredients.sortedBy { it.sortOrder }
+            .map { line -> line.toInfo(line.ingredient?.id?.let { catalogueNames[it] }) },
 
         owner = this.owner!!.toOverview(),
         creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),
         editionDate = this.modificationDate.toEpochSecond(ZoneOffset.UTC),
-        likesCount = this.likes.size,
+        likesCount = likesCount,
         tips = this.tips,
 
         yield = this.yield,
@@ -152,13 +163,14 @@ class Recipe (
         isHidden = this.isHidden,
     )
 
-    fun toOverview() = RecipeOverview(
+    /** @param likesCount counted by the caller, for the reason [toInfo] gives. */
+    fun toOverview(likesCount: Int) = RecipeOverview(
         id = this.id,
         version = this.imageVersion,
         title = title,
         dishClass = dishClass,
         owner = this.owner!!.toOverview(),
-        likesCount = this.likes.size,
+        likesCount = likesCount,
         creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),
         isHidden = this.isHidden,
     )
@@ -177,15 +189,19 @@ class Recipe (
         hiddenReason = ""
     }
 
-    fun toAdminInfo(pendingReportsCount: Int) = AdminRecipeInfo(
+    /**
+     * @param likesCount and [cookbooksCount] counted by the caller, for the reason [toInfo] gives —
+     *   two collections here, so the admin table would pay two queries per row.
+     */
+    fun toAdminInfo(pendingReportsCount: Int, likesCount: Int, cookbooksCount: Int) = AdminRecipeInfo(
         id = this.id,
         version = this.imageVersion,
         title = this.title,
         owner = this.owner?.toOverview(),
         creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),
         modificationDate = this.modificationDate.toEpochSecond(ZoneOffset.UTC),
-        likesCount = this.likes.size,
-        cookbooksCount = this.cookbooks.size,
+        likesCount = likesCount,
+        cookbooksCount = cookbooksCount,
         isHidden = this.isHidden,
         hiddenReason = this.hiddenReason,
         taggedForDeletion = this.taggedForDeletion,

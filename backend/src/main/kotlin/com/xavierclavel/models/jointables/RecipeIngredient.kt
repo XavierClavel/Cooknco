@@ -54,10 +54,19 @@ class RecipeIngredient (
 
     ): Model() {
 
-    fun toInfo(locale: Locale) = RecipeIngredientInfo(
+    /**
+     * @param catalogueName what the catalogue entry this line names is called in the reader's
+     *   language, resolved by `IngredientService.namesOf` rather than read off
+     *   `ingredient.translations`. That collection lazy-loads one query per *line*, which a recipe
+     *   with a dozen ingredients pays a dozen times over — and a cookbook export pays per recipe as
+     *   well, twice, the book being printed twice to number its contents.
+     *
+     *   Free text wins over it, as it always has: a line the cook typed is what they typed.
+     */
+    fun toInfo(catalogueName: String?) = RecipeIngredientInfo(
         id = ingredient?.id,
         name = customName
-            ?: ingredient?.translations?.find { it.locale == locale }?.name
+            ?: catalogueName
             ?: "Unknown",
         type = ingredient?.type,
         amount = amount,

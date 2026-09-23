@@ -30,7 +30,7 @@ class RecipeFiltersTest : ApplicationTest() {
         var adminUser: UserInfo? = null
         var recipe: RecipeInfo? = null
         runAsAdmin {
-            user = userService.findByMail(USER1).toInfo()
+            user = userService.describe(userService.findByMail(USER1))
             adminUser = client.getMe()
         }
         runAs(USER1) {
@@ -103,7 +103,7 @@ class RecipeFiltersTest : ApplicationTest() {
         var recipe2: RecipeInfo? = null
         var recipe3: RecipeInfo? = null
         runAsAdmin {
-            user = userService.findByMail(USER1).toInfo()
+            user = userService.describe(userService.findByMail(USER1))
             adminUser = client.getMe()
             recipe1 = client.createRecipe()
             recipe2 = client.createRecipe()
@@ -263,8 +263,8 @@ class RecipeFiltersTest : ApplicationTest() {
         var recipe12: RecipeInfo? = null
         var recipe21: RecipeInfo? = null
         runAsAdmin {
-            user1 = userService.findByMail(USER1).toInfo()
-            user2 = userService.findByMail(USER2).toInfo()
+            user1 = userService.describe(userService.findByMail(USER1))
+            user2 = userService.describe(userService.findByMail(USER2))
             adminUser = client.getMe()
             recipe0 = client.createRecipe()
         }

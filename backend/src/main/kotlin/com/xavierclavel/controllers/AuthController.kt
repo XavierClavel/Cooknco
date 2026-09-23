@@ -107,7 +107,7 @@ object AuthController: Controller(AUTH_URL) {
         val mail = call.principal<UserIdPrincipal>()?.name.toString()
         val entity = userService.findByMail(mail)
         reportedLocale()?.let { userService.adoptLocale(entity, it) }
-        val sessionId = createSession(entity.toInfo())
+        val sessionId = createSession(userService.describe(entity))
         call.sessions.set(UserSession(sessionId))
         call.respond(SessionDto(sessionId))
     }
@@ -178,7 +178,7 @@ object AuthController: Controller(AUTH_URL) {
             // Same reporting as a password sign-in: a returning account with no language
             // takes the one its client came in with
             reported?.let { userService.adoptLocale(user, it) }
-            val sessionId = createSession(user.toInfo())
+            val sessionId = createSession(userService.describe(user))
             call.sessions.set(UserSession(sessionId))
             return sessionId
         }
@@ -188,7 +188,7 @@ object AuthController: Controller(AUTH_URL) {
         }
 
         user = createGoogleOauthUser(response, reported)
-        val sessionId = createSession(user.toInfo())
+        val sessionId = createSession(userService.describe(user))
         call.sessions.set(UserSession(sessionId))
         return sessionId
     }
@@ -254,7 +254,7 @@ object AuthController: Controller(AUTH_URL) {
 
         val userCreated = userService.createUser(userDTO, false, reportedLocale())
         logger.info {"Account created through basic auth by ${userCreated.username}"}
-        call.respond(HttpStatusCode.Created, userCreated.toInfo())
+        call.respond(HttpStatusCode.Created, userService.describe(userCreated))
     }
 
     //TODO: send mail to user with verification code to send through another endpoint to chose a new password

@@ -75,7 +75,7 @@ object ExportController: Controller(EXPORT_URL) {
         val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
         val unitSystem = getEnumQueryParam<UnitSystem>("unitSystem") ?: UnitSystem.DEFAULT
         val recipe =
-            if (caller.role == UserRole.ADMIN) recipeService.getEntityById(id).toInfo(locale)
+            if (caller.role == UserRole.ADMIN) recipeService.describe(recipeService.getEntityById(id), locale)
             else recipeService.getById(caller.id, id, locale)
         call.respondPDF(exportService.filenameOf(recipe), exportService.generatePDF(recipe, locale, unitSystem))
     }
@@ -102,7 +102,7 @@ object ExportController: Controller(EXPORT_URL) {
         val id = getPathId()
         val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
         val recipe =
-            if (caller.role == UserRole.ADMIN) recipeService.getEntityById(id).toInfo(locale)
+            if (caller.role == UserRole.ADMIN) recipeService.describe(recipeService.getEntityById(id), locale)
             else recipeService.getById(caller.id, id, locale)
         call.respondTextFile(
             filename = exportService.filenameOf(recipe, COOKLANG_EXTENSION),
@@ -130,7 +130,7 @@ object ExportController: Controller(EXPORT_URL) {
         val unitSystem = getEnumQueryParam<UnitSystem>("unitSystem") ?: UnitSystem.DEFAULT
         val isModerator = caller.role == UserRole.ADMIN
         val cookbook =
-            if (isModerator) cookbookService.getEntityById(id).toInfo()
+            if (isModerator) cookbookService.describe(cookbookService.getEntityById(id))
             else cookbookService.getCookbook(id, caller.id)
         call.respondPDF(
             exportService.filenameOf(cookbook),

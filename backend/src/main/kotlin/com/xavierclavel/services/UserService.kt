@@ -10,11 +10,17 @@ import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.exceptions.UnauthorizedCause
 import com.xavierclavel.exceptions.UnauthorizedException
 import com.xavierclavel.models.User
+import com.xavierclavel.models.UserCounts
+import com.xavierclavel.models.jointables.query.QCookbookUser
+import com.xavierclavel.models.jointables.query.QFollow
+import com.xavierclavel.models.jointables.query.QLike
+import com.xavierclavel.models.query.QRecipe
 import com.xavierclavel.models.query.QNotification
 import com.xavierclavel.models.query.QReport
 import com.xavierclavel.models.query.QUser
 import com.xavierclavel.utils.DbTransaction.insertAndGet
 import com.xavierclavel.utils.DbTransaction.updateAndGet
+import com.xavierclavel.utils.countByParent
 import com.xavierclavel.utils.logger
 import shared.dto.UserDTO
 import shared.dto.UserSettingsDTO
@@ -168,7 +174,7 @@ class UserService: KoinComponent {
         if (userDTO.username != currentUser.username && existsByUsername(userDTO.username)) {
             throw BadRequestException(BadRequestCause.USERNAME_ALREADY_USED)
         }
-        return currentUser.merge(userDTO).updateAndGet().toInfo()
+        return describe(currentUser.merge(userDTO).updateAndGet())
     }
 
     /**
@@ -216,11 +222,11 @@ class UserService: KoinComponent {
         QUser().username.eq(username).delete()
 
     fun getUserByUsername(username: String) : UserInfo? {
-        return findByUsername(username)?.toInfo()
+        return findByUsername(username)?.let { describe(it) }
     }
 
     fun getUser(id: Long) : UserInfo =
-        getEntityById(id).toInfo()
+        describe(getEntityById(id))
 
     fun listUsers(paging: Paging): List<UserOverview> =
         QUser().setPaging(paging).findList().map { it.toOverview() }
@@ -243,7 +249,7 @@ class UserService: KoinComponent {
     fun verifyUser(token:String): UserInfo {
         val user = findByToken(token)
         if (!user.isTokenValid()) throw UnauthorizedException(UnauthorizedCause.INVALID_TOKEN)
-        return user.verify().updateAndGet().toInfo()
+        return describe(user.verify().updateAndGet())
     }
 
     fun isPasswordValid(id: Long, password: String): Boolean =
@@ -255,12 +261,12 @@ class UserService: KoinComponent {
     fun updatePassword(id: Long, password: String): UserInfo {
         val user = getEntityById(id)
         if (user.passwordHash == null) throw BadRequestException(BadRequestCause.OAUTH_ONLY)
-        return getEntityById(id).updatePassword(encryptionService.encryptPassword(password)!!).updateAndGet().toInfo()
+        return describe(getEntityById(id).updatePassword(encryptionService.encryptPassword(password)!!).updateAndGet())
     }
 
 
     fun setRole(id: Long, role: UserRole) =
-        getEntityById(id).setRole(role).updateAndGet().toInfo()
+        describe(getEntityById(id).setRole(role).updateAndGet())
 
     /**
      * The account behind a premium feature's request, or a refusal.
@@ -293,12 +299,12 @@ class UserService: KoinComponent {
         }
         val user = getEntityById(id)
         if (until == null) user.grantPremiumForever() else user.grantPremiumUntil(until)
-        return user.updateAndGet().toInfo()
+        return describe(user.updateAndGet())
     }
 
     /** Ends a grant of either kind, now. See [User.revokePremium]. */
     fun revokePremium(id: Long): UserInfo =
-        getEntityById(id).revokePremium().updateAndGet().toInfo()
+        describe(getEntityById(id).revokePremium().updateAndGet())
 
     fun countPremiumUsers() =
         QUser()
@@ -322,10 +328,10 @@ class UserService: KoinComponent {
 
     fun updateSettings(id: Long, userSettingsDTO: UserSettingsDTO): UserInfo {
         val user = getEntityById(id).updateSettings(userSettingsDTO).updateAndGet()
-        if (!user.autoAcceptsFollowRequests()) return user.toInfo()
+        if (!user.autoAcceptsFollowRequests()) return describe(user)
         // Nothing left to review: clear the backlog and reload to get up-to-date counts
         followService.acceptAllPendingFollowRequests(id)
-        return getEntityById(id).toInfo()
+        return describe(getEntityById(id))
     }
 
     fun getSettings(id: Long): UserSettingsDTO =
@@ -379,7 +385,74 @@ class UserService: KoinComponent {
                 }
             }
 
-        return Pair(query.findCount(), query.setPaging(paging).findList().map{ it.toInfo() })
+        return Pair(query.findCount(), describeAll(query.setPaging(paging).findList()))
+    }
+
+    /**
+     * One account's [UserInfo]. Five queries for the counts rather than the five lazy loads it
+     * would otherwise cost — the same five, but the shape is the one a listing can use, so there is
+     * a single way to build the DTO and a page cannot drift from a single read.
+     */
+    fun describe(user: User): UserInfo = describeAll(listOf(user)).single()
+
+    /** [describe] for a whole page, at a fixed cost whatever the page holds. */
+    fun describeAll(users: List<User>): List<UserInfo> {
+        val counts = countsOf(users.map { it.id })
+        return users.map { it.toInfo(counts[it.id] ?: UserCounts.NONE) }
+    }
+
+    /**
+     * The five figures a profile states, for a whole page of accounts, in five queries.
+     *
+     * One grouped `count(*)` per collection, from the child side: reading `user.recipes.size` and
+     * the four like it costs a round trip each, per account. See
+     * [com.xavierclavel.utils.countByParent].
+     *
+     * Soft-deleted recipes drop out on their own — Ebean applies the flag to its own queries — which
+     * is what keeps this agreeing with the collection it replaces.
+     *
+     * @return counts per account id; an account with nothing to its name is absent from the map
+     */
+    fun countsOf(userIds: Collection<Long>): Map<Long, UserCounts> {
+        if (userIds.isEmpty()) return emptyMap()
+        val recipes = QRecipe()
+            .select("${QRecipe.Alias.owner.id}, count(*)")
+            .owner.id.`in`(userIds)
+            .query()
+            .countByParent()
+        val likes = QLike()
+            .select("${QLike.Alias.user.id}, count(*)")
+            .user.id.`in`(userIds)
+            .query()
+            .countByParent()
+        val cookbooks = QCookbookUser()
+            .select("${QCookbookUser.Alias.user.id}, count(*)")
+            .user.id.`in`(userIds)
+            .query()
+            .countByParent()
+        // A pending request is not a follower, on either side
+        val followers = QFollow()
+            .select("${QFollow.Alias.user.id}, count(*)")
+            .user.id.`in`(userIds)
+            .pending.eq(false)
+            .query()
+            .countByParent()
+        val follows = QFollow()
+            .select("${QFollow.Alias.follower.id}, count(*)")
+            .follower.id.`in`(userIds)
+            .pending.eq(false)
+            .query()
+            .countByParent()
+
+        return userIds.associateWith { id ->
+            UserCounts(
+                recipes = recipes[id] ?: 0,
+                likes = likes[id] ?: 0,
+                cookbooks = cookbooks[id] ?: 0,
+                followers = followers[id] ?: 0,
+                follows = follows[id] ?: 0,
+            )
+        }
     }
 
 

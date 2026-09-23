@@ -6,8 +6,10 @@ import com.xavierclavel.exceptions.ForbiddenCause
 import com.xavierclavel.exceptions.ForbiddenException
 import com.xavierclavel.exceptions.NotFoundCause
 import com.xavierclavel.exceptions.NotFoundException
+import com.xavierclavel.models.Recipe
 import com.xavierclavel.models.Report
 import com.xavierclavel.models.User
+import com.xavierclavel.models.UserCounts
 import com.xavierclavel.models.query.QReport
 import com.xavierclavel.plugins.RedisService
 import com.xavierclavel.utils.DbTransaction.insertAndGet
@@ -41,6 +43,7 @@ class ModerationService: KoinComponent {
     val userService: UserService by inject()
     val recipeService: RecipeService by inject()
     val cookbookService: CookbookService by inject()
+    val likeService: LikeService by inject()
     val imageService: ImageService by inject()
     val redisService: RedisService by inject()
 
@@ -188,13 +191,13 @@ class ModerationService: KoinComponent {
     fun hideRecipe(recipeId: Long, reason: String): AdminRecipeInfo {
         val recipe = recipeService.getEntityById(recipeId).hide(reason).updateAndGet()
         logger.info { "Recipe $recipeId hidden by moderation" }
-        return recipe.toAdminInfo(countPendingReportsOn(ReportTargetType.RECIPE, recipeId))
+        return adminInfoOf(recipe)
     }
 
     fun unhideRecipe(recipeId: Long): AdminRecipeInfo {
         val recipe = recipeService.getEntityById(recipeId).unhide().updateAndGet()
         logger.info { "Recipe $recipeId un-hidden by moderation" }
-        return recipe.toAdminInfo(countPendingReportsOn(ReportTargetType.RECIPE, recipeId))
+        return adminInfoOf(recipe)
     }
 
     /** Removes a recipe outright, ignoring the like/cookbook references a self-delete respects. */
@@ -321,11 +324,42 @@ class ModerationService: KoinComponent {
         return counts
     }
 
-    fun adminInfoOf(user: User): AdminUserInfo =
-        user.toAdminInfo(
-            mail = userService.readMail(user),
-            reportsAgainstCount = countReportsAgainstUser(user.id),
-        )
+    fun adminInfoOf(user: User): AdminUserInfo = adminInfoOfUsers(listOf(user)).single()
+
+    /**
+     * The backoffice's view of a page of accounts, at a fixed cost whatever the page holds: the
+     * reports filed against them and the five figures each row states, each resolved for the whole
+     * page rather than per row. `UserFetchPlanTest` is what keeps it that way.
+     */
+    fun adminInfoOfUsers(users: List<User>): List<AdminUserInfo> {
+        val ids = users.map { it.id }
+        val reports = countReportsAgainstUsers(ids)
+        val counts = userService.countsOf(ids)
+        return users.map {
+            it.toAdminInfo(
+                mail = userService.readMail(it),
+                reportsAgainstCount = reports[it.id] ?: 0,
+                counts = counts[it.id] ?: UserCounts.NONE,
+            )
+        }
+    }
+
+    fun adminInfoOf(recipe: Recipe): AdminRecipeInfo = adminInfoOfRecipes(listOf(recipe)).single()
+
+    /** [adminInfoOf] for a page of recipes, resolving its three counts in three queries. */
+    fun adminInfoOfRecipes(recipes: List<Recipe>): List<AdminRecipeInfo> {
+        val ids = recipes.map { it.id }
+        val reports = countPendingReportsOn(ReportTargetType.RECIPE, ids)
+        val likes = likeService.countLikesByRecipe(ids)
+        val cookbooks = cookbookService.countCookbooksByRecipe(ids)
+        return recipes.map {
+            it.toAdminInfo(
+                pendingReportsCount = reports[it.id] ?: 0,
+                likesCount = likes[it.id] ?: 0,
+                cookbooksCount = cookbooks[it.id] ?: 0,
+            )
+        }
+    }
 
     private fun getReportEntity(id: Long): Report =
         QReport().id.eq(id).findOne() ?: throw NotFoundException(NotFoundCause.REPORT_NOT_FOUND)

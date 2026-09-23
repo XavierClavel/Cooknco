@@ -50,11 +50,40 @@ class IngredientService: KoinComponent {
         return counts
     }
 
+    /**
+     * What each of [ingredientIds] is called, per language — the collection a catalogue entry has
+     * instead of a name column, read from the child side in one query.
+     *
+     * @return names per ingredient id; an entry with no translation at all is absent from the map
+     */
+    fun namesOf(ingredientIds: Collection<Long>): Map<Long, Map<Locale, String>> {
+        if (ingredientIds.isEmpty()) return emptyMap()
+        return QLocalizedIngredientName()
+            .ingredient.fetch(QIngredient.Alias.id)
+            .ingredient.id.`in`(ingredientIds)
+            .findList()
+            .groupBy { it.ingredient!!.id }
+            .mapValues { (_, rows) -> rows.associate { it.locale to it.name } }
+    }
+
+    /** What each of [ingredientIds] is called in one language, for the paths that need only that. */
+    fun namesOf(ingredientIds: Collection<Long>, locale: Locale): Map<Long, String> =
+        namesOf(ingredientIds).mapNotNull { (id, names) -> names[locale]?.let { id to it } }.toMap()
+
+    /** One catalogue entry's [IngredientInfo], named the way a listing names a page of them. */
+    fun describe(ingredient: Ingredient): IngredientInfo = describeAll(listOf(ingredient)).single()
+
+    /** [describe] for a whole page, at a fixed cost whatever the page holds. */
+    fun describeAll(ingredients: List<Ingredient>): List<IngredientInfo> {
+        val names = namesOf(ingredients.map { it.id })
+        return ingredients.map { it.toInfo(names[it.id].orEmpty()) }
+    }
+
     fun findEntityById(ingredientId: Long) : Ingredient? =
         QIngredient().id.eq(ingredientId).findOne()
 
     fun findById(ingredientId: Long) : IngredientInfo? =
-        QIngredient().id.eq(ingredientId).findOne()?.toInfo()
+        QIngredient().id.eq(ingredientId).findOne()?.let { describe(it) }
 
     fun createIngredient(ingredientDTO: IngredientDTO): IngredientInfo {
         validate(ingredientDTO)
@@ -63,7 +92,7 @@ class IngredientService: KoinComponent {
             val localizedIngredientName = LocalizedIngredientName(ingredient = ingredient, locale = it.key, name = it.value)
             localizedIngredientName.insert()
         }
-        return QIngredient().id.eq(ingredient.id).findOne()!!.toInfo()
+        return describe(QIngredient().id.eq(ingredient.id).findOne()!!)
     }
 
 
@@ -83,8 +112,7 @@ class IngredientService: KoinComponent {
         ingredient
             .mergeDTO(ingredientDTO)
             .updateAndGet()
-            .toInfo()
-        return QIngredient().id.eq(ingredient.id).findOne()!!.toInfo()
+        return describe(QIngredient().id.eq(ingredient.id).findOne()!!)
     }
 
 
@@ -213,7 +241,7 @@ class IngredientService: KoinComponent {
             else -> query.orderBy("${QIngredient.Alias.translations.name} asc")
         }
 
-        return Pair(query.findCount(), query.setPaging(paging).findList().map{it.toInfo()})
+        return Pair(query.findCount(), describeAll(query.setPaging(paging).findList()))
     }
 
     /**
@@ -259,7 +287,7 @@ class IngredientService: KoinComponent {
         found.forEach { ingredient ->
             val name = ingredient.translations.find { it.locale == locale }?.name ?: return@forEach
             val key = fold(name).removeSuffix("s")
-            val info = ingredient.toInfo()
+            val info = describe(ingredient)
             // Singular and plural both point at it. `putIfAbsent`, so that two catalogue
             // entries differing only by a plural do not silently take each other's place —
             // the first is kept and the second stays unmatched, which is free text rather

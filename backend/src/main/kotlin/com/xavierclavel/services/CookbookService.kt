@@ -15,6 +15,7 @@ import com.xavierclavel.models.query.QCookbook
 import com.xavierclavel.utils.DbTransaction.insertAndGet
 import com.xavierclavel.utils.DbTransaction.updateAndGet
 import com.xavierclavel.utils.Extensions.page
+import com.xavierclavel.utils.countByParent
 import shared.dto.CookbookDTO
 import shared.dto.CookbookUserDTO
 import shared.enums.Sort
@@ -23,7 +24,7 @@ import shared.infodto.CookbookInfo
 import shared.infodto.CookbookRecipeInfo
 import shared.infodto.CookbookUserInfo
 import shared.overviewdto.CookbookRecipeOverview
-import io.ebean.FetchConfig
+import shared.overviewdto.UserOverview
 import io.ebean.Paging
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -35,6 +36,65 @@ class CookbookService: KoinComponent {
 
     fun countAll() =
         QCookbook().findCount()
+
+    /**
+     * How many recipes each of [cookbookIds] holds, in one query — what a listing uses instead of
+     * reading `cookbook.recipes`. See [com.xavierclavel.utils.countByParent].
+     *
+     * @return count per cookbook id; an empty cookbook is absent from the map
+     */
+    fun countRecipesByCookbook(cookbookIds: Collection<Long>): Map<Long, Int> =
+        if (cookbookIds.isEmpty()) emptyMap()
+        else QCookbookRecipe()
+            .select("${QCookbookRecipe.Alias.cookbook.id}, count(*)")
+            .cookbook.id.`in`(cookbookIds)
+            .query()
+            .countByParent()
+
+    /** How many cookbooks each of [recipeIds] appears in, counted the same way. */
+    fun countCookbooksByRecipe(recipeIds: Collection<Long>): Map<Long, Int> =
+        if (recipeIds.isEmpty()) emptyMap()
+        else QCookbookRecipe()
+            .select("${QCookbookRecipe.Alias.recipe.id}, count(*)")
+            .recipe.id.`in`(recipeIds)
+            .query()
+            .countByParent()
+
+    /**
+     * Everything a listing needs about each cookbook's membership: how many members it has, and the
+     * first few of them by name.
+     *
+     * One query for the rows and one for the count, rather than the count being derived from the
+     * rows — the rows are cut to [CookbookInfo.MEMBERS_SHOWN] per book, so counting them would make
+     * a cookbook of forty report ten.
+     */
+    fun membershipOf(cookbookIds: Collection<Long>): Map<Long, Membership> {
+        if (cookbookIds.isEmpty()) return emptyMap()
+        val counts = countUsersByCookbook(cookbookIds)
+        val members = QCookbookUser()
+            .user.fetch()
+            .cookbook.fetch(QCookbook.Alias.id)
+            .cookbook.id.`in`(cookbookIds)
+            .orderBy().joinDate.asc()
+            .findList()
+            .groupBy { it.cookbook.id }
+        return cookbookIds.associateWith { id ->
+            Membership(
+                count = counts[id] ?: 0,
+                shown = members[id].orEmpty().take(CookbookInfo.MEMBERS_SHOWN).map { it.user.toOverview() },
+            )
+        }
+    }
+
+    /** What [membershipOf] resolves per cookbook. */
+    data class Membership(val count: Int, val shown: List<UserOverview>)
+
+    private fun countUsersByCookbook(cookbookIds: Collection<Long>): Map<Long, Int> =
+        QCookbookUser()
+            .select("${QCookbookUser.Alias.cookbook.id}, count(*)")
+            .cookbook.id.`in`(cookbookIds)
+            .query()
+            .countByParent()
 
     fun existsById(id: Long) = QCookbook().id.eq(id).exists()
 
@@ -59,7 +119,27 @@ class CookbookService: KoinComponent {
 
 
     fun createCookbook(cookbookDTO: CookbookDTO): CookbookInfo =
-        Cookbook.from(cookbookDTO).insertAndGet().toInfo()
+        describe(Cookbook.from(cookbookDTO).insertAndGet())
+
+    /**
+     * One cookbook's [CookbookInfo], counted the same way a listing counts a page of them. Three
+     * queries for one row rather than the two lazy loads it would otherwise cost — the point is
+     * that there is one way to build the DTO, so a listing cannot drift from a single read.
+     */
+    fun describe(cookbook: Cookbook): CookbookInfo = describeAll(listOf(cookbook)).single()
+
+    /** [describe] for a whole page, at a fixed cost whatever the page holds. */
+    fun describeAll(cookbooks: List<Cookbook>): List<CookbookInfo> {
+        val ids = cookbooks.map { it.id }
+        val recipeCounts = countRecipesByCookbook(ids)
+        val membership = membershipOf(ids)
+        return cookbooks.map {
+            it.toInfo(
+                recipesCount = recipeCounts[it.id] ?: 0,
+                membership = membership[it.id] ?: Membership(0, emptyList()),
+            )
+        }
+    }
 
     fun getCookbook(cookbookId: Long, currentUserId: Long?): CookbookInfo {
         if (!existsById(cookbookId)) throw NotFoundException(NotFoundCause.COOKBOOK_NOT_FOUND)
@@ -69,26 +149,26 @@ class CookbookService: KoinComponent {
                 .exists()) {
             throw ForbiddenException(ForbiddenCause.NOT_ALLOWED_TO_SEE_COOKBOOK)
         }
-        return getEntityById(cookbookId).toInfo()
+        return describe(getEntityById(cookbookId))
     }
 
     fun listCookbooks(paging: Paging, sort:Sort, user: Long?, recipe: Long?, search: String?, currentUser: Long?) : List<CookbookInfo> =
-        QCookbook()
-            .users.fetchLazy()
-            //.fetch(QCookbook.Alias.users.toString(), "count(*)", FetchConfig.ofLazy())
-            //.having().raw("count(${QCookbook.Alias.users.user.id}) >= 0")
-            .filterByUser(user)
-            .filterByRecipe(recipe)
-            .filterBySearch(search)
-            .filterByVisibility(currentUser)
-            .setPaging(paging)
-            .findList()
-            .map { it.toInfo() }
+        describeAll(
+            QCookbook()
+                .filterByUser(user)
+                .filterByRecipe(recipe)
+                .filterBySearch(search)
+                .filterByVisibility(currentUser)
+                .setPaging(paging)
+                .findList()
+        )
 
     fun getRecipeStatusInUserCookbooks(user: Long, recipe: Long) : List<CookbookRecipeOverview> {
+        // The recipes are what the mark below is read off, so they are fetched rather than left to
+        // lazy-load per cookbook. A join works here only because nothing pages this query: a
+        // `-to-many` fetch path is dropped as soon as `maxRows` is set.
         val cookbooks = QCookbook()
-            .users.fetchLazy()
-            .recipes.fetchLazy()
+            .recipes.fetch()
             .filterByUser(user)
             .orderBy().title.desc()
             .findList()
@@ -121,10 +201,7 @@ class CookbookService: KoinComponent {
             .exists()
 
     fun updateCookbook(id: Long, cookbookDTO: CookbookDTO) =
-        getEntityById(id)
-            .merge(cookbookDTO)
-            .updateAndGet()
-            .toInfo()
+        describe(getEntityById(id).merge(cookbookDTO).updateAndGet())
 
     fun deleteCookbook(id: Long): Boolean =
         getEntityById(id).delete()

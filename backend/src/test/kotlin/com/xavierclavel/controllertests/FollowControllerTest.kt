@@ -84,8 +84,8 @@ class FollowControllerTest : ApplicationTest() {
         val mail = "abc@mail.com"
         runAsAdmin {
             user = client.createUser(mail)
-            follower1 = userService.findByMail(USER1).toInfo()
-            follower2 = userService.findByMail(USER2).toInfo()
+            follower1 = userService.describe(userService.findByMail(USER1))
+            follower2 = userService.describe(userService.findByMail(USER2))
 
             val follows1 = client.getFollows(user.id)
             assertEquals(setOf<UserOverview>(), follows1.map {it.user}.toSet())

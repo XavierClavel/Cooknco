@@ -13,5 +13,11 @@ data class CookbookInfo(
     val description: String = "",
     val recipesCount: Int,
     val usersCount: Int,
+    /** The first [MEMBERS_SHOWN] members by join date; [usersCount] says how many there are. */
     val members: List<UserOverview>,
-)
+) {
+    companion object {
+        /** How many members a cookbook names. Enough for a row of faces, not a membership list. */
+        const val MEMBERS_SHOWN = 10
+    }
+}
