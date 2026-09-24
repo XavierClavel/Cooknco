@@ -266,8 +266,23 @@ const toggleDrawer = () => {
   drawer.value = !drawer.value
 }
 
+/**
+ * Whether this route wears the app's chrome — the drawer, the search bar, the bell and the
+ * avatar menu.
+ *
+ * `/` is named here rather than being left to the session check below, because the session
+ * check is the wrong question to ask about it. The landing page is the face of the site to
+ * somebody who has no account, and it carries nothing but the page whoever is reading it —
+ * exactly as `/login` does, and for the same reason: neither is a page of the app.
+ *
+ * It cannot be left to the router either. That guard sends a member on to their feed only if
+ * `authToken` is in localStorage, and nothing in this app has ever written that key — auth is
+ * the session cookie `checkAuth()` reads. So a signed-in visitor stays on `/`, and without
+ * this line they read the public page from inside a signed-in shell.
+ */
 const showSidebar = computed(() =>
   route.name &&
+  route.name !== '/' &&
   !noLoginRedirect.includes(route.name) &&
   !noLoginRedirectStartsWith.some((it) => route.name.startsWith(it)) &&
   authStore.isAuthenticated
