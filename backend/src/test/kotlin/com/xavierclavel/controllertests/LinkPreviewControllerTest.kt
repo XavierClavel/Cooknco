@@ -20,6 +20,12 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import org.koin.test.inject
 import java.io.File
@@ -202,6 +208,136 @@ class LinkPreviewControllerTest : ApplicationTest() {
 
         assertEquals("Tomato", client.fetchPreview("/ingredient/view?ingredient=${ingredient.id}").metaContent("og:title"))
         assertEquals("Tomate", client.fetchPreview("/ingredient/view?ingredient=${ingredient.id}&locale=fr").metaContent("og:title"))
+    }
+
+    // endregion
+
+    // region structured data
+
+    /**
+     * The `Recipe` document is what earns a rich result — the picture, the times and the
+     * ingredients a search engine shows next to the link instead of a bare blue line. It is
+     * asserted through a JSON parser rather than with `contains`, because a document that
+     * says the right words in the wrong shape is exactly as useless as one that says nothing.
+     */
+    @Test
+    fun `a recipe carries a schema org Recipe describing it`() = runTest {
+        val owner = setupTestUser(uniqueMail())
+        val recipe = recipeService.createRecipe(
+            RecipeDTO(
+                title = "Tarte aux pommes",
+                description = "A simple apple tart.",
+                yield = 6,
+                preparationTime = 20,
+                cookingTime = 40,
+                steps = mutableListOf(
+                    RecipeDTO.RecipeStepDTO(text = "Peel the apples."),
+                    RecipeDTO.RecipeStepDTO(text = "Bake."),
+                ),
+            ),
+            userService.getEntityById(owner),
+        )
+
+        val document = client.fetchPreview("/recipe/view?id=${recipe.id}").jsonLd()
+
+        assertEquals("https://schema.org", document["@context"]?.jsonPrimitive?.content)
+        assertEquals("Recipe", document["@type"]?.jsonPrimitive?.content)
+        assertEquals("Tarte aux pommes", document["name"]?.jsonPrimitive?.content)
+        assertEquals("A simple apple tart.", document["description"]?.jsonPrimitive?.content)
+        assertEquals("$siteUrl/recipe/view?id=${recipe.id}", document["mainEntityOfPage"]?.jsonPrimitive?.content)
+        assertEquals(6, document["recipeYield"]?.jsonPrimitive?.int)
+        assertEquals("PT20M", document["prepTime"]?.jsonPrimitive?.content)
+        assertEquals("PT40M", document["cookTime"]?.jsonPrimitive?.content)
+        assertEquals("PT60M", document["totalTime"]?.jsonPrimitive?.content)
+        assertEquals("Main course", document["recipeCategory"]?.jsonPrimitive?.content)
+        assertEquals(
+            listOf("Peel the apples.", "Bake."),
+            document["recipeInstructions"]!!.jsonArray.map { it.jsonObject["text"]!!.jsonPrimitive.content },
+        )
+        assertEquals(
+            "Person",
+            document["author"]?.jsonObject?.get("@type")?.jsonPrimitive?.content,
+        )
+    }
+
+    /**
+     * A field the author left blank is left out rather than published as zero. `"cookTime":
+     * "PT0M"` is read as a fact about the dish, and a wrong one is what gets structured data
+     * distrusted rather than merely ignored.
+     */
+    @Test
+    fun `what the author did not state is left out, not published as zero`() = runTest {
+        val owner = setupTestUser(uniqueMail())
+        val recipe = recipeService.createRecipe(
+            RecipeDTO(title = "Bare", preparationTime = 15),
+            userService.getEntityById(owner),
+        )
+
+        val document = client.fetchPreview("/recipe/view?id=${recipe.id}").jsonLd()
+
+        assertEquals("PT15M", document["prepTime"]?.jsonPrimitive?.content)
+        assertFalse(document.containsKey("cookTime"), "an unstated cooking time was published")
+        assertFalse(document.containsKey("recipeYield"), "an unstated yield was published")
+        assertFalse(document.containsKey("recipeIngredient"), "an empty ingredient list was published")
+        assertFalse(document.containsKey("recipeInstructions"), "an empty step list was published")
+        // Half a total is not a total: 15 minutes of prep and no stated cooking time does not
+        // make this a 15-minute recipe, and totalTime is the field a search result shows.
+        assertFalse(document.containsKey("totalTime"), "a total was published from one half of it")
+    }
+
+    /**
+     * Without escaping, a recipe titled `</script>…` would close the element and everything
+     * after it would be parsed as markup — a stored XSS on every page that previews the
+     * recipe, reachable by anyone who can name a recipe.
+     */
+    @Test
+    fun `a recipe title cannot close the structured-data script`() = runTest {
+        val owner = setupTestUser(uniqueMail())
+        val recipe = recipeService.createRecipe(
+            RecipeDTO(title = """</script><script>alert(1)</script>"""),
+            userService.getEntityById(owner),
+        )
+
+        val document = client.fetchPreview("/recipe/view?id=${recipe.id}")
+
+        assertFalse(document.contains("<script>alert(1)"), "a script tag reached the document")
+        // The value survives intact once the JSON escapes are decoded: escaped, not stripped.
+        assertEquals(
+            """</script><script>alert(1)</script>""",
+            document.jsonLd()["name"]?.jsonPrimitive?.content,
+        )
+    }
+
+    @Test
+    fun `a page that is not a recipe carries no structured data of its own`() = runTest {
+        val owner = setupTestUser(uniqueMail())
+
+        // A member, and a recipe that does not exist: neither is a Recipe, and inventing a
+        // document for them would describe pages we are not trying to have indexed.
+        for (path in listOf("/user/view/?user=$owner", "/recipe/view?id=999999")) {
+            assertFalse(
+                client.fetchPreview(path).contains("application/ld+json"),
+                "$path carried structured data",
+            )
+        }
+    }
+
+    /**
+     * The site-wide `Organization` block sits outside the preview markers in
+     * `frontend/index.html` precisely so that it survives the swap. Nothing else notices if
+     * it is moved inside them — the symptom is a recipe page silently losing it.
+     */
+    @Test
+    fun `the shell's own Organization block survives the swap`() = runTest {
+        fakeAppShellSource.html = shippedIndexHtml()
+        val owner = setupTestUser(uniqueMail())
+        val recipe = recipeService.createRecipe(RecipeDTO(title = "Real shell"), userService.getEntityById(owner))
+
+        val document = client.fetchPreview("/recipe/view?id=${recipe.id}")
+
+        assertTrue(document.contains(""""@type": "Organization""""), "the site's Organization block was lost")
+        // And the recipe's own document is added next to it rather than replacing it.
+        assertEquals(2, Regex("application/ld\\+json").findAll(document).count())
     }
 
     // endregion
@@ -396,4 +532,20 @@ class LinkPreviewControllerTest : ApplicationTest() {
             ?.get(1)
 
     private fun String.titleTag(): String? = Regex("<title>.*?</title>").find(this)?.value
+
+    /**
+     * The `Recipe` document out of the page, parsed.
+     *
+     * The script's content is JSON with `<`, `>` and `&` written as numeric escapes, which is
+     * what keeps a hostile title from ending the element — and which a JSON parser decodes on
+     * its own, so nothing has to be unescaped here first.
+     */
+    private fun String.jsonLd(): JsonObject {
+        val body = Regex("""<script type="application/ld\+json">(.*?)</script>""", RegexOption.DOT_MATCHES_ALL)
+            .find(this)
+            ?.groupValues
+            ?.get(1)
+            ?: throw AssertionError("no structured data in the document")
+        return Json.parseToJsonElement(body).jsonObject
+    }
 }

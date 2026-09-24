@@ -1,3 +1,18 @@
+# Two Ingresses for one site, because they answer two different entrypoints.
+#
+# `cooknco-frontend` serves HTTPS. `cooknco-frontend-http` exists only so that plain HTTP
+# reaches the pod at all: a single router declared on `web,websecure` *with* `router.tls`
+# is a TLS router on both, so nothing matched a plain-HTTP request and Traefik answered
+# `http://cooknco.eu` with its own `404 page not found`. Anyone typing the bare domain, and
+# every link written as http://, landed on that. nginx does the redirecting (see the
+# `$insecure_request` map in frontend/nginx.conf), so the rule here is only to route.
+#
+# Both carry www as well as the apex. www is a CNAME to the apex in DNS, but nothing
+# terminated TLS for it, so it served the ingress controller's self-signed default and then
+# a 404 — a browser security warning on the way to nothing. It redirects to the apex in
+# nginx rather than serving a second copy of the site, so search engines have one address to
+# rank. Its certificate comes from k8s/base/certificate.yaml, which has to name it too, and
+# the HTTP-01 challenge for it needs the plain-HTTP Ingress below to exist.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -5,16 +20,61 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: traefik
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
 spec:
   tls:
     - hosts:
         - "cooknco.eu"
+        - "www.cooknco.eu"
       secretName: cooknco-tls
   rules:
     - host: cooknco.eu
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cooknco-frontend
+                port:
+                  number: 80
+    - host: www.cooknco.eu
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cooknco-frontend
+                port:
+                  number: 80
+---
+# Plain HTTP. No `router.tls`, which is the whole point: this is the router that matches a
+# request arriving on the `web` entrypoint. Everything it routes is answered by nginx with a
+# 301 to https://cooknco.eu, except an ACME challenge, which nginx serves as itself — a
+# redirect there would fail the validation and with it the certificate renewal.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cooknco-frontend-http
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: cooknco.eu
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cooknco-frontend
+                port:
+                  number: 80
+    - host: www.cooknco.eu
       http:
         paths:
           - path: /

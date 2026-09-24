@@ -4,13 +4,26 @@ import com.xavierclavel.exceptions.ForbiddenException
 import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.models.User
 import com.xavierclavel.utils.Configuration
+import com.xavierclavel.utils.UnitLabels
+import shared.enums.DishClass
 import shared.enums.Locale
+import shared.enums.UnitSystem
+import shared.infodto.RecipeInfo
 import shared.utils.URL.COOKBOOK_VIEW_URL
 import shared.utils.URL.INGREDIENT_VIEW_URL
 import shared.utils.URL.RECIPE_VIEW_URL
 import shared.utils.URL.USER_VIEW_URL
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import java.time.Instant
 
 /** What a crawler shows for a shared link. */
 data class LinkPreview(
@@ -20,6 +33,17 @@ data class LinkPreview(
     val canonicalUrl: String,
     /** `og:type`. `article` for a recipe, `profile` for a member, `website` otherwise. */
     val type: String = "website",
+    /**
+     * A schema.org document for this entity, already serialised, or null when the entity has
+     * no type worth describing.
+     *
+     * Separate from the `og:` tags above because it answers a different question: those say
+     * what a link *looks* like when it is pasted into a chat window, this says what the page
+     * *is* to a search engine. Only recipes carry one — `Recipe` is the type that earns a
+     * rich result, and inventing a `Person` for every member would describe accounts we are
+     * not trying to have indexed as people.
+     */
+    val jsonLd: String? = null,
 )
 
 /**
@@ -57,12 +81,15 @@ class LinkPreviewService: KoinComponent {
 
     fun recipePreview(id: Long?, locale: Locale): LinkPreview =
         entityPreview(id, RECIPE_VIEW_URL, "id", locale, { recipeService.getById(null, it, locale) }) {
+            val image = imageUrl("recipes", it.id, it.version)
+            val canonical = viewUrl(RECIPE_VIEW_URL, "id", it.id)
             LinkPreview(
                 title = it.title,
                 description = it.description.ifBlank { defaultDescription(locale) },
-                imageUrl = imageUrl("recipes", it.id, it.version),
-                canonicalUrl = viewUrl(RECIPE_VIEW_URL, "id", it.id),
+                imageUrl = image,
+                canonicalUrl = canonical,
                 type = "article",
+                jsonLd = recipeJsonLd(it, locale, image, canonical),
             )
         }
 
@@ -164,6 +191,104 @@ class LinkPreviewService: KoinComponent {
         else "$siteUrl/image/$bucket/$id-v$version.webp"
 
     /**
+     * The recipe as a schema.org `Recipe`, which is what earns a rich result — the picture,
+     * the times and the ingredient list a search engine shows next to the link rather than a
+     * bare blue line.
+     *
+     * Built from the same [RecipeInfo] the `og:` tags are built from, and therefore under the
+     * same anonymous visibility check: nothing describable here is anything the public could
+     * not already open.
+     *
+     * Every field is omitted when the author did not state it. A `Recipe` that claims
+     * `"cookTime": "PT0M"` or an empty `recipeIngredient` is worse than one that stays quiet:
+     * the value is read as a fact about the dish, and a wrong one is what gets structured
+     * data distrusted rather than merely ignored.
+     */
+    private fun recipeJsonLd(recipe: RecipeInfo, locale: Locale, imageUrl: String, canonicalUrl: String): String {
+        // Metric, rather than the reader's own ladder: this restates the recipe as written,
+        // for a machine, and there is no reader on the other end to localise for. The
+        // conversion still rolls an amount up to the larger unit (1500 g reads 1.5 kg), and an
+        // imperial-authored recipe comes out as the same quantity in metric — true either way.
+        val units = UnitLabels.of(locale, UnitSystem.METRIC)
+        val ingredients = recipe.ingredients.map { units.format(it) }.filter { it.isNotBlank() }
+        val steps = recipe.steps.map { it.text }.filter { it.isNotBlank() }
+
+        return buildJsonObject {
+            put("@context", "https://schema.org")
+            put("@type", "Recipe")
+            put("name", recipe.title)
+            put("mainEntityOfPage", canonicalUrl)
+            put("image", buildJsonArray { add(imageUrl) })
+            recipe.description.takeIf { it.isNotBlank() }?.let { put("description", it) }
+            putJsonObject("author") {
+                put("@type", "Person")
+                put("name", recipe.owner.username)
+                put("url", viewUrl(USER_VIEW_URL, "user", recipe.owner.id))
+            }
+            put("datePublished", isoInstant(recipe.creationDate))
+            recipe.editionDate?.let { put("dateModified", isoInstant(it)) }
+            categoryOf(recipe.dishClass)?.let { put("recipeCategory", it) }
+            recipe.yield?.takeIf { it > 0 }?.let { put("recipeYield", it) }
+            isoDuration(recipe.preparationTime)?.let { put("prepTime", it) }
+            isoDuration(recipe.cookingTime)?.let { put("cookTime", it) }
+            isoDuration(totalMinutes(recipe))?.let { put("totalTime", it) }
+            if (ingredients.isNotEmpty()) {
+                put("recipeIngredient", JsonArray(ingredients.map { JsonPrimitive(it) }))
+            }
+            if (steps.isNotEmpty()) {
+                put("recipeInstructions", buildJsonArray {
+                    steps.forEach { text ->
+                        add(buildJsonObject {
+                            put("@type", "HowToStep")
+                            put("text", text)
+                        })
+                    }
+                })
+            }
+            recipe.likesCount.takeIf { it > 0 }?.let { likes ->
+                putJsonObject("interactionStatistic") {
+                    put("@type", "InteractionCounter")
+                    put("interactionType", "https://schema.org/LikeAction")
+                    put("userInteractionCount", likes)
+                }
+            }
+        }.toString()
+    }
+
+    /**
+     * Only when both halves were stated. Adding a missing half as zero would publish a total
+     * that is simply wrong — a two-hour braise whose prep nobody filled in is not a two-hour
+     * recipe, and `totalTime` is the field a search result shows.
+     */
+    private fun totalMinutes(recipe: RecipeInfo): Int? {
+        val preparation = recipe.preparationTime?.takeIf { it > 0 }
+        val cooking = recipe.cookingTime?.takeIf { it > 0 }
+        if (preparation == null || cooking == null) return null
+        return preparation + cooking
+    }
+
+    /** Minutes as an ISO 8601 duration, which is the only form schema.org reads. */
+    private fun isoDuration(minutes: Int?): String? =
+        minutes?.takeIf { it > 0 }?.let { "PT${it}M" }
+
+    private fun isoInstant(epochSeconds: Long): String = Instant.ofEpochSecond(epochSeconds).toString()
+
+    /**
+     * A free-text hint, in English, because `recipeCategory` is a taxonomy a search engine
+     * reads rather than a word anybody is shown. [DishClass.OTHER] says nothing worth saying,
+     * so it says nothing.
+     */
+    private fun categoryOf(dishClass: DishClass): String? = when (dishClass) {
+        DishClass.ENTREE -> "Starter"
+        DishClass.MAIN_DISH -> "Main course"
+        DishClass.DESERT -> "Dessert"
+        DishClass.SALTY_SNACK -> "Snack"
+        DishClass.SUGARY_SNACK -> "Snack"
+        DishClass.DRINK -> "Drink"
+        DishClass.OTHER -> null
+    }
+
+    /**
      * The [preview] rendered into the app shell.
      *
      * @return null when the shell cannot be read, which the caller turns into a 502 so that
@@ -185,6 +310,7 @@ class LinkPreviewService: KoinComponent {
 
     fun renderHead(preview: LinkPreview): String = with(preview) {
         val shortDescription = truncate(description)
+        val structuredData = jsonLd?.let { "\n<script type=\"application/ld+json\">${escapeJsonLd(it)}</script>" }.orEmpty()
         """
         <title>${escape(title)}</title>
         <meta name="description" content="${escape(shortDescription)}">
@@ -200,8 +326,29 @@ class LinkPreviewService: KoinComponent {
         <meta name="twitter:title" content="${escape(title)}">
         <meta name="twitter:description" content="${escape(shortDescription)}">
         <meta name="twitter:image" content="${escape(imageUrl)}">
-        """.trimIndent()
+        """.trimIndent() + structuredData
     }
+
+    /**
+     * A JSON document made safe to sit inside a `<script>` element.
+     *
+     * HTML escaping is wrong here — the browser does not decode entities inside a script, so
+     * `&amp;` would reach the parser literally and the document would no longer be the recipe.
+     * What has to go is anything that could end the element early, and the numeric escape JSON
+     * defines for a character is what replaces it. Only these three matter, and none of them
+     * can occur in JSON outside a string literal, so replacing them across the whole document
+     * is safe.
+     *
+     * (Spelled out rather than written as an escape sequence in this comment: kapt turns KDoc
+     * into a Java comment, and javac rejects a stray unicode escape even inside one.)
+     *
+     * Without this, a recipe titled `</script><script>…` would be a stored XSS on every page
+     * that previews it.
+     */
+    private fun escapeJsonLd(json: String) = json
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
 
     /** Cut on a word boundary, so a preview never ends mid-word. */
     private fun truncate(text: String): String {

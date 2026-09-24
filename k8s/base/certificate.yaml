@@ -7,5 +7,10 @@ spec:
   issuerRef:
     name: letsencrypt-prod
     kind: ClusterIssuer
+  # www as well as the apex: it is a CNAME to this host in DNS, so it reached the cluster
+  # already, but with no certificate naming it the ingress controller served its own
+  # self-signed default and a browser refused the page before showing the redirect. Both
+  # Ingresses in k8s/base/ingress.yaml route it; nginx sends it to the apex.
   dnsNames:
     - "cooknco.eu"
+    - "www.cooknco.eu"

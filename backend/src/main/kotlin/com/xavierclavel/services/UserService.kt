@@ -61,6 +61,23 @@ class UserService: KoinComponent {
         QUser().id.eq(userId).findOne()
 
     /**
+     * Every member profile a search engine may be pointed at.
+     *
+     * The same two flags [com.xavierclavel.services.LinkPreviewService] checks before it will
+     * describe an account, and deliberately not a third: whatever is listed here has to be
+     * exactly what the preview will render, or the sitemap advertises pages that come back as
+     * the site's own default.
+     */
+    fun findPublicForSitemap(limit: Int): List<User> =
+        QUser()
+            .select(QUser.Alias.id)
+            .isAccountPublic.isTrue
+            .isBanned.isFalse
+            .orderBy().id.asc()
+            .setMaxRows(limit)
+            .findList()
+
+    /**
      * Decrypts an account's mail address, for the admin backoffice. Returns a placeholder
      * rather than throwing when the ciphertext cannot be read with the current AES key, so
      * one unreadable row does not break a whole listing.

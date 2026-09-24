@@ -32,6 +32,28 @@
     <meta name="twitter:description" content="Share your recipes, build your cookbooks and follow your friends on Cook&amp;Co.">
     <meta name="twitter:image" content="https://cooknco.eu/og-default.png">
     <!--preview:end-->
+
+    <!--
+      Outside the markers on purpose, so it survives the swap above and every page carries it.
+      What it says is true of the site whatever entity is being previewed, and a recipe page
+      adds its own Recipe document next to this one rather than replacing it
+      (LinkPreviewService.recipeJsonLd).
+
+      It is here rather than in the backend because none of it is a fact about a request: the
+      name, the mark and the accounts are the same for every visitor, and a constant the
+      backend renders is a constant two services have to agree on.
+    -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Cook&Co",
+      "alternateName": "Cooknco",
+      "url": "https://cooknco.eu",
+      "logo": "https://cooknco.eu/logo.png",
+      "description": "Share your recipes, build your cookbooks and follow your friends on Cook&Co."
+    }
+    </script>
 </head>
 
 <body>

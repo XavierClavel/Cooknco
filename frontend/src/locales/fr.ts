@@ -98,6 +98,19 @@ export default {
   follow_requests: "Follow requests",
   nothing_to_display: "Rien à afficher",
 
+  // La page d'accueil publique sur `/`, la seule page de l'application que voient un visiteur
+  // déconnecté et un moteur de recherche. Écrite comme une description du produit plutôt que
+  // comme une consigne au lecteur : c'est aussi sur elle que le site est jugé pour son propre nom.
+  landing_tagline: "Notez vos recettes, gardez-les ensemble, cuisinez-les entre amis.",
+  landing_what_is_it: "Qu'est-ce que Cook&Co ?",
+  landing_intro: "Cook&Co est une application de recettes gratuite. Notez vos propres recettes, rangez-les dans des livres de cuisine et suivez les personnes avec qui vous cuisinez. Ce que vous enregistrez vous appartient, et vos recettes se lisent sur n'importe quel appareil — en cuisine, au marché, ou imprimées en PDF.",
+  landing_feature_write_title: "Notez vos recettes",
+  landing_feature_write_text: "Ingrédients, étapes et minuteurs, en unités métriques ou impériales. Scannez une recette imprimée avec votre téléphone et le formulaire se remplit tout seul.",
+  landing_feature_cookbooks_title: "Composez vos livres",
+  landing_feature_cookbooks_text: "Regroupez vos recettes en livres de cuisine, partagez-en un avec vos proches, et exportez ce que vous voulez en PDF.",
+  landing_feature_share_title: "Cuisinez à plusieurs",
+  landing_feature_share_text: "Suivez vos amis et votre famille, voyez ce qu'ils ont cuisiné, et gardez sous la main les recettes que vous aimez.",
+  landing_latest_recipes: "Dernières recettes",
   welcome: "Bienvenue",
   welcome_subtext: "Qu'est-ce que tu mijotes aujourd'hui ?",
   no_result: "Pas de résultat",

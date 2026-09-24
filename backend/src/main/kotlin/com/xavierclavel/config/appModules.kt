@@ -6,6 +6,7 @@ import com.xavierclavel.services.AppShellSource
 import com.xavierclavel.services.AppVersionService
 import com.xavierclavel.services.HttpAppShellSource
 import com.xavierclavel.services.LinkPreviewService
+import com.xavierclavel.services.SitemapService
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DashboardService
 import com.xavierclavel.services.DefaultImageService
@@ -70,6 +71,7 @@ val appModules = module {
     single { EmailTemplateService() }
     single { PdfTemplateService() }
     single { LinkPreviewService() }
+    single { SitemapService() }
     single { DeviceService() }
     single { AppVersionService() }
     single { OAuthService() }

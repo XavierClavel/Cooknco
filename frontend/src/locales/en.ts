@@ -98,6 +98,19 @@ export default {
   follow_requests: "Demandes d'abonnements",
   nothing_to_display: "Nothing to display",
 
+  // The public landing page at `/`, which is the only page of the app a signed-out visitor
+  // or a search engine reads. Written as a description of the product rather than as an
+  // instruction to the reader: it is also what the site is judged on for its own name.
+  landing_tagline: "Write down your recipes, keep them together, cook them with friends.",
+  landing_what_is_it: "What is Cook&Co?",
+  landing_intro: "Cook&Co is a free recipe app. Write your own recipes down, organise them into cookbooks, and follow the people you cook with. Everything you save stays yours, and your recipes are readable on any device — in the kitchen, at the market, or printed as a PDF.",
+  landing_feature_write_title: "Write your recipes",
+  landing_feature_write_text: "Ingredients, steps and timers, in metric or imperial. Scan a printed recipe with your phone and the form fills itself in.",
+  landing_feature_cookbooks_title: "Build cookbooks",
+  landing_feature_cookbooks_text: "Group recipes into cookbooks, share one with the people you cook with, and export any of it as a PDF.",
+  landing_feature_share_title: "Cook together",
+  landing_feature_share_text: "Follow friends and family, see what they have been cooking, and keep the recipes you love within reach.",
+  landing_latest_recipes: "Latest recipes",
   welcome: "Welcome",
   welcome_subtext: "What's cooking, good looking ?",
   no_result: "No result",

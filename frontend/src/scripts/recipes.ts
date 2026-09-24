@@ -5,6 +5,7 @@ import {downloadFile, downloadPdf} from "@/scripts/download";
 export {
   getRecipe,
   listRecipes,
+  listPublicRecipes,
   createRecipe,
   updateRecipe,
   deleteRecipe,
@@ -31,6 +32,19 @@ async function listRecipes(search: string, page: number, size: number) {
   if (page != undefined) query.append('page', page)
   if (size != undefined) query.append('size', size)
   return await apiClient.get(`/recipe?${query.toString()}`)
+}
+
+/**
+ * The newest recipes anyone may read, for the landing page.
+ *
+ * Deliberately not [listRecipes], which refuses a query naming no source: every one of those
+ * sources is a person — my recipes, the ones I liked, the ones people I follow wrote — and a
+ * signed-out visitor is nobody. The endpoint itself has always allowed it and applies its own
+ * anonymous visibility rule (`filterByVisibility` with no requestor), so what comes back is
+ * exactly the public set.
+ */
+async function listPublicRecipes(size: number) {
+  return await apiClient.get(`/recipe?sort=DATE_DESCENDING&page=0&size=${size}`)
 }
 
 async function createRecipe(recipe) {

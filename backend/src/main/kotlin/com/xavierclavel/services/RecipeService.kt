@@ -85,6 +85,28 @@ class RecipeService: KoinComponent {
         QRecipe().id.eq(recipeId).findOne()
 
     /**
+     * Every recipe a search engine may be pointed at, most recently changed first.
+     *
+     * Behind [filterByVisibility] with no requestor, which is the same anonymous rule the
+     * link-preview documents are built under: a recipe listed here is one the public can
+     * already open. Listing a private one would not leak the recipe — the page still refuses
+     * — but it would hand a crawler a page that answers nothing, and enough of those is what
+     * gets a site's crawl budget spent elsewhere.
+     *
+     * The partial select is about the columns, not the collections: this query is bounded, and a
+     * bounded query already drops every `-to-many` from the plan, so the steps and the ingredients
+     * would not be joined either way. What it avoids is reading the title, the description and the
+     * tips of every public recipe in order to print a list of ids.
+     */
+    fun findPublicForSitemap(limit: Int): List<Recipe> =
+        QRecipe()
+            .select(QRecipe.Alias.id, QRecipe.Alias.modificationDate)
+            .filterByVisibility(null)
+            .orderBy().modificationDate.desc()
+            .setMaxRows(limit)
+            .findList()
+
+    /**
      * Maps every recipe owned by one of [ownerIds] to its owner, so callers can attribute
      * per-recipe data back to accounts without a query per recipe.
      */
