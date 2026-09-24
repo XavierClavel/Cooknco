@@ -32,6 +32,7 @@ import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.RecipeStepService
+import com.xavierclavel.services.SitemapService
 import com.xavierclavel.services.StorageService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Configuration
@@ -123,6 +124,7 @@ abstract class ApplicationTest: KoinTest {
                 single { EmailTemplateService() }
                 single { PdfTemplateService() }
                 single { LinkPreviewService() }
+                single { SitemapService() }
                 single { DeviceService() }
                 single { BackupService() }
                 single { AppVersionService() }

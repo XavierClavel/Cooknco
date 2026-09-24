@@ -26,8 +26,21 @@ const router = createRouter({
 
 
 router.beforeEach(async (to, from) => {
+  // An unrecognised path lands on the public page rather than on the feed, which for anyone
+  // signed out was a bounce to /login. A member falls through to /home on the next check.
   if (!to.name) {
-    return {name: '/home'}
+    return {name: '/'}
+  }
+  // `/` is the landing page, and the one route at the root of the site a signed-out visitor
+  // or a crawler can read. A member has no use for it, so they carry on to their own feed —
+  // which is what `/` resolved to directly before this page existed.
+  if (to.name === '/') {
+    if (localStorage.getItem('authToken')) {
+      const authStore = useAuthStore()
+      await authStore.checkAuth()
+      if (authStore.isAuthenticated) return {name: '/home'}
+    }
+    return
   }
   if (noLoginRedirect.includes(to.name) ||
     noLoginRedirectStartsWith.some((it) => to.name.startsWith(it)) ||

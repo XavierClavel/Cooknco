@@ -15,6 +15,7 @@ import com.xavierclavel.controllers.RecipeController
 import com.xavierclavel.controllers.ImageController
 import com.xavierclavel.controllers.LikeController
 import com.xavierclavel.controllers.LinkPreviewController
+import com.xavierclavel.controllers.SitemapController
 import com.xavierclavel.controllers.McpController
 import com.xavierclavel.controllers.OAuthController
 import com.xavierclavel.controllers.OAuthMetadataController
@@ -155,6 +156,8 @@ fun Application.serveRoutes() = routing {
     serve(ReportController)
     // Not an API: the documents behind the public app routes people share. See the controller.
     serve(LinkPreviewController)
+    // Not an API either: the list of public pages, for search engines. See the controller.
+    serve(SitemapController)
     // Resolves its own bearer token so the 401 can point at the metadata below, and refuses
     // the session cookie the rest of the API accepts. See the controller.
     serve(McpController)

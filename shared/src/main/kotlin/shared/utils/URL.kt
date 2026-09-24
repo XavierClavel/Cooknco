@@ -64,6 +64,15 @@ object URL {
      * already builds and users copy out of the address bar (`toViewRecipe` and friends in
      * `frontend/src/scripts/common.ts`).
      */
+    /**
+     * The list of pages worth indexing, generated from the catalogue.
+     *
+     * Outside `api/` because a search engine looks for it at the site root and nowhere else,
+     * and `frontend/nginx.conf` publishes exactly this path. Its companion `robots.txt` is not
+     * here: it never changes, so it ships as a static file with the SPA.
+     */
+    const val SITEMAP_URL = "sitemap.xml"
+
     const val RECIPE_VIEW_URL = "recipe/view"
     const val USER_VIEW_URL = "user/view"
     const val COOKBOOK_VIEW_URL = "cookbook/view"

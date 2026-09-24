@@ -1,0 +1,50 @@
+# Cook&Co — https://cooknco.eu
+#
+# Served off disk by nginx's `try_files`, like every other file in public/. It had to be
+# written down at all because that same `try_files` answers an absent path with index.html
+# and a 200 — so before this file existed, /robots.txt was the app's HTML, and a crawler
+# read a page of markup where it expected rules.
+#
+# The rule behind the list: everything below bounces an anonymous visitor to /login (see
+# `noLoginRedirect` and `allowNoLoginStartsWith` in frontend/src/scripts/common.ts), so
+# crawling it costs budget and indexes a login form. What is *not* listed is the short list
+# of pages that render signed out: / , /privacy, /account-deletion, /recipe/view and
+# /user/view.
+
+User-agent: *
+Allow: /
+
+# Signed-in surfaces.
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /home
+Disallow: /search
+Disallow: /login
+Disallow: /logout
+Disallow: /signup
+Disallow: /verification-email-sent
+Disallow: /password/
+Disallow: /recipe/edit
+Disallow: /recipe/list
+Disallow: /cookbook/edit
+Disallow: /cookbook/list
+Disallow: /ingredient/list
+Disallow: /user/edit
+Disallow: /user/list
+Disallow: /user/settings
+Disallow: /user/mcp
+Disallow: /user/verify
+
+# Endpoints rather than pages. /oauth/ is the consent screen an MCP client sends someone to;
+# it is a security control reached from a client, never from a search result.
+Disallow: /api/
+Disallow: /mcp
+Disallow: /oauth/
+
+# /cookbook/view and /ingredient/view are deliberately absent from this list even though they
+# also bounce a signed-out visitor: the backend renders their og: tags for a shared link, and
+# the unfurlers that build those previews honour this file. Disallowing them would trade a
+# little crawl budget for every cookbook link pasted into a chat losing its preview. They are
+# left out of sitemap.xml instead, so nothing invites a crawler to them.
+
+Sitemap: https://cooknco.eu/sitemap.xml
