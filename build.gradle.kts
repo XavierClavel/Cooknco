@@ -1,5 +1,5 @@
 allprojects {
-    version = "1.37.2"
+    version = "1.37.3"
     group = "eu.cooknco"
 }
 

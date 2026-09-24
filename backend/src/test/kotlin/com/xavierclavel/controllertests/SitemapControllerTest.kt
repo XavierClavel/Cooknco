@@ -48,7 +48,7 @@ class SitemapControllerTest : ApplicationTest() {
 
         val locations = client.fetchSitemap().locations()
 
-        assertTrue(locations.contains(siteUrl), "the homepage is not listed: $locations")
+        assertTrue(locations.contains("$siteUrl/"), "the homepage is not listed: $locations")
         assertTrue(locations.contains("$siteUrl/recipe/view?id=${recipe.id}"), "the recipe is not listed")
         assertTrue(locations.contains("$siteUrl/user/view?user=$owner"), "the author is not listed")
     }
@@ -195,6 +195,29 @@ class SitemapControllerTest : ApplicationTest() {
         client.head("/sitemap.xml").apply {
             assertEquals(HttpStatusCode.OK, status)
             assertEquals(ContentType.Text.Xml, contentType()?.withoutParameters())
+        }
+    }
+
+    /**
+     * Every `<loc>` names a path, the homepage's included.
+     *
+     * `https://cooknco.eu` and `https://cooknco.eu/` are the same page to a browser, but the
+     * first has an empty path where every example in the sitemap protocol has one — and it is
+     * the document's first entry, so a parser strict about it gives up before reaching a single
+     * recipe rather than dropping one URL.
+     */
+    @Test
+    fun `no location is a bare origin with no path`() = runTest {
+        val owner = setupTestUser(uniqueMail())
+        recipeService.createRecipe(RecipeDTO(title = "Pathed"), userService.getEntityById(owner))
+
+        val locations = client.fetchSitemap().locations()
+
+        assertTrue(locations.isNotEmpty(), "nothing was listed at all")
+        locations.forEach { location ->
+            val path = java.net.URI(location).path
+            assertTrue(path.isNotEmpty(), "$location has no path component")
+            assertTrue(location.startsWith("$siteUrl/"), "$location is not under the site")
         }
     }
 

@@ -75,7 +75,13 @@ class SitemapService: KoinComponent {
 
     private fun build(): String {
         val siteUrl = configuration.frontend.url.trimEnd('/')
-        val pages = STATIC_PAGES.map { Entry(location = if (it.isEmpty()) siteUrl else "$siteUrl/$it") }
+        // Always with the slash, the homepage included. `https://cooknco.eu` and
+        // `https://cooknco.eu/` are the same page to a browser, but the first has an empty path
+        // and every example in the sitemap protocol has a path — and this is the document's
+        // *first* entry, so a parser strict about it abandons the file before reaching a single
+        // recipe. That reads as "couldn't read sitemap" with nothing discovered, which is a much
+        // worse symptom than one dropped URL.
+        val pages = STATIC_PAGES.map { Entry(location = "$siteUrl/$it") }
         val budget = MAX_URLS - pages.size
 
         // Recipes next, and given the whole remaining budget before members are considered: they
