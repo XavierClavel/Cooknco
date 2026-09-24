@@ -8,6 +8,7 @@ import shared.dto.RecipeDTO
 import shared.dto.UserSettingsDTO
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.head
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -176,6 +177,25 @@ class SitemapControllerTest : ApplicationTest() {
 
         sitemapService.invalidate()
         assertTrue(client.fetchSitemap().contains("id=${later.id}"), "the rebuilt document is missing a new recipe")
+    }
+
+    /**
+     * Google probes a submitted sitemap with HEAD before reading it, and Ktor answers 405 for a
+     * verb a route does not declare — so the document fetched perfectly in a browser while Search
+     * Console reported that it could not read it. nginx served this path from disk before there
+     * was a route here, where a HEAD got a 200 like any other file, which is why nothing caught
+     * the change.
+     */
+    @Test
+    fun `HEAD is answered, not rejected as a bad method`() = runTest {
+        val owner = setupTestUser(uniqueMail())
+        recipeService.createRecipe(RecipeDTO(title = "Probed"), userService.getEntityById(owner))
+        sitemapService.invalidate()
+
+        client.head("/sitemap.xml").apply {
+            assertEquals(HttpStatusCode.OK, status)
+            assertEquals(ContentType.Text.Xml, contentType()?.withoutParameters())
+        }
     }
 
     private fun uniqueMail() = "${UUID.randomUUID()}@mail.com"
