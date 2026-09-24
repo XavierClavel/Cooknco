@@ -4,6 +4,7 @@ import com.xavierclavel.ApplicationTest
 import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.SitemapService
+import com.xavierclavel.services.SitemapService.SitemapDocument
 import shared.dto.RecipeDTO
 import shared.dto.UserSettingsDTO
 import io.ktor.client.HttpClient
@@ -24,7 +25,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * `GET /sitemap.xml`.
+ * `GET /sitemap.xml`, the index, and the documents it names.
  *
  * Every request here is the anonymous one a crawler makes, and fixtures are built through the
  * services rather than over HTTP so that nothing accidentally carries a session — the whole
@@ -39,18 +40,46 @@ class SitemapControllerTest : ApplicationTest() {
     private val siteUrl = "http://localhost:3000"
 
     @Test
-    fun `the sitemap lists the site, a public recipe and its author`() = runTest {
+    fun `each document lists its own kind of page, and only that`() = runTest {
         val owner = setupTestUser(uniqueMail())
         val recipe = recipeService.createRecipe(
             RecipeDTO(title = "Tarte aux pommes"),
             userService.getEntityById(owner),
         )
 
-        val locations = client.fetchSitemap().locations()
+        val pages = client.fetchSitemap(SitemapDocument.PAGES).locations()
+        val recipes = client.fetchSitemap(SitemapDocument.RECIPES).locations()
+        val users = client.fetchSitemap(SitemapDocument.USERS).locations()
 
-        assertTrue(locations.contains("$siteUrl/"), "the homepage is not listed: $locations")
-        assertTrue(locations.contains("$siteUrl/recipe/view?id=${recipe.id}"), "the recipe is not listed")
-        assertTrue(locations.contains("$siteUrl/user/view?user=$owner"), "the author is not listed")
+        assertTrue(pages.contains("$siteUrl/"), "the homepage is not listed: $pages")
+        assertTrue(recipes.contains("$siteUrl/recipe/view?id=${recipe.id}"), "the recipe is not listed")
+        assertTrue(users.contains("$siteUrl/user/view?user=$owner"), "the author is not listed")
+        assertTrue(recipes.all { it.startsWith("$siteUrl/recipe/view?") }, "the recipe sitemap lists something else: $recipes")
+        assertTrue(users.all { it.startsWith("$siteUrl/user/view?") }, "the member sitemap lists something else: $users")
+    }
+
+    /**
+     * `/sitemap.xml` is what robots.txt and the Search Console submission name, so it is the
+     * only way a crawler finds the others: a document missing from it is never read, and one
+     * named but not served is an error reported against the whole index.
+     */
+    @Test
+    fun `the index names every document, and every one it names is served`() = runTest {
+        val index = client.fetchSitemap(SitemapDocument.INDEX)
+        assertEquals("sitemapindex", parse(index).documentElement.tagName)
+
+        val named = index.locations()
+        assertEquals(
+            listOf(SitemapDocument.PAGES, SitemapDocument.RECIPES, SitemapDocument.USERS).map { "$siteUrl/${it.path}" },
+            named,
+        )
+        named.forEach { location ->
+            val path = java.net.URI(location).path
+            client.get(path).apply {
+                assertEquals(HttpStatusCode.OK, status, "$path is named by the index but not served")
+                assertEquals("urlset", parse(bodyAsText()).documentElement.tagName)
+            }
+        }
     }
 
     @Test
@@ -62,7 +91,7 @@ class SitemapControllerTest : ApplicationTest() {
         )
         moderationService.hideRecipe(recipe.id, "spam")
 
-        val locations = client.fetchSitemap().locations()
+        val locations = client.fetchSitemap(SitemapDocument.RECIPES).locations()
 
         assertFalse(
             locations.contains("$siteUrl/recipe/view?id=${recipe.id}"),
@@ -78,7 +107,7 @@ class SitemapControllerTest : ApplicationTest() {
             userService.getEntityById(owner),
         )
 
-        val locations = client.fetchSitemap().locations()
+        val locations = client.fetchAllSitemaps().flatMap { it.locations() }
 
         assertFalse(locations.contains("$siteUrl/recipe/view?id=${recipe.id}"), "a private recipe was advertised")
         assertFalse(locations.contains("$siteUrl/user/view?user=$owner"), "a private profile was advertised")
@@ -93,7 +122,7 @@ class SitemapControllerTest : ApplicationTest() {
         )
         moderationService.banUser(owner, "spam")
 
-        val locations = client.fetchSitemap().locations()
+        val locations = client.fetchAllSitemaps().flatMap { it.locations() }
 
         assertFalse(locations.contains("$siteUrl/recipe/view?id=${recipe.id}"), "a banned member's recipe was advertised")
         assertFalse(locations.contains("$siteUrl/user/view?user=$owner"), "a banned member's profile was advertised")
@@ -110,28 +139,30 @@ class SitemapControllerTest : ApplicationTest() {
         val owner = setupTestUser(uniqueMail())
         recipeService.createRecipe(RecipeDTO(title = "Something"), userService.getEntityById(owner))
 
-        val document = client.fetchSitemap()
-
-        assertFalse(document.contains("/cookbook/view"), "a cookbook page was advertised")
-        assertFalse(document.contains("/ingredient/view"), "an ingredient page was advertised")
+        client.fetchAllSitemaps().forEach { document ->
+            assertFalse(document.contains("/cookbook/view"), "a cookbook page was advertised")
+            assertFalse(document.contains("/ingredient/view"), "an ingredient page was advertised")
+        }
     }
 
     @Test
-    fun `it is served as XML, and the document parses`() = runTest {
+    fun `every document is served as XML, and parses`() = runTest {
         val owner = setupTestUser(uniqueMail())
         recipeService.createRecipe(RecipeDTO(title = "Parsed"), userService.getEntityById(owner))
 
         sitemapService.invalidate()
-        client.get("/sitemap.xml").apply {
-            assertEquals(HttpStatusCode.OK, status)
-            assertEquals(ContentType.Text.Xml, contentType()?.withoutParameters())
-            val root = parse(bodyAsText()).documentElement
-            assertEquals("urlset", root.tagName)
-            assertEquals(
-                "http://www.sitemaps.org/schemas/sitemap/0.9",
-                root.getAttribute("xmlns"),
-                "a urlset in the wrong namespace is rejected whole",
-            )
+        SitemapDocument.entries.forEach { document ->
+            client.get("/${document.path}").apply {
+                assertEquals(HttpStatusCode.OK, status, document.path)
+                assertEquals(ContentType.Text.Xml, contentType()?.withoutParameters(), document.path)
+                val root = parse(bodyAsText()).documentElement
+                assertEquals(if (document == SitemapDocument.INDEX) "sitemapindex" else "urlset", root.tagName)
+                assertEquals(
+                    "http://www.sitemaps.org/schemas/sitemap/0.9",
+                    root.getAttribute("xmlns"),
+                    "${document.path}: a document in the wrong namespace is rejected whole",
+                )
+            }
         }
     }
 
@@ -149,7 +180,7 @@ class SitemapControllerTest : ApplicationTest() {
             userService.getEntityById(owner),
         )
 
-        val document = client.fetchSitemap()
+        val document = client.fetchSitemap(SitemapDocument.RECIPES)
 
         assertFalse(document.contains("evil.example"), "a recipe title reached the document")
         parse(document)
@@ -165,18 +196,22 @@ class SitemapControllerTest : ApplicationTest() {
         val owner = setupTestUser(uniqueMail())
         recipeService.createRecipe(RecipeDTO(title = "First"), userService.getEntityById(owner))
 
-        val first = client.fetchSitemap()
+        val path = "/${SitemapDocument.RECIPES.path}"
+        val first = client.fetchSitemap(SitemapDocument.RECIPES)
         val later = recipeService.createRecipe(RecipeDTO(title = "Second"), userService.getEntityById(owner))
 
         // No invalidation: the same document comes back, without the recipe added since.
-        assertEquals(first, client.get("/sitemap.xml").bodyAsText())
+        assertEquals(first, client.get(path).bodyAsText())
         assertFalse(
-            client.get("/sitemap.xml").bodyAsText().contains("id=${later.id}"),
+            client.get(path).bodyAsText().contains("id=${later.id}"),
             "the catalogue was read again inside the caching window",
         )
 
         sitemapService.invalidate()
-        assertTrue(client.fetchSitemap().contains("id=${later.id}"), "the rebuilt document is missing a new recipe")
+        assertTrue(
+            client.fetchSitemap(SitemapDocument.RECIPES).contains("id=${later.id}"),
+            "the rebuilt document is missing a new recipe",
+        )
     }
 
     /**
@@ -192,9 +227,11 @@ class SitemapControllerTest : ApplicationTest() {
         recipeService.createRecipe(RecipeDTO(title = "Probed"), userService.getEntityById(owner))
         sitemapService.invalidate()
 
-        client.head("/sitemap.xml").apply {
-            assertEquals(HttpStatusCode.OK, status)
-            assertEquals(ContentType.Text.Xml, contentType()?.withoutParameters())
+        SitemapDocument.entries.forEach { document ->
+            client.head("/${document.path}").apply {
+                assertEquals(HttpStatusCode.OK, status, document.path)
+                assertEquals(ContentType.Text.Xml, contentType()?.withoutParameters(), document.path)
+            }
         }
     }
 
@@ -211,7 +248,7 @@ class SitemapControllerTest : ApplicationTest() {
         val owner = setupTestUser(uniqueMail())
         recipeService.createRecipe(RecipeDTO(title = "Pathed"), userService.getEntityById(owner))
 
-        val locations = client.fetchSitemap().locations()
+        val locations = client.fetchAllSitemaps().flatMap { it.locations() }
 
         assertTrue(locations.isNotEmpty(), "nothing was listed at all")
         locations.forEach { location ->
@@ -231,13 +268,17 @@ class SitemapControllerTest : ApplicationTest() {
      * through this helper is what keeps a test from asserting against a document another test
      * built.
      */
-    private suspend fun HttpClient.fetchSitemap(): String {
+    private suspend fun HttpClient.fetchSitemap(document: SitemapDocument): String {
         sitemapService.invalidate()
-        return get("/sitemap.xml").run {
+        return get("/${document.path}").run {
             assertEquals(HttpStatusCode.OK, status)
             bodyAsText()
         }
     }
+
+    /** Every document, the index included: what a crawler reads by following the index. */
+    private suspend fun HttpClient.fetchAllSitemaps(): List<String> =
+        SitemapDocument.entries.map { fetchSitemap(it) }
 
     private fun parse(xml: String) =
         DocumentBuilderFactory.newInstance()
