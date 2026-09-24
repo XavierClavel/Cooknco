@@ -8,7 +8,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.server.response.header
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.get
+import io.ktor.server.routing.head
 import org.koin.java.KoinJavaComponent.inject
 
 /**
@@ -30,11 +32,20 @@ object SitemapController: Controller() {
     private val sitemapService: SitemapService by inject(SitemapService::class.java)
 
     override fun Route.routes() {
-        get("/$SITEMAP_URL") {
-            // Matches the service's own regeneration window: a crawler that revisits sooner
-            // gets the copy it already had, and one that revisits later gets a fresh document.
-            call.response.header(HttpHeaders.CacheControl, "public, max-age=3600")
-            call.respondText(sitemapService.sitemap(), ContentType.Text.Xml)
-        }
+        get("/$SITEMAP_URL") { respondSitemap() }
+        // Declared for the same reason LinkPreviewController declares it, and learned the same
+        // way: nginx answered this path from disk before there was a route here, where a HEAD
+        // got a 200 like any other file. Ktor answers 405 for a verb a route does not declare,
+        // and Google probes a submitted sitemap with HEAD before reading it — so the 405 was
+        // reported as "couldn't read sitemap" while a browser fetched the document perfectly.
+        // Same handler, so a HEAD reports exactly what a GET would.
+        head("/$SITEMAP_URL") { respondSitemap() }
+    }
+
+    private suspend fun RoutingContext.respondSitemap() {
+        // Matches the service's own regeneration window: a crawler that revisits sooner
+        // gets the copy it already had, and one that revisits later gets a fresh document.
+        call.response.header(HttpHeaders.CacheControl, "public, max-age=3600")
+        call.respondText(sitemapService.sitemap(), ContentType.Text.Xml)
     }
 }
