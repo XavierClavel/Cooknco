@@ -70,8 +70,14 @@ object URL {
      * Outside `api/` because a search engine looks for it at the site root and nowhere else,
      * and `frontend/nginx.conf` publishes exactly this path. Its companion `robots.txt` is not
      * here: it never changes, so it ships as a static file with the SPA.
+     *
+     * It is a sitemap index naming the three below, one per kind of page. All four sit at the
+     * root because a sitemap may only list URLs at or below its own path.
      */
     const val SITEMAP_URL = "sitemap.xml"
+    const val SITEMAP_PAGES_URL = "sitemap-pages.xml"
+    const val SITEMAP_RECIPES_URL = "sitemap-recipes.xml"
+    const val SITEMAP_USERS_URL = "sitemap-users.xml"
 
     const val RECIPE_VIEW_URL = "recipe/view"
     const val USER_VIEW_URL = "user/view"

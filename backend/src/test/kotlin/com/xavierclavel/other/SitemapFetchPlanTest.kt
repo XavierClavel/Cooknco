@@ -2,6 +2,7 @@ package main.com.xavierclavel.other
 
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.SitemapService
+import com.xavierclavel.services.SitemapService.SitemapDocument
 import main.com.xavierclavel.utils.FetchPlanTest
 import main.com.xavierclavel.utils.createUser
 import shared.dto.RecipeDTO
@@ -31,7 +32,7 @@ class SitemapFetchPlanTest : FetchPlanTest() {
 
         assertQueryCountDoesNotGrow(
             what = "SitemapService.sitemap (recipes)",
-            read = { sitemapLocations() },
+            read = { sitemapLocations(SitemapDocument.RECIPES) },
             grow = {
                 repeat(4) { index ->
                     recipeService.createRecipe(RecipeDTO(title = "Grown $index"), owner)
@@ -44,7 +45,7 @@ class SitemapFetchPlanTest : FetchPlanTest() {
     fun `the sitemap costs the same whether there are few members or many`() = runTest {
         assertQueryCountDoesNotGrow(
             what = "SitemapService.sitemap (members)",
-            read = { sitemapLocations() },
+            read = { sitemapLocations(SitemapDocument.USERS) },
             grow = { repeat(4) { client.createUser(mail = "listed-$it@mail.com") } },
         )
     }
@@ -56,8 +57,8 @@ class SitemapFetchPlanTest : FetchPlanTest() {
      * hour, so a second read would cost no queries at all and the comparison would fail describing
      * a cache rather than a fetch plan.
      */
-    private fun sitemapLocations(): List<String> {
+    private fun sitemapLocations(document: SitemapDocument): List<String> {
         sitemapService.invalidate()
-        return sitemapService.sitemap().lines().filter { it.contains("<loc>") }
+        return sitemapService.sitemap(document).lines().filter { it.contains("<loc>") }
     }
 }
