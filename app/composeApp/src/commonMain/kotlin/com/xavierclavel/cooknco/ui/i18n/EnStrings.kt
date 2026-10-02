@@ -342,9 +342,6 @@ object EnStrings : Strings {
     override val stepPhoto = "Photo"
     override val theBasics = "The basics"
 
-    override val newRecipeSubtitle =
-        "Photograph a page or pick a .cook file — we'll fill in what we can read, and nothing already typed is replaced."
-
     override val scanARecipe = "Scan a recipe"
     override val scanning = "Reading the page…"
     override val scanFoundNothing = "No recipe could be read on that page."
