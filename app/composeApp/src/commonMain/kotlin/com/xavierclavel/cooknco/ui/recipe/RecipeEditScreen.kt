@@ -459,20 +459,15 @@ fun RecipeEditScreen(
         }
 
         if (menuOpen) {
-            // The sheet explains the two rather than merely naming them: "we fill in what we
-            // can read, and nothing already typed is replaced" is the whole contract — the
-            // editor is still where the recipe is written, and either way in produces a first
-            // draft of it rather than a result to accept or reject. That is also why there is
-            // no review screen after them: what would be reviewed is exactly the form
-            // underneath. One sentence serves both because it is the same promise; only the
-            // source differs, a page held up to a camera or a file somebody sent.
+            // Either way in produces a first draft rather than a result to accept or reject,
+            // which is why there is no review screen after them: what would be reviewed is
+            // exactly the form underneath.
             //
             // The import carries no padlock, unlike the export it is the reverse of. Getting
             // a collection *into* the product is how somebody arrives with it, and charging
             // at the door is the wrong toll.
             StickerActionSheet(
                 title = s.newRecipe,
-                subtitle = s.newRecipeSubtitle,
                 actions = listOf(
                     SheetAction(
                         label = s.scanARecipe,

@@ -310,10 +310,6 @@ interface Strings {
     val stepPhoto: String
     val theBasics: String
 
-    // The editor's overflow menu: the two ways of filling it in from somewhere else.
-    // The subtitle heads both of them, because the promise they make is the same one.
-    val newRecipeSubtitle: String
-
     // Scanning a printed recipe into the editor.
     val scanARecipe: String
     val scanning: String

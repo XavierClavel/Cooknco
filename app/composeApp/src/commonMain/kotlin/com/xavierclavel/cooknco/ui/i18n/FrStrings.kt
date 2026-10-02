@@ -352,9 +352,6 @@ object FrStrings : Strings {
     override val stepPhoto = "Photo"
     override val theBasics = "Les bases"
 
-    override val newRecipeSubtitle =
-        "Photographiez une page ou choisissez un fichier .cook : on remplit ce qu'on arrive à lire, sans rien remplacer de ce qui est déjà saisi."
-
     override val scanARecipe = "Scanner une recette"
     override val scanning = "Lecture de la page…"
     override val scanFoundNothing = "Aucune recette n'a pu être lue sur cette page."
