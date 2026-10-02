@@ -57,6 +57,7 @@ kotlin {
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
             implementation(libs.compose.ui.tooling.preview)
+            implementation(libs.androidx.navigationevent.compose)
             implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.components.resources)
 

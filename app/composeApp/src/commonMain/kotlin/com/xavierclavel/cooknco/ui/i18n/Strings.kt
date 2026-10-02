@@ -248,9 +248,13 @@ interface Strings {
     val visibilityCaps: String
     val membersCaps: String
     val addMember: String
+    // Named after the value stored, which is not what the cook reads: each of these says
+    // who can see the cookbook, since "protected" means nothing to anyone outside a codebase.
     val visibilityPrivate: String
     val visibilityProtected: String
     val visibilityPublic: String
+    /** The line under the switch, saying exactly who that is. Takes the stored value. */
+    fun visibilityHint(value: String): String
     val removeMember: String
     val searchAMember: String
 
@@ -313,7 +317,6 @@ interface Strings {
     val stepSteps: String
     val stepPhoto: String
     val theBasics: String
-    val theBasicsSubtitle: String
 
     // The editor's overflow menu: the two ways of filling it in from somewhere else.
     // The subtitle heads both of them, because the promise they make is the same one.
@@ -328,13 +331,13 @@ interface Strings {
     val aLineAboutTheDish: String
     val timesAndYield: String
     val dishClass: String
-    val ingredientsSubtitle: String
     fun addedCount(count: Int): String
     val nothingYetSearchAbove: String
     val searchAnIngredient: String
+    /** What an ingredient row's empty amount box shows. It has a few characters' room. */
+    val amountPlaceholder: String
     fun addAsCustom(name: String): String
     fun removeNamed(name: String): String
-    val stepsSubtitle: String
     val addStep: String
     val tipsOptional: String
     val tipsPlaceholder: String
@@ -342,31 +345,34 @@ interface Strings {
     val dragToReorder: String
     val removeStep: String
     val photoAndPublish: String
-    val photoSubtitle: String
     val recipePhoto: String
     val tapToAddPhoto: String
     val takeAPhoto: String
     val chooseAnother: String
     val readyToPublish: String
     val noIngredientsYet: String
-    fun ingredientsAllFromCatalogue(count: Int): String
+    val recipePhotoAdded: String
+    val noRecipePhotoYet: String
     fun ingredientsAdded(count: Int): String
-    fun cookMinutes(minutes: String): String
     val untitledRecipe: String
     val publishCaps: String
     fun nextStepLabel(step: String): String
+
+    // What a page of the editor says about a field it will not let the cook leave behind.
+    // See `EditProblem`.
+    val titleMissing: String
+    fun tooLong(max: Int): String
+    val amountMissing: String
+    fun unitNotAllowed(ingredient: String, unit: String): String
+    val stepTextMissing: String
+    fun stepSharesOver(ingredient: String, used: String, listed: String): String
+    fun stepSharesShort(ingredient: String, used: String, listed: String): String
     fun dishClassName(value: String): String
     fun unitName(value: String): String
     val yieldLabel: String
-    val yieldHint: String
     val prepTime: String
-    val prepHint: String
     val cookTime: String
-    val cookHint: String
     val ovenTemp: String
-    val ovenHint: String
-    fun totalMinutes(total: Int): String
-    val noTimesYet: String
     val sectionWeight: String
     val sectionVolume: String
     val sectionCount: String
@@ -417,6 +423,11 @@ interface Strings {
     val removeStepIngredients: String
     val noIngredientsToPickYet: String
     val removeStepTimer: String
+    // What a closed attachment says about itself in its header, so it rarely needs opening.
+    val timerNotSet: String
+    val noStepIngredientsPicked: String
+    val stepPhotoAdded: String
+    val stepPhotoNone: String
     val stepPhotoLabel: String
     val removeStepPhoto: String
     val recipeStepPhoto: String

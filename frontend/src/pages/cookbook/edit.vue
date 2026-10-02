@@ -24,9 +24,11 @@
         max-width="200px"
         v-model="cookbook.visibility"
         :label="`${$t('visibility')}`"
-        item-title="label"
+        :item-title="(option) => $t(option.label)"
         item-value="value"
         :items="visibilityOptions"
+        :hint="visibilityHint && $t(visibilityHint)"
+        persistent-hint
       >
         <!-- Customize how items appear in the dropdown -->
         <template v-slot:item="{ props, item }">
@@ -40,7 +42,7 @@
         <!-- Customize how selected item appears -->
         <template v-slot:selection="{ item }">
           <v-icon start class="mr-2">{{ item.raw.icon }}</v-icon>
-          {{ item.raw.label }}
+          {{ $t(item.raw.label) }}
         </template>
       </v-select>
 
@@ -140,7 +142,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import {getUserIconUrl, toErrorMessage, toViewCookbook} from "@/scripts/common";
 import EditablePicture from "@/components/EditablePicture.vue";
@@ -208,6 +210,11 @@ const cookbook = ref<object>({
   description: "",
   visibility: "PUBLIC"
 })
+
+// Said under the select: "Followers" alone does not say whose, which is the whole question.
+const visibilityHint = computed(() =>
+  visibilityOptions.value.find(option => option.value === cookbook.value.visibility)?.hint
+)
 const authStore = useAuthStore()
 
 

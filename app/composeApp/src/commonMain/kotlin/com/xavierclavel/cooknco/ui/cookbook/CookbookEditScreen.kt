@@ -271,6 +271,14 @@ fun CookbookEditScreen(
                         spacing = 5.dp,
                         shadowOffset = 6.dp,
                     )
+                    // "Followers" alone does not say whose, which is the whole question.
+                    Text(
+                        text = s.visibilityHint(uiState.visibility),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = CookncoGreenDark,
+                        modifier = Modifier.padding(start = 2.dp),
+                    )
                 }
             }
 
