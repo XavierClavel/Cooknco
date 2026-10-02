@@ -138,13 +138,6 @@ fun UserSettingsScreen(
                         spacing = 5.dp,
                         shadowOffset = 6.dp,
                     )
-                    Text(
-                        text = s.languageNote,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = CookncoGreenDark,
-                        modifier = Modifier.padding(top = 8.dp, start = 2.dp),
-                    )
                 }
 
                 // ── Units ────────────────────────────────────────────────────────
@@ -163,41 +156,20 @@ fun UserSettingsScreen(
                         spacing = 5.dp,
                         shadowOffset = 6.dp,
                     )
-                    Text(
-                        text = s.unitsNote,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = CookncoGreenDark,
-                        modifier = Modifier.padding(top = 8.dp, start = 2.dp),
-                    )
                 }
 
                 // ── Privacy ──────────────────────────────────────────────────────
                 Column {
                     SettingsSectionLabel(s.privacy)
+                    // No auto-accept switch: a public account accepts every follower, and a
+                    // private one asks (`User.autoAcceptsFollowRequests`).
                     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            SettingsToggleRow(
-                                title = s.publicAccount,
-                                description = s.publicAccountNote,
-                                checked = uiState.isAccountPublic,
-                                onCheckedChange = { viewModel.toggleAccountPublic() },
-                                modifier = Modifier.padding(14.dp),
-                            )
-                            HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
-                            SettingsToggleRow(
-                                title = s.autoAcceptFollows,
-                                description = if (uiState.isAccountPublic) {
-                                    s.autoAcceptAlwaysOn
-                                } else {
-                                    s.autoAcceptAnyone
-                                },
-                                checked = uiState.isAccountPublic || uiState.autoAcceptFollowRequests,
-                                enabled = !uiState.isAccountPublic,
-                                onCheckedChange = { viewModel.toggleAutoAccept() },
-                                modifier = Modifier.padding(14.dp),
-                            )
-                        }
+                        SettingsToggleRow(
+                            title = s.publicAccount,
+                            checked = uiState.isAccountPublic,
+                            onCheckedChange = { viewModel.toggleAccountPublic() },
+                            modifier = Modifier.padding(14.dp),
+                        )
                     }
                 }
 
@@ -208,7 +180,6 @@ fun UserSettingsScreen(
                         Column(modifier = Modifier.fillMaxWidth()) {
                             SettingsToggleRow(
                                 title = s.pushOnThisDevice,
-                                description = s.pushNote,
                                 checked = uiState.pushEnabled,
                                 onCheckedChange = { viewModel.togglePush() },
                                 modifier = Modifier.padding(14.dp),
@@ -216,7 +187,6 @@ fun UserSettingsScreen(
                             HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
                             SettingsToggleRow(
                                 title = s.emailNotifications,
-                                description = s.emailNotificationsNote,
                                 checked = uiState.mailNotificationsEnabled,
                                 onCheckedChange = { viewModel.toggleMailNotifications() },
                                 modifier = Modifier.padding(14.dp),
@@ -228,44 +198,15 @@ fun UserSettingsScreen(
                 // ── Offline ──────────────────────────────────────────────────────
                 Column {
                     SettingsSectionLabel(s.offlineSettingsTitle)
+                    // No "update now": the copy is refreshed on every launch (AppNavigation)
+                    // and the moment this is switched on.
                     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            SettingsToggleRow(
-                                title = s.offlineSettingsTitle,
-                                description = s.offlineSettingsSubtitle,
-                                checked = uiState.offlineRecipes,
-                                onCheckedChange = { viewModel.toggleOfflineRecipes() },
-                                modifier = Modifier.padding(14.dp),
-                            )
-                            if (uiState.offlineRecipes) {
-                                HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable(enabled = !uiState.isSyncingOffline) {
-                                            viewModel.syncOfflineNow()
-                                        }
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = s.offlineSettingsHolding(
-                                            uiState.offlineRecipeCount,
-                                            uiState.offlineMegabytes,
-                                        ),
-                                        fontSize = 12.sp,
-                                        color = CookncoNavy.copy(alpha = 0.7f),
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Text(
-                                        text = if (uiState.isSyncingOffline) s.offlineSyncing else s.offlineSyncNow,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = CookncoNavy,
-                                    )
-                                }
-                            }
-                        }
+                        SettingsToggleRow(
+                            title = s.offlineSettingsTitle,
+                            checked = uiState.offlineRecipes,
+                            onCheckedChange = { viewModel.toggleOfflineRecipes() },
+                            modifier = Modifier.padding(14.dp),
+                        )
                     }
                 }
 
@@ -473,29 +414,23 @@ private fun SettingsSectionLabel(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun SettingsToggleRow(
     title: String,
-    description: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
 ) {
-    val textColor = if (enabled) CookncoNavy else CookncoNavy.copy(alpha = 0.5f)
-    val descriptionColor = if (enabled) CookncoGreenDark else CookncoNavy.copy(alpha = 0.5f)
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = textColor)
-            Text(
-                text = description,
-                fontSize = 12.sp,
-                color = descriptionColor,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
+        Text(
+            title,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = CookncoNavy,
+            modifier = Modifier.weight(1f),
+        )
         Spacer(Modifier.width(12.dp))
-        StickerToggle(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+        StickerToggle(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -523,24 +458,12 @@ fun UserSettingsScreenPreview() {
                 Column {
                     SettingsSectionLabel("PRIVACY")
                     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            SettingsToggleRow(
-                                title = "Public account",
-                                description = "Anyone can see your recipes",
-                                checked = true,
-                                onCheckedChange = {},
-                                modifier = Modifier.padding(14.dp),
-                            )
-                            HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
-                            SettingsToggleRow(
-                                title = "Auto-accept follow requests",
-                                description = "Always on while your account is public",
-                                checked = true,
-                                enabled = false,
-                                onCheckedChange = {},
-                                modifier = Modifier.padding(14.dp),
-                            )
-                        }
+                        SettingsToggleRow(
+                            title = "Public account",
+                            checked = true,
+                            onCheckedChange = {},
+                            modifier = Modifier.padding(14.dp),
+                        )
                     }
                 }
                 Column {

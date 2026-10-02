@@ -150,22 +150,14 @@ object FrStrings : Strings {
 
     override val settings = "Réglages"
     override val language = "LANGUE"
-    override val languageNote = "Ce dans quoi nous vous écrivons — mails, notifications, et l'application elle-même."
     override val units = "UNITÉS"
-    override val unitsNote = "Comment les quantités vous sont affichées. Les recettes gardent les unités dans lesquelles elles ont été écrites."
     override val unitsMetric = "Métrique"
     override val unitsImperial = "Impérial"
     override val privacy = "CONFIDENTIALITÉ"
     override val publicAccount = "Compte public"
-    override val publicAccountNote = "Tout le monde peut voir vos recettes"
-    override val autoAcceptFollows = "Accepter les abonnements automatiquement"
-    override val autoAcceptAlwaysOn = "Toujours actif tant que votre compte est public"
-    override val autoAcceptAnyone = "N'importe qui peut vous suivre sans demander"
     override val notifications = "NOTIFICATIONS"
     override val pushOnThisDevice = "Notifications sur cet appareil"
-    override val pushNote = "J'aime, abonnements et activité des carnets de recette"
     override val emailNotifications = "Notifications par e-mail"
-    override val emailNotificationsNote = "Un résumé quand les personnes que vous suivez publient"
     override val account = "COMPTE"
     override val changePassword = "Changer le mot de passe"
     override val mcpAccess = "Accès MCP"
@@ -544,12 +536,6 @@ object FrStrings : Strings {
     override val offlineCannotDoThat = "Une connexion est nécessaire pour cela."
 
     override val offlineSettingsTitle = "Garder mes recettes sur ce téléphone"
-    override val offlineSettingsSubtitle =
-        "Vos recettes, vos coups de cœur et vos carnets restent lisibles sans connexion."
-    override fun offlineSettingsHolding(recipes: Int, megabytes: Int) =
-        "$recipes recettes enregistrées · $megabytes Mo"
-    override val offlineSyncNow = "Mettre à jour"
-    override val offlineSyncing = "Mise à jour…"
 
     override val premiumLocked = "Fonctionnalité premium"
     override val premiumFeatureTitle = "Une fonctionnalité premium"

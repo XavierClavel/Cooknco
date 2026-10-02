@@ -362,7 +362,6 @@ data class PasswordDTO(
 
 @Serializable
 data class UserSettingsDTO(
-    val autoAcceptFollowRequests: Boolean = false,
     val isAccountPublic: Boolean = false,
     /**
      * The language the backend writes to this account in ("FR"/"EN"), or null.

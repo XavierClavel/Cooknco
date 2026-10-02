@@ -146,7 +146,7 @@ class FollowControllerTest : ApplicationTest() {
 
     @Test
     fun `following a public account is accepted immediately`() = runTest {
-        val user = setupTestUser("user3", UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = true))
+        val user = setupTestUser("user3", UserSettingsDTO(isAccountPublic = true))
         runAsUser1 {
             assertFalse(client.follow(user).pending)
             assertEquals(1, client.getUser(user).followersCount)
@@ -155,7 +155,19 @@ class FollowControllerTest : ApplicationTest() {
 
     @Test
     fun `following a private account stays pending`() = runTest {
-        val user = setupTestUser("user3", UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+        val user = setupTestUser("user3", UserSettingsDTO(isAccountPublic = false))
+        runAsUser1 {
+            assertTrue(client.follow(user).pending)
+            assertEquals(0, client.getUser(user).followersCount)
+        }
+    }
+
+    // An app build from before the switch was removed can still send it; a private account
+    // asks for approval all the same
+    @Suppress("DEPRECATION")
+    @Test
+    fun `a private account holds follows pending whatever auto-accept an old client sends`() = runTest {
+        val user = setupTestUser("user3", UserSettingsDTO(autoAcceptFollowRequests = true, isAccountPublic = false))
         runAsUser1 {
             assertTrue(client.follow(user).pending)
             assertEquals(0, client.getUser(user).followersCount)
@@ -164,11 +176,11 @@ class FollowControllerTest : ApplicationTest() {
 
     @Test
     fun `switching an account to public accepts its pending follow requests`() = runTest {
-        val user = setupTestUser("user3", UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+        val user = setupTestUser("user3", UserSettingsDTO(isAccountPublic = false))
         runAsUser1 {
             assertTrue(client.follow(user).pending)
         }
-        userService.updateSettings(user, UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = true))
+        userService.updateSettings(user, UserSettingsDTO(isAccountPublic = true))
         runAsUser1 {
             assertEquals(1, client.getUser(user).followersCount)
             assertEquals(listOf(false), client.getFollowers(user).map { it.pending })

@@ -15,6 +15,12 @@ data class UserDTO(
 
 @Serializable
 data class UserSettingsDTO(
+    /**
+     * Ignored. Follows are auto-accepted exactly when the account is public. Kept so that
+     * app builds already on phones, which still send it, are not refused by the strict
+     * converter; never sent back, since it is always false.
+     */
+    @Deprecated("Follows are auto-accepted exactly when the account is public")
     val autoAcceptFollowRequests: Boolean = false,
     val isAccountPublic: Boolean = false,
     /**

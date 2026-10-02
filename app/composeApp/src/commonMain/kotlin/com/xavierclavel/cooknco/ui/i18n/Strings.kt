@@ -150,22 +150,14 @@ interface Strings {
     // ── Settings ──────────────────────────────────────────────────────────────
     val settings: String
     val language: String
-    val languageNote: String
     val units: String
-    val unitsNote: String
     val unitsMetric: String
     val unitsImperial: String
     val privacy: String
     val publicAccount: String
-    val publicAccountNote: String
-    val autoAcceptFollows: String
-    val autoAcceptAlwaysOn: String
-    val autoAcceptAnyone: String
     val notifications: String
     val pushOnThisDevice: String
-    val pushNote: String
     val emailNotifications: String
-    val emailNotificationsNote: String
     val account: String
     val changePassword: String
     val mcpAccess: String
@@ -490,10 +482,6 @@ interface Strings {
 
     // ── Keeping recipes on the phone, from the settings screen ────────────────
     val offlineSettingsTitle: String
-    val offlineSettingsSubtitle: String
-    fun offlineSettingsHolding(recipes: Int, megabytes: Int): String
-    val offlineSyncNow: String
-    val offlineSyncing: String
 
     // ── Premium, and what a locked feature says when it is tapped ─────────────
     /** The padlock on a locked action sheet row, for a screen reader. */

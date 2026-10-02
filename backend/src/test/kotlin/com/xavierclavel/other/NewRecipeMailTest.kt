@@ -37,7 +37,6 @@ class NewRecipeMailTest : ApplicationTest() {
 
     /** The settings a follower who wants these mails has. */
     private val subscribed = UserSettingsDTO(
-        autoAcceptFollowRequests = true,
         isAccountPublic = true,
         mailNotificationsEnabled = true,
     )
@@ -97,10 +96,9 @@ class NewRecipeMailTest : ApplicationTest() {
             authorId = client.createUser(author).id
             followerId = client.createUser(follower).id
         }
-        // A private account with no auto-accept holds the follow pending, and a pending
+        // A private account holds the follow pending, and a pending
         // follower has not been let in yet — mailing them the recipe would let them in
         userService.updateSettings(authorId, UserSettingsDTO(
-            autoAcceptFollowRequests = false,
             isAccountPublic = false,
         ))
         userService.updateSettings(followerId, subscribed)
@@ -134,7 +132,6 @@ class NewRecipeMailTest : ApplicationTest() {
         var userId = 0L
         runAsAdmin { userId = client.createUser(follower).id }
         userService.updateSettings(userId, UserSettingsDTO(
-            autoAcceptFollowRequests = true,
             isAccountPublic = true,
             mailNotificationsEnabled = false,
         ))

@@ -189,9 +189,8 @@ class UserLocaleTest : ApplicationTest() {
         runAsAdmin { client.createUser(mail, locale = Locale.EN) }
 
         runAs(mail, password) {
-            client.updateSettings(UserSettingsDTO(autoAcceptFollowRequests = true, isAccountPublic = false))
+            client.updateSettings(UserSettingsDTO(isAccountPublic = false))
             client.getSettings().apply {
-                assertEquals(true, autoAcceptFollowRequests)
                 assertEquals(false, isAccountPublic)
                 assertEquals(Locale.EN, locale)
             }

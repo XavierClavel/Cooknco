@@ -149,22 +149,14 @@ object EnStrings : Strings {
 
     override val settings = "Settings"
     override val language = "LANGUAGE"
-    override val languageNote = "What we write to you in — mails, notifications, and the app itself."
     override val units = "UNITS"
-    override val unitsNote = "How amounts are shown to you. Recipes keep the units they were written in."
     override val unitsMetric = "Metric"
     override val unitsImperial = "Imperial"
     override val privacy = "PRIVACY"
     override val publicAccount = "Public account"
-    override val publicAccountNote = "Anyone can see your recipes"
-    override val autoAcceptFollows = "Auto-accept follow requests"
-    override val autoAcceptAlwaysOn = "Always on while your account is public"
-    override val autoAcceptAnyone = "Anyone can follow you without asking"
     override val notifications = "NOTIFICATIONS"
     override val pushOnThisDevice = "Push on this device"
-    override val pushNote = "Likes, follows and cookbook activity"
     override val emailNotifications = "Email notifications"
-    override val emailNotificationsNote = "A digest when people you follow post"
     override val account = "ACCOUNT"
     override val changePassword = "Change password"
     override val mcpAccess = "MCP access"
@@ -532,12 +524,6 @@ object EnStrings : Strings {
     override val offlineCannotDoThat = "You need a connection to do that."
 
     override val offlineSettingsTitle = "Keep my recipes on this phone"
-    override val offlineSettingsSubtitle =
-        "Your recipes, your likes and your cookbooks stay readable without a connection."
-    override fun offlineSettingsHolding(recipes: Int, megabytes: Int) =
-        "$recipes recipes saved · $megabytes MB"
-    override val offlineSyncNow = "Update now"
-    override val offlineSyncing = "Updating…"
 
     override val premiumLocked = "Premium feature"
     override val premiumFeatureTitle = "A premium feature"

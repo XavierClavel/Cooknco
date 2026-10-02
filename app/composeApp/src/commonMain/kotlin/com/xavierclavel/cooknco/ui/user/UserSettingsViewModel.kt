@@ -31,7 +31,6 @@ enum class AccountLocale(val code: String, val label: String) {
 }
 
 data class UserSettingsUiState(
-    val autoAcceptFollowRequests: Boolean = false,
     val isAccountPublic: Boolean = false,
     /**
      * The language the account actually carries, or null when nothing has ever told the
@@ -49,10 +48,6 @@ data class UserSettingsUiState(
     val pushEnabled: Boolean = true,
     /** Whether this handset keeps the cook's recipes readable without a connection. */
     val offlineRecipes: Boolean = true,
-    /** How many recipes are held, and what they take — the line under the switch. */
-    val offlineRecipeCount: Int = 0,
-    val offlineMegabytes: Int = 0,
-    val isSyncingOffline: Boolean = false,
     /** How many MCP clients this account has approved — the badge on the "MCP access" row. */
     val mcpClientCount: Int = 0,
     val isLoading: Boolean = true,
@@ -110,7 +105,6 @@ class UserSettingsViewModel(
                     val unitSystem = AppUnitSystem.of(settings.unitSystem)
                     _uiState.update {
                         it.copy(
-                            autoAcceptFollowRequests = settings.autoAcceptFollowRequests,
                             isAccountPublic = settings.isAccountPublic,
                             accountLocale = locale,
                             unitSystem = unitSystem,
@@ -125,8 +119,6 @@ class UserSettingsViewModel(
                 }
         }
     }
-
-    fun toggleAutoAccept() = updateAndSave { it.copy(autoAcceptFollowRequests = !it.autoAcceptFollowRequests) }
 
     fun toggleAccountPublic() = updateAndSave { it.copy(isAccountPublic = !it.isAccountPublic) }
 
@@ -174,37 +166,18 @@ class UserSettingsViewModel(
         _uiState.update { it.copy(offlineRecipes = enabled) }
         viewModelScope.launch {
             devicePreferences.setOfflineRecipes(enabled)
-            if (enabled) syncOfflineNow() else {
+            if (enabled) {
+                AppGraph.offlineStore.readSession()?.let { AppGraph.offlineSync.sync(it.id) }
+            } else {
                 AppGraph.offlineStore.clear()
                 AppGraph.offlineImages.refresh()
-                readOfflineState()
             }
-        }
-    }
-
-    /** "Update now", for a cook about to go somewhere without signal and not waiting for luck. */
-    fun syncOfflineNow() {
-        if (_uiState.value.isSyncingOffline) return
-        _uiState.update { it.copy(isSyncingOffline = true) }
-        viewModelScope.launch {
-            AppGraph.offlineStore.readSession()?.let { AppGraph.offlineSync.sync(it.id) }
-            readOfflineState()
-            _uiState.update { it.copy(isSyncingOffline = false) }
         }
     }
 
     private suspend fun readOfflineState() {
         val enabled = devicePreferences.offlineRecipes.first()
-        val index = AppGraph.offlineStore.readIndex()
-        val bytes = AppGraph.offlineStore.sizeBytes()
-        _uiState.update {
-            it.copy(
-                offlineRecipes = enabled,
-                offlineRecipeCount = index?.recipes?.size ?: 0,
-                // Rounded up, so a store holding something never reads as holding nothing.
-                offlineMegabytes = ((bytes + 1_048_575) / 1_048_576).toInt(),
-            )
-        }
+        _uiState.update { it.copy(offlineRecipes = enabled) }
     }
 
     /**
@@ -274,7 +247,6 @@ class UserSettingsViewModel(
             val state = _uiState.value
             userRepo.updateSettings(
                 UserSettingsDTO(
-                    autoAcceptFollowRequests = state.autoAcceptFollowRequests,
                     isAccountPublic = state.isAccountPublic,
                     // Null until the user has picked one — "leave it alone", so a privacy
                     // toggle cannot write a language nobody chose.
