@@ -106,7 +106,7 @@ class NotificationEventsTest : ApplicationTest() {
             authorId = client.createUser(author).id
             client.createUser(follower)
             // Private, and not auto-accepting: this is what holds a request pending
-            userService.updateSettings(authorId, UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+            userService.updateSettings(authorId, UserSettingsDTO(isAccountPublic = false))
         }
 
         runAs(follower, password) {
@@ -147,7 +147,7 @@ class NotificationEventsTest : ApplicationTest() {
         runAsAdmin {
             authorId = client.createUser(author).id
             client.createUser(follower)
-            userService.updateSettings(authorId, UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+            userService.updateSettings(authorId, UserSettingsDTO(isAccountPublic = false))
         }
 
         runAs(author, password) { client.registerDevice("private-phone") }
@@ -165,7 +165,7 @@ class NotificationEventsTest : ApplicationTest() {
         runAsAdmin {
             authorId = client.createUser(author).id
             followerId = client.createUser(follower).id
-            userService.updateSettings(authorId, UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+            userService.updateSettings(authorId, UserSettingsDTO(isAccountPublic = false))
         }
 
         runAs(follower, password) {

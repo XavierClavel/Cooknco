@@ -33,24 +33,6 @@
         </v-card>
 
         <v-card color="background" class="mb-2">
-          <v-checkbox
-            v-model="autoAcceptFollowRequests"
-            :label="`${$t('auto_accept_follow_requests')}`"
-            :disabled="settings.isAccountPublic"
-            color="black"
-            base-color="black"
-            variant="elevated"
-            :class="settings.isAccountPublic ? 'mx-2 my-0' : 'mx-2 my-0 mb-n6'"
-          ></v-checkbox>
-          <v-card-text
-            v-if="settings.isAccountPublic"
-            class="pt-0 pb-2 text-caption"
-          >
-            {{ $t('auto_accept_follow_requests_public_hint') }}
-          </v-card-text>
-        </v-card>
-
-        <v-card color="background" class="mb-2">
           <v-select
             v-model="settings.unitSystem"
             :prepend-inner-icon="ICON_WEIGHT"
@@ -184,17 +166,9 @@ const unitSystems = computed(() => [
 ])
 
 const settings = ref({
-  autoAcceptFollowRequests: false,
   isAccountPublic: false,
   mailNotificationsEnabled: false,
   unitSystem: METRIC,
-})
-
-// Public accounts always auto accept: show the toggle locked on, but keep the
-// stored preference untouched so it applies again if the account goes private
-const autoAcceptFollowRequests = computed({
-  get: () => settings.value.isAccountPublic || !!settings.value.autoAcceptFollowRequests,
-  set: (value) => { settings.value.autoAcceptFollowRequests = value },
 })
 
 getSettings().then(response => {

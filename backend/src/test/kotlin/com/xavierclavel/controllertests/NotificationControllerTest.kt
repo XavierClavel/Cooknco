@@ -258,7 +258,7 @@ class NotificationControllerTest : ApplicationTest() {
             client.createUser(requester)
             userService.updateSettings(
                 privateId,
-                UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false),
+                UserSettingsDTO(isAccountPublic = false),
             )
         }
 

@@ -63,6 +63,11 @@ class User (
 
     //Privacy
     var isAccountPublic: Boolean = true,
+    /**
+     * No longer read or written: a public account accepts every follower and a private one
+     * asks, with nothing in between. Still mapped because the column is still there; it goes
+     * in a later migration, once no running pod selects it.
+     */
     var autoAcceptFollowRequests : Boolean = false,
 
     /**
@@ -263,7 +268,6 @@ class User (
     }
 
     fun updateSettings(userSettingsDTO: UserSettingsDTO) = this.apply {
-        autoAcceptFollowRequests = userSettingsDTO.autoAcceptFollowRequests
         isAccountPublic = userSettingsDTO.isAccountPublic
         // Null is "not saying", not "forget it": a client that predates the field sends
         // nothing, and must not wipe a language chosen from another one
@@ -287,8 +291,9 @@ class User (
         return true
     }
 
-    // Public accounts have nothing to gate, so they never hold follow requests pending
-    fun autoAcceptsFollowRequests() = isAccountPublic || autoAcceptFollowRequests
+    // Public accounts have nothing to gate, so they never hold follow requests pending, and a
+    // private one always does — there is no setting in between
+    fun autoAcceptsFollowRequests() = isAccountPublic
 
     /** True while a temporary suspension is still running. */
     fun isSuspended(): Boolean = suspendedUntil?.isAfter(LocalDateTime.now()) == true
@@ -401,7 +406,6 @@ class User (
     )
 
     fun getSettings() = UserSettingsDTO(
-        autoAcceptFollowRequests = this.autoAcceptFollowRequests,
         isAccountPublic = this.isAccountPublic,
         locale = this.locale,
         mailNotificationsEnabled = this.mailNotificationsEnabled,

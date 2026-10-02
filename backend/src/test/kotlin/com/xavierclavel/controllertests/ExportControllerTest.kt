@@ -216,7 +216,7 @@ class ExportControllerTest : ApplicationTest() {
     fun `a subscriber cannot export a recipe they cannot see`() = runTest {
         var recipe: RecipeInfo? = null
         runAsUser2 {
-            client.updateSettings(UserSettingsDTO(autoAcceptFollowRequests = false, isAccountPublic = false))
+            client.updateSettings(UserSettingsDTO(isAccountPublic = false))
             recipe = client.createRecipe(fullRecipe)
         }
         grantPremiumForever(USER1)
