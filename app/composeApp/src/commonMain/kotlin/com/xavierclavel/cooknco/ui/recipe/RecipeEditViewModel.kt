@@ -189,6 +189,23 @@ data class RecipeEditUiState(
     val scanMessage: String? = null,
     /** What the last Cooklang import did, said once. See [RecipeEditViewModel.importCooklang]. */
     val importMessage: String? = null,
+    /** The page of the editor the cook is on. */
+    val page: EditorStep = EditorStep.BASICS,
+    /**
+     * The pages whose problems are shown — see [shownProblems].
+     *
+     * A page joins when the cook tries to leave it with something wrong on it, and leaves
+     * once they get past it. So nothing is flagged on a form nobody has tried to submit, nor
+     * on the tap that adds an ingredient to a page already passed. While a page is in, its
+     * problems are worked out from the form as it stands, so a field goes back to normal the
+     * moment it is fixed.
+     */
+    val checkedPages: Set<EditorStep> = emptySet(),
+    /**
+     * How many times the cook has been stopped. The screen scrolls to the problem on each
+     * one, including a second tap on the same problem after scrolling away from it.
+     */
+    val refusals: Int = 0,
 )
 
 class RecipeEditViewModel(
@@ -531,7 +548,7 @@ class RecipeEditViewModel(
 
     private fun copy(): Strings = stringsFor(AppLanguage.current.value)
 
-    fun updateTitle(value: String) = _uiState.update { it.copy(title = value, error = null) }
+    fun updateTitle(value: String) = _uiState.update { it.copy(title = value) }
     fun updateDescription(value: String) = _uiState.update { it.copy(description = value) }
     fun updateDishClass(value: String) = _uiState.update { it.copy(dishClass = value) }
     fun updateYield(value: String) = _uiState.update { it.copy(yield = value) }
@@ -550,7 +567,19 @@ class RecipeEditViewModel(
         searchJobs[index]?.cancel()
         searchJobs.remove(index)
         _uiState.update { state ->
-            state.copy(ingredients = state.ingredients.toMutableList().also { it.removeAt(index) })
+            state.copy(
+                ingredients = state.ingredients.toMutableList().also { it.removeAt(index) },
+                // A step names its ingredients by position, so every row after this one has
+                // just moved up by one. Left alone, a step that used the flour would now be
+                // using whatever was listed after it.
+                steps = state.steps.map { step ->
+                    step.copy(
+                        ingredients = step.ingredients
+                            .filter { it.index != index }
+                            .map { if (it.index > index) it.copy(index = it.index - 1) else it },
+                    )
+                },
+            )
         }
     }
 
@@ -831,10 +860,39 @@ class RecipeEditViewModel(
         s.copy(steps = s.steps.toMutableList().apply { add(to, removeAt(from)) })
     }
 
+    // ── Moving through the pages ──────────────────────────────────────────────
+
+    /**
+     * Moves on to the next page, or publishes from the last one — unless something on this
+     * page is wrong, in which case the cook stays where it can be fixed and is shown what.
+     */
+    fun next() {
+        val state = _uiState.value
+        val page = state.page
+        if (state.problems().any { it.page == page }) {
+            stopAt(page)
+            return
+        }
+        val following = EditorStep.entries.getOrNull(page.ordinal + 1) ?: return save()
+        _uiState.update { it.copy(page = following, checkedPages = it.checkedPages - page) }
+    }
+
+    /** Back one page. Never refused: going back skips nothing. */
+    fun back() = _uiState.update { state ->
+        state.copy(page = EditorStep.entries.getOrNull(state.page.ordinal - 1) ?: state.page)
+    }
+
+    private fun stopAt(page: EditorStep) = _uiState.update {
+        it.copy(page = page, checkedPages = it.checkedPages + page, refusals = it.refusals + 1)
+    }
+
     fun save() {
         val state = _uiState.value
-        if (state.title.isBlank()) {
-            _uiState.update { it.copy(error = "Title is required") }
+        // Checked again, over every page: the scan and the import can add rows from any page
+        // of the editor, including ones already passed. The cook is sent back to the first
+        // page holding something, rather than told about it from here.
+        state.problems().firstOrNull()?.let { problem ->
+            stopAt(problem.page)
             return
         }
 
@@ -842,6 +900,12 @@ class RecipeEditViewModel(
         // with the steps it was sent, in the order it was sent them, and that is how a
         // step being written learns the id its picture is posted against.
         val written = state.steps.filter { it.text.isNotBlank() }
+
+        // Where each row lands in what is sent. A step names its ingredients by position in
+        // the form, and the rows the form holds but does not send — the search row, which a
+        // scan or an import appends after — would shift every position behind them.
+        val sent = state.ingredients.withIndex().filter { it.value.isSaved }
+        val sentPosition = sent.withIndex().associate { (position, row) -> row.index to position }
 
         val dto = RecipeSaveDto(
             title = state.title.trim(),
@@ -851,14 +915,12 @@ class RecipeEditViewModel(
             preparationTime = state.prepTime.toIntOrNull(),
             cookingTime = state.cookTime.toIntOrNull(),
             cookingTemperature = state.cookTemp.toIntOrNull(),
-            ingredients = state.ingredients.mapNotNull { ing ->
-                val customName = ing.customName?.takeIf { it.isNotBlank() }
-                if (ing.ingredientId == null && customName == null) return@mapNotNull null
+            ingredients = sent.map { (_, ing) ->
                 RecipeIngredientSaveDto(
                     id = ing.ingredientId,
-                    customName = customName.takeIf { ing.ingredientId == null },
+                    customName = ing.customName.takeIf { ing.ingredientId == null },
                     unit = ing.unit,
-                    amount = if (ing.unit == "NONE") null else ing.amount,
+                    amount = ing.savedAmount,
                     complement = ing.complement.ifBlank { null },
                 )
             },
@@ -874,17 +936,19 @@ class RecipeEditViewModel(
                         durationSeconds = step.durationSeconds
                             ?.takeIf { StepAttachment.TIMER in step.attachments },
                         ingredients = if (StepAttachment.INGREDIENTS !in step.attachments) emptyList()
-                        else step.ingredients
-                            // An ingredient deleted since it was ticked leaves a position
-                            // pointing at nothing. The server drops those, but not sending
-                            // them keeps the amounts it checks honest.
-                            .filter { it.index in state.ingredients.indices }
-                            .map { used ->
-                                RecipeStepIngredientInfo(
-                                    index = used.index,
-                                    amount = used.amount.toFloatOrNull()?.takeIf { it > 0f },
-                                )
-                            },
+                        else step.ingredients.mapNotNull { used ->
+                            // A row that is not sent has nothing for the step to point at.
+                            val position = sentPosition[used.index] ?: return@mapNotNull null
+                            RecipeStepIngredientInfo(
+                                index = position,
+                                // A share of a row listed with no amount is a share of
+                                // nothing, which the server refuses. The box for it is not
+                                // shown either, so a number left there from before the
+                                // row's unit was cleared is one the cook cannot see.
+                                amount = used.savedAmount
+                                    ?.takeIf { state.ingredients[used.index].savedAmount != null },
+                            )
+                        },
                     )
                 },
             tips = state.tips.trim(),

@@ -60,19 +60,24 @@ const sortOptions = ref([
   { label: 'date', value: "DATE", icon:ICON_DATE, ordered: true },
 ]);
 
+// Labels are locale keys, like the other options here. Each says who can see the cookbook
+// rather than naming the stored value: "protected" means nothing outside a codebase.
 const visibilityOptions = ref([
   {
-    label: 'Private',
+    label: 'visibility_members',
+    hint: 'visibility_members_hint',
     value: 'PRIVATE',
     icon: ICON_VISIBILITY_PRIVATE,
   },
   {
-    label: 'Protected',
+    label: 'visibility_followers',
+    hint: 'visibility_followers_hint',
     value: 'PROTECTED',
     icon: ICON_VISIBILITY_PROTECTED,
   },
   {
-    label: 'Public',
+    label: 'visibility_everyone',
+    hint: 'visibility_everyone_hint',
     value: 'PUBLIC',
     icon: ICON_VISIBILITY_PUBLIC,
   },

@@ -1,12 +1,20 @@
 package com.xavierclavel.cooknco.ui.recipe
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +33,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +50,9 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.DragIndicator
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
@@ -72,6 +84,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -86,6 +99,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import coil3.compose.AsyncImage
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
@@ -159,19 +175,11 @@ private fun unitSectionLabel(type: String, s: Strings): String? = when (type) {
 private fun EditIngredient.originLabel(s: Strings): String? =
     if (ingredientId == null) s.custom else null
 
-private enum class EditorStep {
-    BASICS,
-    INGREDIENTS,
-    STEPS,
-    PHOTO,
-    ;
-
-    fun label(s: Strings) = when (this) {
-        BASICS -> s.stepBasics
-        INGREDIENTS -> s.stepIngredients
-        STEPS -> s.stepSteps
-        PHOTO -> s.stepPhoto
-    }
+private fun EditorStep.label(s: Strings) = when (this) {
+    EditorStep.BASICS -> s.stepBasics
+    EditorStep.INGREDIENTS -> s.stepIngredients
+    EditorStep.STEPS -> s.stepSteps
+    EditorStep.PHOTO -> s.stepPhoto
 }
 
 // ── Shared styling helpers ────────────────────────────────────────────────────
@@ -194,6 +202,9 @@ private fun FieldCaption(text: String) {
  * inside it. The outline turns coral while focused — the mockup draws the field being
  * typed into that way, and it is the only focus signal there is without Material's
  * label-and-indicator machinery.
+ *
+ * An [error] turns it red and is said underneath, and outranks the focus: the field being
+ * typed into is the one being fixed, and it stays red until it is.
  */
 @Composable
 private fun StickerField(
@@ -206,10 +217,15 @@ private fun StickerField(
     lineHeight: TextUnit = 22.sp,
     fontWeight: FontWeight = FontWeight.Medium,
     minHeight: Dp = 50.dp,
+    error: String? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val borderColor by animateColorAsState(
-        targetValue = if (focused) CookncoOrange else CookncoNavy,
+        targetValue = when {
+            error != null -> MaterialTheme.colorScheme.error
+            focused -> CookncoOrange
+            else -> CookncoNavy
+        },
         animationSpec = stickerSwitchSpec(),
         label = "field_border",
     )
@@ -219,36 +235,90 @@ private fun StickerField(
         fontWeight = fontWeight,
         color = CookncoNavy,
     )
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = minHeight)
-            .clip(RoundedCornerShape(12.dp))
-            .background(CookncoWhite)
-            .border(2.dp, borderColor, RoundedCornerShape(12.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        if (value.isEmpty()) {
-            Text(placeholder, style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.35f)))
+    Column(modifier = modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = minHeight)
+                .clip(RoundedCornerShape(12.dp))
+                .background(CookncoWhite)
+                .border(2.dp, borderColor, RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (value.isEmpty()) {
+                Text(placeholder, style = textStyle.copy(color = CookncoNavy.copy(alpha = 0.35f)))
+            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = singleLine,
+                textStyle = textStyle,
+                cursorBrush = SolidColor(CookncoOrange),
+                modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+            )
         }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = singleLine,
-            textStyle = textStyle,
-            cursorBrush = SolidColor(CookncoOrange),
-            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+        if (error != null) FieldError(error)
+    }
+}
+
+/**
+ * Why the cook cannot move on, said under what it is about, in the red its outline has
+ * turned. Words as well as a colour: a red border says where, and only a sentence says what
+ * to do about it.
+ */
+@Composable
+private fun FieldError(text: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.padding(top = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Icon(
+            Icons.Outlined.ErrorOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 1.dp).size(15.dp),
+        )
+        Text(
+            text = text,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.error,
         )
     }
 }
 
+/**
+ * Brings the first thing wrong on a page into view, each time the cook is stopped there.
+ *
+ * Keyed on the count of refusals rather than on the problem, so a second tap on Next after
+ * scrolling away scrolls back to it. It also runs as the page is entered, which is how a
+ * publish refused from the last page arrives at the field it was refused for: the page and
+ * the problem are chosen together, and this is the first composition that knows both.
+ *
+ * [item] is the problem's position in the page's list, or null when there is nothing to show.
+ */
 @Composable
-private fun StepHeading(title: String, subtitle: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(bottom = 16.dp)) {
-        Text(title, fontSize = 25.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 31.sp)
-        Text(subtitle, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = CookncoNavy, modifier = Modifier.padding(top = 4.dp))
+private fun ScrollToProblem(listState: LazyListState, refusals: Int, item: Int?) {
+    LaunchedEffect(refusals) {
+        val target = item ?: return@LaunchedEffect
+        // A list that has never been laid out has nothing to animate from.
+        withFrameNanos { }
+        listState.animateScrollToItem(target)
     }
+}
+
+@Composable
+private fun StepHeading(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        fontSize = 25.sp,
+        fontWeight = FontWeight.Bold,
+        color = CookncoNavy,
+        lineHeight = 31.sp,
+        modifier = modifier.padding(bottom = 16.dp),
+    )
 }
 
 // A small uppercase caption over a group of fields — "DISH CLASS", "TIMES & YIELD" —
@@ -284,7 +354,10 @@ fun RecipeEditScreen(
 ) {
     val s = strings()
     val uiState by viewModel.uiState.collectAsState()
-    var currentStep by rememberSaveable { mutableIntStateOf(0) }
+    // The view model's, not this composition's: a publish refused on the last page has to be
+    // able to send the cook back to the page holding the problem.
+    val currentStep = uiState.page.ordinal
+    val problems = uiState.shownProblems()
     var menuOpen by remember { mutableStateOf(false) }
     val steps = EditorStep.entries
     // Remembered here rather than inside the step that offers it: a launcher registered
@@ -334,7 +407,7 @@ fun RecipeEditScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StickerIconButton(
-                onClick = { if (currentStep > 0) currentStep-- else onNavigateBack() },
+                onClick = { if (currentStep > 0) viewModel.back() else onNavigateBack() },
                 shadowOffset = 3.dp,
             ) {
                 // Step 0 has nowhere to go "back" to inside the wizard, so the icon reads
@@ -489,17 +562,64 @@ fun RecipeEditScreen(
             return@Column
         }
 
-        Box(modifier = Modifier.weight(1f)) {
-            when (steps[currentStep]) {
-                EditorStep.BASICS -> BasicsStep(uiState = uiState, viewModel = viewModel)
-                EditorStep.INGREDIENTS -> IngredientsStep(uiState = uiState, viewModel = viewModel)
-                EditorStep.STEPS -> StepsStep(uiState = uiState, viewModel = viewModel)
-                EditorStep.PHOTO -> PhotoStep(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    pickedImage = uiState.pendingImage,
-                    onImagePicked = viewModel::setPendingImage,
-                )
+        // The system back — the edge swipe on Android, the one from the left edge on iOS —
+        // steps back a page, as the arrow does. Left alone it closed the editor from whatever
+        // page the cook was on, and everything typed went with it. The first page lets it
+        // through, and it leaves the editor exactly as the close button does.
+        NavigationBackHandler(
+            state = rememberNavigationEventState(NavigationEventInfo.None),
+            isBackEnabled = currentStep > 0,
+            onBackCompleted = viewModel::back,
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                // A swipe across the page turns it, as Next and Back do — and forward is
+                // refused the same way, so a swipe cannot skip what Next would have stopped at.
+                // It never publishes: a gesture brushing the last page must not put a recipe
+                // online. A list scrolling vertically does not claim a sideways drag, so this
+                // sees one wherever it starts; the steps' drag handles do, and keep theirs.
+                .pointerInput(Unit) {
+                    val distance = 80.dp.toPx()
+                    var dragged = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragged = 0f },
+                        onHorizontalDrag = { change, amount ->
+                            dragged += amount
+                            change.consume()
+                        },
+                        onDragEnd = {
+                            val last = viewModel.uiState.value.page == EditorStep.entries.last()
+                            when {
+                                dragged <= -distance && !last -> viewModel.next()
+                                dragged >= distance -> viewModel.back()
+                            }
+                        },
+                    )
+                },
+        ) {
+            // Sliding the way the cook went, so a swipe and the page it brings agree.
+            AnimatedContent(
+                targetState = uiState.page,
+                transitionSpec = {
+                    val forward = targetState.ordinal > initialState.ordinal
+                    (slideInHorizontally { if (forward) it else -it } + fadeIn()) togetherWith
+                        (slideOutHorizontally { if (forward) -it else it } + fadeOut())
+                },
+                label = "editor_page",
+            ) { page ->
+                when (page) {
+                    EditorStep.BASICS -> BasicsStep(uiState = uiState, problems = problems, viewModel = viewModel)
+                    EditorStep.INGREDIENTS -> IngredientsStep(uiState = uiState, problems = problems, viewModel = viewModel)
+                    EditorStep.STEPS -> StepsStep(uiState = uiState, problems = problems, viewModel = viewModel)
+                    EditorStep.PHOTO -> PhotoStep(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        pickedImage = uiState.pendingImage,
+                        onImagePicked = viewModel::setPendingImage,
+                    )
+                }
             }
         }
 
@@ -515,7 +635,7 @@ fun RecipeEditScreen(
                     modifier = Modifier.size(width = 100.dp, height = 56.dp),
                     shape = RoundedCornerShape(16.dp),
                     shadowOffset = 4.dp,
-                    onClick = { currentStep-- },
+                    onClick = viewModel::back,
                 ) {
                     Text(
                         text = s.back,
@@ -531,9 +651,7 @@ fun RecipeEditScreen(
                 shape = RoundedCornerShape(16.dp),
                 fillColor = CookncoOrange,
                 shadowOffset = 4.dp,
-                onClick = {
-                    if (currentStep < steps.lastIndex) currentStep++ else viewModel.save()
-                },
+                onClick = viewModel::next,
             ) {
                 if (uiState.isSaving && currentStep == steps.lastIndex) {
                     CircularProgressIndicator(
@@ -569,16 +687,31 @@ fun RecipeEditScreen(
 // ── Step 1: Basics ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel, modifier: Modifier = Modifier) {
+private fun BasicsStep(
+    uiState: RecipeEditUiState,
+    problems: List<EditProblem>,
+    viewModel: RecipeEditViewModel,
+    modifier: Modifier = Modifier,
+) {
     val s = strings()
     var picking by remember { mutableStateOf<RecipeNumber?>(null) }
+    val listState = rememberLazyListState()
+    val titleError = when {
+        EditProblem.TitleMissing in problems -> s.titleMissing
+        EditProblem.TitleTooLong in problems -> s.tooLong(TITLE_MAX_LENGTH)
+        else -> null
+    }
+    val descriptionError = s.tooLong(DESCRIPTION_MAX_LENGTH).takeIf { EditProblem.DescriptionTooLong in problems }
+    // Both live in the card under the heading, which is the list's second item.
+    ScrollToProblem(listState, uiState.refusals, item = 1.takeIf { titleError != null || descriptionError != null })
 
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         item {
-            StepHeading(title = s.theBasics, subtitle = s.theBasicsSubtitle)
+            StepHeading(title = s.theBasics)
         }
         item {
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
@@ -593,6 +726,7 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
                             minHeight = 50.dp,
+                            error = titleError,
                         )
                     }
                     Column {
@@ -604,6 +738,7 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
                             fontSize = 15.sp,
                             lineHeight = 22.sp,
                             minHeight = 52.dp,
+                            error = descriptionError,
                         )
                     }
                 }
@@ -614,8 +749,9 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
                 // Every row but the first is preceded by a 2dp rule and the 5dp of padding
                 // under it, so the first row — yield — was sitting 7dp tighter to the card's
-                // edge than its neighbours are to theirs. This is that 7dp.
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 7.dp)) {
+                // edge than its neighbours are to theirs. This is that 7dp, and the same again
+                // under the last row, which nothing follows.
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
                     RecipeNumber.entries.forEach { number ->
                         NumberStepperRow(
                             number = number,
@@ -623,15 +759,11 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
                             onValueChange = { number.update(viewModel, it) },
                             onTypeIt = { picking = number },
                         )
-                        HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
+                        // Between the rows only: the card's own outline closes the last one.
+                        if (number != RecipeNumber.entries.last()) {
+                            HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.1f))
+                        }
                     }
-                    Text(
-                        text = totalTimeLabel(uiState, s),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CookncoGreenDark,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
-                    )
                 }
             }
         }
@@ -654,7 +786,6 @@ private fun BasicsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewMode
         NumberPickerSheet(
             number = number,
             value = number.valueOf(uiState),
-            totalLabel = totalTimeLabel(uiState, s),
             onConfirm = { number.update(viewModel, it); picking = null },
             onDismissRequest = { picking = null },
         )
@@ -693,13 +824,6 @@ private enum class RecipeNumber(
         TEMP -> s.ovenTemp
     }
 
-    fun hint(s: Strings) = when (this) {
-        YIELD -> s.yieldHint
-        PREP -> s.prepHint
-        COOK -> s.cookHint
-        TEMP -> s.ovenHint
-    }
-
     fun valueOf(state: RecipeEditUiState): Int = when (this) {
         YIELD -> state.yield
         PREP -> state.prepTime
@@ -728,12 +852,7 @@ private enum class RecipeNumber(
     }
 }
 
-private fun totalTimeLabel(state: RecipeEditUiState, s: Strings): String {
-    val total = (state.prepTime.toIntOrNull() ?: 0) + (state.cookTime.toIntOrNull() ?: 0)
-    return if (total > 0) s.totalMinutes(total) else s.noTimesYet
-}
-
-/** One row of the TIMES & YIELD card: name and hint, then a −/value/+ pill. */
+/** One row of the TIMES & YIELD card: its name, then a −/value/+ pill. */
 @Composable
 private fun NumberStepperRow(
     number: RecipeNumber,
@@ -747,10 +866,13 @@ private fun NumberStepperRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(number.title(s), fontSize = 14.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-            Text(number.hint(s), fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = CookncoGreenDark)
-        }
+        Text(
+            text = number.title(s),
+            fontSize = 14.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = CookncoNavy,
+            modifier = Modifier.weight(1f),
+        )
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(percent = 50))
@@ -826,7 +948,6 @@ private fun StepperButton(
 private fun NumberPickerSheet(
     number: RecipeNumber,
     value: Int,
-    totalLabel: String,
     onConfirm: (Int) -> Unit,
     onDismissRequest: () -> Unit,
 ) {
@@ -851,16 +972,13 @@ private fun NumberPickerSheet(
             ) {
                 StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), shadowOffset = 6.dp) {
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)) {
-                            Text(number.title(s), fontSize = 19.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-                            Text(
-                                text = number.hint(s),
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = CookncoGreenDark,
-                                modifier = Modifier.padding(top = 2.dp),
-                            )
-                        }
+                        Text(
+                            text = number.title(s),
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CookncoNavy,
+                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp),
+                        )
                         HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.12f))
 
                         Row(
@@ -950,15 +1068,6 @@ private fun NumberPickerSheet(
                                 )
                             }
                         }
-
-                        HorizontalDivider(thickness = 2.dp, color = CookncoNavy.copy(alpha = 0.12f))
-                        Text(
-                            text = totalLabel,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = CookncoGreenDark,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
-                        )
                     }
                 }
 
@@ -1072,19 +1181,36 @@ private fun DishClassChip(label: String, selected: Boolean, onClick: () -> Unit)
  * on screen without a separate "add" button to press first.
  */
 @Composable
-private fun IngredientsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel, modifier: Modifier = Modifier) {
+private fun IngredientsStep(
+    uiState: RecipeEditUiState,
+    problems: List<EditProblem>,
+    viewModel: RecipeEditViewModel,
+    modifier: Modifier = Modifier,
+) {
     val s = strings()
     val searchIndex = uiState.ingredients.indexOfFirst { !it.isResolved }
     LaunchedEffect(searchIndex) { if (searchIndex < 0) viewModel.addIngredient() }
     val search = uiState.ingredients.getOrNull(searchIndex)
     val added = uiState.ingredients.withIndex().filter { it.value.isResolved }
 
+    val listState = rememberLazyListState()
+    val amountMissing = problems.filterIsInstance<EditProblem.AmountMissing>().map { it.ingredient }.toSet()
+    val unitNotAllowed = problems.filterIsInstance<EditProblem.UnitNotAllowed>().map { it.ingredient }.toSet()
+    // Where the first row with a problem sits in the list below: after the heading, the search
+    // field and its results when they are showing, and the count. Kept beside the list it
+    // counts, and to be changed with it.
+    val firstAddedItem = 2 + (if (search != null) 1 else 0) + (if (search?.query?.isNotBlank() == true) 1 else 0) +
+        (if (added.isEmpty()) 1 else 0)
+    val firstProblem = added.indexOfFirst { it.index in amountMissing || it.index in unitNotAllowed }
+    ScrollToProblem(listState, uiState.refusals, item = (firstAddedItem + firstProblem).takeIf { firstProblem >= 0 })
+
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StepHeading(title = s.stepIngredients, subtitle = s.ingredientsSubtitle)
+            StepHeading(title = s.stepIngredients)
         }
 
         if (search != null) {
@@ -1131,14 +1257,22 @@ private fun IngredientsStep(uiState: RecipeEditUiState, viewModel: RecipeEditVie
 
         added.forEach { (index, ingredient) ->
             item(key = "ingredient_$index") {
-                AddedIngredientCard(
-                    ingredient = ingredient,
-                    units = uiState.units,
-                    onUnitChange = { viewModel.updateIngredientUnit(index, it) },
-                    onAmountChange = { viewModel.updateIngredientAmount(index, it) },
-                    onComplementChange = { viewModel.updateIngredientComplement(index, it) },
-                    onRemove = { viewModel.removeIngredient(index) },
-                )
+                Column {
+                    AddedIngredientCard(
+                        ingredient = ingredient,
+                        units = uiState.units,
+                        amountMissing = index in amountMissing,
+                        unitNotAllowed = index in unitNotAllowed,
+                        onUnitChange = { viewModel.updateIngredientUnit(index, it) },
+                        onAmountChange = { viewModel.updateIngredientAmount(index, it) },
+                        onComplementChange = { viewModel.updateIngredientComplement(index, it) },
+                        onRemove = { viewModel.removeIngredient(index) },
+                    )
+                    if (index in amountMissing) FieldError(s.amountMissing)
+                    if (index in unitNotAllowed) {
+                        FieldError(s.unitNotAllowed(ingredient.ingredientName, s.unitName(ingredient.unit)))
+                    }
+                }
             }
         }
         item { Spacer(Modifier.height(8.dp)) }
@@ -1251,6 +1385,8 @@ private fun IngredientThumb(type: String, size: Dp, radius: Dp) {
 private fun AddedIngredientCard(
     ingredient: EditIngredient,
     units: List<UnitInfo>,
+    amountMissing: Boolean,
+    unitNotAllowed: Boolean,
     onUnitChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
     onComplementChange: (String) -> Unit,
@@ -1260,8 +1396,16 @@ private fun AddedIngredientCard(
     val availableUnits = unitsForIngredient(ingredient.allowedTypes, units)
     val showAmount = ingredient.unit != "NONE"
     var unitExpanded by remember { mutableStateOf(false) }
+    val errorColor = MaterialTheme.colorScheme.error
 
-    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), shadowOffset = 5.dp) {
+    // The card goes red as well as the control, so the row stands out of a long list before
+    // the box inside it does. What is wrong is said under the card, by the list.
+    StickerCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        borderColor = if (amountMissing || unitNotAllowed) errorColor else CookncoNavy,
+        shadowOffset = 5.dp,
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1364,10 +1508,24 @@ private fun AddedIngredientCard(
                         .heightIn(min = 44.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(CookncoWhite)
-                        .border(2.dp, CookncoNavy, RoundedCornerShape(12.dp))
+                        .border(
+                            width = if (amountMissing) 2.5.dp else 2.dp,
+                            color = if (amountMissing) errorColor else CookncoNavy,
+                            shape = RoundedCornerShape(12.dp),
+                        )
                         .padding(horizontal = 11.dp),
                     contentAlignment = Alignment.Center,
                 ) {
+                    // Empty, the box is a white square beside the unit, and nothing about it
+                    // says it is where the quantity goes.
+                    if (ingredient.amount == null) {
+                        Text(
+                            text = s.amountPlaceholder,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = CookncoNavy.copy(alpha = 0.35f),
+                        )
+                    }
                     BasicTextField(
                         value = ingredient.amount?.let { amount ->
                             if (amount % 1f == 0f) amount.toInt().toString() else amount.toString()
@@ -1400,7 +1558,7 @@ private fun AddedIngredientCard(
                         .heightIn(min = 44.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(CookncoGold)
-                        .border(2.5.dp, CookncoNavy, RoundedCornerShape(12.dp))
+                        .border(2.5.dp, if (unitNotAllowed) errorColor else CookncoNavy, RoundedCornerShape(12.dp))
                         .clickable { unitExpanded = !unitExpanded }
                         .padding(horizontal = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1429,9 +1587,23 @@ private fun AddedIngredientCard(
 // ── Step 3: Steps ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel, modifier: Modifier = Modifier) {
+private fun StepsStep(
+    uiState: RecipeEditUiState,
+    problems: List<EditProblem>,
+    viewModel: RecipeEditViewModel,
+    modifier: Modifier = Modifier,
+) {
     val s = strings()
     val lazyListState = rememberLazyListState()
+    val tipsError = s.tooLong(TIPS_MAX_LENGTH).takeIf { EditProblem.TipsTooLong in problems }
+    // The heading, then one item per step, the add button and the tips' label: a step's card
+    // is one past its index, and the tips are scrolled to by their label so it shows too.
+    val firstProblemItem = when (val first = problems.firstOrNull { it.page == EditorStep.STEPS }) {
+        null -> null
+        EditProblem.TipsTooLong -> uiState.steps.size + 2
+        else -> uiState.steps.indexOfFirst { it.id == first.stepId }.takeIf { it >= 0 }?.plus(1)
+    }
+    ScrollToProblem(lazyListState, uiState.refusals, item = firstProblemItem)
     val reorderState = rememberReorderableLazyColumnState(lazyListState) { from, to ->
         val steps = uiState.steps
         val fromIdx = steps.indexOfFirst { it.id == from.key }
@@ -1445,7 +1617,7 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            StepHeading(title = s.stepSteps, subtitle = s.stepsSubtitle)
+            StepHeading(title = s.stepSteps)
         }
 
         uiState.steps.forEachIndexed { index, step ->
@@ -1456,6 +1628,13 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
                     StepEditCard(
                         index = index,
                         step = step,
+                        textError = when {
+                            EditProblem.StepTextMissing(step.id) in problems -> s.stepTextMissing
+                            EditProblem.StepTextTooLong(step.id) in problems -> s.tooLong(STEP_TEXT_MAX_LENGTH)
+                            else -> null
+                        },
+                        shares = problems.filterIsInstance<EditProblem.SharesDoNotAddUp>()
+                            .filter { step.id in it.steps },
                         elevation = elevation,
                         dragHandleModifier = Modifier.draggableHandle(
                             onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
@@ -1489,18 +1668,22 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
             SectionLabel(s.tipsOptional)
         }
         item {
-            StickerCard(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 74.dp),
-                shape = RoundedCornerShape(16.dp),
-                shadowOffset = 5.dp,
-            ) {
-                StickerTextArea(
-                    value = uiState.tips,
-                    onValueChange = viewModel::updateTips,
-                    placeholder = s.tipsPlaceholder,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
-                )
+            Column {
+                StickerCard(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 74.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    borderColor = if (tipsError != null) MaterialTheme.colorScheme.error else CookncoNavy,
+                    shadowOffset = 5.dp,
+                ) {
+                    StickerTextArea(
+                        value = uiState.tips,
+                        onValueChange = viewModel::updateTips,
+                        placeholder = s.tipsPlaceholder,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+                    )
+                }
+                if (tipsError != null) FieldError(tipsError)
             }
         }
         item { Spacer(Modifier.height(8.dp)) }
@@ -1519,13 +1702,15 @@ private fun StepsStep(uiState: RecipeEditUiState, viewModel: RecipeEditViewModel
  * has, and it disappears when there is nothing left to add. A second kind of attachment is a
  * case in that enum and a row below, not another button.
  *
- * Each attachment renders itself and owns its own removal, so nothing here has to know what
- * a timer is beyond where to put it.
+ * Each attachment renders its own controls inside an [AttachmentSection], which owns the
+ * header, the opening and closing and the removal — so the three look and behave alike, and
+ * nothing here has to know what a timer is beyond where to put it.
  */
 @Composable
 private fun StepAttachments(
     step: StepItem,
     recipeIngredients: List<EditIngredient>,
+    shares: List<EditProblem.SharesDoNotAddUp>,
     onDurationChange: (Int?) -> Unit,
     onToggleIngredient: (Int) -> Unit,
     onIngredientAmountChange: (Int, String) -> Unit,
@@ -1536,32 +1721,53 @@ private fun StepAttachments(
 ) {
     val s = strings()
     val available = StepAttachment.entries.filter { it !in step.attachments }
+    // Which attachments are open. Closed is the default: a step with a timer, its ingredients
+    // and a photo all open is a screenful of controls around one sentence, and the header's
+    // summary is enough to read most of the time. One the cook has just added opens, since
+    // adding it is asking to fill it in — a timer read off the wording stays closed, nobody
+    // asked for it. Saveable, so a card scrolled away and back keeps what was open; by name,
+    // which is what a saved state can hold.
+    var expanded by rememberSaveable(step.id) { mutableStateOf(listOf<String>()) }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // Driven off entries rather than off the set, so attachments always stack in the
         // order they are declared in. Iterating the set would order them by whatever the cook
         // happened to add first, which nobody chose and nothing guarantees to stay stable.
         StepAttachment.entries.filter { it in step.attachments }.forEach { attachment ->
-            when (attachment) {
-                StepAttachment.TIMER -> StepTimerField(
-                    durationSeconds = step.durationSeconds,
-                    onDurationChange = onDurationChange,
-                    onRemove = { onDetach(StepAttachment.TIMER) },
-                )
+            // Shares that do not add up are shown open: the boxes to fix are inside.
+            val wrong = attachment == StepAttachment.INGREDIENTS && shares.isNotEmpty()
+            AttachmentSection(
+                attachment = attachment,
+                summary = attachment.summary(step, recipeIngredients, s),
+                expanded = attachment.name in expanded || wrong,
+                isError = wrong,
+                onToggle = {
+                    expanded = if (attachment.name in expanded) expanded - attachment.name else expanded + attachment.name
+                },
+                onRemove = {
+                    expanded = expanded - attachment.name
+                    onDetach(attachment)
+                },
+            ) {
+                when (attachment) {
+                    StepAttachment.TIMER -> StepTimerField(
+                        durationSeconds = step.durationSeconds,
+                        onDurationChange = onDurationChange,
+                    )
 
-                StepAttachment.INGREDIENTS -> StepIngredientPicker(
-                    step = step,
-                    ingredients = recipeIngredients,
-                    onToggle = onToggleIngredient,
-                    onAmountChange = onIngredientAmountChange,
-                    onRemove = { onDetach(StepAttachment.INGREDIENTS) },
-                )
+                    StepAttachment.INGREDIENTS -> StepIngredientPicker(
+                        step = step,
+                        ingredients = recipeIngredients,
+                        shares = shares,
+                        onToggle = onToggleIngredient,
+                        onAmountChange = onIngredientAmountChange,
+                    )
 
-                StepAttachment.PHOTO -> StepPhotoField(
-                    step = step,
-                    onPicked = onImagePicked,
-                    onRemove = { onDetach(StepAttachment.PHOTO) },
-                )
+                    StepAttachment.PHOTO -> StepPhotoField(
+                        step = step,
+                        onPicked = onImagePicked,
+                    )
+                }
             }
         }
 
@@ -1578,6 +1784,7 @@ private fun StepAttachments(
                 iconOf = { it.icon() },
                 onSelect = {
                     open = false
+                    expanded = expanded + it.name
                     onAttach(it)
                 },
                 width = 196.dp,
@@ -1625,6 +1832,95 @@ private fun StepAttachment.icon(): ImageVector = when (this) {
     StepAttachment.PHOTO -> Icons.Outlined.CameraAlt
 }
 
+private fun StepAttachment.removeLabel(s: Strings) = when (this) {
+    StepAttachment.TIMER -> s.removeStepTimer
+    StepAttachment.INGREDIENTS -> s.removeStepIngredients
+    StepAttachment.PHOTO -> s.removeStepPhoto
+}
+
+/** What a closed attachment holds, said on its header: "20 min", "farine, sucre", "Added". */
+private fun StepAttachment.summary(step: StepItem, ingredients: List<EditIngredient>, s: Strings) = when (this) {
+    StepAttachment.TIMER ->
+        step.durationSeconds?.let { "${(it + 59) / 60} ${s.minutesShort}" } ?: s.timerNotSet
+    StepAttachment.INGREDIENTS -> step.ingredients
+        .mapNotNull { used -> ingredients.getOrNull(used.index)?.takeIf { it.isSaved }?.ingredientName }
+        .ifEmpty { null }
+        ?.joinToString(", ")
+        ?: s.noStepIngredientsPicked
+    StepAttachment.PHOTO ->
+        if (step.pendingImage != null || (step.serverId != null && step.imageVersion > 0)) s.stepPhotoAdded
+        else s.stepPhotoNone
+}
+
+/**
+ * One attachment on a step card: a header that names it and says what it holds, and its
+ * controls underneath, shown only while it is open. The whole header opens and closes it;
+ * the cross beside the chevron takes it off.
+ *
+ * The summary is left out while open, where the controls already say the same thing.
+ */
+@Composable
+private fun AttachmentSection(
+    attachment: StepAttachment,
+    summary: String,
+    expanded: Boolean,
+    isError: Boolean,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val s = strings()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 32.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onToggle),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(attachment.icon(), contentDescription = null, tint = CookncoGreenDark, modifier = Modifier.size(16.dp))
+            Text(
+                text = attachment.label(s),
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoGreenDark,
+                letterSpacing = 1.2.sp,
+            )
+            Text(
+                text = if (expanded) "" else summary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isError) MaterialTheme.colorScheme.error else CookncoNavy,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = if (expanded) s.hide else s.show,
+                tint = CookncoGreenDark,
+                modifier = Modifier.size(18.dp),
+            )
+            Box(
+                modifier = Modifier.size(28.dp).clickable(onClick = onRemove),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = attachment.removeLabel(s),
+                    tint = CookncoGreenDark,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+        }
+        AnimatedVisibility(visible = expanded) {
+            Box(modifier = Modifier.padding(top = 4.dp)) { content() }
+        }
+    }
+}
+
 /**
  * A picture of what the step should come out looking like.
  *
@@ -1640,7 +1936,6 @@ private fun StepAttachment.icon(): ImageVector = when (this) {
 private fun StepPhotoField(
     step: StepItem,
     onPicked: (PickedImage) -> Unit,
-    onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
@@ -1652,28 +1947,6 @@ private fun StepPhotoField(
     }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = s.stepPhotoLabel,
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = CookncoGreenDark,
-                letterSpacing = 1.2.sp,
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                modifier = Modifier.size(28.dp).clickable(onClick = onRemove),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = s.removeStepPhoto,
-                    tint = CookncoGreenDark,
-                    modifier = Modifier.size(15.dp),
-                )
-            }
-        }
-
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1752,36 +2025,16 @@ private fun StepPhotoField(
 private fun StepIngredientPicker(
     step: StepItem,
     ingredients: List<EditIngredient>,
+    shares: List<EditProblem.SharesDoNotAddUp>,
     onToggle: (Int) -> Unit,
     onAmountChange: (Int, String) -> Unit,
-    onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = s.stepIngredientsLabel,
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = CookncoGreenDark,
-                letterSpacing = 1.2.sp,
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                modifier = Modifier.size(28.dp).clickable(onClick = onRemove),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = s.removeStepIngredients,
-                    tint = CookncoGreenDark,
-                    modifier = Modifier.size(15.dp),
-                )
-            }
-        }
-
-        if (ingredients.none { it.ingredientName.isNotBlank() }) {
+        // Only the rows the save sends: the search row has a name as soon as something is
+        // typed into it, and a step ticking it would be pointing at nothing.
+        if (ingredients.none { it.isSaved }) {
             // Nothing to tick yet. Said out loud rather than shown as an empty box, since the
             // fix is on a different step of the editor entirely.
             Text(
@@ -1794,8 +2047,9 @@ private fun StepIngredientPicker(
         }
 
         ingredients.forEachIndexed { index, ingredient ->
-            if (ingredient.ingredientName.isBlank()) return@forEachIndexed
+            if (!ingredient.isSaved) return@forEachIndexed
             val used = step.ingredients.firstOrNull { it.index == index }
+            val wrong = shares.any { it.ingredient == index }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1835,7 +2089,11 @@ private fun StepIngredientPicker(
                             .height(32.dp)
                             .clip(RoundedCornerShape(9.dp))
                             .background(CookncoWhite)
-                            .border(2.dp, CookncoNavy, RoundedCornerShape(9.dp))
+                            .border(
+                                width = if (wrong) 2.5.dp else 2.dp,
+                                color = if (wrong) MaterialTheme.colorScheme.error else CookncoNavy,
+                                shape = RoundedCornerShape(9.dp),
+                            )
                             .padding(horizontal = 8.dp),
                         contentAlignment = Alignment.CenterStart,
                     ) {
@@ -1866,6 +2124,18 @@ private fun StepIngredientPicker(
                 }
             }
         }
+
+        // Said in every step that spelled out a number of it, not only the first: these are
+        // often far apart, and a red box should never be one the card it sits in does not
+        // explain.
+        shares.forEach { problem ->
+            val row = ingredients.getOrNull(problem.ingredient) ?: return@forEach
+            fun amount(value: Float) = "${formatAmount(value)} ${s.unitName(row.unit)}"
+            FieldError(
+                if (problem.short) s.stepSharesShort(row.ingredientName, amount(problem.used), amount(problem.listed))
+                else s.stepSharesOver(row.ingredientName, amount(problem.used), amount(problem.listed)),
+            )
+        }
     }
 }
 
@@ -1883,7 +2153,6 @@ private fun StepIngredientPicker(
 private fun StepTimerField(
     durationSeconds: Int?,
     onDurationChange: (Int?) -> Unit,
-    onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
@@ -1893,12 +2162,6 @@ private fun StepTimerField(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(
-            Icons.Outlined.Timer,
-            contentDescription = null,
-            tint = if (minutes == null) CookncoGreenDark else CookncoNavy,
-            modifier = Modifier.size(18.dp),
-        )
         Box(
             modifier = Modifier
                 .width(64.dp)
@@ -1937,17 +2200,6 @@ private fun StepTimerField(
             fontWeight = FontWeight.Bold,
             color = CookncoGreenDark,
         )
-        Box(
-            modifier = Modifier.size(32.dp).clickable(onClick = onRemove),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Outlined.Close,
-                contentDescription = s.removeStepTimer,
-                tint = CookncoGreenDark,
-                modifier = Modifier.size(16.dp),
-            )
-        }
     }
 }
 
@@ -1955,6 +2207,8 @@ private fun StepTimerField(
 private fun StepEditCard(
     index: Int,
     step: StepItem,
+    textError: String?,
+    shares: List<EditProblem.SharesDoNotAddUp>,
     elevation: Dp = 0.dp,
     dragHandleModifier: Modifier = Modifier,
     recipeIngredients: List<EditIngredient>,
@@ -1971,6 +2225,7 @@ private fun StepEditCard(
     StickerCard(
         modifier = Modifier.fillMaxWidth().shadow(elevation, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(18.dp),
+        borderColor = if (textError != null || shares.isNotEmpty()) MaterialTheme.colorScheme.error else CookncoNavy,
         shadowOffset = 5.dp,
     ) {
         Row(
@@ -1992,9 +2247,11 @@ private fun StepEditCard(
                     placeholder = s.describeThisStep,
                     modifier = Modifier.padding(top = 5.dp),
                 )
+                if (textError != null) FieldError(textError)
                 StepAttachments(
                     step = step,
                     recipeIngredients = recipeIngredients,
+                    shares = shares,
                     onDurationChange = onDurationChange,
                     onToggleIngredient = onToggleIngredient,
                     onIngredientAmountChange = onIngredientAmountChange,
@@ -2046,16 +2303,14 @@ private fun PhotoStep(
     val pickedBitmap = pickedImage?.let { picked ->
         remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
     }
-    // A version of 0 means the recipe is still on the backend's default placeholder —
-    // RecipeInfo.version doubles as the image version (see ImageController on the backend).
-    val hasExistingPhoto = uiState.recipeId != null && (uiState.recipeVersion ?: 0) > 0
+    val hasExistingPhoto = uiState.hasSavedPhoto
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            StepHeading(title = s.photoAndPublish, subtitle = s.photoSubtitle)
+            StepHeading(title = s.photoAndPublish)
         }
         item {
             StickerCard(modifier = Modifier.fillMaxWidth(), shadowOffset = 6.dp) {
@@ -2142,36 +2397,36 @@ private fun PhotoActionButton(text: String, onClick: () -> Unit, modifier: Modif
 @Composable
 private fun PublishChecklist(uiState: RecipeEditUiState, modifier: Modifier = Modifier) {
     val s = strings()
-    val dishClassLabel = s.dishClassName(uiState.dishClass)
     val ingredientCount = uiState.ingredients.count { it.ingredientId != null || it.customName != null }
-    val catalogCount = uiState.ingredients.count { it.ingredientId != null }
-    val ingredientsLine = when {
-        ingredientCount == 0 -> s.noIngredientsYet
-        catalogCount == ingredientCount -> s.ingredientsAllFromCatalogue(ingredientCount)
-        else -> s.ingredientsAdded(ingredientCount)
-    }
+    val ingredientsLine = if (ingredientCount == 0) s.noIngredientsYet else s.ingredientsAdded(ingredientCount)
     val stepCount = uiState.steps.count { it.text.isNotBlank() }
-    val stepsLine = if (uiState.cookTime.isNotBlank()) {
-        s.stepsCount(stepCount) + " · " + s.cookMinutes(uiState.cookTime)
-    } else {
-        s.stepsCount(stepCount)
-    }
+    // A cross says what is missing and nothing more: a recipe publishes without a photo, and
+    // nothing here holds the PUBLISH button back.
+    val hasPhoto = uiState.pendingImage != null || uiState.hasSavedPhoto
 
     StickerCard(modifier = modifier.fillMaxWidth(), shadowOffset = 6.dp) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            ChecklistRow(title = uiState.title.ifBlank { s.untitledRecipe }, ok = uiState.title.isNotBlank(), showDivider = true)
+            ChecklistRow(title = ingredientsLine, ok = ingredientCount > 0, showDivider = true)
+            ChecklistRow(title = s.stepsCount(stepCount), ok = stepCount > 0, showDivider = true)
             ChecklistRow(
-                title = if (uiState.title.isNotBlank()) "${uiState.title} · ${dishClassLabel.lowercase()}" else s.untitledRecipe,
-                trailing = s.stepBasics + " ✓",
-                showDivider = true,
+                title = if (hasPhoto) s.recipePhotoAdded else s.noRecipePhotoYet,
+                ok = hasPhoto,
+                showDivider = false,
             )
-            ChecklistRow(title = ingredientsLine, trailing = "✓", showDivider = true)
-            ChecklistRow(title = stepsLine, trailing = "✓", showDivider = false)
         }
     }
 }
 
+/**
+ * Whether the recipe already has a photo on the server. A version of 0 means it is still on
+ * the backend's default placeholder — `RecipeInfo.version` doubles as the image version (see
+ * `ImageController` on the backend).
+ */
+private val RecipeEditUiState.hasSavedPhoto get() = recipeId != null && (recipeVersion ?: 0) > 0
+
 @Composable
-private fun ChecklistRow(title: String, trailing: String, showDivider: Boolean, modifier: Modifier = Modifier) {
+private fun ChecklistRow(title: String, ok: Boolean, showDivider: Boolean, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
@@ -2179,7 +2434,13 @@ private fun ChecklistRow(title: String, trailing: String, showDivider: Boolean, 
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(title, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy, modifier = Modifier.weight(1f))
-            Text(trailing, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+            // No description: the line beside it already says what is there and what is not.
+            Icon(
+                imageVector = if (ok) Icons.Outlined.Check else Icons.Outlined.Close,
+                contentDescription = null,
+                tint = if (ok) CookncoGreenDark else MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(18.dp),
+            )
         }
         if (showDivider) {
             Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(CookncoNavy.copy(alpha = 0.1f)))
