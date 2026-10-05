@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.ui.components.CookbookImage
+import com.xavierclavel.cooknco.ui.components.CookingEmptyScreen
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoBackground
@@ -52,9 +54,12 @@ fun CookbooksScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    // Every time the tab comes back on screen: the cookbook it is missing was made on another one.
+    LaunchedEffect(Unit) { viewModel.load() }
     CookbooksScreenContent(
         cookbooks = uiState.cookbooks,
         isLoading = uiState.isLoading,
+        isEmpty = uiState.isEmpty,
         onCookbookClick = onCookbookClick,
         onNewCookbook = onNewCookbook,
         modifier = modifier,
@@ -65,6 +70,7 @@ fun CookbooksScreen(
 private fun CookbooksScreenContent(
     cookbooks: List<CookbookInfo>,
     isLoading: Boolean,
+    isEmpty: Boolean,
     onCookbookClick: (Long) -> Unit,
     onNewCookbook: () -> Unit,
     modifier: Modifier = Modifier,
@@ -90,6 +96,14 @@ private fun CookbooksScreenContent(
             isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp)
             }
+
+            // Instead of the dashed "New cookbook" row, whose job its button does.
+            isEmpty -> CookingEmptyScreen(
+                title = s.cookbooksEmptyTitle,
+                message = s.cookbooksEmptyMessage,
+                actionLabel = s.createACookbookCaps,
+                onAction = onNewCookbook,
+            )
 
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
@@ -194,7 +208,7 @@ private val previewCookbooks = listOf(
 @Composable
 fun CookbooksScreenPreview() {
     CookncoTheme {
-        CookbooksScreenContent(cookbooks = previewCookbooks, isLoading = false, onCookbookClick = {}, onNewCookbook = {})
+        CookbooksScreenContent(cookbooks = previewCookbooks, isLoading = false, isEmpty = false, onCookbookClick = {}, onNewCookbook = {})
     }
 }
 
@@ -202,6 +216,6 @@ fun CookbooksScreenPreview() {
 @Composable
 fun CookbooksEmptyPreview() {
     CookncoTheme {
-        CookbooksScreenContent(cookbooks = emptyList(), isLoading = false, onCookbookClick = {}, onNewCookbook = {})
+        CookbooksScreenContent(cookbooks = emptyList(), isLoading = false, isEmpty = true, onCookbookClick = {}, onNewCookbook = {})
     }
 }

@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import com.xavierclavel.cooknco.ui.components.CookingEmptyScreen
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
@@ -84,6 +85,10 @@ fun HomeScreen(
      * so it opened a second, lesser copy of a screen the bottom bar already holds.
      */
     onProfileClick: () -> Unit = {},
+    /** The empty feed's way out: to recipes worth following somebody for. */
+    onExploreClick: () -> Unit = {},
+    /** Its other one: the cook's own recipes are in the feed too. */
+    onCreateRecipeClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -101,6 +106,9 @@ fun HomeScreen(
     LaunchedEffect(reachedEnd) {
         if (reachedEnd && !uiState.allLoaded) viewModel.loadMore()
     }
+    // Every time the feed comes back on screen, from another tab or a pushed route: that is
+    // where the follow or the recipe the empty state asked for was made.
+    LaunchedEffect(Unit) { viewModel.reloadIfEmpty() }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         HomeHeader(user = user, onAvatarClick = onProfileClick)
@@ -120,6 +128,12 @@ fun HomeScreen(
                 )
             },
         ) {
+            // Inside the pull rather than instead of it: the empty state is the one screen a
+            // cook back from following somebody is most likely to want to pull on.
+            if (uiState.isEmpty) {
+                FeedEmptyState(onExploreClick = onExploreClick, onCreateRecipeClick = onCreateRecipeClick)
+                return@PullToRefreshBox
+            }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 state = gridState,
@@ -409,6 +423,22 @@ private fun AuthorChip(owner: RecipeOwner, onClick: () -> Unit = {}, modifier: M
     }
 }
 
+/** The feed's words and actions for [CookingEmptyScreen]. */
+@Composable
+private fun FeedEmptyState(onExploreClick: () -> Unit, onCreateRecipeClick: () -> Unit) {
+    val s = strings()
+    CookingEmptyScreen(
+        title = s.feedEmptyTitle,
+        message = s.feedEmptyMessage,
+        actionLabel = s.exploreRecipesCaps,
+        onAction = onExploreClick,
+        // Second, because following people is what fills a feed: posting one recipe of your
+        // own leaves it nearly as empty as before.
+        secondaryActionLabel = s.createARecipeCaps,
+        onSecondaryAction = onCreateRecipeClick,
+    )
+}
+
 // ── Previews ──────────────────────────────────────────────────────────────────
 
 private val previewUser = UserInfo(
@@ -451,6 +481,17 @@ fun HomeScreenPreview() {
                     }
                 }
             }
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Feed - Empty")
+@Composable
+fun HomeScreenEmptyPreview() {
+    CookncoTheme {
+        Column(modifier = Modifier.fillMaxSize().background(CookncoGreen)) {
+            HomeHeader(user = previewUser, onAvatarClick = {})
+            FeedEmptyState(onExploreClick = {}, onCreateRecipeClick = {})
         }
     }
 }
