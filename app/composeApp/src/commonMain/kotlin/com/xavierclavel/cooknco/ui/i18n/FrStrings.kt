@@ -50,7 +50,10 @@ object FrStrings : Strings {
     override val today = "Aujourd'hui"
     override val yesterday = "Hier"
     override fun daysAgo(days: Long) = "Il y a $days jours"
-    override val feedEmpty = "Rien pour l'instant. Suivez quelques cuisiniers et leurs recettes arriveront ici."
+    override val feedEmptyTitle = "Rien sur le feu pour l'instant"
+    override val feedEmptyMessage = "Suivez quelques cuisiniers : leurs nouvelles recettes arriveront ici, à côté des vôtres."
+    override val exploreRecipesCaps = "EXPLORER LES RECETTES"
+    override val createARecipeCaps = "CRÉER UNE RECETTE"
 
     override val ingredients = "Ingrédients"
     override val steps = "Étapes"
@@ -225,6 +228,9 @@ object FrStrings : Strings {
     override val decline = "Refuser"
 
     override val newCookbook = "Nouveau carnet de recette"
+    override val cookbooksEmptyTitle = "Aucun carnet pour l'instant"
+    override val cookbooksEmptyMessage = "Rassemblez vos recettes préférées dans un carnet de recette, et partagez-le avec ceux avec qui vous cuisinez."
+    override val createACookbookCaps = "CRÉER UN CARNET"
     override val addToCookbookHint = "Touchez un carnet pour y ranger cette recette"
     override val inThisCookbook = "Dans ce carnet de recette"
     override val noCookbooksYet =
@@ -290,7 +296,10 @@ object FrStrings : Strings {
     override fun seeAll(count: Int, approximate: Boolean) = "Voir les $count${if (approximate) "+" else ""} →"
     override val myRecipes = "Recettes"
     override val liked = "Favoris"
-    override val noLikesYet = "Aucun favori pour l'instant. Le cœur sur une recette la range ici."
+    override val likedEmptyTitle = "Aucun favori pour l'instant"
+    override val likedEmptyMessage = "Touchez le cœur d'une recette que vous aimez pour la retrouver ici."
+    override val ownRecipesEmptyMessage = "Notez une recette que vous aimez : elle vivra ici, pour vous et pour ceux qui vous suivent."
+    override fun noRecipesFrom(username: String) = "$username n'a pas encore partagé de recette."
     override val noRecipesYet = "Aucune recette pour l'instant"
     override val noUsersYet = "Aucun utilisateur"
     override fun recipeCount(count: Int) = if (count == 1) "1 recette" else "$count recettes"

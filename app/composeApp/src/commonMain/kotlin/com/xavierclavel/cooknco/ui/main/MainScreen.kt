@@ -141,6 +141,10 @@ fun MainScreen(
                 onRecipeClick = onNavigateToRecipe,
                 onUserClick = onNavigateToUser,
                 onProfileClick = { selectedTab = MainTab.PROFILE },
+                // The search tab with nothing typed lists recent recipes, and every one of
+                // them leads to a cook to follow.
+                onExploreClick = { selectedTab = MainTab.SEARCH },
+                onCreateRecipeClick = { onNavigateToEditRecipe(null) },
                 modifier = Modifier.padding(innerPadding),
             )
             MainTab.SEARCH -> RecipesScreen(
@@ -167,6 +171,8 @@ fun MainScreen(
                 onNavigateToSettings = onNavigateToSettings,
                 onNavigateToFollowers = onNavigateToFollowers,
                 onNavigateToFollowing = onNavigateToFollowing,
+                onCreateRecipe = { onNavigateToEditRecipe(null) },
+                onExploreRecipes = { selectedTab = MainTab.SEARCH },
                 modifier = Modifier.padding(innerPadding),
             )
         }

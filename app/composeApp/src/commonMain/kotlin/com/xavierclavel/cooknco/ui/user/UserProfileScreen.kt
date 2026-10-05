@@ -59,6 +59,7 @@ import com.xavierclavel.cooknco.ui.components.StickerActionSheet
 import com.xavierclavel.cooknco.network.ReportTargetType
 import com.xavierclavel.cooknco.ui.moderation.ReportSheet
 import com.xavierclavel.cooknco.ui.components.SheetAction
+import com.xavierclavel.cooknco.ui.components.CookingEmptyState
 import com.xavierclavel.cooknco.ui.components.LikeCount
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
@@ -92,10 +93,17 @@ fun UserProfileScreen(
     onNavigateToSettings: (() -> Unit)? = null,
     onNavigateToFollowers: () -> Unit = {},
     onNavigateToFollowing: () -> Unit = {},
+    /** The empty recipes grid's button. Null leaves it without one, as on anyone else's profile. */
+    onCreateRecipe: (() -> Unit)? = null,
+    /** The empty likes grid's button, to recipes worth a heart. */
+    onExploreRecipes: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val linkSharer = rememberLinkSharer()
+    // Every time the profile comes back on screen: the recipe written or liked that its empty
+    // state asked for was made on another one.
+    LaunchedEffect(Unit) { viewModel.reloadIfEmpty() }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         when {
@@ -110,6 +118,7 @@ fun UserProfileScreen(
             uiState.user != null -> ProfileContent(
                 user = uiState.user!!,
                 recipes = uiState.shownRecipes,
+                isEmpty = uiState.isShownEmpty,
                 tab = uiState.tab,
                 onTabSelected = viewModel::selectTab,
                 isLikedLoading = uiState.isLikedLoading,
@@ -130,6 +139,8 @@ fun UserProfileScreen(
                 onLoadMore = { viewModel.loadMoreShown() },
                 allLoaded = if (uiState.tab == ProfileTab.LIKED) uiState.allLikedLoaded else uiState.allRecipesLoaded,
                 onRecipeClick = onNavigateToRecipe,
+                onCreateRecipe = onCreateRecipe,
+                onExploreRecipes = onExploreRecipes,
             )
         }
     }
@@ -139,6 +150,7 @@ fun UserProfileScreen(
 private fun ProfileContent(
     user: UserInfo,
     recipes: List<RecipeOverview>,
+    isEmpty: Boolean,
     tab: ProfileTab,
     onTabSelected: (ProfileTab) -> Unit,
     isLikedLoading: Boolean,
@@ -156,6 +168,8 @@ private fun ProfileContent(
     onLoadMore: () -> Unit,
     allLoaded: Boolean,
     onRecipeClick: (Long) -> Unit,
+    onCreateRecipe: (() -> Unit)?,
+    onExploreRecipes: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
@@ -365,9 +379,21 @@ private fun ProfileContent(
                 ) { CircularProgressIndicator(color = CookncoNavy, strokeWidth = 3.dp) }
             }
 
+            isEmpty -> item(span = { GridItemSpan(2) }) {
+                ProfileEmptyState(
+                    tab = tab,
+                    isOwnProfile = isOwnProfile,
+                    username = user.username,
+                    onCreateRecipe = onCreateRecipe,
+                    onExploreRecipes = onExploreRecipes,
+                )
+            }
+
+            // Empty with nothing having answered: a failure, which is not a profile with no
+            // recipes and must not be told as one.
             recipes.isEmpty() -> item(span = { GridItemSpan(2) }) {
                 Text(
-                    text = if (tab == ProfileTab.LIKED) s.noLikesYet else s.noRecipesYet,
+                    text = s.somethingWentWrong,
                     color = CookncoNavy.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
                     textAlign = TextAlign.Center,
@@ -436,6 +462,44 @@ private fun ProfileContent(
     // Closes itself once the unfollow actually completes, rather than on tapping Unfollow —
     // `isConfirming` (wired to `isFollowLoading` above) keeps the dialog up while in flight.
     LaunchedEffect(isFollowing) { if (!isFollowing) showUnfollowConfirm = false }
+}
+
+/**
+ * The profile's words for [CookingEmptyState], one set per grid: your own recipes ask you to
+ * write one, your likes send you to find one, and somebody else's empty profile asks nothing of
+ * the reader. A grid item rather than a screen, under the header the profile still shows.
+ */
+@Composable
+private fun ProfileEmptyState(
+    tab: ProfileTab,
+    isOwnProfile: Boolean,
+    username: String,
+    onCreateRecipe: (() -> Unit)?,
+    onExploreRecipes: (() -> Unit)?,
+) {
+    val s = strings()
+    val modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 12.dp)
+    when {
+        tab == ProfileTab.LIKED -> CookingEmptyState(
+            title = s.likedEmptyTitle,
+            message = s.likedEmptyMessage,
+            actionLabel = onExploreRecipes?.let { s.exploreRecipesCaps },
+            onAction = { onExploreRecipes?.invoke() },
+            modifier = modifier,
+        )
+        isOwnProfile -> CookingEmptyState(
+            title = s.noRecipesYet,
+            message = s.ownRecipesEmptyMessage,
+            actionLabel = onCreateRecipe?.let { s.createARecipeCaps },
+            onAction = { onCreateRecipe?.invoke() },
+            modifier = modifier,
+        )
+        else -> CookingEmptyState(
+            title = s.noRecipesYet,
+            message = s.noRecipesFrom(username),
+            modifier = modifier,
+        )
+    }
 }
 
 @Composable
@@ -527,6 +591,7 @@ fun UserProfileOwnPreview() {
             ProfileContent(
                 user = previewUser,
                 recipes = previewRecipes,
+                isEmpty = false,
                 tab = ProfileTab.RECIPES,
                 onTabSelected = {},
                 isLikedLoading = false,
@@ -543,6 +608,8 @@ fun UserProfileOwnPreview() {
                 onLoadMore = {},
                 allLoaded = true,
                 onRecipeClick = {},
+                onCreateRecipe = null,
+                onExploreRecipes = null,
             )
         }
     }
@@ -556,6 +623,7 @@ fun UserProfileOtherPreview() {
             ProfileContent(
                 user = previewUser,
                 recipes = previewRecipes,
+                isEmpty = false,
                 tab = ProfileTab.RECIPES,
                 onTabSelected = {},
                 isLikedLoading = false,
@@ -572,6 +640,40 @@ fun UserProfileOtherPreview() {
                 onLoadMore = {},
                 allLoaded = true,
                 onRecipeClick = {},
+                onCreateRecipe = null,
+                onExploreRecipes = null,
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Profile - Own, empty")
+@Composable
+fun UserProfileOwnEmptyPreview() {
+    CookncoTheme {
+        Box(modifier = Modifier.background(CookncoGreen)) {
+            ProfileContent(
+                user = previewUser,
+                recipes = emptyList(),
+                isEmpty = true,
+                tab = ProfileTab.RECIPES,
+                onTabSelected = {},
+                isLikedLoading = false,
+                isOwnProfile = true,
+                isFollowing = false,
+                isFollowLoading = false,
+                onToggleFollow = {},
+                onNavigateBack = null,
+                onNavigateToEdit = {},
+                onNavigateToSettings = {},
+                onNavigateToFollowers = {},
+                onNavigateToFollowing = {},
+                onShare = {},
+                onLoadMore = {},
+                allLoaded = true,
+                onRecipeClick = {},
+                onCreateRecipe = {},
+                onExploreRecipes = {},
             )
         }
     }

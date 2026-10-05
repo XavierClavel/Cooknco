@@ -9,6 +9,7 @@ import com.xavierclavel.cooknco.data.UserRepository
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.UserInfo
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,10 +39,21 @@ data class UserProfileUiState(
     val allRecipesLoaded: Boolean = false,
     val allLikedLoaded: Boolean = false,
     val error: String? = null,
+    /**
+     * Whether the server has answered for [recipes] and for [liked]. Without them an empty list
+     * reads the same whether there is nothing in it or nothing could be fetched, and only one of
+     * those may be shown as "no recipes yet".
+     */
+    val recipesLoaded: Boolean = false,
+    val likedLoaded: Boolean = false,
 ) {
     /** What the grid is actually drawing, which is all the screen needs to know. */
     val shownRecipes: List<RecipeOverview>
         get() = if (tab == ProfileTab.LIKED) liked else recipes
+
+    /** The grid on screen has nothing in it, and the server is what said so. */
+    val isShownEmpty: Boolean
+        get() = shownRecipes.isEmpty() && if (tab == ProfileTab.LIKED) likedLoaded else recipesLoaded
 }
 
 class UserProfileViewModel(
@@ -73,6 +85,9 @@ class UserProfileViewModel(
     private var isLoadingMore = false
     private var isLoadingMoreLiked = false
 
+    /** The quiet reload in flight — see [reloadIfEmpty]. */
+    private var reloadJob: Job? = null
+
     init {
         loadAll()
     }
@@ -86,7 +101,8 @@ class UserProfileViewModel(
 
             val user = userDeferred.await().getOrNull()
             val following = followDeferred?.await()?.getOrNull() ?: false
-            val initialRecipes = recipesDeferred.await().getOrNull() ?: emptyList()
+            val recipesResult = recipesDeferred.await()
+            val initialRecipes = recipesResult.getOrNull() ?: emptyList()
 
             recipes.clear()
             recipes.addAll(initialRecipes)
@@ -99,6 +115,7 @@ class UserProfileViewModel(
                     isFollowing = following,
                     recipes = recipes.toList(),
                     allRecipesLoaded = initialRecipes.size < pageSize,
+                    recipesLoaded = recipesResult.isSuccess,
                     error = if (user == null) "Failed to load profile" else null,
                 )
             }
@@ -132,6 +149,7 @@ class UserProfileViewModel(
                             liked = liked.toList(),
                             isLikedLoading = false,
                             allLikedLoaded = page.size < pageSize,
+                            likedLoaded = true,
                         )
                     }
                 }
@@ -139,6 +157,39 @@ class UserProfileViewModel(
                     _uiState.update { it.copy(isLikedLoading = false, error = err.message) }
                 }
         }.invokeOnCompletion { isLoadingMoreLiked = false }
+    }
+
+    /**
+     * Asks again for the grid on screen when it came back empty, without a spinner.
+     *
+     * Called each time the profile comes back on screen. What its empty state asks for — writing
+     * a recipe, liking one — happens on other screens, and nothing else would reload this one:
+     * paging has stopped asking, and the likes are loaded once per visit to the tab. Quiet,
+     * because the empty state is already showing and stays true until something arrives; a
+     * failure leaves it there for the same reason.
+     */
+    fun reloadIfEmpty() {
+        val state = _uiState.value
+        if (!state.isShownEmpty || reloadJob?.isActive == true) return
+        reloadJob = viewModelScope.launch {
+            if (state.tab == ProfileTab.LIKED) {
+                userRepo.getUserRecipes(profileUserId, 0, liked = true).onSuccess { page ->
+                    if (page.isEmpty()) return@onSuccess
+                    liked.addAll(page)
+                    likedPage = 1
+                    _uiState.update { it.copy(liked = liked.toList(), allLikedLoaded = page.size < pageSize) }
+                }
+            } else {
+                userRepo.getUserRecipes(profileUserId, 0).onSuccess { page ->
+                    if (page.isEmpty()) return@onSuccess
+                    recipes.addAll(page)
+                    recipePage = 1
+                    _uiState.update { it.copy(recipes = recipes.toList(), allRecipesLoaded = page.size < pageSize) }
+                    // The count above the grid still says none.
+                    userRepo.getUser(profileUserId).onSuccess { user -> _uiState.update { it.copy(user = user) } }
+                }
+            }
+        }
     }
 
     /** Pages whichever grid is on screen; the two keep their own offset and their own guard. */

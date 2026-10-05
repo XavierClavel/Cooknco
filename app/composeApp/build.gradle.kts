@@ -76,6 +76,7 @@ kotlin {
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor3)
             implementation(libs.reorderable)
+            implementation(libs.compottie.lite)
         }
 
         androidMain.dependencies {

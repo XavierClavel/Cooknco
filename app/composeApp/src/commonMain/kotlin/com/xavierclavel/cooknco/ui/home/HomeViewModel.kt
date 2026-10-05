@@ -48,7 +48,15 @@ data class HomeUiState(
     val isRefreshing: Boolean = false,
     val allLoaded: Boolean = false,
     val error: String? = null,
-)
+) {
+    /**
+     * The server has been asked and has nothing: no recipe of the cook's own, none from anyone
+     * they follow. Not while the first page is still on its way, which is a spinner, and not
+     * after a failure, which is the error: telling an offline cook that nobody they follow has
+     * posted would be a claim about the feed that nothing has checked.
+     */
+    val isEmpty: Boolean get() = allLoaded && dateGroups.isEmpty() && error == null
+}
 
 class HomeViewModel(
     private val recipeRepository: RecipeRepository,
@@ -139,6 +147,29 @@ class HomeViewModel(
                 .onFailure { error ->
                     _uiState.update { it.copy(isRefreshing = false, error = error.message) }
                 }
+        }
+    }
+
+    /**
+     * Asks again for a feed that came back empty, without the pull's spinner.
+     *
+     * Called each time the feed comes back on screen. What the empty state asks for — following
+     * somebody, posting a recipe — happens on other screens, and nothing else would reload this
+     * one: paging has stopped asking, and a cook who has just followed somebody has no reason to
+     * think a pull is needed. Quiet, because the empty state is already showing and stays true
+     * until something arrives; a failure leaves it there for the same reason.
+     */
+    fun reloadIfEmpty() {
+        if (!_uiState.value.isEmpty || loadJob?.isActive == true) return
+        loadJob = viewModelScope.launch {
+            recipeRepository.listRecipes(userId, 0).onSuccess { items ->
+                if (items.isEmpty()) return@onSuccess
+                allRecipes.addAll(items)
+                // Set rather than incremented: an empty refresh leaves it at 1 without
+                // having loaded anything.
+                currentPage = 1
+                _uiState.update { it.copy(allLoaded = false, dateGroups = groupByDate(allRecipes)) }
+            }
         }
     }
 

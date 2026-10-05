@@ -75,7 +75,10 @@ interface Strings {
     val today: String
     val yesterday: String
     fun daysAgo(days: Long): String
-    val feedEmpty: String
+    val feedEmptyTitle: String
+    val feedEmptyMessage: String
+    val exploreRecipesCaps: String
+    val createARecipeCaps: String
 
     // ── Recipe ────────────────────────────────────────────────────────────────
     val ingredients: String
@@ -209,6 +212,9 @@ interface Strings {
 
     // ── Cookbooks ─────────────────────────────────────────────────────────────
     val newCookbook: String
+    val cookbooksEmptyTitle: String
+    val cookbooksEmptyMessage: String
+    val createACookbookCaps: String
     val addToCookbookHint: String
     val inThisCookbook: String
     val noCookbooksYet: String
@@ -264,7 +270,10 @@ interface Strings {
     fun seeAll(count: Int, approximate: Boolean): String
     val myRecipes: String
     val liked: String
-    val noLikesYet: String
+    val likedEmptyTitle: String
+    val likedEmptyMessage: String
+    val ownRecipesEmptyMessage: String
+    fun noRecipesFrom(username: String): String
     val noRecipesYet: String
     val noUsersYet: String
     fun recipeCount(count: Int): String
