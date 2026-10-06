@@ -186,13 +186,13 @@ class RecipeApi(private val client: HttpClient) {
      * The timeout is this request's own and generous: a model reads a page in several seconds
      * and a busy one in tens, while OkHttp's default would give up at ten.
      */
-    suspend fun importPhoto(token: String, pages: List<CapturedPage>, locale: String): CooklangImportDto {
-        val response = client.post("$base/recipe/import/photo") {
+    suspend fun scanRecipe(token: String, pages: List<CapturedPage>, locale: String): CooklangImportDto {
+        val response = client.post("$base/recipe/scan") {
             bearerAuth(token)
             parameter("locale", locale)
             timeout {
-                requestTimeoutMillis = PHOTO_IMPORT_TIMEOUT_MILLIS
-                socketTimeoutMillis = PHOTO_IMPORT_TIMEOUT_MILLIS
+                requestTimeoutMillis = RECIPE_SCAN_TIMEOUT_MILLIS
+                socketTimeoutMillis = RECIPE_SCAN_TIMEOUT_MILLIS
             }
             setBody(MultiPartFormDataContent(formData {
                 pages.forEachIndexed { index, page ->
@@ -397,4 +397,4 @@ class RecipeApi(private val client: HttpClient) {
 }
 
 /** Past the backend's own wait on the model (90 s), so the backend's answer always wins. */
-private const val PHOTO_IMPORT_TIMEOUT_MILLIS = 120_000L
+private const val RECIPE_SCAN_TIMEOUT_MILLIS = 120_000L

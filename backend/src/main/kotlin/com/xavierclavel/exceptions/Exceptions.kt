@@ -79,7 +79,7 @@ enum class ServiceUnavailableCause(val key: String) {
     PDF_RENDERER_BUSY("pdf_renderer_busy"),
     PDF_RENDERER_FAILED("pdf_renderer_failed"),
 
-    // The photo import's model, which is somebody else's service: see `RecipePhotoReader`.
+    // The recipe scan's model, which is somebody else's service: see `RecipePhotoReader`.
     // NOT_CONFIGURED is an install with no provider set, and is what every developer's
     // backend and the test suite answer by default.
     RECIPE_READER_NOT_CONFIGURED("recipe_reader_not_configured"),
@@ -146,12 +146,12 @@ enum class BadRequestCause (val key: String) {
     COOKLANG_FILE_EMPTY("cooklang_file_empty"),
     COOKLANG_FILE_TOO_LARGE("cooklang_file_too_large"),
 
-    // A photo import with no picture in it, more pages than one recipe has, or a picture
+    // A recipe scan with no picture in it, more pages than one recipe has, or a picture
     // the model read no recipe off. The last is the one a cook acts on - by taking the
     // photo again - so it is a cause of its own rather than a failure.
-    PHOTO_IMPORT_NO_PHOTO("photo_import_no_photo"),
-    PHOTO_IMPORT_TOO_MANY_PHOTOS("photo_import_too_many_photos"),
-    PHOTO_IMPORT_NOTHING_READ("photo_import_nothing_read"),
+    RECIPE_SCAN_NO_PHOTO("recipe_scan_no_photo"),
+    RECIPE_SCAN_TOO_MANY_PHOTOS("recipe_scan_too_many_photos"),
+    RECIPE_SCAN_NOTHING_READ("recipe_scan_nothing_read"),
 
     // The backoffice AI tab's settings, one cause per field so the form can say which.
     AI_LIMIT_INVALID("ai_limit_invalid"),

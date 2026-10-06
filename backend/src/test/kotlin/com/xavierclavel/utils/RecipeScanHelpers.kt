@@ -21,11 +21,11 @@ import shared.utils.URL.RECIPE_URL
 import kotlin.test.assertEquals
 
 /** Posts pages the way the app does: one file part per page, in order. */
-suspend fun HttpClient.importPhotoRaw(
+suspend fun HttpClient.scanRecipeRaw(
     pages: List<ByteArray> = listOf(testImageBytes()),
     locale: Locale? = null,
 ): HttpResponse =
-    this.post("$RECIPE_URL/import/photo") {
+    this.post("$RECIPE_URL/scan") {
         url { locale?.let { parameters.append("locale", it.name) } }
         setBody(MultiPartFormDataContent(formData {
             pages.forEachIndexed { index, bytes ->
@@ -37,11 +37,11 @@ suspend fun HttpClient.importPhotoRaw(
         }))
     }
 
-suspend fun HttpClient.importPhoto(
+suspend fun HttpClient.scanRecipe(
     pages: List<ByteArray> = listOf(testImageBytes()),
     locale: Locale? = null,
 ): CooklangImportInfo =
-    this.importPhotoRaw(pages, locale).let {
+    this.scanRecipeRaw(pages, locale).let {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
         Json.decodeFromString<CooklangImportInfo>(it.bodyAsText())
     }

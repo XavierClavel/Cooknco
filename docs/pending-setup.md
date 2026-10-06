@@ -233,7 +233,7 @@ changes this table, the two documents, and the form — in that order, and in th
 The app's manifest declares no `com.google.android.gms.permission.AD_ID`, and the only
 Firebase library it pulls in is **Messaging** — no Analytics, no Crashlytics. The ML Kit
 document scanner and text recogniser it also carries read the page on the device and send
-nothing anywhere. The premium photo import does send the page — to the backend, which passes
+nothing anywhere. The premium recipe scan does send the page — to the backend, which passes
 it to the provider of section 5 — and that is a processor acting for the service, the same
 standing Google has for mail and push, so the "shared" row stays a no as long as that
 provider is one with no-retention, no-training terms. That is what
@@ -268,7 +268,7 @@ a private window once, in both languages (the browser's language picks which).
 
 ## 5. The AI provider — a key, a model id, and the prices
 
-**What is inert until this is done:** "Read a photo with AI", on the new-recipe sheet in the
+**What is inert until this is done:** "Scan a recipe with AI", on the new-recipe sheet in the
 app. A premium account still sees it and can tap it; the backend answers
 `503 recipe_reader_not_configured` and the app says reading photos is unavailable right now.
 Everything else, the on-device scan included, is unaffected.
@@ -298,12 +298,12 @@ about a cent per account per day on that model.
 
 ### Trying a provider before choosing it
 
-`scripts/try-photo-provider.sh` sends photos to a provider exactly as the backend does — the
+`scripts/try-recipe-scan-provider.sh` sends photos to a provider exactly as the backend does — the
 prompt read out of `RecipePhotoReader.kt`, the pages scaled as the app scales them — and prints
 the time, the tokens billed and the answer. Nothing has to be deployed for it:
 
 ```bash
-BASE_URL=https://api.scaleway.ai/v1 API_KEY=... MODEL=... scripts/try-photo-provider.sh page.jpg
+BASE_URL=https://api.scaleway.ai/v1 API_KEY=... MODEL=... scripts/try-recipe-scan-provider.sh page.jpg
 ```
 
 ### Setting it
@@ -329,7 +329,7 @@ ids differ from the ones its dedicated deployments use, and an unknown id comes 
 
 Then restart the backend (`kubectl rollout restart deployment/cooknco-backend`), since the
 secret is read at start-up. Its log says which model it reads with:
-`Photo import reads with <model> at <baseUrl>`.
+`Recipe scan reads with <model> at <baseUrl>`.
 
 **Then open the backoffice's AI tab and type in the provider's prices** (per million tokens, in
 and out) and a monthly budget. Nothing reads prices from the provider, so until they are set
@@ -341,11 +341,11 @@ every AI feature together — there is one provider and one bill.
 
 ```bash
 # A premium account's session cookie, and a photographed recipe page
-curl -sS -X POST "https://cooknco.eu/api/v1/recipe/import/photo?locale=FR" \
+curl -sS -X POST "https://cooknco.eu/api/v1/recipe/scan?locale=FR" \
   -b "user_session=<cookie>" -F "page=@page.jpg;type=image/jpeg" | head -c 400
 
 # What it cost: one line per import
-kubectl logs deployment/cooknco-backend | grep "Photo import by user"
+kubectl logs deployment/cooknco-backend | grep "Recipe scan by user"
 ```
 
 A `503` whose body is `recipe_reader_failed` means the provider refused: the line just before

@@ -68,7 +68,7 @@ actual fun rememberRecipePhotoCapture(onCaptured: (PhotoCaptureResult) -> Unit):
 }
 
 /**
- * One page as a JPEG no longer than [PHOTO_IMPORT_MAX_EDGE] on its long side, upright.
+ * One page as a JPEG no longer than [RECIPE_SCAN_MAX_EDGE] on its long side, upright.
  *
  * Decoded at a power-of-two sample first, so a 12-megapixel page is never held in memory at
  * full size just to be shrunk. The EXIF orientation is applied by hand because
@@ -83,7 +83,7 @@ private fun encodePage(context: Context, uri: Uri): CapturedPage {
     require(longest > 0) { "Unreadable page" }
 
     var sample = 1
-    while (longest / (sample * 2) >= PHOTO_IMPORT_MAX_EDGE) sample *= 2
+    while (longest / (sample * 2) >= RECIPE_SCAN_MAX_EDGE) sample *= 2
     val decoded = resolver.openInputStream(uri).use {
         BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
     } ?: error("Unreadable page")
@@ -97,7 +97,7 @@ private fun encodePage(context: Context, uri: Uri): CapturedPage {
         }
     }
 
-    val scale = minOf(1f, PHOTO_IMPORT_MAX_EDGE.toFloat() / max(decoded.width, decoded.height))
+    val scale = minOf(1f, RECIPE_SCAN_MAX_EDGE.toFloat() / max(decoded.width, decoded.height))
     val matrix = Matrix().apply {
         postScale(scale, scale)
         postRotate(rotation)
@@ -109,7 +109,7 @@ private fun encodePage(context: Context, uri: Uri): CapturedPage {
 
     return try {
         val out = ByteArrayOutputStream()
-        page.compress(Bitmap.CompressFormat.JPEG, PHOTO_IMPORT_JPEG_QUALITY, out)
+        page.compress(Bitmap.CompressFormat.JPEG, RECIPE_SCAN_JPEG_QUALITY, out)
         CapturedPage(out.toByteArray())
     } finally {
         page.recycle()

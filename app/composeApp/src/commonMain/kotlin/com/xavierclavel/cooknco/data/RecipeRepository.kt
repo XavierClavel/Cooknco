@@ -92,9 +92,9 @@ class RecipeRepository(
     }
 
     /** Has the backend read photographed pages into a recipe. Saves nothing; premium only. */
-    suspend fun importPhoto(pages: List<CapturedPage>): Result<CooklangImportDto> = runCatching {
+    suspend fun scanRecipe(pages: List<CapturedPage>): Result<CooklangImportDto> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
-        recipeApi.importPhoto(token, pages, AppLanguage.current.value.code)
+        recipeApi.scanRecipe(token, pages, AppLanguage.current.value.code)
     }
 
     suspend fun updateRecipe(id: Long, dto: RecipeSaveDto): Result<RecipeInfo> = runCatching {

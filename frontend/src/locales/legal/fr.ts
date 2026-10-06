@@ -81,7 +81,7 @@ const documents: LegalDocuments = {
           { text: "Aucune mesure d'audience, aucun outil de suivi d'aucune sorte, aucun profilage." },
           { text: "Rien de ce qui vous concerne n'est vendu, loué ni transmis à des fins de prospection." },
           {
-            text: "La lecture d'une recette imprimée se fait entièrement sur votre téléphone : ni la photo ni le texte qui en est tiré ne quittent l'appareil.",
+            text: "Le scan d'une recette imprimée sans IA se fait entièrement sur votre téléphone : ni la photo ni le texte qui en est tiré ne quittent l'appareil.",
           },
           {
             text: "L'export d'une recette en PDF est réalisé par un composant interne à l'infrastructure du service, qui n'a aucun accès à internet.",
@@ -105,7 +105,7 @@ const documents: LegalDocuments = {
           },
           {
             term: "Le modèle qui lit une photo de recette",
-            text: "seulement si vous avez un compte premium et choisissez « Lire une photo avec l'IA » : les pages photographiées sont envoyées à un prestataire qui fait tourner ce modèle dans l'Union européenne, qui les lit pour le compte du service et renvoie la recette. Le service ne conserve ni les photos ni la réponse du modèle — seulement ce que vous enregistrez ensuite comme recette.",
+            text: "seulement si vous avez un compte premium et choisissez « Scanner une recette avec l'IA » : les pages photographiées sont envoyées à un prestataire qui fait tourner ce modèle dans l'Union européenne, qui les lit pour le compte du service et renvoie la recette. Le service ne conserve ni les photos ni la réponse du modèle — seulement ce que vous enregistrez ensuite comme recette.",
           },
           {
             term: "Les clients IA que vous avez connectés",

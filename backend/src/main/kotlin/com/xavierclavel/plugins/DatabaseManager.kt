@@ -54,7 +54,7 @@ object DatabaseManager {
         // (User.oauthGrants) so they would go with it regardless; listed here so the
         // wipe does not rest on that
         QOAuthGrant(),
-        // Photo imports point at users too, and nothing clears them — an account's deletion
+        // AI usage rows point at users too, and nothing clears them — an account's deletion
         // detaches them on purpose (UserService.deleteUserById), so its spend stays counted
         QAiUsage(),
         // Before both tables it points at: a step's ingredient links restrict deletes at

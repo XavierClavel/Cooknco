@@ -277,7 +277,7 @@ import UiEmpty from '../components/UiEmpty.vue'
 
 const {t, te} = useI18n()
 
-/** What a typical one-page photo import bills; only used to turn draft prices into an estimate. */
+/** What a typical one-page recipe scan bills; only used to turn draft prices into an estimate. */
 const TYPICAL_INPUT_TOKENS = 3500
 const TYPICAL_OUTPUT_TOKENS = 1000
 

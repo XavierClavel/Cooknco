@@ -7,7 +7,7 @@ package shared.enums
  * Stored by ordinal, like every enum here: append, never reorder.
  */
 enum class AiUsageOutcome {
-    /** The model's answer was used — for a photo import, a recipe handed to the editor. */
+    /** The model's answer was used — for a recipe scan, a recipe handed to the editor. */
     READ,
 
     /** The model answered, and had nothing to give — no recipe on the photographed page. */

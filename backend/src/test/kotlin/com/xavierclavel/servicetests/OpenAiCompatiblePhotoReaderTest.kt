@@ -28,7 +28,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The one class in the photo import that speaks to a provider, against a mock engine.
+ * The one class in the recipe scan that speaks to a provider, against a mock engine.
  *
  * The request is asserted field by field because it is the whole of the provider contract:
  * every OpenAI-compatible service reads the same body, so a body this gets wrong is wrong for

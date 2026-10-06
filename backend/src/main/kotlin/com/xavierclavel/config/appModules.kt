@@ -28,7 +28,7 @@ import com.xavierclavel.services.ModerationService
 import com.xavierclavel.services.NoopPushSender
 import com.xavierclavel.services.NotificationService
 import com.xavierclavel.services.OpenAiCompatiblePhotoReader
-import com.xavierclavel.services.PhotoImportService
+import com.xavierclavel.services.RecipeScanService
 import com.xavierclavel.services.AiUsageService
 import com.xavierclavel.services.RecipePhotoReader
 import com.xavierclavel.services.UnconfiguredPhotoReader
@@ -62,7 +62,7 @@ val appModules = module {
     single { DefaultImageService() }
     single { ExportService() }
     single { CooklangService() }
-    single { PhotoImportService() }
+    single { RecipeScanService() }
     single { AiUsageService() }
     single { LikeService() }
     single { MailService() }
@@ -119,17 +119,17 @@ val appModules = module {
         }
     }
     /**
-     * The model behind the premium photo import, chosen entirely in configuration: any
+     * The model behind the premium recipe scan, chosen entirely in configuration: any
      * OpenAI-compatible provider. An install without one keeps the route and answers 503,
      * which is what every developer's backend does. See `Configuration.Ai`.
      */
     single<RecipePhotoReader> {
         val ai = config.ai
         if (!ai.isConfigured) {
-            appLogger.info { "Photo import has no provider configured: the route will answer 503" }
+            appLogger.info { "Recipe scan has no provider configured: the route will answer 503" }
             UnconfiguredPhotoReader()
         } else {
-            appLogger.info { "Photo import reads with ${ai.model} at ${ai.baseUrl}" }
+            appLogger.info { "Recipe scan reads with ${ai.model} at ${ai.baseUrl}" }
             OpenAiCompatiblePhotoReader(
                 baseUrl = ai.baseUrl,
                 apiKey = ai.apiKey,

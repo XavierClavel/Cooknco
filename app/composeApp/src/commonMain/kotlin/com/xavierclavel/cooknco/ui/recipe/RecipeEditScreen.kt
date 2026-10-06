@@ -379,7 +379,7 @@ fun RecipeEditScreen(
     // of the system's, so this composition can be stopped and restarted while the file is
     // being chosen.
     // And the same again: the capture is the scanner's window, handing pages back as pictures.
-    val photoCapture = rememberRecipePhotoCapture(onCaptured = viewModel::importPhoto)
+    val photoCapture = rememberRecipePhotoCapture(onCaptured = viewModel::scanWithAi)
     val cooklangPicker = rememberTextFilePicker(
         mimeTypes = COOKLANG_PICKER_MIME_TYPES,
         onPicked = viewModel::importCooklang,
@@ -491,11 +491,11 @@ fun RecipeEditScreen(
                         // differently: the scan reads on the phone and sends nothing, this
                         // sends the page to a model. Premium, because each one is a paid call.
                         premiumSheetAction(
-                            label = s.readRecipePhoto,
+                            label = s.scanRecipeWithAi,
                             icon = Icons.Outlined.AutoAwesome,
                             isPremium = isPremium,
                             onUse = photoCapture::launch,
-                            onLocked = { lockedFeature = s.readRecipePhoto },
+                            onLocked = { lockedFeature = s.scanRecipeWithAi },
                         ),
                     SheetAction(
                         label = s.importCooklang,
@@ -546,7 +546,7 @@ fun RecipeEditScreen(
         // One strip for the two, because only one of them can be running: the menu is the
         // only way into either and it closes on the way, and the view models refuse a second
         // start while one is in flight.
-        val busy = uiState.isScanning || uiState.isImporting || uiState.isReadingPhoto
+        val busy = uiState.isScanning || uiState.isImporting || uiState.isScanningWithAi
         val statusMessage = uiState.scanMessage ?: uiState.importMessage
         if (busy || statusMessage != null) {
             StickerCard(
@@ -568,7 +568,7 @@ fun RecipeEditScreen(
                     }
                     Text(
                         text = statusMessage ?: when {
-                            uiState.isReadingPhoto -> s.readingPhoto
+                            uiState.isScanningWithAi -> s.scanningWithAi
                             uiState.isImporting -> s.importing
                             else -> s.scanning
                         },

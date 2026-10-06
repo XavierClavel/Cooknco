@@ -223,8 +223,8 @@ export const previewPdfTemplate = (key: string, locale: string, body: string, su
 /** Every mobile platform, gated or not. The web app has no row: see AppPlatform. */
 export const listAppVersions = () => api.get('/admin/app-versions')
 
-// ------------------------------------------------------------- photo import
-/** Spend, limits and recent imports of the premium photo import, in one read. */
+// ------------------------------------------------------------- recipe scan
+/** Spend, limits and recent imports of the premium recipe scan, in one read. */
 export const getAiOverview = () => api.get('/admin/ai')
 
 export type AiSettings = {

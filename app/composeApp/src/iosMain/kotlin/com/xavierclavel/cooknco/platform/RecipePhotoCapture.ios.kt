@@ -87,7 +87,7 @@ actual fun rememberRecipePhotoCapture(onCaptured: (PhotoCaptureResult) -> Unit):
 }
 
 /**
- * One page as a JPEG no longer than [PHOTO_IMPORT_MAX_EDGE] points on its long side.
+ * One page as a JPEG no longer than [RECIPE_SCAN_MAX_EDGE] points on its long side.
  *
  * VisionKit hands the page over upright and already flattened, so all that is left is the
  * size: drawn at scale 1 into a smaller context, which is the one resize UIKit offers that
@@ -98,7 +98,7 @@ private fun encodePage(image: UIImage): CapturedPage? {
     val (width, height) = image.size.useContents { width to height }
     val longest = maxOf(width, height)
     if (longest <= 0.0) return null
-    val scale = minOf(1.0, PHOTO_IMPORT_MAX_EDGE / longest)
+    val scale = minOf(1.0, RECIPE_SCAN_MAX_EDGE / longest)
     val resized = if (scale < 1.0) {
         UIGraphicsBeginImageContextWithOptions(CGSizeMake(width * scale, height * scale), true, 1.0)
         image.drawInRect(CGRectMake(0.0, 0.0, width * scale, height * scale))
@@ -106,7 +106,7 @@ private fun encodePage(image: UIImage): CapturedPage? {
         UIGraphicsEndImageContext()
         drawn ?: image
     } else image
-    val data = UIImageJPEGRepresentation(resized, PHOTO_IMPORT_JPEG_QUALITY / 100.0) ?: return null
+    val data = UIImageJPEGRepresentation(resized, RECIPE_SCAN_JPEG_QUALITY / 100.0) ?: return null
     return CapturedPage(data.toBytes())
 }
 

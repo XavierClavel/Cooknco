@@ -7,7 +7,7 @@ import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.services.CooklangService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.NotificationService
-import com.xavierclavel.services.PhotoImportService
+import com.xavierclavel.services.RecipeScanService
 import com.xavierclavel.services.RecipePhoto
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeService
@@ -52,7 +52,7 @@ object RecipeController: Controller(RECIPE_URL) {
     val imageService: ImageService by inject(ImageService::class.java)
     val notificationService: NotificationService by inject(NotificationService::class.java)
     val cooklangService: CooklangService by inject(CooklangService::class.java)
-    val photoImportService: PhotoImportService by inject(PhotoImportService::class.java)
+    val recipeScanService: RecipeScanService by inject(RecipeScanService::class.java)
     val configuration: Configuration by inject(Configuration::class.java)
 
     override fun Route.routes() {
@@ -61,7 +61,7 @@ object RecipeController: Controller(RECIPE_URL) {
         authenticate("auth-session", "bearer-auth") {
             createRecipe()
             importCooklang()
-            importPhoto()
+            scanRecipe()
             updateRecipe()
             deleteRecipe()
         }
@@ -152,13 +152,13 @@ object RecipeController: Controller(RECIPE_URL) {
      * **without saving anything** — the premium counterpart of the on-device scanner.
      *
      * The answer is the same [shared.infodto.CooklangImportInfo] the Cooklang import gives,
-     * because it is built the same way (see [PhotoImportService]), so a client fills the
+     * because it is built the same way (see [RecipeScanService]), so a client fills the
      * editor in from either with one piece of code.
      *
      * **Premium, unlike the Cooklang import beside it**, and the difference is the bill: a
      * file is parsed here for nothing, while every photograph is a paid call to somebody
      * else's model. The gate is checked before the body is read, so a refused account costs
-     * no upload either, and [PhotoImportService] adds a daily allowance on top of it.
+     * no upload either, and [RecipeScanService] adds a daily allowance on top of it.
      *
      * The body is `multipart/form-data` with one file part per page, in order. Each page is
      * bounded as it is read ([Configuration.Ai.maxPhotoBytes]) rather than trusted to
@@ -168,7 +168,7 @@ object RecipeController: Controller(RECIPE_URL) {
      * @param locale which language to look the ingredients up in, as for the Cooklang import.
      *   The page is transcribed in its own language whatever this says.
      */
-    private fun Route.importPhoto() = post("/import/photo") {
+    private fun Route.scanRecipe() = post("/scan") {
         val user = userService.checkPremiumAccess(getSessionUserId())
         val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
         val settings = configuration.ai
@@ -177,18 +177,18 @@ object RecipeController: Controller(RECIPE_URL) {
         call.receiveMultipart(formFieldLimit = settings.maxPhotoBytes + 1).forEachPart { part ->
             try {
                 if (part !is PartData.FileItem) return@forEachPart
-                if (photos.size >= settings.maxPhotos) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_TOO_MANY_PHOTOS)
+                if (photos.size >= settings.maxPhotos) throw BadRequestException(BadRequestCause.RECIPE_SCAN_TOO_MANY_PHOTOS)
                 val bytes = part.provider().toInputStream().readBounded(settings.maxPhotoBytes)
-                val mediaType = PhotoImportService.mediaTypeOf(bytes)
+                val mediaType = RecipeScanService.mediaTypeOf(bytes)
                     ?: throw BadRequestException(BadRequestCause.INVALID_IMAGE)
                 photos += RecipePhoto(bytes, mediaType)
             } finally {
                 part.dispose()
             }
         }
-        if (photos.isEmpty()) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_NO_PHOTO)
+        if (photos.isEmpty()) throw BadRequestException(BadRequestCause.RECIPE_SCAN_NO_PHOTO)
 
-        call.respond(HttpStatusCode.OK, photoImportService.read(user, photos, locale))
+        call.respond(HttpStatusCode.OK, recipeScanService.read(user, photos, locale))
     }
 
     private fun Route.updateRecipe() = put("/{id}") {

@@ -33,7 +33,7 @@ data class Configuration(
     val ai: Ai = Ai(),
 ) {
     /**
-     * The model provider behind the AI features — today the premium photo import, which reads a
+     * The model provider behind the AI features — today the premium recipe scan, which reads a
      * picture of a recipe into the editor — and the bounds they share.
      *
      * **Provider-agnostic by configuration.** Any service speaking the OpenAI chat-completions
@@ -60,7 +60,7 @@ data class Configuration(
         val timeoutSeconds: Long = 90,
 
         /**
-         * Pages one photo import may carry. A recipe over a spread is two; the app's scanner stops
+         * Pages one recipe scan may carry. A recipe over a spread is two; the app's scanner stops
          * at four, and this matches it — every page is another image billed.
          */
         val maxPhotos: Int = 4,

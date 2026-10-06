@@ -79,7 +79,7 @@ const documents: LegalDocuments = {
           { text: "No analytics, no measurement or tracking toolkit of any kind, no profiling." },
           { text: "Nothing about you is sold, rented, or handed to anyone for marketing." },
           {
-            text: "Scanning a printed recipe happens entirely on your phone. Neither the photograph nor the text read off it leaves the device.",
+            text: "Scanning a printed recipe without AI happens entirely on your phone. Neither the photograph nor the text read off it leaves the device.",
           },
           {
             text: "Exporting a recipe to PDF is done by a component inside the service's own infrastructure, which has no access to the internet at all.",
@@ -103,7 +103,7 @@ const documents: LegalDocuments = {
           },
           {
             term: "The model that reads a recipe photo",
-            text: "only if you have a premium account and choose “Read a photo with AI”: the pages you photograph are sent to a provider running that model inside the European Union, which reads them on the service's behalf and returns the recipe. The service keeps neither the photographs nor what the model answered — only what you then save as a recipe.",
+            text: "only if you have a premium account and choose “Scan a recipe with AI”: the pages you photograph are sent to a provider running that model inside the European Union, which reads them on the service's behalf and returns the recipe. The service keeps neither the photographs nor what the model answered — only what you then save as a recipe.",
           },
           {
             term: "The AI clients you connected yourself",

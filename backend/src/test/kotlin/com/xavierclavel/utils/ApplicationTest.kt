@@ -28,7 +28,7 @@ import com.xavierclavel.services.OAuthService
 import com.xavierclavel.services.PdfRenderer
 import com.xavierclavel.services.PushSender
 import com.xavierclavel.services.PdfTemplateService
-import com.xavierclavel.services.PhotoImportService
+import com.xavierclavel.services.RecipeScanService
 import com.xavierclavel.services.AiUsageService
 import com.xavierclavel.services.RecipePhotoReader
 import com.xavierclavel.services.RecipeIngredientService
@@ -116,7 +116,7 @@ abstract class ApplicationTest: KoinTest {
                 single { DefaultImageService() }
                 single { ExportService() }
                 single { CooklangService() }
-                single { PhotoImportService() }
+                single { RecipeScanService() }
                 single { AiUsageService() }
                 // No test pays for a model: see FakeRecipePhotoReader.
                 single<RecipePhotoReader> { FakeRecipePhotoReader() }

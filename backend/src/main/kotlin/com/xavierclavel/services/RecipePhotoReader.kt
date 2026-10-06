@@ -34,7 +34,7 @@ class RecipePhoto(val bytes: ByteArray, val mediaType: String)
 /**
  * What a model answered, before anything has been made of it.
  *
- * [json] is the model's own text, unparsed: deciding what it means is [PhotoImportService]'s
+ * [json] is the model's own text, unparsed: deciding what it means is [RecipeScanService]'s
  * job, so that every provider is held to one reading of it rather than each to its own.
  */
 class RecipePhotoReading(
@@ -49,14 +49,14 @@ class RecipePhotoReading(
 /**
  * Something that can look at photographs of a recipe and write down what is on them.
  *
- * An interface, and the only thing in the photo import that knows a model is involved,
+ * An interface, and the only thing in the recipe scan that knows a model is involved,
  * because which model is a decision about price and hosting rather than about the feature:
  * swapping providers must be a configuration change and nothing else. Everything a provider
  * gets wrong — the shape of the answer, units it invented, an ingredient a step names but the
  * list does not — is dealt with downstream, in one place, whoever answered.
  *
  * The prompt lives here rather than with each implementation for the same reason: it is the
- * contract [PhotoImportService] parses against, and a second copy would drift from it.
+ * contract [RecipeScanService] parses against, and a second copy would drift from it.
  */
 interface RecipePhotoReader {
     /**

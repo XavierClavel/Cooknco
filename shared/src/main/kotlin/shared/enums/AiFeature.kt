@@ -11,6 +11,6 @@ package shared.enums
  * Stored by ordinal, like every enum here: append, never reorder.
  */
 enum class AiFeature {
-    /** A photographed recipe page, read into the editor (`PhotoImportService`). */
-    PHOTO_IMPORT,
+    /** A photographed recipe page, read into the editor (`RecipeScanService`). */
+    RECIPE_SCAN,
 }

@@ -21,17 +21,17 @@ sealed interface PhotoCaptureResult {
  * keeps body text legible — a printed page at this size reads fine — at a few hundred
  * kilobytes a page.
  */
-const val PHOTO_IMPORT_MAX_EDGE = 1600
+const val RECIPE_SCAN_MAX_EDGE = 1600
 
 /** JPEG quality of a sent page: text survives it, and the size halves against 95. */
-const val PHOTO_IMPORT_JPEG_QUALITY = 85
+const val RECIPE_SCAN_JPEG_QUALITY = 85
 
 /**
  * Remembers a launcher that opens the same document scanner as [rememberRecipeScanner] and
  * hands back the pages as pictures instead of reading them on the phone.
  *
  * It is the premium import's camera: the pages are posted to the backend, which has a vision
- * model read them (`POST /recipe/import/photo`). So unlike the scan, **this one leaves the
+ * model read them (`POST /recipe/scan`). So unlike the scan, **this one leaves the
  * phone** — which is why it is a separate launcher rather than a flag on the scanner, whose
  * whole promise is that nothing does. A screen that offers both offers them as two choices.
  *

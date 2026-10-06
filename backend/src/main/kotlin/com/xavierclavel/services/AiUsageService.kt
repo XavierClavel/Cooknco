@@ -37,7 +37,7 @@ import java.time.ZoneOffset
  * shows on one backoffice tab. A feature says which it is ([AiFeature]) and nothing else here
  * changes for it.
  *
- * Kept apart from [PhotoImportService], which reads photos, because this is the money side:
+ * Kept apart from [RecipeScanService], which reads photos, because this is the money side:
  * the settings the backoffice edits, one [AiUsage] row per billed answer, and the sums the
  * monthly budget and the backoffice tab are read from. Every boundary is UTC, the same one the
  * daily allowance is counted in, so "today" means one thing on both sides.

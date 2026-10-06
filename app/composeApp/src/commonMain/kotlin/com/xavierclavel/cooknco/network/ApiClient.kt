@@ -38,7 +38,7 @@ object ApiClient {
             json(json)
         }
         // Configures nothing by itself, so every request keeps the engine's defaults. It is
-        // what lets one request set a timeout of its own — the photo import's, which waits on
+        // what lets one request set a timeout of its own — the AI recipe scan's, which waits on
         // a model far longer than OkHttp's ten seconds.
         install(HttpTimeout)
         expectSuccess = false

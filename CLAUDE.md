@@ -801,11 +801,11 @@ Nothing here can be verified on this machine beyond compiling: there is no emula
 device, so the parser is the part that is tested (`RecipeScanTest`, over fixtures built from
 the geometry) and the two platform shims are compile-checked only.
 
-## Reading a photo with a model is premium, and lands like a Cooklang import
+## Scanning a recipe with AI is premium, and lands like a Cooklang import
 
-"Read a photo with AI" sits beside the scan on the new-recipe sheet. It takes the same
+"Scan a recipe with AI" sits beside the on-device scan on the new-recipe sheet. It takes the same
 document scanner's pages as JPEGs (`rememberRecipePhotoCapture`, scaled to 1600 px) and posts
-them to `POST /recipe/import/photo`, where a vision model transcribes them. It is the scan's
+them to `POST /recipe/scan`, where a vision model transcribes them. It is the scan's
 opposite in the one way that matters: **this sends the page off the phone**. That is why it is
 a second launcher rather than a mode of the scanner, whose promise is that nothing leaves.
 
@@ -817,7 +817,7 @@ a second launcher rather than a mode of the scanner, whose promise is that nothi
   nothing: the privacy policy says the service transfers nothing outside the Union, so a
   cheaper provider elsewhere makes the policy false. `docs/pending-setup.md` section 5.
 - **The model answers JSON, and the JSON becomes a `CooklangService.Parsed`.**
-  `PhotoImportService.toParsed` maps the transcription onto exactly what a `.cook` file is read
+  `RecipeScanService.toParsed` maps the transcription onto exactly what a `.cook` file is read
   into and hands it to `CooklangService.toRecipe`, so the three things the save path refuses are
   resolved by code already written, and the app fills the editor from the same
   `CooklangImportInfo` it already handles. JSON rather than asking for Cooklang: models write it
@@ -830,7 +830,7 @@ a second launcher rather than a mode of the scanner, whose promise is that nothi
   the two limits are what make premium a bounded cost. An import that never got a usable
   answer — provider down, refusal, an answer that is not the object — is refunded to the cook's
   day, but still counted in the month: the provider billed it.
-- **The money side is generic over AI features, not the photo import's** (backoffice AI tab,
+- **The money side is generic over AI features, not the AI recipe scan's** (backoffice AI tab,
   `AiUsageService`). Every billed answer from any feature leaves an `ai_usage` row tagged with
   its `AiFeature`, its tokens and its cost *at the prices then in force*, so correcting a price
   never rewrites a past month. One budget, one daily allowance and one set of prices
@@ -845,7 +845,7 @@ a second launcher rather than a mode of the scanner, whose promise is that nothi
   edit. Saving the settings does log.
 
 The prompt (`RecipePhotoReader.PROMPT`) and the parser are a contract: changing a field name in
-one is changing it in the other, and `PhotoImportControllerTest` is what notices.
+one is changing it in the other, and `RecipeScanControllerTest` is what notices.
 
 ## Build and test
 

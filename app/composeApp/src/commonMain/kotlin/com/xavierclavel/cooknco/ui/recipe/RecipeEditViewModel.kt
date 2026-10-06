@@ -190,7 +190,7 @@ data class RecipeEditUiState(
      * Photographed pages are with the backend's model. Its own flag beside [isImporting]
      * because the strip says something different for it, and the wait is far longer.
      */
-    val isReadingPhoto: Boolean = false,
+    val isScanningWithAi: Boolean = false,
     /** What the last scan came to, shown once and dismissed. */
     val scanMessage: String? = null,
     /** What the last Cooklang import did, said once. See [RecipeEditViewModel.importCooklang]. */
@@ -401,7 +401,7 @@ class RecipeEditViewModel(
      * many, and it is worth a sentence rather than a warning.
      */
     fun importCooklang(source: String) {
-        if (_uiState.value.isImporting || _uiState.value.isReadingPhoto) return
+        if (_uiState.value.isImporting || _uiState.value.isScanningWithAi) return
         // Set before the coroutine, not inside it: the card is tappable until this flips, so
         // raising it a dispatch later leaves a window in which a second tap starts a second
         // import of the same file.
@@ -425,20 +425,20 @@ class RecipeEditViewModel(
      * trusted never to happen. Lands exactly as a Cooklang import does, because the backend
      * answers with the same thing: **nothing already written is overwritten**.
      */
-    fun importPhoto(result: PhotoCaptureResult) {
+    fun scanWithAi(result: PhotoCaptureResult) {
         val pages = when (result) {
             is PhotoCaptureResult.Failed -> return reportScanFailure()
             is PhotoCaptureResult.Captured -> result.pages
         }
-        if (_uiState.value.isReadingPhoto || _uiState.value.isImporting) return
+        if (_uiState.value.isScanningWithAi || _uiState.value.isImporting) return
         // Raised before the coroutine for the reason importCooklang raises its own.
-        _uiState.update { it.copy(isReadingPhoto = true, importMessage = null, error = null) }
+        _uiState.update { it.copy(isScanningWithAi = true, importMessage = null, error = null) }
         viewModelScope.launch {
-            repo.importPhoto(pages)
-                .onSuccess { imported -> prefillFromImport(imported, done = copy().photoImportDone) }
+            repo.scanRecipe(pages)
+                .onSuccess { imported -> prefillFromImport(imported, done = copy().aiScanDone) }
                 .onFailure { error ->
                     _uiState.update {
-                        it.copy(isReadingPhoto = false, importMessage = photoImportFailure(error))
+                        it.copy(isScanningWithAi = false, importMessage = aiScanFailure(error))
                     }
                 }
         }
@@ -447,20 +447,20 @@ class RecipeEditViewModel(
     /**
      * What to tell the cook when a photo did not read.
      *
-     * The causes are the backend's keys (`PhotoImportService`, and `AiUsageService` for the
+     * The causes are the backend's keys (`RecipeScanService`, and `AiUsageService` for the
      * daily allowance and the monthly budget every AI feature shares); each one the cook can act on
      * differently gets its own sentence — retake the photo, wait for tomorrow, wait a while —
      * and everything else is one apology.
      */
-    private fun photoImportFailure(throwable: Throwable): String {
+    private fun aiScanFailure(throwable: Throwable): String {
         val s = copy()
-        val body = (throwable as? ApiException)?.body ?: return s.photoImportFailed
+        val body = (throwable as? ApiException)?.body ?: return s.aiScanFailed
         return when {
-            "photo_import_nothing_read" in body -> s.photoImportNothingRead
-            "ai_daily_limit" in body -> s.photoImportDailyLimit
+            "recipe_scan_nothing_read" in body -> s.aiScanNothingRead
+            "ai_daily_limit" in body -> s.aiScanDailyLimit
             // The month's AI budget is spent: nothing the cook can do but wait, like a provider down.
-            "recipe_reader_" in body || "ai_budget_exhausted" in body -> s.photoImportUnavailable
-            else -> s.photoImportFailed
+            "recipe_reader_" in body || "ai_budget_exhausted" in body -> s.aiScanUnavailable
+            else -> s.aiScanFailed
         }
     }
 
@@ -514,7 +514,7 @@ class RecipeEditViewModel(
                 // Both, in the same update as the rows: a flag dropped a step earlier would show
                 // the strip as finished over a form that is still empty.
                 isImporting = false,
-                isReadingPhoto = false,
+                isScanningWithAi = false,
                 importMessage = listOfNotNull(
                     s.importCooklangUnmatched(imported.unmatchedIngredients)
                         .takeIf { imported.unmatchedIngredients > 0 },

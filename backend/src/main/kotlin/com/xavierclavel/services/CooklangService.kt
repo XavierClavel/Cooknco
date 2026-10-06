@@ -119,7 +119,7 @@ class CooklangService: KoinComponent {
          * the right outcome either way — a reader that does not know `cooking temperature`
          * loses the temperature, not the recipe.
          *
-         * Internal rather than private because the photo import builds a [Parsed] of its own
+         * Internal rather than private because the recipe scan builds a [Parsed] of its own
          * and hands it to [toRecipe], which reads the metadata under these names.
          */
         internal const val KEY_TITLE = "title"
@@ -627,7 +627,7 @@ class CooklangService: KoinComponent {
      * never mid-word, and never silently shortened.
      *
      * Not private: a model transcribing a photographed page has no bound either, and the
-     * photo import cuts its steps the same way.
+     * recipe scan cuts its steps the same way.
      */
     fun splitStep(text: String): List<String> {
         if (text.length <= RECIPE_STEP_TEXT_MAX_LENGTH) return listOf(text)

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Sends recipe photos to a vision provider exactly as the backend's photo import does, so a
+# Sends recipe photos to a vision provider exactly as the backend's recipe scan does, so a
 # provider and a model can be judged before one is configured (docs/pending-setup.md, section 5).
 #
-#   BASE_URL=https://api.scaleway.ai/v1 API_KEY=... MODEL=... scripts/try-photo-provider.sh page.jpg [page2.jpg ...]
+#   BASE_URL=https://api.scaleway.ai/v1 API_KEY=... MODEL=... scripts/try-recipe-scan-provider.sh page.jpg [page2.jpg ...]
 #
 # The prompt is read out of RecipePhotoReader.kt rather than copied here, so this always tests
 # the prompt that ships. Pages are scaled to 1600 px on the long edge, as the app sends them

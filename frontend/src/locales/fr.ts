@@ -774,7 +774,7 @@ export default {
   admin_ai_requests: "Requêtes",
   admin_ai_features: "Ce mois-ci, par fonctionnalité",
   admin_ai_feature: "Fonctionnalité",
-  admin_ai_feature_photo_import: "Import photo",
+  admin_ai_feature_recipe_scan: "Scan de recette",
   admin_ai_share: "Part",
   admin_ai_top_users: "Comptes les plus consommateurs ce mois-ci",
   admin_ai_account: "Compte",

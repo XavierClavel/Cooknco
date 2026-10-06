@@ -46,11 +46,11 @@ import kotlin.test.assertTrue
  * nothing typed is lost. What is specific to the photo is the request and the failures: each
  * refusal the cook can act on differently has to reach them as a different sentence.
  */
-class RecipeEditPhotoImportTest {
+class RecipeEditAiScanTest {
 
     /** A store per call, not per test: one test below runs the harness several times. */
     private fun newStoreFile() = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
-        "cooknco-photo-import-${Random.nextLong()}.preferences_pb"
+        "cooknco-ai-scan-${Random.nextLong()}.preferences_pb"
 
     private val tart = """
         {
@@ -75,25 +75,25 @@ class RecipeEditPhotoImportTest {
     private val strings get() = stringsFor(AppLanguage.current.value)
 
     @Test
-    fun a_read_photo_fills_the_editor_and_says_so() = photoTest(tart) { viewModel, _ ->
-        viewModel.importPhoto(PhotoCaptureResult.Captured(listOf(page)))
-        viewModel.awaitPhoto()
+    fun a_scanned_page_fills_the_editor_and_says_so() = aiScanTest(tart) { viewModel, _ ->
+        viewModel.scanWithAi(PhotoCaptureResult.Captured(listOf(page)))
+        viewModel.awaitAiScan()
 
         val state = viewModel.uiState.value
         assertEquals("Tarte aux pommes", state.title)
         assertEquals(listOf("pommes"), state.ingredients.map { it.customName })
         assertEquals(2100, state.steps.single().durationSeconds)
-        assertEquals(strings.photoImportDone, state.importMessage)
+        assertEquals(strings.aiScanDone, state.importMessage)
     }
 
     @Test
-    fun a_read_photo_never_overwrites_what_was_typed() = photoTest(tart) { viewModel, _ ->
+    fun a_scanned_page_never_overwrites_what_was_typed() = aiScanTest(tart) { viewModel, _ ->
         viewModel.updateTitle("Ma tarte")
         viewModel.addStep()
         viewModel.updateStep(viewModel.uiState.value.steps.first().id, "Préchauffer")
 
-        viewModel.importPhoto(PhotoCaptureResult.Captured(listOf(page)))
-        viewModel.awaitPhoto()
+        viewModel.scanWithAi(PhotoCaptureResult.Captured(listOf(page)))
+        viewModel.awaitAiScan()
 
         val state = viewModel.uiState.value
         assertEquals("Ma tarte", state.title)
@@ -101,11 +101,11 @@ class RecipeEditPhotoImportTest {
     }
 
     @Test
-    fun every_page_is_posted_to_the_photo_import() = photoTest(tart) { viewModel, requests ->
-        viewModel.importPhoto(PhotoCaptureResult.Captured(listOf(page, page)))
-        viewModel.awaitPhoto()
+    fun every_page_is_posted_to_the_recipe_scan() = aiScanTest(tart) { viewModel, requests ->
+        viewModel.scanWithAi(PhotoCaptureResult.Captured(listOf(page, page)))
+        viewModel.awaitAiScan()
 
-        val request = requests.single { it.url.encodedPath.endsWith("/recipe/import/photo") }
+        val request = requests.single { it.url.encodedPath.endsWith("/recipe/scan") }
         assertEquals("Bearer test-token", request.headers[HttpHeaders.Authorization])
         assertTrue(request.body.contentType.toString().startsWith("multipart/form-data"))
         assertEquals(2, countParts(request.body))
@@ -113,28 +113,28 @@ class RecipeEditPhotoImportTest {
 
     /** A capture that could not happen is the scanner's failure, and asks the backend nothing. */
     @Test
-    fun a_failed_capture_says_so_and_sends_nothing() = photoTest(tart) { viewModel, requests ->
-        viewModel.importPhoto(PhotoCaptureResult.Failed)
+    fun a_failed_capture_says_so_and_sends_nothing() = aiScanTest(tart) { viewModel, requests ->
+        viewModel.scanWithAi(PhotoCaptureResult.Failed)
 
         assertEquals(strings.scanFailed, viewModel.uiState.value.scanMessage)
-        assertTrue(requests.none { it.url.encodedPath.endsWith("/recipe/import/photo") })
+        assertTrue(requests.none { it.url.encodedPath.endsWith("/recipe/scan") })
     }
 
     @Test
     fun each_refusal_the_cook_can_act_on_has_its_own_sentence() {
-        expectMessage("photo_import_nothing_read", HttpStatusCode.BadRequest) { strings.photoImportNothingRead }
-        expectMessage("ai_daily_limit", HttpStatusCode.TooManyRequests) { strings.photoImportDailyLimit }
-        expectMessage("recipe_reader_not_configured", HttpStatusCode.ServiceUnavailable) { strings.photoImportUnavailable }
-        expectMessage("recipe_reader_busy", HttpStatusCode.ServiceUnavailable) { strings.photoImportUnavailable }
-        expectMessage("ai_budget_exhausted", HttpStatusCode.ServiceUnavailable) { strings.photoImportUnavailable }
-        expectMessage("something_else", HttpStatusCode.InternalServerError) { strings.photoImportFailed }
+        expectMessage("recipe_scan_nothing_read", HttpStatusCode.BadRequest) { strings.aiScanNothingRead }
+        expectMessage("ai_daily_limit", HttpStatusCode.TooManyRequests) { strings.aiScanDailyLimit }
+        expectMessage("recipe_reader_not_configured", HttpStatusCode.ServiceUnavailable) { strings.aiScanUnavailable }
+        expectMessage("recipe_reader_busy", HttpStatusCode.ServiceUnavailable) { strings.aiScanUnavailable }
+        expectMessage("ai_budget_exhausted", HttpStatusCode.ServiceUnavailable) { strings.aiScanUnavailable }
+        expectMessage("something_else", HttpStatusCode.InternalServerError) { strings.aiScanFailed }
     }
 
     private fun expectMessage(cause: String, status: HttpStatusCode, expected: () -> String) =
-        photoTest(cause, status) { viewModel, _ ->
+        aiScanTest(cause, status) { viewModel, _ ->
             viewModel.updateTitle("Ma tarte")
-            viewModel.importPhoto(PhotoCaptureResult.Captured(listOf(page)))
-            viewModel.awaitPhoto()
+            viewModel.scanWithAi(PhotoCaptureResult.Captured(listOf(page)))
+            viewModel.awaitAiScan()
 
             val state = viewModel.uiState.value
             assertEquals(expected(), state.importMessage, "for $cause")
@@ -146,7 +146,7 @@ class RecipeEditPhotoImportTest {
     // ── Harness ───────────────────────────────────────────────────────────────
 
     /** `RecipeEditImportTest.importTest`, recording what was sent. */
-    private fun photoTest(
+    private fun aiScanTest(
         body: String,
         status: HttpStatusCode = HttpStatusCode.OK,
         test: suspend TestScope.(RecipeEditViewModel, List<HttpRequestData>) -> Unit,
@@ -158,7 +158,7 @@ class RecipeEditPhotoImportTest {
         val requests = mutableListOf<HttpRequestData>()
         val engine = MockEngine { request ->
             requests += request
-            if (request.url.encodedPath.endsWith("/recipe/import/photo")) {
+            if (request.url.encodedPath.endsWith("/recipe/scan")) {
                 respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
             } else {
                 respond("[]", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
@@ -182,7 +182,7 @@ class RecipeEditPhotoImportTest {
         }
     }
 
-    private suspend fun RecipeEditViewModel.awaitPhoto() = uiState.first { !it.isReadingPhoto }
+    private suspend fun RecipeEditViewModel.awaitAiScan() = uiState.first { !it.isScanningWithAi }
 
     /** How many pages a multipart body holds, read off its rendered bytes. */
     private suspend fun countParts(body: OutgoingContent): Int =

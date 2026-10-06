@@ -50,7 +50,7 @@ import kotlin.math.roundToInt
  * Saves nothing, for the reason the Cooklang import saves nothing: an import that created a
  * recipe would notify every follower of something its owner has not read yet.
  */
-class PhotoImportService : KoinComponent {
+class RecipeScanService : KoinComponent {
     private val reader: RecipePhotoReader by inject()
     private val cooklangService: CooklangService by inject()
     private val usageService: AiUsageService by inject()
@@ -151,14 +151,14 @@ class PhotoImportService : KoinComponent {
             // Not `logEdit`: the recipe is not saved, and the usage row below is bookkeeping
             // rather than an edit anybody made. This line and that row are the cost trail.
             logger.info {
-                "Photo import by user $userId: ${photos.size} page(s), " +
+                "Recipe scan by user $userId: ${photos.size} page(s), " +
                     "${reading.inputTokens ?: "?"} tokens in, ${reading.outputTokens ?: "?"} out"
             }
             // Billed whatever it comes to, so recorded before anything can refuse it — the
             // budget is checked against these rows, failures included.
             val parsed = runCatching { toParsed(parse(reading.json)) }
             usageService.record(
-                feature = AiFeature.PHOTO_IMPORT,
+                feature = AiFeature.RECIPE_SCAN,
                 user = user,
                 pages = photos.size,
                 reading = reading,
@@ -173,7 +173,7 @@ class PhotoImportService : KoinComponent {
             usageService.refund(admission)
             throw e
         }
-        if (read.isEmpty) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_NOTHING_READ)
+        if (read.isEmpty) throw BadRequestException(BadRequestCause.RECIPE_SCAN_NOTHING_READ)
         return cooklangService.toRecipe(read, locale)
     }
 

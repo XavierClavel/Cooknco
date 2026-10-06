@@ -5,8 +5,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import main.com.xavierclavel.utils.getAiOverview
 import main.com.xavierclavel.utils.getAiOverviewRaw
-import main.com.xavierclavel.utils.importPhoto
-import main.com.xavierclavel.utils.importPhotoRaw
+import main.com.xavierclavel.utils.scanRecipe
+import main.com.xavierclavel.utils.scanRecipeRaw
 import main.com.xavierclavel.utils.saveAiSettings
 import main.com.xavierclavel.utils.saveAiSettingsRaw
 import org.junit.jupiter.api.Test
@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * The backoffice AI tab: what it reports and what its settings do to an AI feature — the photo
  * import, today's only one, standing in for all of them.
  *
- * The settings are tested by their effect on `POST /recipe/import/photo` rather than by
+ * The settings are tested by their effect on `POST /recipe/scan` rather than by
  * reading them back, because a limit that saves and shows but does not bite is the failure
  * that costs money. [main.com.xavierclavel.utils.FakeRecipePhotoReader] bills 1 000 tokens in
  * and 200 out per import, which is what the cost assertions are worked out from.
@@ -79,7 +79,7 @@ class AdminAiControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = toast
         runAsAdmin { client.saveAiSettings(priced) }
-        runAsUser1 { client.importPhoto() }
+        runAsUser1 { client.scanRecipe() }
 
         runAsAdmin {
             val overview = client.getAiOverview()
@@ -96,13 +96,13 @@ class AdminAiControllerTest : ApplicationTest() {
             assertEquals(1, heaviest.requestsToday)
 
             // Told apart by feature, every known feature listed.
-            val photoImport = overview.features.single { it.feature == AiFeature.PHOTO_IMPORT }
-            assertEquals(1, photoImport.requests)
-            assertEquals(costOfOne, photoImport.cost, 1e-9)
+            val recipeScan = overview.features.single { it.feature == AiFeature.RECIPE_SCAN }
+            assertEquals(1, recipeScan.requests)
+            assertEquals(costOfOne, recipeScan.cost, 1e-9)
             assertEquals(AiFeature.entries.size, overview.features.size)
 
             val entry = overview.recent.single()
-            assertEquals(AiFeature.PHOTO_IMPORT, entry.feature)
+            assertEquals(AiFeature.RECIPE_SCAN, entry.feature)
             assertEquals("fake-vision-model", entry.model)
             assertEquals(AiUsageOutcome.READ, entry.outcome)
             assertEquals(1, entry.pages)
@@ -118,7 +118,7 @@ class AdminAiControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = toast
         runAsAdmin { client.saveAiSettings(priced) }
-        runAsUser1 { client.importPhoto() }
+        runAsUser1 { client.scanRecipe() }
         runAsAdmin {
             client.saveAiSettings(priced.copy(inputPricePerMillion = 100.0, outputPricePerMillion = 100.0))
             assertEquals(costOfOne, client.getAiOverview().month.cost, 1e-9)
@@ -132,9 +132,9 @@ class AdminAiControllerTest : ApplicationTest() {
         runAsAdmin { client.saveAiSettings(priced) }
         runAsUser1 {
             fakePhotoReader.answer = """{"ingredients": [], "steps": []}"""
-            client.importPhotoRaw().apply { assertEquals(HttpStatusCode.BadRequest, status) }
+            client.scanRecipeRaw().apply { assertEquals(HttpStatusCode.BadRequest, status) }
             fakePhotoReader.answer = "not json"
-            client.importPhotoRaw().apply { assertEquals(HttpStatusCode.ServiceUnavailable, status) }
+            client.scanRecipeRaw().apply { assertEquals(HttpStatusCode.ServiceUnavailable, status) }
         }
         runAsAdmin {
             val overview = client.getAiOverview()
@@ -153,7 +153,7 @@ class AdminAiControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = toast
         runAsAdmin { client.saveAiSettings(priced) }
-        runAsUser1 { client.importPhoto() }
+        runAsUser1 { client.scanRecipe() }
         userService.deleteUserById(userService.findByMail(USER1).id)
 
         runAsAdmin {
@@ -200,8 +200,8 @@ class AdminAiControllerTest : ApplicationTest() {
         fakePhotoReader.answer = toast
         runAsAdmin { client.saveAiSettings(priced.copy(dailyLimitPerUser = 1)) }
         runAsUser1 {
-            client.importPhoto()
-            client.importPhotoRaw().apply {
+            client.scanRecipe()
+            client.scanRecipeRaw().apply {
                 assertEquals(HttpStatusCode.TooManyRequests, status)
                 assertContains(bodyAsText(), "ai_daily_limit")
             }
@@ -213,7 +213,7 @@ class AdminAiControllerTest : ApplicationTest() {
     fun `a daily limit of zero closes the import to everybody`() = runTest {
         grantPremiumForever(USER1)
         runAsAdmin { client.saveAiSettings(priced.copy(dailyLimitPerUser = 0)) }
-        runAsUser1 { client.importPhotoRaw().apply { assertEquals(HttpStatusCode.TooManyRequests, status) } }
+        runAsUser1 { client.scanRecipeRaw().apply { assertEquals(HttpStatusCode.TooManyRequests, status) } }
         assertTrue(fakePhotoReader.calls.isEmpty())
     }
 
@@ -228,9 +228,9 @@ class AdminAiControllerTest : ApplicationTest() {
         fakePhotoReader.answer = toast
         // One import spends 0.0014: a budget of 0.01 rounds to cents and holds seven of them.
         runAsAdmin { client.saveAiSettings(priced.copy(monthlyBudget = 0.01)) }
-        runAsUser1 { repeat(8) { client.importPhoto() } }
+        runAsUser1 { repeat(8) { client.scanRecipe() } }
         runAsUser2 {
-            client.importPhotoRaw().apply {
+            client.scanRecipeRaw().apply {
                 assertEquals(HttpStatusCode.ServiceUnavailable, status)
                 assertContains(bodyAsText(), "ai_budget_exhausted")
             }
@@ -244,6 +244,6 @@ class AdminAiControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = toast
         runAsAdmin { client.saveAiSettings(priced.copy(inputPricePerMillion = 0.0, outputPricePerMillion = 0.0, monthlyBudget = 0.01)) }
-        runAsUser1 { repeat(3) { client.importPhoto() } }
+        runAsUser1 { repeat(3) { client.scanRecipe() } }
     }
 }

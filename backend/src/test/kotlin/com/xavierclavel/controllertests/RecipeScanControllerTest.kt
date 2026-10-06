@@ -8,8 +8,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
 import main.com.xavierclavel.utils.createRecipe
-import main.com.xavierclavel.utils.importPhoto
-import main.com.xavierclavel.utils.importPhotoRaw
+import main.com.xavierclavel.utils.scanRecipe
+import main.com.xavierclavel.utils.scanRecipeRaw
 import main.com.xavierclavel.utils.testImageBytes
 import org.junit.jupiter.api.Test
 import org.koin.test.inject
@@ -24,7 +24,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The premium photo import, with the model replaced by [main.com.xavierclavel.utils.FakeRecipePhotoReader].
+ * The premium recipe scan, with the model replaced by [main.com.xavierclavel.utils.FakeRecipePhotoReader].
  *
  * What is under test is everything around the model — who may call it, what reaches it, what
  * an answer is turned into, and what a bad answer costs the cook — because that is the part a
@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
  * As with the Cooklang import, the result is **saved through the ordinary create route** at
  * least once: an import the editor could not then save would pass every other test here.
  */
-class PhotoImportControllerTest : ApplicationTest() {
+class RecipeScanControllerTest : ApplicationTest() {
 
     private val redisService: RedisService by inject()
 
@@ -72,9 +72,9 @@ class PhotoImportControllerTest : ApplicationTest() {
      * account must cost no tokens at all, not merely be told no afterwards.
      */
     @Test
-    fun `the photo import is closed to an account with no subscription`() = runTest {
+    fun `the recipe scan is closed to an account with no subscription`() = runTest {
         runAsUser1 {
-            client.importPhotoRaw().apply {
+            client.scanRecipeRaw().apply {
                 assertEquals(HttpStatusCode.Forbidden, status)
                 assertContains(bodyAsText(), "premium_required")
             }
@@ -83,8 +83,8 @@ class PhotoImportControllerTest : ApplicationTest() {
     }
 
     @Test
-    fun `the photo import is closed to anonymous callers`() = runTest {
-        client.importPhotoRaw().apply { assertEquals(HttpStatusCode.Unauthorized, status) }
+    fun `the recipe scan is closed to anonymous callers`() = runTest {
+        client.scanRecipeRaw().apply { assertEquals(HttpStatusCode.Unauthorized, status) }
         assertTrue(fakePhotoReader.calls.isEmpty())
     }
 
@@ -92,7 +92,7 @@ class PhotoImportControllerTest : ApplicationTest() {
     @Test
     fun `an admin imports without a grant`() = runTestAsAdmin {
         fakePhotoReader.answer = tart
-        assertEquals("Tarte aux pommes", client.importPhoto().recipe.title)
+        assertEquals("Tarte aux pommes", client.scanRecipe().recipe.title)
     }
 
     // ------------------------------------------------------------ what is read
@@ -102,7 +102,7 @@ class PhotoImportControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = tart
         runAsUser1 {
-            val imported = client.importPhoto()
+            val imported = client.scanRecipe()
             val recipe = imported.recipe
 
             assertEquals("Tarte aux pommes", recipe.title)
@@ -147,7 +147,7 @@ class PhotoImportControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = tart
         runAsUser1 {
-            val imported = client.importPhoto()
+            val imported = client.scanRecipe()
             val saved = client.createRecipe(imported.recipe)
             assertEquals("Tarte aux pommes", saved.title)
             assertEquals(4, saved.ingredients.size)
@@ -161,7 +161,7 @@ class PhotoImportControllerTest : ApplicationTest() {
         fakePhotoReader.answer = tart
         val first = testImageBytes(40, 30)
         val second = testImageBytes(30, 40)
-        runAsUser1 { client.importPhoto(listOf(first, second)) }
+        runAsUser1 { client.scanRecipe(listOf(first, second)) }
 
         val pages = fakePhotoReader.calls.single()
         assertEquals(2, pages.size)
@@ -175,7 +175,7 @@ class PhotoImportControllerTest : ApplicationTest() {
     fun `an answer wrapped in a markdown fence is still read`() = runTest {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = "Here is the recipe:\n```json\n$tart\n```"
-        runAsUser1 { assertEquals("Tarte aux pommes", client.importPhoto().recipe.title) }
+        runAsUser1 { assertEquals("Tarte aux pommes", client.scanRecipe().recipe.title) }
     }
 
     /** A model has no 255-character bound; the import cuts the way a `.cook` import does. */
@@ -186,7 +186,7 @@ class PhotoImportControllerTest : ApplicationTest() {
         val long = sentence.repeat(RECIPE_STEP_TEXT_MAX_LENGTH / sentence.length + 2).trim()
         fakePhotoReader.answer = """{"title": "Long", "ingredients": [], "steps": [{"text": "$long", "uses": []}]}"""
         runAsUser1 {
-            val imported = client.importPhoto()
+            val imported = client.scanRecipe()
             assertTrue(imported.stepsWereSplit)
             assertTrue(imported.recipe.steps.size > 1)
             assertTrue(imported.recipe.steps.all { it.text.length <= RECIPE_STEP_TEXT_MAX_LENGTH })
@@ -200,9 +200,9 @@ class PhotoImportControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = """{"title": null, "ingredients": [], "steps": []}"""
         runAsUser1 {
-            client.importPhotoRaw().apply {
+            client.scanRecipeRaw().apply {
                 assertEquals(HttpStatusCode.BadRequest, status)
-                assertContains(bodyAsText(), "photo_import_nothing_read")
+                assertContains(bodyAsText(), "recipe_scan_nothing_read")
             }
         }
     }
@@ -217,7 +217,7 @@ class PhotoImportControllerTest : ApplicationTest() {
         fakePhotoReader.answer = "I'm sorry, I can't help with that."
         val userId = userService.findByMail(USER1).id
         runAsUser1 {
-            client.importPhotoRaw().apply {
+            client.scanRecipeRaw().apply {
                 assertEquals(HttpStatusCode.ServiceUnavailable, status)
                 assertContains(bodyAsText(), "recipe_reader_failed")
             }
@@ -231,7 +231,7 @@ class PhotoImportControllerTest : ApplicationTest() {
         fakePhotoReader.failure = ServiceUnavailableException(ServiceUnavailableCause.RECIPE_READER_UNAVAILABLE)
         val userId = userService.findByMail(USER1).id
         runAsUser1 {
-            client.importPhotoRaw().apply {
+            client.scanRecipeRaw().apply {
                 assertEquals(HttpStatusCode.ServiceUnavailable, status)
                 assertContains(bodyAsText(), "recipe_reader_unavailable")
             }
@@ -243,9 +243,9 @@ class PhotoImportControllerTest : ApplicationTest() {
     fun `a request with no photograph is refused`() = runTest {
         grantPremiumForever(USER1)
         runAsUser1 {
-            client.importPhotoRaw(pages = emptyList()).apply {
+            client.scanRecipeRaw(pages = emptyList()).apply {
                 assertEquals(HttpStatusCode.BadRequest, status)
-                assertContains(bodyAsText(), "photo_import_no_photo")
+                assertContains(bodyAsText(), "recipe_scan_no_photo")
             }
         }
         assertTrue(fakePhotoReader.calls.isEmpty())
@@ -256,7 +256,7 @@ class PhotoImportControllerTest : ApplicationTest() {
     fun `a file that is not an image never reaches the model`() = runTest {
         grantPremiumForever(USER1)
         runAsUser1 {
-            client.importPhotoRaw(pages = listOf("not a picture at all".toByteArray())).apply {
+            client.scanRecipeRaw(pages = listOf("not a picture at all".toByteArray())).apply {
                 assertEquals(HttpStatusCode.BadRequest, status)
                 assertContains(bodyAsText(), "invalid_image")
             }
@@ -269,9 +269,9 @@ class PhotoImportControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         val pages = List(configuration.ai.maxPhotos + 1) { testImageBytes() }
         runAsUser1 {
-            client.importPhotoRaw(pages = pages).apply {
+            client.scanRecipeRaw(pages = pages).apply {
                 assertEquals(HttpStatusCode.BadRequest, status)
-                assertContains(bodyAsText(), "photo_import_too_many_photos")
+                assertContains(bodyAsText(), "recipe_scan_too_many_photos")
             }
         }
         assertTrue(fakePhotoReader.calls.isEmpty())
@@ -288,7 +288,7 @@ class PhotoImportControllerTest : ApplicationTest() {
         val userId = userService.findByMail(USER1).id
         runBlocking { repeat(configuration.ai.dailyRequestsPerUser) { redisService.countAiRequest(userId, today()) } }
         runAsUser1 {
-            client.importPhotoRaw().apply {
+            client.scanRecipeRaw().apply {
                 assertEquals(HttpStatusCode.TooManyRequests, status)
                 assertContains(bodyAsText(), "ai_daily_limit")
             }
@@ -305,7 +305,7 @@ class PhotoImportControllerTest : ApplicationTest() {
         fakePhotoReader.answer = tart
         val user1 = userService.findByMail(USER1).id
         runBlocking { repeat(configuration.ai.dailyRequestsPerUser) { redisService.countAiRequest(user1, today()) } }
-        runAsUser2 { client.importPhoto() }
+        runAsUser2 { client.scanRecipe() }
     }
 
     private fun today() = LocalDate.now(ZoneOffset.UTC).toString()

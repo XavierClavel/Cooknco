@@ -47,9 +47,9 @@ class AiUsage(
     var createdAt: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC),
 
     @Column(nullable = false)
-    var feature: AiFeature = AiFeature.PHOTO_IMPORT,
+    var feature: AiFeature = AiFeature.RECIPE_SCAN,
 
-    /** How many images the request carried — pages, for a photo import. */
+    /** How many images the request carried — pages, for a recipe scan. */
     @Column(nullable = false)
     var pages: Int = 0,
 
