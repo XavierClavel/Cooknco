@@ -118,15 +118,18 @@ class CooklangService: KoinComponent {
          * canonical key for; they are read back by us and ignored by everything else, which is
          * the right outcome either way — a reader that does not know `cooking temperature`
          * loses the temperature, not the recipe.
+         *
+         * Internal rather than private because the photo import builds a [Parsed] of its own
+         * and hands it to [toRecipe], which reads the metadata under these names.
          */
-        private const val KEY_TITLE = "title"
-        private const val KEY_DESCRIPTION = "description"
-        private const val KEY_SERVINGS = "servings"
-        private const val KEY_PREP_TIME = "prep time"
-        private const val KEY_COOK_TIME = "cook time"
-        private const val KEY_TEMPERATURE = "cooking temperature"
-        private const val KEY_COURSE = "course"
-        private const val KEY_TIPS = "tips"
+        internal const val KEY_TITLE = "title"
+        internal const val KEY_DESCRIPTION = "description"
+        internal const val KEY_SERVINGS = "servings"
+        internal const val KEY_PREP_TIME = "prep time"
+        internal const val KEY_COOK_TIME = "cook time"
+        internal const val KEY_TEMPERATURE = "cooking temperature"
+        internal const val KEY_COURSE = "course"
+        internal const val KEY_TIPS = "tips"
         private const val KEY_AUTHOR = "author"
         private const val KEY_SOURCE = "source"
 
@@ -622,8 +625,11 @@ class CooklangService: KoinComponent {
      * paragraph has no such bound — a file written by hand routinely runs a whole method into
      * one. Cut at a sentence end where there is one within reach, and at a word otherwise;
      * never mid-word, and never silently shortened.
+     *
+     * Not private: a model transcribing a photographed page has no bound either, and the
+     * photo import cuts its steps the same way.
      */
-    private fun splitStep(text: String): List<String> {
+    fun splitStep(text: String): List<String> {
         if (text.length <= RECIPE_STEP_TEXT_MAX_LENGTH) return listOf(text)
         val pieces = mutableListOf<String>()
         var rest = text.trim()

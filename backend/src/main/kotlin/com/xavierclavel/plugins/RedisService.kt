@@ -362,4 +362,29 @@ class RedisService(redisUrl: String): KoinComponent {
         return redisJson.decodeFromString<ImageUploadTicketData>(json)
     }
 
+
+    /**
+     * Counts one more photo import against [userId]'s allowance for [day], and answers the
+     * count including this one.
+     *
+     * `INCR` first and the expiry after, so that two imports racing each other both see a
+     * number that includes the other: checking and then incrementing would let a burst of
+     * parallel requests all pass a limit of one. The key outlives its day by a day so it is
+     * gone without anything having to sweep it.
+     */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun countPhotoImport(userId: Long, day: String): Long {
+        val key = photoImportKey(userId, day)
+        val count = redis.incr(key) ?: 0L
+        if (count == 1L) redis.expire(key, 2L * 24 * 60 * 60)
+        return count
+    }
+
+    /** Gives back an import that never reached a model — a provider down is not a use. */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun refundPhotoImport(userId: Long, day: String) {
+        redis.decr(photoImportKey(userId, day))
+    }
+
+    private fun photoImportKey(userId: Long, day: String) = "photo-imports:$userId:$day"
 }

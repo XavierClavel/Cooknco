@@ -15,7 +15,7 @@ const documents: LegalDocuments = {
   // ── Politique de confidentialité ───────────────────────────────────────────
   privacy: {
     title: "Politique de confidentialité",
-    updated: "Dernière mise à jour le 18 septembre 2026",
+    updated: "Dernière mise à jour le 6 octobre 2026",
     intro: [
       "Cook'n'Co est un carnet de recettes : vous y notez les plats que vous cuisinez, vous les retrouvez au moment de les refaire, et vous les partagez avec qui vous voulez. Cette page dit ce que le service conserve sur vous, pourquoi, qui d'autre le voit, et comment tout faire disparaître.",
       "L'application et cooknco.eu sont un seul service et un seul compte : cette politique couvre les deux.",
@@ -102,6 +102,10 @@ const documents: LegalDocuments = {
           {
             term: "L'hébergeur",
             text: "les serveurs et la base de données tournent sur des machines louées chez un hébergeur situé dans l'Union européenne.",
+          },
+          {
+            term: "Le modèle qui lit une photo de recette",
+            text: "seulement si vous avez un compte premium et choisissez « Lire une photo avec l'IA » : les pages photographiées sont envoyées à un prestataire qui fait tourner ce modèle dans l'Union européenne, qui les lit pour le compte du service et renvoie la recette. Le service ne conserve ni les photos ni la réponse du modèle — seulement ce que vous enregistrez ensuite comme recette.",
           },
           {
             term: "Les clients IA que vous avez connectés",

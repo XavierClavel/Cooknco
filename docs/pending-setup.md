@@ -222,7 +222,7 @@ changes this table, the two documents, and the form — in that order, and in th
 | --- | --- | --- |
 | Personal info → Name | Collected, required | the username, which is the account |
 | Personal info → Email address | Collected, required | sign-in and the account mails; stored encrypted |
-| Photos and videos → Photos | Collected, optional | recipe pictures and the profile picture |
+| Photos and videos → Photos | Collected, optional | recipe pictures and the profile picture — and, for a premium account that reads a recipe photo with the model, the photographed pages, processed and not kept (section 5) |
 | Device or other IDs | Collected, optional | the FCM registration token, only while push is on |
 | App activity, messages, location, financial, health… | Not collected | none of it exists in the schema |
 | Is any of it **shared** with third parties? | No | Google carries mail and push as a processor, which Play's definition excludes |
@@ -233,7 +233,10 @@ changes this table, the two documents, and the form — in that order, and in th
 The app's manifest declares no `com.google.android.gms.permission.AD_ID`, and the only
 Firebase library it pulls in is **Messaging** — no Analytics, no Crashlytics. The ML Kit
 document scanner and text recogniser it also carries read the page on the device and send
-nothing anywhere. That is what
+nothing anywhere. The premium photo import does send the page — to the backend, which passes
+it to the provider of section 5 — and that is a processor acting for the service, the same
+standing Google has for mail and push, so the "shared" row stays a no as long as that
+provider is one with no-retention, no-training terms. That is what
 makes the last row answerable with a flat no, and it is worth re-checking whenever a
 dependency is added: a transitive Analytics would make the declaration false without anybody
 writing a line of code.
@@ -260,3 +263,74 @@ The two `curl`s return the SPA's shell rather than the text — the pages are Vu
 Play's review opens them in a browser, which runs the JavaScript. What the `curl` proves is
 that the path serves 200 rather than the SPA's 404 path; the text itself is worth opening in
 a private window once, in both languages (the browser's language picks which).
+
+---
+
+## 5. The photo import's model — a provider, a key, and a model id
+
+**What is inert until this is done:** "Read a photo with AI", on the new-recipe sheet in the
+app. A premium account still sees it and can tap it; the backend answers
+`503 recipe_reader_not_configured` and the app says reading photos is unavailable right now.
+Everything else, the on-device scan included, is unaffected.
+
+### Picking a provider — the constraint is the privacy policy, not the price
+
+Any service speaking the OpenAI chat-completions API works, and switching is three values
+with no release (`Configuration.PhotoImport`). What narrows the choice is a sentence the
+privacy policy already makes: **"The service itself transfers nothing outside the European
+Union."** So the provider must process in the EU, and must not keep or train on what it is
+sent — the policy says the photographs are read *on the service's behalf*. That rules out
+DeepSeek's own API (servers in China) whatever its price.
+
+What fits, with prices as of October 2026 (per million tokens, in / out; one page is roughly
+4 000 in and 1 000 out, so a thousand imports cost about what the last column says):
+
+| Provider | Model | Price | ~per 1 000 imports |
+| --- | --- | --- | --- |
+| Scaleway (Paris) | Mistral Small 3.2 | €0.15 / €0.35 | ~€1 |
+| Scaleway (Paris) | Qwen3.6 35B-A3B | €0.25 / €1.50 | ~€2.5 |
+| OVHcloud (France) | Qwen3.8 27B | €0.40 / €2.70 | ~€4 |
+| Mistral (EU) | Mistral Large 3 | $0.50 / $1.50 | ~$3.5 |
+
+Start with **Scaleway + Mistral Small 3.2**: cheapest, French, and its free tier covers a few
+hundred test imports. The daily allowance (`dailyReadsPerUser`, 30) bounds the worst case at
+about a cent per account per day on that model.
+
+### Setting it
+
+The values go in the backend's `application.yaml`, which lives in the `cooknco-config` secret
+(`k8s/README.md`) next to the SMTP password — the key is a credential that bills somebody, and
+nothing about it belongs in the image or the repository:
+
+```yaml
+photoImport:
+  baseUrl: https://api.scaleway.ai/v1          # up to and including /v1
+  apiKey: <the provider's secret key>
+  model: <the model id as the provider's console spells it>
+  # optional, shown with their defaults:
+  # jsonMode: true             # false for a provider that rejects response_format
+  # dailyReadsPerUser: 30
+  # maxConcurrentReads: 4
+```
+
+Copy the model id from the provider's console rather than from memory: Scaleway's serverless
+ids differ from the ones its dedicated deployments use, and an unknown id comes back as a
+`recipe_reader_failed` with the provider's reason in the backend log.
+
+Then restart the backend (`kubectl rollout restart deployment/cooknco-backend`), since the
+secret is read at start-up. Its log says which model it reads with:
+`Photo import reads with <model> at <baseUrl>`.
+
+### Checking it worked
+
+```bash
+# A premium account's session cookie, and a photographed recipe page
+curl -sS -X POST "https://cooknco.eu/api/v1/recipe/import/photo?locale=FR" \
+  -b "user_session=<cookie>" -F "page=@page.jpg;type=image/jpeg" | head -c 400
+
+# What it cost: one line per import
+kubectl logs deployment/cooknco-backend | grep "Photo import by user"
+```
+
+A `503` whose body is `recipe_reader_failed` means the provider refused: the line just before
+it in the log carries the provider's own status and message (bad key, unknown model, quota).

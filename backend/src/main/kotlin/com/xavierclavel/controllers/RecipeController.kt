@@ -7,9 +7,12 @@ import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.services.CooklangService
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.NotificationService
+import com.xavierclavel.services.PhotoImportService
+import com.xavierclavel.services.RecipePhoto
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.UserService
+import com.xavierclavel.utils.Configuration
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.checkRecipeEditionRights
 import com.xavierclavel.utils.getIdPathVariable
@@ -28,7 +31,11 @@ import shared.enums.Locale
 import shared.utils.URL.RECIPE_URL
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
+import io.ktor.http.content.PartData
+import io.ktor.http.content.forEachPart
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveMultipart
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import io.ktor.server.request.receiveStream
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -45,6 +52,8 @@ object RecipeController: Controller(RECIPE_URL) {
     val imageService: ImageService by inject(ImageService::class.java)
     val notificationService: NotificationService by inject(NotificationService::class.java)
     val cooklangService: CooklangService by inject(CooklangService::class.java)
+    val photoImportService: PhotoImportService by inject(PhotoImportService::class.java)
+    val configuration: Configuration by inject(Configuration::class.java)
 
     override fun Route.routes() {
         getRecipe()
@@ -52,6 +61,7 @@ object RecipeController: Controller(RECIPE_URL) {
         authenticate("auth-session", "bearer-auth") {
             createRecipe()
             importCooklang()
+            importPhoto()
             updateRecipe()
             deleteRecipe()
         }
@@ -135,6 +145,51 @@ object RecipeController: Controller(RECIPE_URL) {
         // it is the only one this refuses for. Anything it could read at all comes back.
         if (parsed.isEmpty) throw BadRequestException(BadRequestCause.COOKLANG_FILE_EMPTY)
         call.respond(HttpStatusCode.OK, cooklangService.toRecipe(parsed, locale))
+    }
+
+    /**
+     * Reads photographs of a recipe with a vision model and answers with the recipe they show,
+     * **without saving anything** — the premium counterpart of the on-device scanner.
+     *
+     * The answer is the same [shared.infodto.CooklangImportInfo] the Cooklang import gives,
+     * because it is built the same way (see [PhotoImportService]), so a client fills the
+     * editor in from either with one piece of code.
+     *
+     * **Premium, unlike the Cooklang import beside it**, and the difference is the bill: a
+     * file is parsed here for nothing, while every photograph is a paid call to somebody
+     * else's model. The gate is checked before the body is read, so a refused account costs
+     * no upload either, and [PhotoImportService] adds a daily allowance on top of it.
+     *
+     * The body is `multipart/form-data` with one file part per page, in order. Each page is
+     * bounded as it is read ([Configuration.PhotoImport.maxPhotoBytes]) rather than trusted to
+     * its declared length, and must actually be a JPEG, PNG or WebP: a provider is never sent
+     * anything this backend has not looked at.
+     *
+     * @param locale which language to look the ingredients up in, as for the Cooklang import.
+     *   The page is transcribed in its own language whatever this says.
+     */
+    private fun Route.importPhoto() = post("/import/photo") {
+        val userId = getSessionUserId()
+        userService.checkPremiumAccess(userId)
+        val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
+        val settings = configuration.photoImport
+
+        val photos = mutableListOf<RecipePhoto>()
+        call.receiveMultipart(formFieldLimit = settings.maxPhotoBytes + 1).forEachPart { part ->
+            try {
+                if (part !is PartData.FileItem) return@forEachPart
+                if (photos.size >= settings.maxPhotos) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_TOO_MANY_PHOTOS)
+                val bytes = part.provider().toInputStream().readBounded(settings.maxPhotoBytes)
+                val mediaType = PhotoImportService.mediaTypeOf(bytes)
+                    ?: throw BadRequestException(BadRequestCause.INVALID_IMAGE)
+                photos += RecipePhoto(bytes, mediaType)
+            } finally {
+                part.dispose()
+            }
+        }
+        if (photos.isEmpty()) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_NO_PHOTO)
+
+        call.respond(HttpStatusCode.OK, photoImportService.read(userId, photos, locale))
     }
 
     private fun Route.updateRecipe() = put("/{id}") {

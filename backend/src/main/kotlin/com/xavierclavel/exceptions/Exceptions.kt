@@ -16,6 +16,20 @@ class NotFoundException(cause: NotFoundCause): Exception(cause.key)
  */
 class ServiceUnavailableException(cause: ServiceUnavailableCause): Exception(cause.key)
 
+/**
+ * The caller has used up an allowance, and will have it back later.
+ *
+ * A 429 rather than a 403: nothing about the account is refused, and asking again tomorrow
+ * is exactly the right thing to do.
+ */
+class TooManyRequestsException(cause: TooManyRequestsCause): Exception(cause.key)
+
+enum class TooManyRequestsCause(val key: String) {
+    // Every photo import is a paid call to a model, so a subscription buys a day's worth of
+    // them rather than an open tap. See `Configuration.PhotoImport.dailyReadsPerUser`.
+    PHOTO_IMPORT_DAILY_LIMIT("photo_import_daily_limit"),
+}
+
 enum class UnauthorizedCause(val key: String) {
     SESSION_NOT_FOUND("session_not_found"),
     USER_NOT_VERIFIED("user_not_verified"),
@@ -64,6 +78,14 @@ enum class ServiceUnavailableCause(val key: String) {
     PDF_RENDERER_UNAVAILABLE("pdf_renderer_unavailable"),
     PDF_RENDERER_BUSY("pdf_renderer_busy"),
     PDF_RENDERER_FAILED("pdf_renderer_failed"),
+
+    // The photo import's model, which is somebody else's service: see `RecipePhotoReader`.
+    // NOT_CONFIGURED is an install with no provider set, and is what every developer's
+    // backend and the test suite answer by default.
+    RECIPE_READER_NOT_CONFIGURED("recipe_reader_not_configured"),
+    RECIPE_READER_UNAVAILABLE("recipe_reader_unavailable"),
+    RECIPE_READER_BUSY("recipe_reader_busy"),
+    RECIPE_READER_FAILED("recipe_reader_failed"),
 }
 
 enum class BadRequestCause (val key: String) {
@@ -120,6 +142,13 @@ enum class BadRequestCause (val key: String) {
     // little of it: see `RecipeController.importCooklang`.
     COOKLANG_FILE_EMPTY("cooklang_file_empty"),
     COOKLANG_FILE_TOO_LARGE("cooklang_file_too_large"),
+
+    // A photo import with no picture in it, more pages than one recipe has, or a picture
+    // the model read no recipe off. The last is the one a cook acts on - by taking the
+    // photo again - so it is a cause of its own rather than a failure.
+    PHOTO_IMPORT_NO_PHOTO("photo_import_no_photo"),
+    PHOTO_IMPORT_TOO_MANY_PHOTOS("photo_import_too_many_photos"),
+    PHOTO_IMPORT_NOTHING_READ("photo_import_nothing_read"),
 
     PDF_TEMPLATE_EMPTY("pdf_template_empty"),
     PDF_TEMPLATE_TOO_LONG("pdf_template_too_long"),

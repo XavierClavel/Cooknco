@@ -13,7 +13,7 @@ const documents: LegalDocuments = {
   // ── Privacy policy ─────────────────────────────────────────────────────────
   privacy: {
     title: "Privacy policy",
-    updated: "Last updated 18 September 2026",
+    updated: "Last updated 6 October 2026",
     intro: [
       "Cook'n'Co is a recipe book: you write down the dishes you cook, you find them again, and you share them with the people you choose. This page says what the service holds about you, why it holds it, who else ever sees it, and how to get rid of all of it.",
       "The mobile app and cooknco.eu are one service and one account, so this policy covers both.",
@@ -100,6 +100,10 @@ const documents: LegalDocuments = {
           {
             term: "The hosting provider",
             text: "the servers and the database run on machines rented from a provider inside the European Union.",
+          },
+          {
+            term: "The model that reads a recipe photo",
+            text: "only if you have a premium account and choose “Read a photo with AI”: the pages you photograph are sent to a provider running that model inside the European Union, which reads them on the service's behalf and returns the recipe. The service keeps neither the photographs nor what the model answered — only what you then save as a recipe.",
           },
           {
             term: "The AI clients you connected yourself",

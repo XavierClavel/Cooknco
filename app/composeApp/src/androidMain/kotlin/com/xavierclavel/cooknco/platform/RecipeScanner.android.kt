@@ -46,7 +46,7 @@ private const val MAX_PAGES = 4
  * the same thing, and nothing here keeps the scan: the pages are read for their text and the
  * file is the system's to reclaim.
  */
-private val scannerOptions = GmsDocumentScannerOptions.Builder()
+internal val scannerOptions = GmsDocumentScannerOptions.Builder()
     .setGalleryImportAllowed(true)
     .setPageLimit(MAX_PAGES)
     .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)

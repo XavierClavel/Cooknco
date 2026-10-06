@@ -28,7 +28,71 @@ data class Configuration(
 
     /** Defaulted whole, for the reason [pdf] is. */
     val backups: Backups = Backups(),
+
+    /** Defaulted whole, and off by default, for the reason [push] is. See [PhotoImport]. */
+    val photoImport: PhotoImport = PhotoImport(),
 ) {
+    /**
+     * The premium photo import: a picture of a recipe, read by a vision model into the editor.
+     *
+     * **Provider-agnostic by configuration.** Any service speaking the OpenAI chat-completions
+     * API works — Scaleway, OVHcloud, Mistral, DeepSeek, OpenRouter — and moving between them
+     * is [baseUrl], [apiKey] and [model], with no release. Which one is a decision about price
+     * and where the photographs are processed; `docs/pending-setup.md` has the options.
+     *
+     * Off unless all three are set, because the key is a credential that bills somebody: a
+     * developer's backend and the test suite get a reader that answers 503, and the rest of
+     * the product is unaffected.
+     */
+    data class PhotoImport(
+        /** Up to and including the version segment, e.g. `https://api.scaleway.ai/v1`. */
+        val baseUrl: String = "",
+        /** Lives in the cluster's `cooknco-config` secret with the rest of this file. Never logged. */
+        val apiKey: String = "",
+        /** The provider's own model id, e.g. `mistral-small-3.2-24b-instruct-2506`. */
+        val model: String = "",
+
+        /** See `OpenAiCompatiblePhotoReader.jsonMode`. */
+        val jsonMode: Boolean = true,
+        /** See `OpenAiCompatiblePhotoReader.maxOutputTokens`. */
+        val maxOutputTokens: Int = 4096,
+        val timeoutSeconds: Long = 90,
+
+        /**
+         * Pages one import may carry. A recipe over a spread is two; the app's scanner stops
+         * at four, and this matches it — every page is another image billed.
+         */
+        val maxPhotos: Int = 4,
+
+        /**
+         * The largest single page read into memory. The app sends pages scaled down to what
+         * a model actually looks at (providers resize to about 1.3 megapixels anyway), which
+         * is a few hundred kilobytes; this is a bound on what a premium route will hold, set
+         * well above it.
+         */
+        val maxPhotoBytes: Long = 8L * 1024 * 1024,
+
+        /**
+         * Imports one account may run per UTC day, admins included.
+         *
+         * Every import is a paid call, so this is what turns "premium" into a bounded cost
+         * rather than an open tap — a script on a premium account would otherwise spend
+         * whatever the provider's own limit allows. Generous next to any cook's use: nobody
+         * types in thirty recipes a day.
+         */
+        val dailyReadsPerUser: Int = 30,
+
+        /**
+         * Readings in flight at once, across the backend. Each holds a request open for
+         * several seconds; past this they wait, and past [queueSeconds] they are told to
+         * come back, for the reason the PDF renderer bounds its prints.
+         */
+        val maxConcurrentReads: Int = 4,
+        val queueSeconds: Long = 20,
+    ) {
+        val isConfigured: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank()
+    }
+
     /**
      * What the backoffice measures the database dumps against.
      *

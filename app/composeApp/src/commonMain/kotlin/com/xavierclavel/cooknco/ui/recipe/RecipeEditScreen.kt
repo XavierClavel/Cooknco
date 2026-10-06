@@ -48,6 +48,7 @@ import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -112,6 +113,9 @@ import com.xavierclavel.cooknco.platform.rememberCameraCapture
 import com.xavierclavel.cooknco.platform.COOKLANG_PICKER_MIME_TYPES
 import com.xavierclavel.cooknco.platform.rememberTextFilePicker
 import com.xavierclavel.cooknco.platform.rememberRecipeScanner
+import com.xavierclavel.cooknco.platform.rememberRecipePhotoCapture
+import com.xavierclavel.cooknco.ui.components.PremiumLockDialog
+import com.xavierclavel.cooknco.ui.components.premiumSheetAction
 import kotlinx.coroutines.delay
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.RecipeImage
@@ -347,6 +351,12 @@ private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
 fun RecipeEditScreen(
     recipeId: Long?,
     currentUserId: Long,
+    /**
+     * [com.xavierclavel.cooknco.network.dto.UserInfo.isPremium], which decides whether reading
+     * a photo with the model is offered or shown locked. False does not hide it: see
+     * [premiumSheetAction].
+     */
+    isPremium: Boolean,
     onNavigateBack: () -> Unit,
     onSaved: (Long) -> Unit,
     viewModel: RecipeEditViewModel,
@@ -359,6 +369,7 @@ fun RecipeEditScreen(
     val currentStep = uiState.page.ordinal
     val problems = uiState.shownProblems()
     var menuOpen by remember { mutableStateOf(false) }
+    var lockedFeature by remember { mutableStateOf<String?>(null) }
     val steps = EditorStep.entries
     // Remembered here rather than inside the step that offers it: a launcher registered
     // from a lazy item is unregistered the moment that item scrolls out of the viewport,
@@ -367,6 +378,8 @@ fun RecipeEditScreen(
     // Remembered here for the same reason, and for a second one: the picker opens a window
     // of the system's, so this composition can be stopped and restarted while the file is
     // being chosen.
+    // And the same again: the capture is the scanner's window, handing pages back as pictures.
+    val photoCapture = rememberRecipePhotoCapture(onCaptured = viewModel::importPhoto)
     val cooklangPicker = rememberTextFilePicker(
         mimeTypes = COOKLANG_PICKER_MIME_TYPES,
         onPicked = viewModel::importCooklang,
@@ -474,6 +487,16 @@ fun RecipeEditScreen(
                         onClick = scanner::launch,
                         icon = Icons.Outlined.DocumentScanner,
                     ),
+                    // Beside the scan rather than replacing it, and named for what it does
+                        // differently: the scan reads on the phone and sends nothing, this
+                        // sends the page to a model. Premium, because each one is a paid call.
+                        premiumSheetAction(
+                            label = s.readRecipePhoto,
+                            icon = Icons.Outlined.AutoAwesome,
+                            isPremium = isPremium,
+                            onUse = photoCapture::launch,
+                            onLocked = { lockedFeature = s.readRecipePhoto },
+                        ),
                     SheetAction(
                         label = s.importCooklang,
                         onClick = cooklangPicker::launch,
@@ -482,6 +505,10 @@ fun RecipeEditScreen(
                 ),
                 onDismissRequest = { menuOpen = false },
             )
+        }
+
+        lockedFeature?.let { feature ->
+            PremiumLockDialog(feature = feature, onDismissRequest = { lockedFeature = null })
         }
 
         // ── Progress segments ────────────────────────────────────────────────
@@ -519,7 +546,7 @@ fun RecipeEditScreen(
         // One strip for the two, because only one of them can be running: the menu is the
         // only way into either and it closes on the way, and the view models refuse a second
         // start while one is in flight.
-        val busy = uiState.isScanning || uiState.isImporting
+        val busy = uiState.isScanning || uiState.isImporting || uiState.isReadingPhoto
         val statusMessage = uiState.scanMessage ?: uiState.importMessage
         if (busy || statusMessage != null) {
             StickerCard(
@@ -540,7 +567,11 @@ fun RecipeEditScreen(
                         )
                     }
                     Text(
-                        text = statusMessage ?: if (uiState.isImporting) s.importing else s.scanning,
+                        text = statusMessage ?: when {
+                            uiState.isReadingPhoto -> s.readingPhoto
+                            uiState.isImporting -> s.importing
+                            else -> s.scanning
+                        },
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (statusMessage != null) CookncoOrange else CookncoNavy,
