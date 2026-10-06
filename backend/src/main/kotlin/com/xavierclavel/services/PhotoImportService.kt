@@ -4,10 +4,8 @@ import com.xavierclavel.exceptions.BadRequestCause
 import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.exceptions.ServiceUnavailableCause
 import com.xavierclavel.exceptions.ServiceUnavailableException
-import com.xavierclavel.exceptions.TooManyRequestsCause
 import com.xavierclavel.exceptions.TooManyRequestsException
 import com.xavierclavel.models.User
-import com.xavierclavel.plugins.RedisService
 import com.xavierclavel.services.CooklangService.Companion.KEY_COOK_TIME
 import com.xavierclavel.services.CooklangService.Companion.KEY_COURSE
 import com.xavierclavel.services.CooklangService.Companion.KEY_DESCRIPTION
@@ -19,21 +17,17 @@ import com.xavierclavel.services.CooklangService.Companion.KEY_TITLE
 import com.xavierclavel.services.CooklangService.Companion.amountOf
 import com.xavierclavel.services.CooklangService.Companion.fold
 import com.xavierclavel.services.CooklangService.Companion.unitOf
-import com.xavierclavel.utils.Configuration
 import com.xavierclavel.utils.logger
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import shared.enums.AiFeature
 import shared.enums.Locale
-import shared.enums.PhotoImportOutcome
+import shared.enums.AiUsageOutcome
 import shared.infodto.CooklangImportInfo
-import java.time.LocalDate
-import java.time.ZoneOffset
 import kotlin.math.roundToInt
 
 /**
@@ -59,14 +53,7 @@ import kotlin.math.roundToInt
 class PhotoImportService : KoinComponent {
     private val reader: RecipePhotoReader by inject()
     private val cooklangService: CooklangService by inject()
-    private val redisService: RedisService by inject()
-    private val configuration: Configuration by inject()
-    private val usageService: PhotoImportUsageService by inject()
-
-    private val settings get() = configuration.photoImport
-
-    /** See `Configuration.PhotoImport.maxConcurrentReads`. */
-    private val slots by lazy { Semaphore(settings.maxConcurrentReads) }
+    private val usageService: AiUsageService by inject()
 
     companion object {
         /**
@@ -141,11 +128,11 @@ class PhotoImportService : KoinComponent {
      *
      * The caller has already checked the subscription and the pages; this owns the cost side
      * — the month's budget, the daily allowance, the bound on readings in flight, and the
-     * usage row every billed answer leaves ([PhotoImportUsageService.record]) — and the
+     * usage row every billed answer leaves ([AiUsageService.record]) — and the
      * reading itself. The limits are the backoffice's, read on every import, so a change
      * there bites on the next one.
      *
-     * @throws ServiceUnavailableException with `recipe_reader_budget_exhausted` once the
+     * @throws ServiceUnavailableException with `ai_budget_exhausted` once the
      *   month's spend has reached the budget
      * @throws TooManyRequestsException past the day's allowance
      * @throws ServiceUnavailableException when no provider is configured — [UnconfiguredPhotoReader]
@@ -155,22 +142,12 @@ class PhotoImportService : KoinComponent {
      */
     suspend fun read(user: User, photos: List<RecipePhoto>, locale: Locale): CooklangImportInfo {
         val userId = user.id
-        if (usageService.isBudgetExhausted()) {
-            logger.warn { "Photo import refused for user $userId: the month's budget is spent" }
-            throw ServiceUnavailableException(ServiceUnavailableCause.RECIPE_READER_BUDGET_EXHAUSTED)
-        }
-        val day = LocalDate.now(ZoneOffset.UTC).toString()
-        if (redisService.countPhotoImport(userId, day) > usageService.settings().dailyLimitPerUser) {
-            // Counted and then given back, so a cook hammering the button past the limit
-            // does not push tomorrow's first import over it as well.
-            redisService.refundPhotoImport(userId, day)
-            throw TooManyRequestsException(TooManyRequestsCause.PHOTO_IMPORT_DAILY_LIMIT)
-        }
+        val admission = usageService.admit(userId)
 
         // An answer that is not the transcription is refunded too: the provider was paid,
         // but the cook got nothing, and that failure is ours to absorb rather than theirs.
         val read = try {
-            val reading = withReadingSlot { reader.read(photos) }
+            val reading = usageService.withRequestSlot { reader.read(photos) }
             // Not `logEdit`: the recipe is not saved, and the usage row below is bookkeeping
             // rather than an edit anybody made. This line and that row are the cost trail.
             logger.info {
@@ -181,32 +158,23 @@ class PhotoImportService : KoinComponent {
             // budget is checked against these rows, failures included.
             val parsed = runCatching { toParsed(parse(reading.json)) }
             usageService.record(
+                feature = AiFeature.PHOTO_IMPORT,
                 user = user,
                 pages = photos.size,
                 reading = reading,
                 outcome = when {
-                    parsed.isFailure -> PhotoImportOutcome.FAILED
-                    parsed.getOrThrow().isEmpty -> PhotoImportOutcome.NOTHING_READ
-                    else -> PhotoImportOutcome.READ
+                    parsed.isFailure -> AiUsageOutcome.FAILED
+                    parsed.getOrThrow().isEmpty -> AiUsageOutcome.NOTHING_READ
+                    else -> AiUsageOutcome.READ
                 },
             )
             parsed.getOrThrow()
         } catch (e: ServiceUnavailableException) {
-            redisService.refundPhotoImport(userId, day)
+            usageService.refund(admission)
             throw e
         }
         if (read.isEmpty) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_NOTHING_READ)
         return cooklangService.toRecipe(read, locale)
-    }
-
-    private suspend fun <T> withReadingSlot(block: suspend () -> T): T {
-        withTimeoutOrNull(settings.queueSeconds * 1_000) { slots.acquire() }
-            ?: throw ServiceUnavailableException(ServiceUnavailableCause.RECIPE_READER_BUSY)
-        try {
-            return block()
-        } finally {
-            slots.release()
-        }
     }
 
     /**

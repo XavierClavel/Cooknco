@@ -550,7 +550,7 @@ object EnStrings : Strings {
     override val readingPhoto = "Reading the photo…"
     override val photoImportDone = "The photo was read. Check it over before saving."
     override val photoImportNothingRead = "No recipe could be read off this photo. Try a closer, sharper picture."
-    override val photoImportDailyLimit = "You have read as many photos as one day allows. Try again tomorrow."
+    override val photoImportDailyLimit = "You have used today's AI allowance. Try again tomorrow."
     override val photoImportUnavailable = "Reading photos is unavailable right now. Please try again later."
     override val photoImportFailed = "The photo could not be read. Please try again."
     override val exportCookbookPdf = "Export the cookbook as PDF"

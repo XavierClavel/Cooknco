@@ -133,7 +133,7 @@ interface RecipePhotoReader {
  * That API is the one every candidate shares — Scaleway, OVHcloud, Mistral, DeepSeek,
  * OpenRouter, OpenAI itself, and Gemini and Claude through their compatibility endpoints —
  * so one implementation is a choice of every one of them, made in configuration
- * (`Configuration.PhotoImport`). A provider that needs a client of its own is a second
+ * (`Configuration.Ai`). A provider that needs a client of its own is a second
  * implementation of [RecipePhotoReader], not a branch in this one.
  *
  * Pictures travel as `data:` URLs inside the request rather than as links: the photographs

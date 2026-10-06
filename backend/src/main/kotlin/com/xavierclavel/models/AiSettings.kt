@@ -12,9 +12,13 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 
 /**
- * The operator's limits and prices for the photo import, edited in the backoffice.
+ * The operator's limits and prices for every AI feature, edited in the backoffice AI tab.
  *
- * At most one row, and no row means the defaults (`Configuration.PhotoImport` for the daily
+ * One set for all features on purpose: they share a provider and a bill, so the ceiling an
+ * operator cares about is the total, and a per-feature budget would be a second place to
+ * forget to look.
+ *
+ * At most one row, and no row means the defaults (`Configuration.Ai` for the daily
  * allowance, no budget and no prices) — the override-over-a-floor shape [AppVersion] and
  * [PdfTemplate] have, so a wiped table degrades to the configured behaviour rather than to
  * none.
@@ -25,14 +29,17 @@ import java.time.LocalDateTime
  * — the backoffice says so.
  */
 @Entity
-@Table(name = "photo_import_settings")
-class PhotoImportSettings(
+@Table(name = "ai_settings")
+class AiSettings(
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0,
 
-    /** Imports one account may run per UTC day. Zero closes the feature to everybody. */
+    /**
+     * Requests one account may make per UTC day, across every AI feature. Zero closes them
+     * all to everybody.
+     */
     @Column(nullable = false)
     var dailyLimitPerUser: Int = 0,
 

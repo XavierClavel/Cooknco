@@ -1,6 +1,6 @@
 package com.xavierclavel.controllers
 
-import com.xavierclavel.services.PhotoImportUsageService
+import com.xavierclavel.services.AiUsageService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.logEdit
 import io.ktor.server.request.receive
@@ -9,18 +9,18 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.put
 import org.koin.java.KoinJavaComponent.inject
-import shared.infodto.PhotoImportSettingsDTO
+import shared.infodto.AiSettingsDTO
 
 /**
- * The photo import's spend and limits, for the backoffice tab of the same name.
+ * What the AI features spend and the limits on them, for the backoffice AI tab.
  *
  * One read for the whole tab, and one write for the settings. The provider itself is not
  * editable here: its key is a credential that lives in the cluster's secret, and an admin
  * session is not a reason to be able to read it or swap it. What an operator steers from here
  * is how much may be spent — per account per day, and in total per month.
  */
-object AdminPhotoImportController : Controller("photo-imports") {
-    val usageService: PhotoImportUsageService by inject(PhotoImportUsageService::class.java)
+object AdminAiController : Controller("ai") {
+    val usageService: AiUsageService by inject(AiUsageService::class.java)
 
     override fun Route.routes() {
         getOverview()
@@ -32,9 +32,9 @@ object AdminPhotoImportController : Controller("photo-imports") {
     }
 
     private fun Route.saveSettings() = put("/settings") {
-        val saved = usageService.saveSettings(call.receive<PhotoImportSettingsDTO>())
+        val saved = usageService.saveSettings(call.receive<AiSettingsDTO>())
         logEdit {
-            "Photo import limits set to ${saved.dailyLimitPerUser}/account/day, " +
+            "AI limits set to ${saved.dailyLimitPerUser} requests/account/day, " +
                 "budget ${saved.monthlyBudget?.let { "$it ${saved.currency}/month" } ?: "none"}, " +
                 "prices ${saved.inputPricePerMillion}/${saved.outputPricePerMillion} ${saved.currency} per M tokens"
         }

@@ -7,8 +7,8 @@ import com.xavierclavel.models.jointables.query.QLike
 import com.xavierclavel.models.jointables.query.QRecipeIngredient
 import com.xavierclavel.models.jointables.query.QRecipeStepIngredient
 import com.xavierclavel.models.query.QAppVersion
-import com.xavierclavel.models.query.QPhotoImport
-import com.xavierclavel.models.query.QPhotoImportSettings
+import com.xavierclavel.models.query.QAiUsage
+import com.xavierclavel.models.query.QAiSettings
 import com.xavierclavel.models.query.QCookbook
 import com.xavierclavel.models.query.QDevice
 import com.xavierclavel.models.query.QEmailTemplate
@@ -56,7 +56,7 @@ object DatabaseManager {
         QOAuthGrant(),
         // Photo imports point at users too, and nothing clears them — an account's deletion
         // detaches them on purpose (UserService.deleteUserById), so its spend stays counted
-        QPhotoImport(),
+        QAiUsage(),
         // Before both tables it points at: a step's ingredient links restrict deletes at
         // either end, and nothing else clears them — a recipe's own delete is soft, so its
         // steps and their links outlive it
@@ -81,7 +81,7 @@ object DatabaseManager {
         QEmailTemplate(),
         QPdfTemplate(),
         QAppVersion(),
-        QPhotoImportSettings(),
+        QAiSettings(),
         // Owned by nobody either: a registered MCP client references no row of ours
         QOAuthClient(),
     )

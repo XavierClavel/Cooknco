@@ -83,7 +83,7 @@ const items = computed(() => [
   {to: '/notifications', label: 'admin_notifications', icon: 'bell' as const},
   {to: '/documents', label: 'admin_documents', icon: 'fileText' as const},
   {to: '/releases', label: 'admin_releases', icon: 'phone' as const},
-  {to: '/photo-import', label: 'admin_photo_import', icon: 'sparkles' as const},
+  {to: '/ai', label: 'admin_ai', icon: 'sparkles' as const},
   {to: '/logs', label: 'admin_logs', icon: 'terminal' as const},
 ])
 

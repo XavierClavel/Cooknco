@@ -50,23 +50,23 @@ suspend fun HttpClient.importPhoto(
 
 private val adminJson = Json { ignoreUnknownKeys = true }
 
-suspend fun HttpClient.getPhotoImportOverviewRaw(): HttpResponse =
-    this.get("${shared.utils.URL.ADMIN_URL}/photo-imports")
+suspend fun HttpClient.getAiOverviewRaw(): HttpResponse =
+    this.get("${shared.utils.URL.ADMIN_URL}/ai")
 
-suspend fun HttpClient.getPhotoImportOverview(): shared.infodto.AdminPhotoImportOverview =
-    this.getPhotoImportOverviewRaw().let {
+suspend fun HttpClient.getAiOverview(): shared.infodto.AdminAiOverview =
+    this.getAiOverviewRaw().let {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
         adminJson.decodeFromString(it.bodyAsText())
     }
 
-suspend fun HttpClient.savePhotoImportSettingsRaw(settings: shared.infodto.PhotoImportSettingsDTO): HttpResponse =
-    this.put("${shared.utils.URL.ADMIN_URL}/photo-imports/settings") {
+suspend fun HttpClient.saveAiSettingsRaw(settings: shared.infodto.AiSettingsDTO): HttpResponse =
+    this.put("${shared.utils.URL.ADMIN_URL}/ai/settings") {
         contentType(ContentType.Application.Json)
         setBody(Json.encodeToString(settings))
     }
 
-suspend fun HttpClient.savePhotoImportSettings(settings: shared.infodto.PhotoImportSettingsDTO): shared.infodto.PhotoImportSettingsDTO =
-    this.savePhotoImportSettingsRaw(settings).let {
+suspend fun HttpClient.saveAiSettings(settings: shared.infodto.AiSettingsDTO): shared.infodto.AiSettingsDTO =
+    this.saveAiSettingsRaw(settings).let {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
         adminJson.decodeFromString(it.bodyAsText())
     }

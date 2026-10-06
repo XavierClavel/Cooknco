@@ -35,7 +35,7 @@ object AdminController: Controller(ADMIN_URL) {
             AdminNotificationController.serve(this)
             AdminPdfController.serve(this)
             AdminAppVersionController.serve(this)
-            AdminPhotoImportController.serve(this)
+            AdminAiController.serve(this)
             AdminLogController.serve(this)
         }
     }

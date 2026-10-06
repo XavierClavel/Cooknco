@@ -225,9 +225,9 @@ export const listAppVersions = () => api.get('/admin/app-versions')
 
 // ------------------------------------------------------------- photo import
 /** Spend, limits and recent imports of the premium photo import, in one read. */
-export const getPhotoImportOverview = () => api.get('/admin/photo-imports')
+export const getAiOverview = () => api.get('/admin/ai')
 
-export type PhotoImportSettings = {
+export type AiSettings = {
   dailyLimitPerUser: number
   /** Null for no monthly ceiling. */
   monthlyBudget: number | null
@@ -236,8 +236,8 @@ export type PhotoImportSettings = {
   currency: string
 }
 
-export const savePhotoImportSettings = (settings: PhotoImportSettings) =>
-  api.put('/admin/photo-imports/settings', settings)
+export const saveAiSettings = (settings: AiSettings) =>
+  api.put('/admin/ai/settings', settings)
 
 export const saveAppVersion = (
   platform: string, minimumVersion: string, latestVersion: string, storeUrl: string,

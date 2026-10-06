@@ -811,7 +811,7 @@ a second launcher rather than a mode of the scanner, whose promise is that nothi
 
 - **Provider-agnostic by configuration.** `RecipePhotoReader` is the only thing that knows a
   model exists; `OpenAiCompatiblePhotoReader` speaks the chat-completions API every candidate
-  shares, and `Configuration.PhotoImport` (`baseUrl`, `apiKey`, `model`) picks one. Unset, the
+  shares, and `Configuration.Ai` (`baseUrl`, `apiKey`, `model`) picks one. Unset, the
   binding is `UnconfiguredPhotoReader`, which answers 503 — every developer's backend and the
   test suite (`FakeRecipePhotoReader`). The provider must process **in the EU** and keep
   nothing: the privacy policy says the service transfers nothing outside the Union, so a
@@ -826,17 +826,21 @@ a second launcher rather than a mode of the scanner, whose promise is that nothi
   step only *name* what it uses (`uses`); a use naming nothing on the list is dropped. Letting
   steps restate amounts would have `amountsOf` add the list's 200 g to the step's 200 g.
 - **Premium is checked before the body is read**, then the month's budget, a per-account daily
-  allowance (Redis, 429 past it) and a bound on readings in flight. Every import is a paid
-  call; the two limits are what make premium a bounded cost. An import that never got a usable
+  allowance (Redis, 429 past it) and a bound on calls in flight. Every import is a paid call;
+  the two limits are what make premium a bounded cost. An import that never got a usable
   answer — provider down, refusal, an answer that is not the object — is refunded to the cook's
   day, but still counted in the month: the provider billed it.
-- **The money side is the backoffice's** (photo-import tab, `PhotoImportUsageService`). Every
-  billed answer leaves a `photo_imports` row with its tokens and its cost *at the prices then in
-  force*, so correcting a price never rewrites a past month. The limits and prices live in the
-  one-row `photo_import_settings`, overriding the YAML default for the daily allowance, and are
-  read on every import. No provider says what a token costs, so the operator types the prices
-  in; with none, everything costs 0 and the budget cannot bite — the tab says so. An account's
-  deletion detaches its rows rather than deleting them, so the month's spend stays true.
+- **The money side is generic over AI features, not the photo import's** (backoffice AI tab,
+  `AiUsageService`). Every billed answer from any feature leaves an `ai_usage` row tagged with
+  its `AiFeature`, its tokens and its cost *at the prices then in force*, so correcting a price
+  never rewrites a past month. One budget, one daily allowance and one set of prices
+  (`ai_settings`, one row, overriding the YAML default) cover every feature, because they share
+  one provider and one bill; the in-flight bound is shared too (`withRequestSlot`). No provider
+  says what a token costs, so the operator types the prices in; with none, everything costs 0
+  and the budget cannot bite — the tab says so. An account's deletion detaches its rows rather
+  than deleting them, so the month's spend stays true. **A new AI feature** is a case in
+  `AiFeature`, a call through `withRequestSlot`, the budget and allowance checks, and a
+  `record(feature = …)` per billed answer — the tab picks it up with no change.
 - **The recipe is not saved**, so it does not `logEdit`; the usage row is bookkeeping, not an
   edit. Saving the settings does log.
 

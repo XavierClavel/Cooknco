@@ -29,11 +29,12 @@ data class Configuration(
     /** Defaulted whole, for the reason [pdf] is. */
     val backups: Backups = Backups(),
 
-    /** Defaulted whole, and off by default, for the reason [push] is. See [PhotoImport]. */
-    val photoImport: PhotoImport = PhotoImport(),
+    /** Defaulted whole, and off by default, for the reason [push] is. See [Ai]. */
+    val ai: Ai = Ai(),
 ) {
     /**
-     * The premium photo import: a picture of a recipe, read by a vision model into the editor.
+     * The model provider behind the AI features — today the premium photo import, which reads a
+     * picture of a recipe into the editor — and the bounds they share.
      *
      * **Provider-agnostic by configuration.** Any service speaking the OpenAI chat-completions
      * API works — Scaleway, OVHcloud, Mistral, DeepSeek, OpenRouter — and moving between them
@@ -44,7 +45,7 @@ data class Configuration(
      * developer's backend and the test suite get a reader that answers 503, and the rest of
      * the product is unaffected.
      */
-    data class PhotoImport(
+    data class Ai(
         /** Up to and including the version segment, e.g. `https://api.scaleway.ai/v1`. */
         val baseUrl: String = "",
         /** Lives in the cluster's `cooknco-config` secret with the rest of this file. Never logged. */
@@ -59,7 +60,7 @@ data class Configuration(
         val timeoutSeconds: Long = 90,
 
         /**
-         * Pages one import may carry. A recipe over a spread is two; the app's scanner stops
+         * Pages one photo import may carry. A recipe over a spread is two; the app's scanner stops
          * at four, and this matches it — every page is another image billed.
          */
         val maxPhotos: Int = 4,
@@ -73,24 +74,24 @@ data class Configuration(
         val maxPhotoBytes: Long = 8L * 1024 * 1024,
 
         /**
-         * Imports one account may run per UTC day, admins included — **until the backoffice
-         * saves its own** (`PhotoImportSettings`), which then wins. The month's budget and the
-         * token prices live only there: they are an operator's to change without a restart.
+         * AI requests one account may make per UTC day, across every feature, admins included —
+         * **until the backoffice AI tab saves its own** (`AiSettings`), which then wins. The
+         * month's budget and the token prices live only there: they are an operator's to change
+         * without a restart.
          *
-         *
-         * Every import is a paid call, so this is what turns "premium" into a bounded cost
+         * Every request is a paid call, so this is what turns "premium" into a bounded cost
          * rather than an open tap — a script on a premium account would otherwise spend
          * whatever the provider's own limit allows. Generous next to any cook's use: nobody
          * types in thirty recipes a day.
          */
-        val dailyReadsPerUser: Int = 30,
+        val dailyRequestsPerUser: Int = 30,
 
         /**
-         * Readings in flight at once, across the backend. Each holds a request open for
+         * Requests to the model in flight at once, across the backend and every feature. Each holds a request open for
          * several seconds; past this they wait, and past [queueSeconds] they are told to
          * come back, for the reason the PDF renderer bounds its prints.
          */
-        val maxConcurrentReads: Int = 4,
+        val maxConcurrentRequests: Int = 4,
         val queueSeconds: Long = 20,
     ) {
         val isConfigured: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank()

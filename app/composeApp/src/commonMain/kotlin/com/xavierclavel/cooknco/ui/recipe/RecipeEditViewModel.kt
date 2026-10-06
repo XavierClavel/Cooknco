@@ -447,7 +447,8 @@ class RecipeEditViewModel(
     /**
      * What to tell the cook when a photo did not read.
      *
-     * The causes are the backend's keys (`PhotoImportService`); each one the cook can act on
+     * The causes are the backend's keys (`PhotoImportService`, and `AiUsageService` for the
+     * daily allowance and the monthly budget every AI feature shares); each one the cook can act on
      * differently gets its own sentence — retake the photo, wait for tomorrow, wait a while —
      * and everything else is one apology.
      */
@@ -456,8 +457,9 @@ class RecipeEditViewModel(
         val body = (throwable as? ApiException)?.body ?: return s.photoImportFailed
         return when {
             "photo_import_nothing_read" in body -> s.photoImportNothingRead
-            "photo_import_daily_limit" in body -> s.photoImportDailyLimit
-            "recipe_reader_" in body -> s.photoImportUnavailable
+            "ai_daily_limit" in body -> s.photoImportDailyLimit
+            // The month's AI budget is spent: nothing the cook can do but wait, like a provider down.
+            "recipe_reader_" in body || "ai_budget_exhausted" in body -> s.photoImportUnavailable
             else -> s.photoImportFailed
         }
     }

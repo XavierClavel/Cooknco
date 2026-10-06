@@ -123,9 +123,10 @@ class RecipeEditPhotoImportTest {
     @Test
     fun each_refusal_the_cook_can_act_on_has_its_own_sentence() {
         expectMessage("photo_import_nothing_read", HttpStatusCode.BadRequest) { strings.photoImportNothingRead }
-        expectMessage("photo_import_daily_limit", HttpStatusCode.TooManyRequests) { strings.photoImportDailyLimit }
+        expectMessage("ai_daily_limit", HttpStatusCode.TooManyRequests) { strings.photoImportDailyLimit }
         expectMessage("recipe_reader_not_configured", HttpStatusCode.ServiceUnavailable) { strings.photoImportUnavailable }
         expectMessage("recipe_reader_busy", HttpStatusCode.ServiceUnavailable) { strings.photoImportUnavailable }
+        expectMessage("ai_budget_exhausted", HttpStatusCode.ServiceUnavailable) { strings.photoImportUnavailable }
         expectMessage("something_else", HttpStatusCode.InternalServerError) { strings.photoImportFailed }
     }
 

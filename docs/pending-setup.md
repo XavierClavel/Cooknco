@@ -266,7 +266,7 @@ a private window once, in both languages (the browser's language picks which).
 
 ---
 
-## 5. The photo import's model — a provider, a key, and a model id
+## 5. The AI provider — a key, a model id, and the prices
 
 **What is inert until this is done:** "Read a photo with AI", on the new-recipe sheet in the
 app. A premium account still sees it and can tap it; the backend answers
@@ -276,7 +276,7 @@ Everything else, the on-device scan included, is unaffected.
 ### Picking a provider — the constraint is the privacy policy, not the price
 
 Any service speaking the OpenAI chat-completions API works, and switching is three values
-with no release (`Configuration.PhotoImport`). What narrows the choice is a sentence the
+with no release (`Configuration.Ai`). What narrows the choice is a sentence the
 privacy policy already makes: **"The service itself transfers nothing outside the European
 Union."** So the provider must process in the EU, and must not keep or train on what it is
 sent — the policy says the photographs are read *on the service's behalf*. That rules out
@@ -293,7 +293,7 @@ What fits, with prices as of October 2026 (per million tokens, in / out; one pag
 | Mistral (EU) | Mistral Large 3 | $0.50 / $1.50 | ~$3.5 |
 
 Start with **Scaleway + Mistral Small 3.2**: cheapest, French, and its free tier covers a few
-hundred test imports. The daily allowance (`dailyReadsPerUser`, 30) bounds the worst case at
+hundred test imports. The daily allowance (`dailyRequestsPerUser`, 30) bounds the worst case at
 about a cent per account per day on that model.
 
 ### Trying a provider before choosing it
@@ -313,14 +313,14 @@ The values go in the backend's `application.yaml`, which lives in the `cooknco-c
 nothing about it belongs in the image or the repository:
 
 ```yaml
-photoImport:
+ai:
   baseUrl: https://api.scaleway.ai/v1          # up to and including /v1
   apiKey: <the provider's secret key>
   model: <the model id as the provider's console spells it>
   # optional, shown with their defaults:
   # jsonMode: true             # false for a provider that rejects response_format
-  # dailyReadsPerUser: 30
-  # maxConcurrentReads: 4
+  # dailyRequestsPerUser: 30
+  # maxConcurrentRequests: 4
 ```
 
 Copy the model id from the provider's console rather than from memory: Scaleway's serverless
@@ -328,13 +328,14 @@ ids differ from the ones its dedicated deployments use, and an unknown id comes 
 `recipe_reader_failed` with the provider's reason in the backend log.
 
 Then restart the backend (`kubectl rollout restart deployment/cooknco-backend`), since the
-secret is read at start-up.
-
-**Then open the backoffice's photo-import tab and type in the provider's prices** (per million
-tokens, in and out) and a monthly budget. Nothing reads prices from the provider, so until they
-are set every import costs 0 and the budget can never be reached. The daily allowance per
-account is there too; until it is saved, `dailyReadsPerUser` from the YAML applies. Its log says which model it reads with:
+secret is read at start-up. Its log says which model it reads with:
 `Photo import reads with <model> at <baseUrl>`.
+
+**Then open the backoffice's AI tab and type in the provider's prices** (per million tokens, in
+and out) and a monthly budget. Nothing reads prices from the provider, so until they are set
+every request costs 0 and the budget can never be reached. The daily allowance per account is
+there too; until it is saved, `dailyRequestsPerUser` from the YAML applies. Both limits cover
+every AI feature together — there is one provider and one bill.
 
 ### Checking it worked
 

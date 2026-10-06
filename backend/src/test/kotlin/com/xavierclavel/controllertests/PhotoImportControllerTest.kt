@@ -267,7 +267,7 @@ class PhotoImportControllerTest : ApplicationTest() {
     @Test
     fun `more pages than one recipe has are refused`() = runTest {
         grantPremiumForever(USER1)
-        val pages = List(configuration.photoImport.maxPhotos + 1) { testImageBytes() }
+        val pages = List(configuration.ai.maxPhotos + 1) { testImageBytes() }
         runAsUser1 {
             client.importPhotoRaw(pages = pages).apply {
                 assertEquals(HttpStatusCode.BadRequest, status)
@@ -286,16 +286,16 @@ class PhotoImportControllerTest : ApplicationTest() {
         grantPremiumForever(USER1)
         fakePhotoReader.answer = tart
         val userId = userService.findByMail(USER1).id
-        runBlocking { repeat(configuration.photoImport.dailyReadsPerUser) { redisService.countPhotoImport(userId, today()) } }
+        runBlocking { repeat(configuration.ai.dailyRequestsPerUser) { redisService.countAiRequest(userId, today()) } }
         runAsUser1 {
             client.importPhotoRaw().apply {
                 assertEquals(HttpStatusCode.TooManyRequests, status)
-                assertContains(bodyAsText(), "photo_import_daily_limit")
+                assertContains(bodyAsText(), "ai_daily_limit")
             }
         }
         assertTrue(fakePhotoReader.calls.isEmpty())
         // Refused attempts are given back, so hammering the button does not eat into tomorrow.
-        assertEquals(configuration.photoImport.dailyReadsPerUser.toLong() + 1, countSoFar(userId))
+        assertEquals(configuration.ai.dailyRequestsPerUser.toLong() + 1, countSoFar(userId))
     }
 
     @Test
@@ -304,12 +304,12 @@ class PhotoImportControllerTest : ApplicationTest() {
         grantPremiumForever(USER2)
         fakePhotoReader.answer = tart
         val user1 = userService.findByMail(USER1).id
-        runBlocking { repeat(configuration.photoImport.dailyReadsPerUser) { redisService.countPhotoImport(user1, today()) } }
+        runBlocking { repeat(configuration.ai.dailyRequestsPerUser) { redisService.countAiRequest(user1, today()) } }
         runAsUser2 { client.importPhoto() }
     }
 
     private fun today() = LocalDate.now(ZoneOffset.UTC).toString()
 
     /** What the counter holds, read by counting one more: the call itself is what is measured. */
-    private fun countSoFar(userId: Long): Long = runBlocking { redisService.countPhotoImport(userId, today()) }
+    private fun countSoFar(userId: Long): Long = runBlocking { redisService.countAiRequest(userId, today()) }
 }

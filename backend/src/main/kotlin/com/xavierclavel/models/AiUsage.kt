@@ -9,21 +9,22 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
-import shared.enums.PhotoImportOutcome
+import shared.enums.AiFeature
+import shared.enums.AiUsageOutcome
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 /**
- * One photo import that reached the model, and what it cost.
+ * One request that reached a model, which feature made it, and what it cost.
  *
- * What the backoffice's spending figures are summed from, and what the monthly budget is
- * checked against — so it is written for every answer the provider billed, whatever the
- * cook got out of it ([outcome]). An import that never reached a model costs nothing and
- * leaves no row.
+ * What the backoffice AI tab's spending figures are summed from, and what the monthly budget
+ * is checked against — so it is written for every answer the provider billed, whatever the
+ * user got out of it ([outcome]). A request that never reached a model costs nothing and
+ * leaves no row. Every AI feature writes here ([feature]), so there is one bill to watch.
  *
  * [cost] is fixed when the row is written, at the prices then in force
- * ([PhotoImportSettings]): a month's spend must not change after the fact because an
+ * ([AiSettings]): a month's spend must not change after the fact because an
  * operator corrected a price today.
  *
  * [user] outlives nothing: an account's deletion detaches its rows rather than deleting them
@@ -31,8 +32,8 @@ import java.time.ZoneOffset
  * nothing about the person remains.
  */
 @Entity
-@Table(name = "photo_imports")
-class PhotoImport(
+@Table(name = "ai_usage")
+class AiUsage(
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,6 +46,10 @@ class PhotoImport(
     @Index
     var createdAt: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC),
 
+    @Column(nullable = false)
+    var feature: AiFeature = AiFeature.PHOTO_IMPORT,
+
+    /** How many images the request carried — pages, for a photo import. */
     @Column(nullable = false)
     var pages: Int = 0,
 
@@ -60,6 +65,6 @@ class PhotoImport(
     var cost: BigDecimal = BigDecimal.ZERO,
 
     @Column(nullable = false)
-    var outcome: PhotoImportOutcome = PhotoImportOutcome.READ,
+    var outcome: AiUsageOutcome = AiUsageOutcome.READ,
 
 ) : Model()

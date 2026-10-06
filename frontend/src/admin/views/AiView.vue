@@ -1,27 +1,28 @@
 <template>
   <div class="page">
     <!--
-      The premium photo import costs money per use, so this page is about that money: what
-      has been spent, by whom, and the two limits that bound it. Read top-down: is a provider
-      configured, how far into the budget is the month, then where the spend went.
+      Every AI feature is a paid call to the same provider, so this page is about that money:
+      what has been spent, on which feature, by whom, and the two limits that bound it — both
+      shared by every feature. Read top-down: is a provider configured, how far into the
+      budget is the month, then where the spend went.
     -->
     <div v-if="loading && !loaded" class="progress"><i></i></div>
 
     <div v-if="loaded && !overview.provider.configured" class="alert info">
       <ui-icon name="info" />
-      <span>{{ $t('admin_photo_import_no_provider') }}</span>
+      <span>{{ $t('admin_ai_no_provider') }}</span>
     </div>
 
     <template v-if="loaded">
       <section class="tiles">
         <div class="tile panel" :class="budgetTone">
-          <span class="label">{{ $t('admin_photo_import_month_spend') }}</span>
+          <span class="label">{{ $t('admin_ai_month_spend') }}</span>
           <span class="value tnum">{{ money(overview.month.cost) }}</span>
           <span class="sub small subtle">
             <template v-if="overview.settings.monthlyBudget">
-              {{ $t('admin_photo_import_of_budget', {budget: money(overview.settings.monthlyBudget), percent: budgetPercent}) }}
+              {{ $t('admin_ai_of_budget', {budget: money(overview.settings.monthlyBudget), percent: budgetPercent}) }}
             </template>
-            <template v-else>{{ $t('admin_photo_import_no_budget') }}</template>
+            <template v-else>{{ $t('admin_ai_no_budget') }}</template>
           </span>
           <div v-if="overview.settings.monthlyBudget" class="meter" :class="budgetTone">
             <i :style="{width: `${Math.min(budgetPercent, 100)}%`}"></i>
@@ -29,42 +30,42 @@
         </div>
 
         <div class="tile panel">
-          <span class="label">{{ $t('admin_photo_import_month_imports') }}</span>
-          <span class="value tnum">{{ fmtNumber(overview.month.imports) }}</span>
+          <span class="label">{{ $t('admin_ai_month_requests') }}</span>
+          <span class="value tnum">{{ fmtNumber(overview.month.requests) }}</span>
           <span class="sub small subtle">
-            {{ $t('admin_photo_import_tokens', {input: fmtTokens(overview.month.inputTokens), output: fmtTokens(overview.month.outputTokens)}) }}
+            {{ $t('admin_ai_tokens', {input: fmtTokens(overview.month.inputTokens), output: fmtTokens(overview.month.outputTokens)}) }}
           </span>
         </div>
 
         <div class="tile panel">
-          <span class="label">{{ $t('admin_photo_import_today') }}</span>
-          <span class="value tnum">{{ fmtNumber(overview.today.imports) }}</span>
+          <span class="label">{{ $t('admin_ai_today') }}</span>
+          <span class="value tnum">{{ fmtNumber(overview.today.requests) }}</span>
           <span class="sub small subtle">{{ money(overview.today.cost) }}</span>
         </div>
 
         <div class="tile panel">
-          <span class="label">{{ $t('admin_photo_import_per_import') }}</span>
-          <span class="value tnum">{{ overview.month.imports ? money(overview.month.cost / overview.month.imports, 4) : '—' }}</span>
+          <span class="label">{{ $t('admin_ai_per_request') }}</span>
+          <span class="value tnum">{{ overview.month.requests ? money(overview.month.cost / overview.month.requests, 4) : '—' }}</span>
           <span class="sub small subtle mono truncate" :title="overview.provider.baseUrl">
-            {{ overview.provider.model || $t('admin_photo_import_no_model') }}
+            {{ overview.provider.model || $t('admin_ai_no_model') }}
           </span>
         </div>
       </section>
 
       <div v-if="budgetPercent >= 100" class="alert danger">
         <ui-icon name="alert" />
-        <span>{{ $t('admin_photo_import_budget_spent') }}</span>
+        <span>{{ $t('admin_ai_budget_spent') }}</span>
       </div>
       <div v-else-if="budgetPercent >= 80" class="alert warn">
         <ui-icon name="alert" />
-        <span>{{ $t('admin_photo_import_budget_close', {percent: budgetPercent}) }}</span>
+        <span>{{ $t('admin_ai_budget_close', {percent: budgetPercent}) }}</span>
       </div>
 
       <!-- --------------------------------------------------------------- limits -->
       <div class="panel">
         <div class="panel-head">
-          <span class="panel-title">{{ $t('admin_photo_import_limits') }}</span>
-          <span v-if="!overview.settingsSaved" class="badge">{{ $t('admin_photo_import_defaults') }}</span>
+          <span class="panel-title">{{ $t('admin_ai_limits') }}</span>
+          <span v-if="!overview.settingsSaved" class="badge">{{ $t('admin_ai_defaults') }}</span>
           <span v-if="dirty" class="badge warn">{{ $t('admin_releases_unsaved') }}</span>
           <span class="spacer"></span>
           <span v-if="overview.settingsUpdatedAt" class="small subtle">
@@ -75,76 +76,76 @@
         <div class="panel-body col" style="gap:14px">
           <div class="fields">
             <label class="field">
-              <span>{{ $t('admin_photo_import_daily_limit') }}</span>
+              <span>{{ $t('admin_ai_daily_limit') }}</span>
               <input v-model.number="draft.dailyLimitPerUser" type="number" min="0" max="1000" step="1" class="input tnum" />
-              <span class="small subtle">{{ $t('admin_photo_import_daily_limit_hint') }}</span>
+              <span class="small subtle">{{ $t('admin_ai_daily_limit_hint') }}</span>
             </label>
 
             <label class="field">
-              <span>{{ $t('admin_photo_import_monthly_budget', {currency: draft.currency}) }}</span>
+              <span>{{ $t('admin_ai_monthly_budget', {currency: draft.currency}) }}</span>
               <!--
                 Text rather than a number input: empty has to mean "no ceiling", and a number
                 input reports a half-typed "0." as empty, which wiped the decimal point.
               -->
               <input v-model="budgetText" type="text" inputmode="decimal" class="input tnum"
-                     :placeholder="$t('admin_photo_import_monthly_budget_none')" />
-              <span v-if="budgetInvalid" class="small danger-text">{{ $t('photo_import_budget_invalid') }}</span>
-              <span v-else class="small subtle">{{ $t('admin_photo_import_monthly_budget_hint') }}</span>
+                     :placeholder="$t('admin_ai_monthly_budget_none')" />
+              <span v-if="budgetInvalid" class="small danger-text">{{ $t('ai_budget_invalid') }}</span>
+              <span v-else class="small subtle">{{ $t('admin_ai_monthly_budget_hint') }}</span>
             </label>
 
             <label class="field">
-              <span>{{ $t('admin_photo_import_currency') }}</span>
+              <span>{{ $t('admin_ai_currency') }}</span>
               <input v-model="draft.currency" class="input mono" maxlength="3" style="text-transform:uppercase" />
             </label>
           </div>
 
           <div class="fields">
             <label class="field">
-              <span>{{ $t('admin_photo_import_input_price', {currency: draft.currency}) }}</span>
+              <span>{{ $t('admin_ai_input_price', {currency: draft.currency}) }}</span>
               <input v-model.number="draft.inputPricePerMillion" type="number" min="0" step="0.01" class="input tnum" />
             </label>
             <label class="field">
-              <span>{{ $t('admin_photo_import_output_price', {currency: draft.currency}) }}</span>
+              <span>{{ $t('admin_ai_output_price', {currency: draft.currency}) }}</span>
               <input v-model.number="draft.outputPricePerMillion" type="number" min="0" step="0.01" class="input tnum" />
             </label>
             <div class="field">
-              <span>{{ $t('admin_photo_import_estimate') }}</span>
+              <span>{{ $t('admin_ai_estimate') }}</span>
               <span class="estimate tnum">{{ money(estimatePerImport, 4) }}</span>
-              <span class="small subtle">{{ $t('admin_photo_import_estimate_hint') }}</span>
+              <span class="small subtle">{{ $t('admin_ai_estimate_hint') }}</span>
             </div>
           </div>
 
           <div v-if="!draft.inputPricePerMillion && !draft.outputPricePerMillion" class="alert warn">
             <ui-icon name="alert" />
-            <span>{{ $t('admin_photo_import_no_prices') }}</span>
+            <span>{{ $t('admin_ai_no_prices') }}</span>
           </div>
           <div v-if="draft.dailyLimitPerUser === 0" class="alert warn">
             <ui-icon name="ban" />
-            <span>{{ $t('admin_photo_import_closed') }}</span>
+            <span>{{ $t('admin_ai_closed') }}</span>
           </div>
         </div>
 
         <div class="panel-foot">
           <button class="btn" :disabled="!dirty || saving" @click="reset">{{ $t('cancel') }}</button>
-          <button class="btn primary" :disabled="!dirty || saving || budgetInvalid" @click="save">{{ $t('admin_photo_import_save') }}</button>
+          <button class="btn primary" :disabled="!dirty || saving || budgetInvalid" @click="save">{{ $t('admin_ai_save') }}</button>
         </div>
       </div>
 
       <!-- ---------------------------------------------------------------- chart -->
       <div class="panel">
         <div class="panel-head">
-          <span class="panel-title">{{ $t('admin_photo_import_last_days', {days: overview.days.length}) }}</span>
+          <span class="panel-title">{{ $t('admin_ai_last_days', {days: overview.days.length}) }}</span>
           <span class="spacer"></span>
           <div class="seg">
-            <button class="btn small" :class="{primary: metric === 'cost'}" @click="metric = 'cost'">{{ $t('admin_photo_import_metric_cost') }}</button>
-            <button class="btn small" :class="{primary: metric === 'imports'}" @click="metric = 'imports'">{{ $t('admin_photo_import_metric_imports') }}</button>
+            <button class="btn small" :class="{primary: metric === 'cost'}" @click="metric = 'cost'">{{ $t('admin_ai_metric_cost') }}</button>
+            <button class="btn small" :class="{primary: metric === 'requests'}" @click="metric = 'requests'">{{ $t('admin_ai_requests') }}</button>
           </div>
           <button class="btn icon" :title="$t('admin_refresh')" @click="load"><ui-icon name="refresh" /></button>
         </div>
         <div class="panel-body">
           <div class="bars">
             <div v-for="d in overview.days" :key="d.date" class="bar"
-                 :title="`${d.date} · ${d.imports} · ${money(d.cost, 4)}`">
+                 :title="`${d.date} · ${d.requests} · ${money(d.cost, 4)}`">
               <i :style="{height: `${barHeight(d)}%`}"></i>
             </div>
           </div>
@@ -155,32 +156,61 @@
         </div>
       </div>
 
-      <!-- ------------------------------------------------------------ top users -->
+      <!-- ------------------------------------------------------------- features -->
       <div class="panel">
         <div class="panel-head">
-          <span class="panel-title">{{ $t('admin_photo_import_top_users') }}</span>
+          <span class="panel-title">{{ $t('admin_ai_features') }}</span>
         </div>
         <div class="table-wrap">
           <table class="grid">
             <thead>
               <tr>
-                <th>{{ $t('admin_photo_import_account') }}</th>
-                <th class="right">{{ $t('admin_photo_import_metric_imports') }}</th>
-                <th class="right">{{ $t('admin_photo_import_today') }}</th>
-                <th class="right">{{ $t('admin_photo_import_tokens_header') }}</th>
-                <th class="right">{{ $t('admin_photo_import_metric_cost') }}</th>
+                <th>{{ $t('admin_ai_feature') }}</th>
+                <th class="right">{{ $t('admin_ai_requests') }}</th>
+                <th class="right">{{ $t('admin_ai_tokens_header') }}</th>
+                <th class="right">{{ $t('admin_ai_metric_cost') }}</th>
+                <th class="right">{{ $t('admin_ai_share') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in overview.features" :key="f.feature">
+                <td><b>{{ featureLabel(f.feature) }}</b></td>
+                <td class="right tnum">{{ fmtNumber(f.requests) }}</td>
+                <td class="right tnum small muted">{{ fmtTokens(f.inputTokens) }} · {{ fmtTokens(f.outputTokens) }}</td>
+                <td class="right tnum">{{ money(f.cost) }}</td>
+                <td class="right tnum small muted">{{ overview.month.cost ? `${Math.round((f.cost / overview.month.cost) * 100)}%` : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ------------------------------------------------------------ top users -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">{{ $t('admin_ai_top_users') }}</span>
+        </div>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th>{{ $t('admin_ai_account') }}</th>
+                <th class="right">{{ $t('admin_ai_requests') }}</th>
+                <th class="right">{{ $t('admin_ai_today') }}</th>
+                <th class="right">{{ $t('admin_ai_tokens_header') }}</th>
+                <th class="right">{{ $t('admin_ai_metric_cost') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="u in overview.topUsers" :key="u.userId ?? 'deleted'">
                 <td>
                   <b v-if="u.username">{{ u.username }}</b>
-                  <span v-else class="subtle">{{ $t('admin_photo_import_deleted_account') }}</span>
+                  <span v-else class="subtle">{{ $t('admin_ai_deleted_account') }}</span>
                 </td>
-                <td class="right tnum">{{ fmtNumber(u.imports) }}</td>
+                <td class="right tnum">{{ fmtNumber(u.requests) }}</td>
                 <td class="right tnum">
-                  <span :class="{'warn-text': u.importsToday >= overview.settings.dailyLimitPerUser}">
-                    {{ u.importsToday }} / {{ overview.settings.dailyLimitPerUser }}
+                  <span :class="{'warn-text': u.requestsToday >= overview.settings.dailyLimitPerUser}">
+                    {{ u.requestsToday }} / {{ overview.settings.dailyLimitPerUser }}
                   </span>
                 </td>
                 <td class="right tnum small muted">{{ fmtTokens(u.inputTokens) }} · {{ fmtTokens(u.outputTokens) }}</td>
@@ -190,25 +220,26 @@
           </table>
         </div>
         <ui-empty v-if="!overview.topUsers.length" icon="sparkles"
-                  :title="$t('admin_photo_import_none')" :hint="$t('admin_photo_import_none_hint')" />
+                  :title="$t('admin_ai_none')" :hint="$t('admin_ai_none_hint')" />
       </div>
 
       <!-- --------------------------------------------------------------- recent -->
       <div v-if="overview.recent.length" class="panel">
         <div class="panel-head">
-          <span class="panel-title">{{ $t('admin_photo_import_recent') }}</span>
+          <span class="panel-title">{{ $t('admin_ai_recent') }}</span>
         </div>
         <div class="table-wrap">
           <table class="grid">
             <thead>
               <tr>
-                <th>{{ $t('admin_photo_import_when') }}</th>
-                <th>{{ $t('admin_photo_import_account') }}</th>
-                <th>{{ $t('admin_photo_import_outcome') }}</th>
-                <th class="right">{{ $t('admin_photo_import_pages') }}</th>
-                <th class="right">{{ $t('admin_photo_import_tokens_header') }}</th>
-                <th class="right">{{ $t('admin_photo_import_metric_cost') }}</th>
-                <th>{{ $t('admin_photo_import_model') }}</th>
+                <th>{{ $t('admin_ai_when') }}</th>
+                <th>{{ $t('admin_ai_account') }}</th>
+                <th>{{ $t('admin_ai_feature') }}</th>
+                <th>{{ $t('admin_ai_outcome') }}</th>
+                <th class="right">{{ $t('admin_ai_pages') }}</th>
+                <th class="right">{{ $t('admin_ai_tokens_header') }}</th>
+                <th class="right">{{ $t('admin_ai_metric_cost') }}</th>
+                <th>{{ $t('admin_ai_model') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -216,8 +247,9 @@
                 <td class="small nowrap">{{ fmtAgo(e.createdAt) }}<div class="subtle tnum">{{ fmtDateTime(e.createdAt) }}</div></td>
                 <td class="small">
                   <span v-if="e.username">{{ e.username }}</span>
-                  <span v-else class="subtle">{{ $t('admin_photo_import_deleted_account') }}</span>
+                  <span v-else class="subtle">{{ $t('admin_ai_deleted_account') }}</span>
                 </td>
+                <td class="small">{{ featureLabel(e.feature) }}</td>
                 <td><span class="badge" :class="OUTCOME_TONES[e.outcome]"><span class="dot"></span>{{ $t(OUTCOME_LABELS[e.outcome]) }}</span></td>
                 <td class="right tnum">{{ e.pages }}</td>
                 <td class="right tnum small muted">{{ fmtTokens(e.inputTokens) }} · {{ fmtTokens(e.outputTokens) }}</td>
@@ -229,7 +261,7 @@
         </div>
       </div>
 
-      <footer class="meta small subtle">{{ $t('admin_photo_import_footer') }}</footer>
+      <footer class="meta small subtle">{{ $t('admin_ai_footer') }}</footer>
     </template>
   </div>
 </template>
@@ -237,7 +269,7 @@
 <script setup lang="ts">
 import {computed, onMounted, ref, watch} from 'vue'
 import {useI18n} from 'vue-i18n'
-import {errorKey, getPhotoImportOverview, savePhotoImportSettings, type PhotoImportSettings} from '../lib/api'
+import {errorKey, getAiOverview, saveAiSettings, type AiSettings} from '../lib/api'
 import {fmtAgo, fmtDateTime, fmtNumber} from '../lib/format'
 import {notifyError, notifyOk} from '../lib/toast'
 import UiIcon from '../components/UiIcon.vue'
@@ -245,24 +277,30 @@ import UiEmpty from '../components/UiEmpty.vue'
 
 const {t, te} = useI18n()
 
-/** What a typical one-page import bills; only used to turn draft prices into an estimate. */
+/** What a typical one-page photo import bills; only used to turn draft prices into an estimate. */
 const TYPICAL_INPUT_TOKENS = 3500
 const TYPICAL_OUTPUT_TOKENS = 1000
 
 const OUTCOME_LABELS: Record<string, string> = {
-  READ: 'admin_photo_import_outcome_read',
-  NOTHING_READ: 'admin_photo_import_outcome_nothing',
-  FAILED: 'admin_photo_import_outcome_failed',
+  READ: 'admin_ai_outcome_read',
+  NOTHING_READ: 'admin_ai_outcome_nothing',
+  FAILED: 'admin_ai_outcome_failed',
 }
+/** A feature the strings do not know yet still shows, under its own name. */
+function featureLabel(feature: string): string {
+  const key = `admin_ai_feature_${feature.toLowerCase()}`
+  return te(key) ? t(key) : feature
+}
+
 const OUTCOME_TONES: Record<string, string> = {READ: 'ok', NOTHING_READ: 'warn', FAILED: 'danger'}
 
 const overview = ref<any>({})
 const loading = ref(true)
 const loaded = ref(false)
 const saving = ref(false)
-const metric = ref<'cost' | 'imports'>('cost')
+const metric = ref<'cost' | 'requests'>('cost')
 
-const draft = ref<PhotoImportSettings>({
+const draft = ref<AiSettings>({
   dailyLimitPerUser: 0, monthlyBudget: null, inputPricePerMillion: 0, outputPricePerMillion: 0, currency: 'EUR',
 })
 
@@ -288,7 +326,7 @@ const budgetInvalid = computed(() => {
 
 const dirty = computed(() => loaded.value && JSON.stringify(normalised(draft.value)) !== JSON.stringify(normalised(overview.value.settings)))
 
-function normalised(s: PhotoImportSettings) {
+function normalised(s: AiSettings) {
   return {...s, currency: (s.currency ?? '').trim().toUpperCase()}
 }
 
@@ -309,11 +347,11 @@ const estimatePerImport = computed(() =>
 )
 
 const barMax = computed(() =>
-  Math.max(...(overview.value.days ?? []).map((d: any) => (metric.value === 'cost' ? d.cost : d.imports)), 0),
+  Math.max(...(overview.value.days ?? []).map((d: any) => (metric.value === 'cost' ? d.cost : d.requests)), 0),
 )
 
 function barHeight(day: any): number {
-  const value = metric.value === 'cost' ? day.cost : day.imports
+  const value = metric.value === 'cost' ? day.cost : day.requests
   return barMax.value ? Math.max((value / barMax.value) * 100, value ? 2 : 0) : 0
 }
 
@@ -350,7 +388,7 @@ async function load() {
   loading.value = true
   try {
     const wasDirty = dirty.value
-    overview.value = (await getPhotoImportOverview()).data
+    overview.value = (await getAiOverview()).data
     // A refresh must not throw away settings being edited.
     if (!loaded.value || !wasDirty) reset()
     loaded.value = true
@@ -360,10 +398,10 @@ async function load() {
 async function save() {
   saving.value = true
   try {
-    await savePhotoImportSettings({...draft.value, currency: draft.value.currency.trim().toUpperCase()})
+    await saveAiSettings({...draft.value, currency: draft.value.currency.trim().toUpperCase()})
     loaded.value = false
     await load()
-    notifyOk(t('admin_photo_import_saved'))
+    notifyOk(t('admin_ai_saved'))
   } catch (e) { fail(e) } finally { saving.value = false }
 }
 

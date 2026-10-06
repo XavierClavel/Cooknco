@@ -25,9 +25,9 @@ class ServiceUnavailableException(cause: ServiceUnavailableCause): Exception(cau
 class TooManyRequestsException(cause: TooManyRequestsCause): Exception(cause.key)
 
 enum class TooManyRequestsCause(val key: String) {
-    // Every photo import is a paid call to a model, so a subscription buys a day's worth of
-    // them rather than an open tap. See `Configuration.PhotoImport.dailyReadsPerUser`.
-    PHOTO_IMPORT_DAILY_LIMIT("photo_import_daily_limit"),
+    // Every AI request is a paid call to a model, so a subscription buys a day's worth of
+    // them — across every feature — rather than an open tap. See `Configuration.Ai.dailyRequestsPerUser`.
+    AI_DAILY_LIMIT("ai_daily_limit"),
 }
 
 enum class UnauthorizedCause(val key: String) {
@@ -87,8 +87,8 @@ enum class ServiceUnavailableCause(val key: String) {
     RECIPE_READER_BUSY("recipe_reader_busy"),
     RECIPE_READER_FAILED("recipe_reader_failed"),
     // The month's spend has reached the budget set in the backoffice. A 503 rather than a
-    // 429: the cook did nothing wrong, and the app says "unavailable" for every reader cause.
-    RECIPE_READER_BUDGET_EXHAUSTED("recipe_reader_budget_exhausted"),
+    // 429: the user did nothing wrong. It covers every AI feature, the budget being shared.
+    AI_BUDGET_EXHAUSTED("ai_budget_exhausted"),
 }
 
 enum class BadRequestCause (val key: String) {
@@ -153,11 +153,11 @@ enum class BadRequestCause (val key: String) {
     PHOTO_IMPORT_TOO_MANY_PHOTOS("photo_import_too_many_photos"),
     PHOTO_IMPORT_NOTHING_READ("photo_import_nothing_read"),
 
-    // The backoffice's photo-import settings, one cause per field so the form can say which.
-    PHOTO_IMPORT_LIMIT_INVALID("photo_import_limit_invalid"),
-    PHOTO_IMPORT_BUDGET_INVALID("photo_import_budget_invalid"),
-    PHOTO_IMPORT_PRICE_INVALID("photo_import_price_invalid"),
-    PHOTO_IMPORT_CURRENCY_INVALID("photo_import_currency_invalid"),
+    // The backoffice AI tab's settings, one cause per field so the form can say which.
+    AI_LIMIT_INVALID("ai_limit_invalid"),
+    AI_BUDGET_INVALID("ai_budget_invalid"),
+    AI_PRICE_INVALID("ai_price_invalid"),
+    AI_CURRENCY_INVALID("ai_currency_invalid"),
 
     PDF_TEMPLATE_EMPTY("pdf_template_empty"),
     PDF_TEMPLATE_TOO_LONG("pdf_template_too_long"),

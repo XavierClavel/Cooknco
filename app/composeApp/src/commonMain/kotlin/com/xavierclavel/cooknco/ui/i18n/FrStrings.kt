@@ -562,7 +562,7 @@ object FrStrings : Strings {
     override val readingPhoto = "Lecture de la photo…"
     override val photoImportDone = "La photo a été lue. Vérifiez-la avant d'enregistrer."
     override val photoImportNothingRead = "Aucune recette n'a pu être lue sur cette photo. Essayez une photo plus nette, prise de plus près."
-    override val photoImportDailyLimit = "Vous avez lu autant de photos qu'une journée le permet. Réessayez demain."
+    override val photoImportDailyLimit = "Vous avez utilisé votre quota d'IA du jour. Réessayez demain."
     override val photoImportUnavailable = "La lecture des photos est indisponible pour le moment. Réessayez plus tard."
     override val photoImportFailed = "La photo n'a pas pu être lue. Veuillez réessayer."
     override val exportCookbookPdf = "Exporter le carnet en PDF"

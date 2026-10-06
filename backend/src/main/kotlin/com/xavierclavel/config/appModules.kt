@@ -29,7 +29,7 @@ import com.xavierclavel.services.NoopPushSender
 import com.xavierclavel.services.NotificationService
 import com.xavierclavel.services.OpenAiCompatiblePhotoReader
 import com.xavierclavel.services.PhotoImportService
-import com.xavierclavel.services.PhotoImportUsageService
+import com.xavierclavel.services.AiUsageService
 import com.xavierclavel.services.RecipePhotoReader
 import com.xavierclavel.services.UnconfiguredPhotoReader
 import com.xavierclavel.services.OAuthService
@@ -63,7 +63,7 @@ val appModules = module {
     single { ExportService() }
     single { CooklangService() }
     single { PhotoImportService() }
-    single { PhotoImportUsageService() }
+    single { AiUsageService() }
     single { LikeService() }
     single { MailService() }
     single { CookbookService() }
@@ -121,22 +121,22 @@ val appModules = module {
     /**
      * The model behind the premium photo import, chosen entirely in configuration: any
      * OpenAI-compatible provider. An install without one keeps the route and answers 503,
-     * which is what every developer's backend does. See `Configuration.PhotoImport`.
+     * which is what every developer's backend does. See `Configuration.Ai`.
      */
     single<RecipePhotoReader> {
-        val photoImport = config.photoImport
-        if (!photoImport.isConfigured) {
+        val ai = config.ai
+        if (!ai.isConfigured) {
             appLogger.info { "Photo import has no provider configured: the route will answer 503" }
             UnconfiguredPhotoReader()
         } else {
-            appLogger.info { "Photo import reads with ${photoImport.model} at ${photoImport.baseUrl}" }
+            appLogger.info { "Photo import reads with ${ai.model} at ${ai.baseUrl}" }
             OpenAiCompatiblePhotoReader(
-                baseUrl = photoImport.baseUrl,
-                apiKey = photoImport.apiKey,
-                model = photoImport.model,
-                maxOutputTokens = photoImport.maxOutputTokens,
-                jsonMode = photoImport.jsonMode,
-                timeoutSeconds = photoImport.timeoutSeconds,
+                baseUrl = ai.baseUrl,
+                apiKey = ai.apiKey,
+                model = ai.model,
+                maxOutputTokens = ai.maxOutputTokens,
+                jsonMode = ai.jsonMode,
+                timeoutSeconds = ai.timeoutSeconds,
             )
         }
     }

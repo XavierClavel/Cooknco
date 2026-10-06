@@ -161,7 +161,7 @@ object RecipeController: Controller(RECIPE_URL) {
      * no upload either, and [PhotoImportService] adds a daily allowance on top of it.
      *
      * The body is `multipart/form-data` with one file part per page, in order. Each page is
-     * bounded as it is read ([Configuration.PhotoImport.maxPhotoBytes]) rather than trusted to
+     * bounded as it is read ([Configuration.Ai.maxPhotoBytes]) rather than trusted to
      * its declared length, and must actually be a JPEG, PNG or WebP: a provider is never sent
      * anything this backend has not looked at.
      *
@@ -171,7 +171,7 @@ object RecipeController: Controller(RECIPE_URL) {
     private fun Route.importPhoto() = post("/import/photo") {
         val user = userService.checkPremiumAccess(getSessionUserId())
         val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
-        val settings = configuration.photoImport
+        val settings = configuration.ai
 
         val photos = mutableListOf<RecipePhoto>()
         call.receiveMultipart(formFieldLimit = settings.maxPhotoBytes + 1).forEachPart { part ->
