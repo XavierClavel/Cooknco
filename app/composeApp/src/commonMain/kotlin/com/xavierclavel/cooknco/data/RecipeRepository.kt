@@ -10,6 +10,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.isOffline
+import com.xavierclavel.cooknco.platform.CapturedPage
 import kotlinx.coroutines.flow.first
 
 class RecipeRepository(
@@ -88,6 +89,12 @@ class RecipeRepository(
     suspend fun importCooklang(source: String): Result<CooklangImportDto> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         recipeApi.importCooklang(token, source, AppLanguage.current.value.code)
+    }
+
+    /** Has the backend read photographed pages into a recipe. Saves nothing; premium only. */
+    suspend fun scanRecipe(pages: List<CapturedPage>): Result<CooklangImportDto> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        recipeApi.scanRecipe(token, pages, AppLanguage.current.value.code)
     }
 
     suspend fun updateRecipe(id: Long, dto: RecipeSaveDto): Result<RecipeInfo> = runCatching {

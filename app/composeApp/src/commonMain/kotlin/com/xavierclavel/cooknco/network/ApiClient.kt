@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.network
 
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -36,6 +37,10 @@ object ApiClient {
         install(ContentNegotiation) {
             json(json)
         }
+        // Configures nothing by itself, so every request keeps the engine's defaults. It is
+        // what lets one request set a timeout of its own — the AI recipe scan's, which waits on
+        // a model far longer than OkHttp's ten seconds.
+        install(HttpTimeout)
         expectSuccess = false
     }
 }

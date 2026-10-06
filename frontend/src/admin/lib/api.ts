@@ -223,6 +223,22 @@ export const previewPdfTemplate = (key: string, locale: string, body: string, su
 /** Every mobile platform, gated or not. The web app has no row: see AppPlatform. */
 export const listAppVersions = () => api.get('/admin/app-versions')
 
+// ------------------------------------------------------------- recipe scan
+/** Spend, limits and recent imports of the premium recipe scan, in one read. */
+export const getAiOverview = () => api.get('/admin/ai')
+
+export type AiSettings = {
+  dailyLimitPerUser: number
+  /** Null for no monthly ceiling. */
+  monthlyBudget: number | null
+  inputPricePerMillion: number
+  outputPricePerMillion: number
+  currency: string
+}
+
+export const saveAiSettings = (settings: AiSettings) =>
+  api.put('/admin/ai/settings', settings)
+
 export const saveAppVersion = (
   platform: string, minimumVersion: string, latestVersion: string, storeUrl: string,
 ) => api.put(`/admin/app-versions/${platform}`, {minimumVersion, latestVersion, storeUrl})

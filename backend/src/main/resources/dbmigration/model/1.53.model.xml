@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="ai_settings" identityType="identity" pkName="pk_ai_settings">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="daily_limit_per_user" type="integer(255)" notnull="true"/>
+            <column name="monthly_budget" type="decimal(12,2)"/>
+            <column name="input_price_per_million" type="decimal(12,6)" notnull="true"/>
+            <column name="output_price_per_million" type="decimal(12,6)" notnull="true"/>
+            <column name="currency" type="varchar(3)" notnull="true"/>
+            <column name="updated_at" type="localdatetime" notnull="true"/>
+        </createTable>
+        <createTable name="ai_usage" identityType="identity" pkName="pk_ai_usage">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="user_id" type="bigint" references="users.id" foreignKeyName="fk_ai_usage_user_id" foreignKeyIndex="ix_ai_usage_user_id"/>
+            <column name="created_at" type="localdatetime" notnull="true"/>
+            <column name="feature" type="integer(255)" notnull="true" checkConstraint="check ( feature in (0))" checkConstraintName="ck_ai_usage_feature"/>
+            <column name="pages" type="integer(255)" notnull="true"/>
+            <column name="model" type="varchar(255)" notnull="true"/>
+            <column name="input_tokens" type="integer"/>
+            <column name="output_tokens" type="integer"/>
+            <column name="cost" type="decimal(14,6)" notnull="true"/>
+            <column name="outcome" type="integer(255)" notnull="true" checkConstraint="check ( outcome in (0,1,2))" checkConstraintName="ck_ai_usage_outcome"/>
+        </createTable>
+        <createIndex indexName="ix_ai_usage_created_at" tableName="ai_usage" columns="created_at"/>
+    </changeSet>
+</migration>

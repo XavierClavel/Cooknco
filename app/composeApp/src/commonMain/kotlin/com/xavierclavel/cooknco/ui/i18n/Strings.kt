@@ -520,6 +520,21 @@ interface Strings {
     val importCooklangSplit: String
     val importCooklangEmpty: String
     val importCooklangFailed: String
+
+    // ── Reading a photo with the backend's model, which a premium account is offered ──
+    /**
+     * Names the model on purpose: unlike the scan beside it, this sends the page off the
+     * phone, and the row is where the cook decides which of the two they want.
+     */
+    val scanRecipeWithAi: String
+    val scanningWithAi: String
+    val aiScanDone: String
+    /** The one failure the cook acts on, by taking the picture again. */
+    val aiScanNothingRead: String
+    val aiScanDailyLimit: String
+    /** No provider configured, or none answering — "later" is all there is to say. */
+    val aiScanUnavailable: String
+    val aiScanFailed: String
     val preparingPdf: String
     val exportFailedTitle: String
     val exportFailed: String

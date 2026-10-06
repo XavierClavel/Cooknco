@@ -212,6 +212,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             RecipeEditScreen(
                 recipeId = recipeId,
                 currentUserId = currentUserId,
+                isPremium = (authState as? AuthState.Authenticated)?.user?.isPremium == true,
                 onNavigateBack = { navController.popBackStack() },
                 onSaved = { savedId ->
                     navController.navigate("recipe/$savedId") {
@@ -231,6 +232,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             RecipeEditScreen(
                 recipeId = null,
                 currentUserId = currentUserId,
+                isPremium = (authState as? AuthState.Authenticated)?.user?.isPremium == true,
                 onNavigateBack = { navController.popBackStack() },
                 onSaved = { savedId ->
                     navController.navigate("recipe/$savedId") {

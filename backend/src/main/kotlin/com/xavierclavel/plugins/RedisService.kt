@@ -362,4 +362,29 @@ class RedisService(redisUrl: String): KoinComponent {
         return redisJson.decodeFromString<ImageUploadTicketData>(json)
     }
 
+
+    /**
+     * Counts one more AI request, from any feature, against [userId]'s allowance for [day], and answers the
+     * count including this one.
+     *
+     * `INCR` first and the expiry after, so that two imports racing each other both see a
+     * number that includes the other: checking and then incrementing would let a burst of
+     * parallel requests all pass a limit of one. The key outlives its day by a day so it is
+     * gone without anything having to sweep it.
+     */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun countAiRequest(userId: Long, day: String): Long {
+        val key = aiRequestKey(userId, day)
+        val count = redis.incr(key) ?: 0L
+        if (count == 1L) redis.expire(key, 2L * 24 * 60 * 60)
+        return count
+    }
+
+    /** Gives back a request that never got a usable answer — a provider down is not a use. */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun refundAiRequest(userId: Long, day: String) {
+        redis.decr(aiRequestKey(userId, day))
+    }
+
+    private fun aiRequestKey(userId: Long, day: String) = "ai-requests:$userId:$day"
 }

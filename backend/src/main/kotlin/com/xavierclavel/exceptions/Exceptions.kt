@@ -16,6 +16,20 @@ class NotFoundException(cause: NotFoundCause): Exception(cause.key)
  */
 class ServiceUnavailableException(cause: ServiceUnavailableCause): Exception(cause.key)
 
+/**
+ * The caller has used up an allowance, and will have it back later.
+ *
+ * A 429 rather than a 403: nothing about the account is refused, and asking again tomorrow
+ * is exactly the right thing to do.
+ */
+class TooManyRequestsException(cause: TooManyRequestsCause): Exception(cause.key)
+
+enum class TooManyRequestsCause(val key: String) {
+    // Every AI request is a paid call to a model, so a subscription buys a day's worth of
+    // them — across every feature — rather than an open tap. See `Configuration.Ai.dailyRequestsPerUser`.
+    AI_DAILY_LIMIT("ai_daily_limit"),
+}
+
 enum class UnauthorizedCause(val key: String) {
     SESSION_NOT_FOUND("session_not_found"),
     USER_NOT_VERIFIED("user_not_verified"),
@@ -64,6 +78,17 @@ enum class ServiceUnavailableCause(val key: String) {
     PDF_RENDERER_UNAVAILABLE("pdf_renderer_unavailable"),
     PDF_RENDERER_BUSY("pdf_renderer_busy"),
     PDF_RENDERER_FAILED("pdf_renderer_failed"),
+
+    // The recipe scan's model, which is somebody else's service: see `RecipePhotoReader`.
+    // NOT_CONFIGURED is an install with no provider set, and is what every developer's
+    // backend and the test suite answer by default.
+    RECIPE_READER_NOT_CONFIGURED("recipe_reader_not_configured"),
+    RECIPE_READER_UNAVAILABLE("recipe_reader_unavailable"),
+    RECIPE_READER_BUSY("recipe_reader_busy"),
+    RECIPE_READER_FAILED("recipe_reader_failed"),
+    // The month's spend has reached the budget set in the backoffice. A 503 rather than a
+    // 429: the user did nothing wrong. It covers every AI feature, the budget being shared.
+    AI_BUDGET_EXHAUSTED("ai_budget_exhausted"),
 }
 
 enum class BadRequestCause (val key: String) {
@@ -120,6 +145,19 @@ enum class BadRequestCause (val key: String) {
     // little of it: see `RecipeController.importCooklang`.
     COOKLANG_FILE_EMPTY("cooklang_file_empty"),
     COOKLANG_FILE_TOO_LARGE("cooklang_file_too_large"),
+
+    // A recipe scan with no picture in it, more pages than one recipe has, or a picture
+    // the model read no recipe off. The last is the one a cook acts on - by taking the
+    // photo again - so it is a cause of its own rather than a failure.
+    RECIPE_SCAN_NO_PHOTO("recipe_scan_no_photo"),
+    RECIPE_SCAN_TOO_MANY_PHOTOS("recipe_scan_too_many_photos"),
+    RECIPE_SCAN_NOTHING_READ("recipe_scan_nothing_read"),
+
+    // The backoffice AI tab's settings, one cause per field so the form can say which.
+    AI_LIMIT_INVALID("ai_limit_invalid"),
+    AI_BUDGET_INVALID("ai_budget_invalid"),
+    AI_PRICE_INVALID("ai_price_invalid"),
+    AI_CURRENCY_INVALID("ai_currency_invalid"),
 
     PDF_TEMPLATE_EMPTY("pdf_template_empty"),
     PDF_TEMPLATE_TOO_LONG("pdf_template_too_long"),

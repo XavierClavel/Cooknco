@@ -23,6 +23,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeIngredientSaveDto
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.network.dto.displayName
+import com.xavierclavel.cooknco.platform.PhotoCaptureResult
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.ScanResult
 import com.xavierclavel.cooknco.ui.i18n.Strings
@@ -185,6 +186,11 @@ data class RecipeEditUiState(
      */
     val isScanning: Boolean = false,
     val isImporting: Boolean = false,
+    /**
+     * Photographed pages are with the backend's model. Its own flag beside [isImporting]
+     * because the strip says something different for it, and the wait is far longer.
+     */
+    val isScanningWithAi: Boolean = false,
     /** What the last scan came to, shown once and dismissed. */
     val scanMessage: String? = null,
     /** What the last Cooklang import did, said once. See [RecipeEditViewModel.importCooklang]. */
@@ -395,14 +401,14 @@ class RecipeEditViewModel(
      * many, and it is worth a sentence rather than a warning.
      */
     fun importCooklang(source: String) {
-        if (_uiState.value.isImporting) return
+        if (_uiState.value.isImporting || _uiState.value.isScanningWithAi) return
         // Set before the coroutine, not inside it: the card is tappable until this flips, so
         // raising it a dispatch later leaves a window in which a second tap starts a second
         // import of the same file.
         _uiState.update { it.copy(isImporting = true, importMessage = null, error = null) }
         viewModelScope.launch {
             repo.importCooklang(source)
-                .onSuccess { imported -> prefillFromImport(imported) }
+                .onSuccess { imported -> prefillFromImport(imported, done = copy().importCooklangDone) }
                 .onFailure { error ->
                     _uiState.update {
                         it.copy(isImporting = false, importMessage = importFailure(error))
@@ -411,7 +417,58 @@ class RecipeEditViewModel(
         }
     }
 
-    private fun prefillFromImport(imported: CooklangImportDto) {
+    /**
+     * Fills the editor in from photographed pages, read by the backend's model.
+     *
+     * Premium, and the screen only offers it to an account that has it (`premiumSheetAction`),
+     * so a 403 here is not expected — but it is answered like any other failure rather than
+     * trusted never to happen. Lands exactly as a Cooklang import does, because the backend
+     * answers with the same thing: **nothing already written is overwritten**.
+     */
+    fun scanWithAi(result: PhotoCaptureResult) {
+        val pages = when (result) {
+            is PhotoCaptureResult.Failed -> return reportScanFailure()
+            is PhotoCaptureResult.Captured -> result.pages
+        }
+        if (_uiState.value.isScanningWithAi || _uiState.value.isImporting) return
+        // Raised before the coroutine for the reason importCooklang raises its own.
+        _uiState.update { it.copy(isScanningWithAi = true, importMessage = null, error = null) }
+        viewModelScope.launch {
+            repo.scanRecipe(pages)
+                .onSuccess { imported -> prefillFromImport(imported, done = copy().aiScanDone) }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(isScanningWithAi = false, importMessage = aiScanFailure(error))
+                    }
+                }
+        }
+    }
+
+    /**
+     * What to tell the cook when a photo did not read.
+     *
+     * The causes are the backend's keys (`RecipeScanService`, and `AiUsageService` for the
+     * daily allowance and the monthly budget every AI feature shares); each one the cook can act on
+     * differently gets its own sentence — retake the photo, wait for tomorrow, wait a while —
+     * and everything else is one apology.
+     */
+    private fun aiScanFailure(throwable: Throwable): String {
+        val s = copy()
+        val body = (throwable as? ApiException)?.body ?: return s.aiScanFailed
+        return when {
+            "recipe_scan_nothing_read" in body -> s.aiScanNothingRead
+            "ai_daily_limit" in body -> s.aiScanDailyLimit
+            // The month's AI budget is spent: nothing the cook can do but wait, like a provider down.
+            "recipe_reader_" in body || "ai_budget_exhausted" in body -> s.aiScanUnavailable
+            else -> s.aiScanFailed
+        }
+    }
+
+    /**
+     * @param done what to say when nothing else is worth saying — which way in this was,
+     *   since a file and a photo land here alike.
+     */
+    private fun prefillFromImport(imported: CooklangImportDto, done: String) {
         val s = copy()
         val parsed = imported.recipe
         // Positions in the *imported* list, so they shift by whatever the form already held.
@@ -454,12 +511,15 @@ class RecipeEditViewModel(
                         attachments = setOfNotNull(StepAttachment.TIMER.takeIf { step.durationSeconds != null }),
                     )
                 },
+                // Both, in the same update as the rows: a flag dropped a step earlier would show
+                // the strip as finished over a form that is still empty.
                 isImporting = false,
+                isScanningWithAi = false,
                 importMessage = listOfNotNull(
                     s.importCooklangUnmatched(imported.unmatchedIngredients)
                         .takeIf { imported.unmatchedIngredients > 0 },
                     s.importCooklangSplit.takeIf { imported.stepsWereSplit },
-                ).ifEmpty { listOf(s.importCooklangDone) }.joinToString(" "),
+                ).ifEmpty { listOf(done) }.joinToString(" "),
                 error = null,
             )
         }

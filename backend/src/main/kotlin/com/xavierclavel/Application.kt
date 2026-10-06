@@ -29,6 +29,7 @@ import com.xavierclavel.exceptions.UnauthorizedException
 import com.xavierclavel.exceptions.ForbiddenException
 import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.exceptions.ServiceUnavailableException
+import com.xavierclavel.exceptions.TooManyRequestsException
 import com.xavierclavel.utils.serve
 import com.xavierclavel.plugins.*
 import com.xavierclavel.services.UserService
@@ -92,6 +93,9 @@ fun Application.module() {
         }
         exception<ServiceUnavailableException> { call, error ->
             call.respond(HttpStatusCode.ServiceUnavailable, error.message ?: "Unknown error")
+        }
+        exception<TooManyRequestsException> { call, error ->
+            call.respond(HttpStatusCode.TooManyRequests, error.message ?: "Unknown error")
         }
         exception<BadRequestException> { call, error ->
             call.respond(HttpStatusCode.BadRequest, error.message ?: "Unknown error")

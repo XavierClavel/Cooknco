@@ -5,10 +5,12 @@ import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.CooklangImportDto
+import com.xavierclavel.cooknco.platform.CapturedPage
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.dto.UnitInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.forms.MultiPartFormDataContent
@@ -167,6 +169,39 @@ class RecipeApi(private val client: HttpClient) {
             contentType(ContentType.Text.Plain)
             parameter("locale", locale)
             setBody(source)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+        return response.decodeJsonText()
+    }
+
+    /**
+     * Has the backend's vision model read photographed pages into a recipe, **saving nothing**.
+     *
+     * Premium, unlike the Cooklang import, because every call is a paid one: the backend
+     * answers a non-subscriber 403, which is why the screen never offers this to one (see
+     * `premiumSheetAction`). The answer is the same [CooklangImportDto] a file import gets.
+     *
+     * The timeout is this request's own and generous: a model reads a page in several seconds
+     * and a busy one in tens, while OkHttp's default would give up at ten.
+     */
+    suspend fun scanRecipe(token: String, pages: List<CapturedPage>, locale: String): CooklangImportDto {
+        val response = client.post("$base/recipe/scan") {
+            bearerAuth(token)
+            parameter("locale", locale)
+            timeout {
+                requestTimeoutMillis = RECIPE_SCAN_TIMEOUT_MILLIS
+                socketTimeoutMillis = RECIPE_SCAN_TIMEOUT_MILLIS
+            }
+            setBody(MultiPartFormDataContent(formData {
+                pages.forEachIndexed { index, page ->
+                    append("page", page.bytes, Headers.build {
+                        append(HttpHeaders.ContentType, page.mimeType)
+                        append(HttpHeaders.ContentDisposition, "filename=page$index.jpg")
+                    })
+                }
+            }))
         }
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())
@@ -360,3 +395,6 @@ class RecipeApi(private val client: HttpClient) {
         return response.body()
     }
 }
+
+/** Past the backend's own wait on the model (90 s), so the backend's answer always wins. */
+private const val RECIPE_SCAN_TIMEOUT_MILLIS = 120_000L

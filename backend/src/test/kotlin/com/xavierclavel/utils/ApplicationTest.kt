@@ -28,6 +28,9 @@ import com.xavierclavel.services.OAuthService
 import com.xavierclavel.services.PdfRenderer
 import com.xavierclavel.services.PushSender
 import com.xavierclavel.services.PdfTemplateService
+import com.xavierclavel.services.RecipeScanService
+import com.xavierclavel.services.AiUsageService
+import com.xavierclavel.services.RecipePhotoReader
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.RecipeService
@@ -52,6 +55,7 @@ import main.com.xavierclavel.containers.GotenbergTestContainer
 import main.com.xavierclavel.containers.RedisTestContainer
 import main.com.xavierclavel.utils.FakeAppShellSource
 import main.com.xavierclavel.utils.FakePushSender
+import main.com.xavierclavel.utils.FakeRecipePhotoReader
 import main.com.xavierclavel.utils.login
 import main.com.xavierclavel.utils.logout
 import kotlinx.coroutines.runBlocking
@@ -81,6 +85,8 @@ abstract class ApplicationTest: KoinTest {
     val notificationService: NotificationService by inject()
     val pushSender: PushSender by inject()
     val fakePushSender by lazy { pushSender as FakePushSender }
+    val recipePhotoReader: RecipePhotoReader by inject()
+    val fakePhotoReader by lazy { recipePhotoReader as FakeRecipePhotoReader }
 
     companion object {
         const val USER1 = "user1"
@@ -110,6 +116,10 @@ abstract class ApplicationTest: KoinTest {
                 single { DefaultImageService() }
                 single { ExportService() }
                 single { CooklangService() }
+                single { RecipeScanService() }
+                single { AiUsageService() }
+                // No test pays for a model: see FakeRecipePhotoReader.
+                single<RecipePhotoReader> { FakeRecipePhotoReader() }
                 single { LikeService() }
                 single { MailService() }
                 single { CookbookService() }
@@ -267,6 +277,7 @@ abstract class ApplicationTest: KoinTest {
             mockEventProducer.clear()
             fakeAppShellSource.reset()
             fakePushSender.reset()
+            fakePhotoReader.reset()
             val wrapper = TestBuilderWrapper(this)
             wrapper.block() // Use the wrapper in the block
         }
