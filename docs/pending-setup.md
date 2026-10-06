@@ -296,6 +296,16 @@ Start with **Scaleway + Mistral Small 3.2**: cheapest, French, and its free tier
 hundred test imports. The daily allowance (`dailyReadsPerUser`, 30) bounds the worst case at
 about a cent per account per day on that model.
 
+### Trying a provider before choosing it
+
+`scripts/try-photo-provider.sh` sends photos to a provider exactly as the backend does — the
+prompt read out of `RecipePhotoReader.kt`, the pages scaled as the app scales them — and prints
+the time, the tokens billed and the answer. Nothing has to be deployed for it:
+
+```bash
+BASE_URL=https://api.scaleway.ai/v1 API_KEY=... MODEL=... scripts/try-photo-provider.sh page.jpg
+```
+
 ### Setting it
 
 The values go in the backend's `application.yaml`, which lives in the `cooknco-config` secret
