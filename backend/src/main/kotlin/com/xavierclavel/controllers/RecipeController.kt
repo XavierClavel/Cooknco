@@ -169,8 +169,7 @@ object RecipeController: Controller(RECIPE_URL) {
      *   The page is transcribed in its own language whatever this says.
      */
     private fun Route.importPhoto() = post("/import/photo") {
-        val userId = getSessionUserId()
-        userService.checkPremiumAccess(userId)
+        val user = userService.checkPremiumAccess(getSessionUserId())
         val locale = getEnumQueryParam<Locale>("locale") ?: Locale.EN
         val settings = configuration.photoImport
 
@@ -189,7 +188,7 @@ object RecipeController: Controller(RECIPE_URL) {
         }
         if (photos.isEmpty()) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_NO_PHOTO)
 
-        call.respond(HttpStatusCode.OK, photoImportService.read(userId, photos, locale))
+        call.respond(HttpStatusCode.OK, photoImportService.read(user, photos, locale))
     }
 
     private fun Route.updateRecipe() = put("/{id}") {

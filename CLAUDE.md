@@ -825,12 +825,20 @@ a second launcher rather than a mode of the scanner, whose promise is that nothi
 - **A quantity is stated once.** The prompt puts every amount on the ingredient list and has a
   step only *name* what it uses (`uses`); a use naming nothing on the list is dropped. Letting
   steps restate amounts would have `amountsOf` add the list's 200 g to the step's 200 g.
-- **Premium is checked before the body is read**, then a per-account daily allowance
-  (`dailyReadsPerUser`, Redis, 429 past it) and a bound on readings in flight. Every import is
-  a paid call; the allowance is what makes premium a bounded cost. An import that never got a
-  usable answer — provider down, refusal, an answer that is not the object — is refunded.
-- **It writes nothing**, so it does not `logEdit`. It logs one ordinary line per import with
-  the tokens billed, which is the cost trail.
+- **Premium is checked before the body is read**, then the month's budget, a per-account daily
+  allowance (Redis, 429 past it) and a bound on readings in flight. Every import is a paid
+  call; the two limits are what make premium a bounded cost. An import that never got a usable
+  answer — provider down, refusal, an answer that is not the object — is refunded to the cook's
+  day, but still counted in the month: the provider billed it.
+- **The money side is the backoffice's** (photo-import tab, `PhotoImportUsageService`). Every
+  billed answer leaves a `photo_imports` row with its tokens and its cost *at the prices then in
+  force*, so correcting a price never rewrites a past month. The limits and prices live in the
+  one-row `photo_import_settings`, overriding the YAML default for the daily allowance, and are
+  read on every import. No provider says what a token costs, so the operator types the prices
+  in; with none, everything costs 0 and the budget cannot bite — the tab says so. An account's
+  deletion detaches its rows rather than deleting them, so the month's spend stays true.
+- **The recipe is not saved**, so it does not `logEdit`; the usage row is bookkeeping, not an
+  edit. Saving the settings does log.
 
 The prompt (`RecipePhotoReader.PROMPT`) and the parser are a contract: changing a field name in
 one is changing it in the other, and `PhotoImportControllerTest` is what notices.

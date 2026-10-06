@@ -40,6 +40,7 @@ import java.util.UUID
 class UserService: KoinComponent {
     val encryptionService: EncryptionService by inject()
     val deviceService: DeviceService by inject()
+    val photoImportUsageService: PhotoImportUsageService by inject()
     val followService: FollowService by inject()
     val mailService: MailService by inject()
     val eventProducerService: EventProducer by inject()
@@ -219,6 +220,8 @@ class UserService: KoinComponent {
     fun deleteUserById(userId: Long): Int {
         detachReports(userId)
         detachNotifications(userId)
+        // Their spend stays in the month's total; who spent it does not. See PhotoImport.
+        photoImportUsageService.detachUser(userId)
         return QUser().id.eq(userId).delete()
     }
 

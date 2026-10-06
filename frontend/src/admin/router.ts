@@ -16,6 +16,7 @@ const router = createRouter({
     {path: '/notifications', name: 'notifications', component: () => import('./views/NotificationsView.vue')},
     {path: '/documents', name: 'documents', component: () => import('./views/DocumentsView.vue')},
     {path: '/releases', name: 'releases', component: () => import('./views/ReleasesView.vue')},
+    {path: '/photo-import', name: 'photo-import', component: () => import('./views/PhotoImportView.vue')},
     {path: '/logs', name: 'logs', component: () => import('./views/LogsView.vue')},
     {path: '/:pathMatch(.*)*', redirect: '/'},
   ],

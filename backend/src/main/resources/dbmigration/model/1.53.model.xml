@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="photo_imports" identityType="identity" pkName="pk_photo_imports">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="user_id" type="bigint" references="users.id" foreignKeyName="fk_photo_imports_user_id" foreignKeyIndex="ix_photo_imports_user_id"/>
+            <column name="created_at" type="localdatetime" notnull="true"/>
+            <column name="pages" type="integer(255)" notnull="true"/>
+            <column name="model" type="varchar(255)" notnull="true"/>
+            <column name="input_tokens" type="integer"/>
+            <column name="output_tokens" type="integer"/>
+            <column name="cost" type="decimal(14,6)" notnull="true"/>
+            <column name="outcome" type="integer(255)" notnull="true" checkConstraint="check ( outcome in (0,1,2))" checkConstraintName="ck_photo_imports_outcome"/>
+        </createTable>
+        <createTable name="photo_import_settings" identityType="identity" pkName="pk_photo_import_settings">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="daily_limit_per_user" type="integer(255)" notnull="true"/>
+            <column name="monthly_budget" type="decimal(12,2)"/>
+            <column name="input_price_per_million" type="decimal(12,6)" notnull="true"/>
+            <column name="output_price_per_million" type="decimal(12,6)" notnull="true"/>
+            <column name="currency" type="varchar(3)" notnull="true"/>
+            <column name="updated_at" type="localdatetime" notnull="true"/>
+        </createTable>
+        <createIndex indexName="ix_photo_imports_created_at" tableName="photo_imports" columns="created_at"/>
+    </changeSet>
+</migration>

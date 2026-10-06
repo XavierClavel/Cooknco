@@ -328,7 +328,12 @@ ids differ from the ones its dedicated deployments use, and an unknown id comes 
 `recipe_reader_failed` with the provider's reason in the backend log.
 
 Then restart the backend (`kubectl rollout restart deployment/cooknco-backend`), since the
-secret is read at start-up. Its log says which model it reads with:
+secret is read at start-up.
+
+**Then open the backoffice's photo-import tab and type in the provider's prices** (per million
+tokens, in and out) and a monthly budget. Nothing reads prices from the provider, so until they
+are set every import costs 0 and the budget can never be reached. The daily allowance per
+account is there too; until it is saved, `dailyReadsPerUser` from the YAML applies. Its log says which model it reads with:
 `Photo import reads with <model> at <baseUrl>`.
 
 ### Checking it worked

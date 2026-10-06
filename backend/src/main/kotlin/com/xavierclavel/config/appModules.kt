@@ -29,6 +29,7 @@ import com.xavierclavel.services.NoopPushSender
 import com.xavierclavel.services.NotificationService
 import com.xavierclavel.services.OpenAiCompatiblePhotoReader
 import com.xavierclavel.services.PhotoImportService
+import com.xavierclavel.services.PhotoImportUsageService
 import com.xavierclavel.services.RecipePhotoReader
 import com.xavierclavel.services.UnconfiguredPhotoReader
 import com.xavierclavel.services.OAuthService
@@ -62,6 +63,7 @@ val appModules = module {
     single { ExportService() }
     single { CooklangService() }
     single { PhotoImportService() }
+    single { PhotoImportUsageService() }
     single { LikeService() }
     single { MailService() }
     single { CookbookService() }

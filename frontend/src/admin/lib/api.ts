@@ -223,6 +223,22 @@ export const previewPdfTemplate = (key: string, locale: string, body: string, su
 /** Every mobile platform, gated or not. The web app has no row: see AppPlatform. */
 export const listAppVersions = () => api.get('/admin/app-versions')
 
+// ------------------------------------------------------------- photo import
+/** Spend, limits and recent imports of the premium photo import, in one read. */
+export const getPhotoImportOverview = () => api.get('/admin/photo-imports')
+
+export type PhotoImportSettings = {
+  dailyLimitPerUser: number
+  /** Null for no monthly ceiling. */
+  monthlyBudget: number | null
+  inputPricePerMillion: number
+  outputPricePerMillion: number
+  currency: string
+}
+
+export const savePhotoImportSettings = (settings: PhotoImportSettings) =>
+  api.put('/admin/photo-imports/settings', settings)
+
 export const saveAppVersion = (
   platform: string, minimumVersion: string, latestVersion: string, storeUrl: string,
 ) => api.put(`/admin/app-versions/${platform}`, {minimumVersion, latestVersion, storeUrl})

@@ -6,6 +6,7 @@ import com.xavierclavel.exceptions.ServiceUnavailableCause
 import com.xavierclavel.exceptions.ServiceUnavailableException
 import com.xavierclavel.exceptions.TooManyRequestsCause
 import com.xavierclavel.exceptions.TooManyRequestsException
+import com.xavierclavel.models.User
 import com.xavierclavel.plugins.RedisService
 import com.xavierclavel.services.CooklangService.Companion.KEY_COOK_TIME
 import com.xavierclavel.services.CooklangService.Companion.KEY_COURSE
@@ -29,6 +30,7 @@ import kotlinx.serialization.json.contentOrNull
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import shared.enums.Locale
+import shared.enums.PhotoImportOutcome
 import shared.infodto.CooklangImportInfo
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -59,6 +61,7 @@ class PhotoImportService : KoinComponent {
     private val cooklangService: CooklangService by inject()
     private val redisService: RedisService by inject()
     private val configuration: Configuration by inject()
+    private val usageService: PhotoImportUsageService by inject()
 
     private val settings get() = configuration.photoImport
 
@@ -134,20 +137,30 @@ class PhotoImportService : KoinComponent {
     }
 
     /**
-     * Reads [photos] into a recipe, counting the import against [userId]'s day.
+     * Reads [photos] into a recipe, counting the import against [user]'s day.
      *
      * The caller has already checked the subscription and the pages; this owns the cost side
-     * — the daily allowance and the bound on readings in flight — and the reading itself.
+     * — the month's budget, the daily allowance, the bound on readings in flight, and the
+     * usage row every billed answer leaves ([PhotoImportUsageService.record]) — and the
+     * reading itself. The limits are the backoffice's, read on every import, so a change
+     * there bites on the next one.
      *
+     * @throws ServiceUnavailableException with `recipe_reader_budget_exhausted` once the
+     *   month's spend has reached the budget
      * @throws TooManyRequestsException past the day's allowance
      * @throws ServiceUnavailableException when no provider is configured — [UnconfiguredPhotoReader]
      *   says so itself, which is what lets a test bind a fake — or none answered; the import
      *   is not counted then, since nothing was read
      * @throws BadRequestException when the photographs held no recipe the model could read
      */
-    suspend fun read(userId: Long, photos: List<RecipePhoto>, locale: Locale): CooklangImportInfo {
+    suspend fun read(user: User, photos: List<RecipePhoto>, locale: Locale): CooklangImportInfo {
+        val userId = user.id
+        if (usageService.isBudgetExhausted()) {
+            logger.warn { "Photo import refused for user $userId: the month's budget is spent" }
+            throw ServiceUnavailableException(ServiceUnavailableCause.RECIPE_READER_BUDGET_EXHAUSTED)
+        }
         val day = LocalDate.now(ZoneOffset.UTC).toString()
-        if (redisService.countPhotoImport(userId, day) > settings.dailyReadsPerUser) {
+        if (redisService.countPhotoImport(userId, day) > usageService.settings().dailyLimitPerUser) {
             // Counted and then given back, so a cook hammering the button past the limit
             // does not push tomorrow's first import over it as well.
             redisService.refundPhotoImport(userId, day)
@@ -156,21 +169,34 @@ class PhotoImportService : KoinComponent {
 
         // An answer that is not the transcription is refunded too: the provider was paid,
         // but the cook got nothing, and that failure is ours to absorb rather than theirs.
-        val transcription = try {
+        val read = try {
             val reading = withReadingSlot { reader.read(photos) }
-            // Not `logEdit`: nothing is written. This is the cost trail — who spent how much.
+            // Not `logEdit`: the recipe is not saved, and the usage row below is bookkeeping
+            // rather than an edit anybody made. This line and that row are the cost trail.
             logger.info {
                 "Photo import by user $userId: ${photos.size} page(s), " +
                     "${reading.inputTokens ?: "?"} tokens in, ${reading.outputTokens ?: "?"} out"
             }
-            parse(reading.json)
+            // Billed whatever it comes to, so recorded before anything can refuse it — the
+            // budget is checked against these rows, failures included.
+            val parsed = runCatching { toParsed(parse(reading.json)) }
+            usageService.record(
+                user = user,
+                pages = photos.size,
+                reading = reading,
+                outcome = when {
+                    parsed.isFailure -> PhotoImportOutcome.FAILED
+                    parsed.getOrThrow().isEmpty -> PhotoImportOutcome.NOTHING_READ
+                    else -> PhotoImportOutcome.READ
+                },
+            )
+            parsed.getOrThrow()
         } catch (e: ServiceUnavailableException) {
             redisService.refundPhotoImport(userId, day)
             throw e
         }
-        val parsed = toParsed(transcription)
-        if (parsed.isEmpty) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_NOTHING_READ)
-        return cooklangService.toRecipe(parsed, locale)
+        if (read.isEmpty) throw BadRequestException(BadRequestCause.PHOTO_IMPORT_NOTHING_READ)
+        return cooklangService.toRecipe(read, locale)
     }
 
     private suspend fun <T> withReadingSlot(block: suspend () -> T): T {

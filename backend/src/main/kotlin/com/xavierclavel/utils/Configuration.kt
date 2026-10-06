@@ -73,7 +73,10 @@ data class Configuration(
         val maxPhotoBytes: Long = 8L * 1024 * 1024,
 
         /**
-         * Imports one account may run per UTC day, admins included.
+         * Imports one account may run per UTC day, admins included — **until the backoffice
+         * saves its own** (`PhotoImportSettings`), which then wins. The month's budget and the
+         * token prices live only there: they are an operator's to change without a restart.
+         *
          *
          * Every import is a paid call, so this is what turns "premium" into a bounded cost
          * rather than an open tap — a script on a premium account would otherwise spend

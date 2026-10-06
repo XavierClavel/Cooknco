@@ -86,6 +86,9 @@ enum class ServiceUnavailableCause(val key: String) {
     RECIPE_READER_UNAVAILABLE("recipe_reader_unavailable"),
     RECIPE_READER_BUSY("recipe_reader_busy"),
     RECIPE_READER_FAILED("recipe_reader_failed"),
+    // The month's spend has reached the budget set in the backoffice. A 503 rather than a
+    // 429: the cook did nothing wrong, and the app says "unavailable" for every reader cause.
+    RECIPE_READER_BUDGET_EXHAUSTED("recipe_reader_budget_exhausted"),
 }
 
 enum class BadRequestCause (val key: String) {
@@ -149,6 +152,12 @@ enum class BadRequestCause (val key: String) {
     PHOTO_IMPORT_NO_PHOTO("photo_import_no_photo"),
     PHOTO_IMPORT_TOO_MANY_PHOTOS("photo_import_too_many_photos"),
     PHOTO_IMPORT_NOTHING_READ("photo_import_nothing_read"),
+
+    // The backoffice's photo-import settings, one cause per field so the form can say which.
+    PHOTO_IMPORT_LIMIT_INVALID("photo_import_limit_invalid"),
+    PHOTO_IMPORT_BUDGET_INVALID("photo_import_budget_invalid"),
+    PHOTO_IMPORT_PRICE_INVALID("photo_import_price_invalid"),
+    PHOTO_IMPORT_CURRENCY_INVALID("photo_import_currency_invalid"),
 
     PDF_TEMPLATE_EMPTY("pdf_template_empty"),
     PDF_TEMPLATE_TOO_LONG("pdf_template_too_long"),

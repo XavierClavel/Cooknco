@@ -25,7 +25,7 @@ class FakeRecipePhotoReader : RecipePhotoReader {
     override suspend fun read(photos: List<RecipePhoto>): RecipePhotoReading {
         synchronized(lock) { received += photos }
         failure?.let { throw it }
-        return RecipePhotoReading(answer, inputTokens = 1000, outputTokens = 200)
+        return RecipePhotoReading(answer, inputTokens = 1000, outputTokens = 200, model = "fake-vision-model")
     }
 
     fun reset() {

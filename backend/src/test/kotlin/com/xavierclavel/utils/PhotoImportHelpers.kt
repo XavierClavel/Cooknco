@@ -3,13 +3,17 @@ package main.com.xavierclavel.utils
 import io.ktor.client.HttpClient
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
+import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
 import shared.enums.Locale
 import shared.infodto.CooklangImportInfo
@@ -40,4 +44,29 @@ suspend fun HttpClient.importPhoto(
     this.importPhotoRaw(pages, locale).let {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
         Json.decodeFromString<CooklangImportInfo>(it.bodyAsText())
+    }
+
+// ------------------------------------------------------------- the backoffice tab
+
+private val adminJson = Json { ignoreUnknownKeys = true }
+
+suspend fun HttpClient.getPhotoImportOverviewRaw(): HttpResponse =
+    this.get("${shared.utils.URL.ADMIN_URL}/photo-imports")
+
+suspend fun HttpClient.getPhotoImportOverview(): shared.infodto.AdminPhotoImportOverview =
+    this.getPhotoImportOverviewRaw().let {
+        assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
+        adminJson.decodeFromString(it.bodyAsText())
+    }
+
+suspend fun HttpClient.savePhotoImportSettingsRaw(settings: shared.infodto.PhotoImportSettingsDTO): HttpResponse =
+    this.put("${shared.utils.URL.ADMIN_URL}/photo-imports/settings") {
+        contentType(ContentType.Application.Json)
+        setBody(Json.encodeToString(settings))
+    }
+
+suspend fun HttpClient.savePhotoImportSettings(settings: shared.infodto.PhotoImportSettingsDTO): shared.infodto.PhotoImportSettingsDTO =
+    this.savePhotoImportSettingsRaw(settings).let {
+        assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
+        adminJson.decodeFromString(it.bodyAsText())
     }

@@ -42,6 +42,8 @@ class RecipePhotoReading(
     /** Tokens billed, as the provider reported them, or null when it did not. For the log. */
     val inputTokens: Int? = null,
     val outputTokens: Int? = null,
+    /** Which model answered, for the usage history. */
+    val model: String = "",
 )
 
 /**
@@ -204,6 +206,7 @@ class OpenAiCompatiblePhotoReader(
             json = content,
             inputTokens = usage?.get("prompt_tokens")?.jsonPrimitive?.intOrNull,
             outputTokens = usage?.get("completion_tokens")?.jsonPrimitive?.intOrNull,
+            model = model,
         )
     }
 
