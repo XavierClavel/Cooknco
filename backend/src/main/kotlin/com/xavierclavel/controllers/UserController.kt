@@ -5,6 +5,7 @@ import com.xavierclavel.exceptions.UnauthorizedCause
 import com.xavierclavel.exceptions.UnauthorizedException
 import com.xavierclavel.services.ImageService
 import com.xavierclavel.services.OAuthService
+import com.xavierclavel.services.UnsubscribeService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Controller
 import com.xavierclavel.utils.UserSession
@@ -28,6 +29,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.sessions
@@ -37,11 +39,13 @@ object UserController: Controller(USER_URL) {
     val userService : UserService by inject(UserService::class.java)
     val imageService: ImageService by inject(ImageService::class.java)
     val oauthService: OAuthService by inject(OAuthService::class.java)
+    val unsubscribeService: UnsubscribeService by inject(UnsubscribeService::class.java)
 
     override fun Route.routes() {
         getUser()
         searchUsers()
         countUsers()
+        unsubscribeFromMails()
 
         authenticate("auth-session", "bearer-auth") {
             editUser()
@@ -77,6 +81,34 @@ object UserController: Controller(USER_URL) {
 
     private fun Route.countUsers() = get("/count") {
         call.respond(userService.countAll())
+    }
+
+    /**
+     * Turns an account's notification mails off, from the link one of those mails carries.
+     *
+     * Outside the authenticate block on purpose: whoever presses this is in their inbox, not
+     * in the app, and an unsubscribe that opened a login page is one people answer with the
+     * spam button instead. The signed token stands in for the session and buys nothing else
+     * — see [UnsubscribeService].
+     *
+     * A POST rather than a GET because it changes something, and links in mail get followed
+     * by scanners and prefetchers that mean nothing by it.
+     *
+     * The edit is logged with its actor passed in, like the ticketed image upload and for the
+     * same reason: there is no session to read one off, and the token names the account as
+     * surely as a ticket does. Only a press that actually switched the mails off writes a
+     * line — a second one wrote nothing, and a trail saying otherwise would read as a reader
+     * asking over and over.
+     */
+    private fun Route.unsubscribeFromMails() = post("/unsubscribe") {
+        val token = call.request.queryParameters["token"] ?: ""
+        val recipientId = unsubscribeService.accountFor(token)
+            ?: throw UnauthorizedException(UnauthorizedCause.INVALID_TOKEN)
+
+        unsubscribeService.unsubscribe(recipientId)?.let {
+            logEdit(it.id, it.username) { "Unsubscribed from the notification mails" }
+        }
+        call.respond(HttpStatusCode.OK)
     }
 
     private fun Route.editUser() = put {

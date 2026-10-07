@@ -37,6 +37,7 @@ import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.RecipeStepService
 import com.xavierclavel.services.SitemapService
 import com.xavierclavel.services.StorageService
+import com.xavierclavel.services.UnsubscribeService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Configuration
 import com.xavierclavel.utils.loadConfig
@@ -83,6 +84,7 @@ abstract class ApplicationTest: KoinTest {
     val appShellSource: AppShellSource by inject()
     val fakeAppShellSource by lazy { appShellSource as FakeAppShellSource }
     val notificationService: NotificationService by inject()
+    val unsubscribeService: UnsubscribeService by inject()
     val pushSender: PushSender by inject()
     val fakePushSender by lazy { pushSender as FakePushSender }
     val recipePhotoReader: RecipePhotoReader by inject()
@@ -122,6 +124,7 @@ abstract class ApplicationTest: KoinTest {
                 single<RecipePhotoReader> { FakeRecipePhotoReader() }
                 single { LikeService() }
                 single { MailService() }
+                single { UnsubscribeService() }
                 single { CookbookService() }
                 single { DashboardService() }
                 single { RecipeIngredientService() }
