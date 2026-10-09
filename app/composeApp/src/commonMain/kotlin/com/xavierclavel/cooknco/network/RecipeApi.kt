@@ -132,6 +132,32 @@ class RecipeApi(private val client: HttpClient) {
         return response.body()
     }
 
+    /**
+     * The cook's own recipes, the ones they liked and the ones in their cookbooks, matching
+     * [query] — all three at once, because the backend ORs its additive filters, which is the
+     * union this wants (see [RecipeScope] for why the offline sync sends them one at a time).
+     *
+     * What the meal plan offers to plan: the recipes a cook already has to hand. Anything else
+     * is planned from its own page.
+     */
+    suspend fun searchOwnCollections(
+        token: String,
+        userId: Long,
+        query: String,
+        size: Int = 20,
+    ): List<RecipeOverview> {
+        val response = client.get("$base/recipe") {
+            bearerAuth(token)
+            RecipeScope.entries.forEach { parameter(it.parameter, userId) }
+            if (query.isNotBlank()) parameter("search", query)
+            parameter("sort", if (query.isBlank()) RecipeSort.RECENT.value else RecipeSort.BEST_MATCH.value)
+            parameter("page", 0)
+            parameter("size", size)
+        }
+        if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
+        return response.body()
+    }
+
     suspend fun getRecipe(id: Long, token: String? = null): RecipeInfo {
         val response = client.get("$base/recipe/$id") {
             if (token != null) bearerAuth(token)

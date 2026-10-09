@@ -7,9 +7,11 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.ExportRepository
+import com.xavierclavel.cooknco.data.MealPlanRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.ui.components.PdfExportState
+import com.xavierclavel.cooknco.ui.plan.MealEntryDraft
 import com.xavierclavel.cooknco.ui.components.pdfExportFailure
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeStatus
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
@@ -42,6 +44,8 @@ data class RecipeUiState(
     val cookbookPicker: CookbookPickerState? = null,
     /** Only ever moves for a subscriber: nobody else is offered the action that starts it. */
     val export: PdfExportState = PdfExportState(),
+    /** The "Add to meal plan" sheet, while it is open. Premium, like [export]. */
+    val planSheet: PlanRecipeState? = null,
 ) {
     /** Whether the recipe is filed anywhere, which is what the bookmark shows. */
     val isBookmarked: Boolean get() = cookbooks.any { it.hasRecipe }
@@ -65,10 +69,17 @@ data class CookbookPickerState(
     val error: String? = null,
 )
 
+/** The "Add to meal plan" sheet. What it is planning for — day, meal, servings — is the sheet's own until it is sent. */
+data class PlanRecipeState(
+    val isSaving: Boolean = false,
+    val saveFailed: Boolean = false,
+)
+
 class RecipeViewModel(
     private val repo: RecipeRepository,
     private val cookbookRepo: CookbookRepository,
     private val exportRepo: ExportRepository,
+    private val mealPlanRepo: MealPlanRepository,
     private val recipeId: Long,
     private val currentUserId: Long,
 ) : ViewModel() {
@@ -214,6 +225,24 @@ class RecipeViewModel(
         _uiState.update { it.copy(cookbookPicker = null) }
     }
 
+    // ── Add to the meal plan ─────────────────────────────────────────────────
+
+    fun openPlanSheet() = _uiState.update { it.copy(planSheet = PlanRecipeState()) }
+
+    fun closePlanSheet() = _uiState.update { it.copy(planSheet = null) }
+
+    /** Plans this recipe, and closes the sheet once the server has it. */
+    fun planRecipe(draft: MealEntryDraft) {
+        val sheet = _uiState.value.planSheet ?: return
+        if (sheet.isSaving) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(planSheet = PlanRecipeState(isSaving = true)) }
+            mealPlanRepo.planRecipe(recipeId, draft.date, draft.slot, draft.servings)
+                .onSuccess { _uiState.update { it.copy(planSheet = null) } }
+                .onFailure { _uiState.update { it.copy(planSheet = PlanRecipeState(saveFailed = true)) } }
+        }
+    }
+
     /**
      * Puts the recipe in the cookbook, or takes it out.
      *
@@ -323,6 +352,7 @@ class RecipeViewModel(
                     AppGraph.recipeRepository,
                     AppGraph.cookbookRepository,
                     AppGraph.exportRepository,
+                    AppGraph.mealPlanRepository,
                     recipeId,
                     userId,
                 )

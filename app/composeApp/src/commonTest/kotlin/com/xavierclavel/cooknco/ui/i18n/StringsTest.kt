@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.ui.i18n
 
+import com.xavierclavel.cooknco.data.MealSlot
 import com.xavierclavel.cooknco.data.UnitRepository
 import com.xavierclavel.cooknco.network.ReportReason
 import kotlin.test.Test
@@ -52,6 +53,20 @@ class StringsTest {
             assertFalse(name.contains('_'), "$language passes an unknown class through: $name")
             assertTrue(name.isNotBlank(), "$language names an unknown class as nothing")
         }
+    }
+
+    @Test
+    fun `every meal is named in every language, short and long, and never as its constant`() {
+        catalogues.forEach { (language, s) ->
+            MealSlot.entries.forEach { slot ->
+                listOf(s.mealSlot(slot), s.mealSlotShort(slot)).forEach { name ->
+                    assertFalse(name.contains('_'), "$language leaves $slot as its constant: $name")
+                    assertNotEquals(slot.name, name, "$language does not name $slot, it echoes it")
+                    assertTrue(name.isNotBlank(), "$language names $slot as nothing")
+                }
+            }
+        }
+        assertEquals("Goûter", FrStrings.mealSlot(MealSlot.SNACK))
     }
 
     @Test

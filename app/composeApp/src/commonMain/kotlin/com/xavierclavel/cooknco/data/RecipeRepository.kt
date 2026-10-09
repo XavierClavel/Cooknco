@@ -55,6 +55,12 @@ class RecipeRepository(
             recipeApi.listRecipes(token, userId, page)
         })
 
+    /** See [RecipeApi.searchOwnCollections]. */
+    suspend fun searchOwnCollections(userId: Long, query: String): Result<List<RecipeOverview>> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        recipeApi.searchOwnCollections(token, userId, query)
+    }
+
     suspend fun getRecipe(id: Long): Result<RecipeInfo> = readThrough(
         fetch = {
             val token = tokenDataStore.tokenFlow.first()

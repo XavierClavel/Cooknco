@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
@@ -51,6 +52,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -88,6 +90,11 @@ import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.StepImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.cookbook.AddToCookbookSheet
+import com.xavierclavel.cooknco.data.MealSlot
+import com.xavierclavel.cooknco.data.daysFrom
+import com.xavierclavel.cooknco.ui.plan.MealEntryDraft
+import com.xavierclavel.cooknco.ui.plan.MealEntrySheet
+import com.xavierclavel.cooknco.ui.plan.currentDay
 import com.xavierclavel.cooknco.ui.components.PdfExportHost
 import com.xavierclavel.cooknco.ui.components.PremiumLockDialog
 import com.xavierclavel.cooknco.ui.components.premiumSheetAction
@@ -145,12 +152,12 @@ fun RecipeScreen(
     recipeId: Long,
     currentUserId: Long,
     /**
-     * Whether the signed-in account may use the premium features, which today is the
-     * export and nothing else. The gate that counts is the server's — the route behind it
-     * refuses anyone else — this one decides whether the sheet's export runs or explains
-     * itself. False does not hide it: see [com.xavierclavel.cooknco.ui.components.premiumSheetAction].
+     * Whether the signed-in account may use the premium features: the two exports and the
+     * meal plan. The gate that counts is the server's — the routes behind them refuse anyone
+     * else — this one decides whether the sheet's rows run or explain themselves. False does
+     * not hide them: see [com.xavierclavel.cooknco.ui.components.premiumSheetAction].
      */
-    canExport: Boolean,
+    isPremium: Boolean,
     onNavigateToEdit: (Long) -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateToUser: (Long) -> Unit = {},
@@ -192,13 +199,14 @@ fun RecipeScreen(
                 recipe = recipe,
                 uiState = uiState,
                 isOwner = viewModel.isOwner,
-                canExport = canExport,
+                isPremium = isPremium,
                 onToggleLike = viewModel::toggleLike,
                 onShare = {
                     linkSharer.share(recipe.title, WebRoutes.urlFor(WebRoutes.Shareable.RECIPE, recipe.id))
                 },
                 onEdit = { onNavigateToEdit(recipe.id) },
                 onAddToCookbook = viewModel::openCookbookPicker,
+                onAddToMealPlan = viewModel::openPlanSheet,
                 onDelete = viewModel::confirmDelete,
                 onYieldMinus = { viewModel.setYield(uiState.selectedYield - 1) },
                 onYieldPlus = { viewModel.setYield(uiState.selectedYield + 1) },
@@ -227,6 +235,33 @@ fun RecipeScreen(
             state = picker,
             onToggle = viewModel::toggleCookbook,
             onDismissRequest = viewModel::closeCookbookPicker,
+        )
+    }
+
+    // Mounted here like the picker above, and opened from the "···" sheet, which is gone by
+    // then. The days start today: a recipe is planned for a meal still to come, while what
+    // was already cooked is put down from the plan itself.
+    val planSheet = uiState.planSheet
+    if (planSheet != null && recipe != null) {
+        val today = remember { currentDay() }
+        MealEntrySheet(
+            heading = recipe.title,
+            subtitle = s.addToMealPlan,
+            initial = MealEntryDraft(
+                date = today,
+                slot = MealSlot.DINNER,
+                // As many as the cook has dialled in on this page; nothing for a recipe that
+                // states no yield, which the backend then leaves unsaid as well.
+                servings = uiState.selectedYield.takeIf { recipe.yield != null },
+                title = recipe.title,
+            ),
+            days = daysFrom(today, 14),
+            titleEditable = false,
+            primaryLabel = s.planIt,
+            isSaving = planSheet.isSaving,
+            saveFailed = planSheet.saveFailed,
+            onSave = viewModel::planRecipe,
+            onDismissRequest = viewModel::closePlanSheet,
         )
     }
 
@@ -259,13 +294,14 @@ private fun RecipeContent(
     uiState: RecipeUiState,
     isOwner: Boolean,
     /** Premium — see [RecipeScreen]. */
-    canExport: Boolean,
+    isPremium: Boolean,
     onToggleLike: () -> Unit,
     onShare: () -> Unit,
     onExport: () -> Unit,
     onExportCooklang: () -> Unit,
     onEdit: () -> Unit,
     onAddToCookbook: () -> Unit,
+    onAddToMealPlan: () -> Unit,
     onDelete: () -> Unit,
     onYieldMinus: () -> Unit,
     onYieldPlus: () -> Unit,
@@ -485,11 +521,13 @@ private fun RecipeContent(
                 RecipeActionSheet(
                     recipe = recipe,
                     isOwner = isOwner,
-                    canExport = canExport,
+                    isPremium = isPremium,
                     onExport = onExport,
                     onExportLocked = { lockedFeature = s.exportRecipePdf },
                     onExportCooklang = onExportCooklang,
                     onExportCooklangLocked = { lockedFeature = s.exportRecipeCooklang },
+                    onAddToMealPlan = onAddToMealPlan,
+                    onAddToMealPlanLocked = { lockedFeature = s.addToMealPlan },
                     onShare = onShare,
                     onEdit = onEdit,
                     onDelete = onDelete,
@@ -1053,12 +1091,14 @@ private fun Modifier.dashedNavyBorder(radius: Dp): Modifier = drawWithContent {
 private fun RecipeActionSheet(
     recipe: RecipeInfo,
     isOwner: Boolean,
-    canExport: Boolean,
+    isPremium: Boolean,
     onShare: () -> Unit,
     onExport: () -> Unit,
     onExportLocked: () -> Unit,
     onExportCooklang: () -> Unit,
     onExportCooklangLocked: () -> Unit,
+    onAddToMealPlan: () -> Unit,
+    onAddToMealPlanLocked: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onReport: () -> Unit,
@@ -1074,6 +1114,17 @@ private fun RecipeActionSheet(
         },
         actions = buildList {
             add(SheetAction(label = s.shareLink, onClick = onShare, icon = Icons.Outlined.Share))
+            // Locked by the same rule as the exports below: the meal plan is premium, and a row
+            // that opened the sheet only to have the save refused would be a 403 dressed as a form.
+            add(
+                premiumSheetAction(
+                    label = s.addToMealPlan,
+                    icon = Icons.Outlined.CalendarMonth,
+                    isPremium = isPremium,
+                    onUse = onAddToMealPlan,
+                    onLocked = onAddToMealPlanLocked,
+                )
+            )
             // Not on your own recipe: the backend refuses a self-report, so an action there
             // exists only to be turned down.
             if (!isOwner) {
@@ -1088,7 +1139,7 @@ private fun RecipeActionSheet(
                 premiumSheetAction(
                     label = s.exportRecipePdf,
                     icon = Icons.Outlined.FileDownload,
-                    isPremium = canExport,
+                    isPremium = isPremium,
                     onUse = onExport,
                     onLocked = onExportLocked,
                 )
@@ -1100,7 +1151,7 @@ private fun RecipeActionSheet(
                 premiumSheetAction(
                     label = s.exportRecipeCooklang,
                     icon = Icons.Outlined.Description,
-                    isPremium = canExport,
+                    isPremium = isPremium,
                     onUse = onExportCooklang,
                     onLocked = onExportCooklangLocked,
                 )
@@ -1157,13 +1208,14 @@ fun RecipeScreenPreview() {
                 recipe = previewRecipe,
                 uiState = RecipeUiState(recipe = previewRecipe, selectedYield = 8, isLoading = false),
                 isOwner = true,
-                canExport = true,
+                isPremium = true,
                 onToggleLike = {},
                 onShare = {},
                 onExport = {},
                 onExportCooklang = {},
                 onEdit = {},
                 onAddToCookbook = {},
+                onAddToMealPlan = {},
                 onDelete = {},
                 onYieldMinus = {},
                 onYieldPlus = {},

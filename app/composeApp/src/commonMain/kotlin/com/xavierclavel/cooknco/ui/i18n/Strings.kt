@@ -5,6 +5,7 @@ import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.xavierclavel.cooknco.data.AppLocale
+import com.xavierclavel.cooknco.data.MealSlot
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
 import com.xavierclavel.cooknco.network.IngredientSort
 import com.xavierclavel.cooknco.network.ReportReason
@@ -69,6 +70,7 @@ interface Strings {
     val navSearch: String
     val navBooks: String
     val navMe: String
+    val navPlan: String
     val newRecipe: String
 
     // ── Feed ──────────────────────────────────────────────────────────────────
@@ -545,6 +547,45 @@ interface Strings {
      */
     val cookbookTooLargeToExport: String
     val exportRendererBusy: String
+
+    // ── The meal plan, which a premium account is offered ─────────────────────
+    val mealPlan: String
+    /** "12 – 18 October", or "28 September – 4 October" across two months. */
+    fun weekRange(start: LocalDate, end: LocalDate): String
+    val thisWeek: String
+    val previousWeek: String
+    val nextWeek: String
+    fun mealSlot(slot: MealSlot): String
+    /** [mealSlot], short enough for a quarter of the sheet's switch. */
+    fun mealSlotShort(slot: MealSlot): String
+    /** A day chip in the sheet: "Mon 12". */
+    fun shortDay(date: LocalDate): String
+    /** Under a dish in its sheet: "Monday 12 October · Dinner". */
+    fun mealOn(date: LocalDate, slot: MealSlot): String
+    val nothingPlanned: String
+    val addADish: String
+    val searchOrTypeADish: String
+    /** The row that plans what was typed as it is, rather than as a recipe. */
+    fun addTypedDish(text: String): String
+    val plannedBeforeCaps: String
+    val yourRecipesCaps: String
+    val noRecipeMatches: String
+    val dishName: String
+    val servingsLabel: String
+    fun servingsCount(count: Int): String
+    val servingsNotSet: String
+    val dayLabel: String
+    val mealLabel: String
+    val openRecipe: String
+    val removeFromPlan: String
+    /** The recipe sheet's row, and the heading of what it opens. */
+    val addToMealPlan: String
+    val planIt: String
+    val mealPlanLoadFailed: String
+    val mealPlanSaveFailed: String
+    /** What the tab says to an account without premium: what it would do, and what opens it. */
+    val mealPlanLockedTitle: String
+    val mealPlanLockedMessage: String
 
     // ── The cook timer, as Android's notification settings list it ────────────
     val timerChannelName: String

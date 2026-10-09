@@ -488,3 +488,57 @@ data class ReportDto(
     val reason: String,
     val comment: String = "",
 )
+
+/**
+ * One dish in the meal plan (`GET /meal-plan` — `shared.infodto.MealPlanEntryInfo`).
+ *
+ * [date] is `yyyy-MM-dd`, a day rather than an instant, and [slot] the backend's `MealSlot`
+ * by name — kept a string here, like [RecipeInfo.dishClass], so a meal this build has never
+ * heard of is skipped rather than failing the whole week. See
+ * [com.xavierclavel.cooknco.data.MealSlot.of].
+ *
+ * [title] is always there; [recipe] only while the recipe can still be opened. A dish whose
+ * recipe was deleted or hidden since it was planned stays in the plan under its name.
+ */
+@Serializable
+data class MealPlanEntry(
+    val id: Long,
+    val date: String,
+    val slot: String,
+    val position: Int = 0,
+    val title: String,
+    val servings: Int? = null,
+    val recipe: MealPlanRecipe? = null,
+)
+
+@Serializable
+data class MealPlanRecipe(
+    val id: Long,
+    /** The picture's version, as [RecipeOverview.version]. */
+    val version: Long,
+)
+
+/**
+ * `POST /meal-plan` — `shared.dto.MealPlanEntryDTO`. Either [recipeId] or [title].
+ *
+ * Every optional field defaults to null, which kotlinx leaves out of the body, and the backend
+ * reads a missing field as null too: so leaving [servings] unset plans a recipe for as many as
+ * it makes, rather than for nobody.
+ */
+@Serializable
+data class MealPlanEntrySaveDto(
+    val date: String,
+    val slot: String,
+    val recipeId: Long? = null,
+    val title: String? = null,
+    val servings: Int? = null,
+)
+
+/** `PUT /meal-plan/{id}` — `shared.dto.MealPlanEntryEditDTO`. [servings] is sent as it is meant: null clears it. */
+@Serializable
+data class MealPlanEntryEditDto(
+    val date: String,
+    val slot: String,
+    val servings: Int? = null,
+    val title: String? = null,
+)
