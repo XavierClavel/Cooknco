@@ -211,6 +211,16 @@ class IngredientService: KoinComponent {
      * typing — it is what the trigram similarity already computed to decide what matches at
      * all. It is also meaningless without a term to be similar *to*, so a blank search falls
      * back to alphabetical rather than ordering by similarity to nothing.
+     *
+     * The query runs on the translation rows — one per ingredient and locale — rather than on
+     * `ingredients`. From there, ordering by a name joins `translations` a second time with
+     * no locale on it, and every ingredient comes back once per language it is named in. From
+     * this side the name is a column of the row and the ingredient a to-one.
+     *
+     * `word_similarity` scores a name 1 as soon as it contains the term, so "sel", "sel de
+     * mer" and "beurre au sel" all tie on a search for "sel". Whole-name `similarity` breaks
+     * that tie in favour of the name with the least else in it, and the id last keeps a page
+     * boundary from moving between two requests.
      */
     fun search(
         searchString: String,
@@ -218,30 +228,34 @@ class IngredientService: KoinComponent {
         locale: Locale,
         sort: Sort = Sort.BEST_MATCH,
     ): Pair<Int,List<IngredientInfo>> {
-        val query = QIngredient()
+        val name = QLocalizedIngredientName.Alias.name
+        val query = QLocalizedIngredientName()
+            .ingredient.fetch()
+            .locale.eq(locale)
             .apply {
-                if (searchString.isBlank()) return@apply
-                this.and()
-                    .translations.locale.eq(locale)
-                    .raw("word_similarity(unaccent(?), unaccent(${QIngredient.Alias.translations.name})) > 0.3", searchString)
-                    .endAnd()
+                if (searchString.isNotBlank()) raw("word_similarity(unaccent(?), unaccent($name)) > 0.3", searchString)
             }
-            .query()
+        val count = query.findCount()
 
+        // Before the order, never after: `setPaging` replaces the query's order with the one
+        // `Paging` carries, and `getPaging()` carries none — Ebean then pages by id.
+        query.setPaging(paging)
         val effectiveSort = if (sort == Sort.BEST_MATCH && searchString.isBlank()) Sort.NAME_ASCENDING else sort
         when (effectiveSort) {
             // Ebean copies orderBy strings into SQL verbatim (no parameter binding),
             // so the search term is inlined as an injection-proof hex literal
-            Sort.BEST_MATCH -> query.orderBy(
-                "word_similarity(unaccent(${sqlStringLiteral(searchString)}), unaccent(${QIngredient.Alias.translations.name})) desc"
-            )
-            // The name lives on the translation rows, so ordering by it needs the locale's
-            // row picked out — the same predicate the search itself filters on.
-            Sort.NAME_DESCENDING -> query.orderBy("${QIngredient.Alias.translations.name} desc")
-            else -> query.orderBy("${QIngredient.Alias.translations.name} asc")
+            Sort.BEST_MATCH -> {
+                val term = "unaccent(${sqlStringLiteral(searchString)})"
+                query.orderBy(
+                    "word_similarity($term, unaccent($name)) desc, similarity($term, unaccent($name)) desc, " +
+                        "$name asc, ${QLocalizedIngredientName.Alias.ingredient.id} asc"
+                )
+            }
+            Sort.NAME_DESCENDING -> query.orderBy().name.desc().ingredient.id.asc()
+            else -> query.orderBy().name.asc().ingredient.id.asc()
         }
 
-        return Pair(query.findCount(), describeAll(query.setPaging(paging).findList()))
+        return Pair(count, describeAll(query.findList().map { it.ingredient!! }))
     }
 
     /**

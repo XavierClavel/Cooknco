@@ -5,6 +5,8 @@ import shared.dto.AbsorbCustomIngredientResult
 import shared.dto.IngredientDTO
 import shared.dto.SearchResult
 import shared.enums.IngredientType
+import shared.enums.Locale
+import shared.enums.Sort
 import shared.infodto.CustomIngredientUsage
 import shared.infodto.IngredientInfo
 import shared.utils.URL.INGREDIENT_URL
@@ -50,11 +52,16 @@ suspend fun HttpClient.createIngredient(ingredient: IngredientDTO = ingredientDT
 
 }
 
-suspend fun HttpClient.searchIngredients(query: String): SearchResult<IngredientInfo> {
+suspend fun HttpClient.searchIngredients(
+    query: String,
+    sort: Sort? = null,
+    locale: Locale = Locale.EN,
+): SearchResult<IngredientInfo> {
     this.get(INGREDIENT_URL) {
         url {
             parameters.append("query", query)
-            parameters.append("locale", "en")
+            parameters.append("locale", locale.name.lowercase())
+            if (sort != null) parameters.append("sort", sort.name)
         }
     }.apply {
         assertEquals(HttpStatusCode.OK, status)

@@ -55,6 +55,7 @@ import shared.enums.PremiumStatus
 import com.xavierclavel.services.AdminService
 import shared.enums.LogLevel
 import shared.enums.ReportTargetType
+import shared.enums.Sort
 import shared.enums.TimeGranularity
 import shared.enums.UserRole
 import shared.infodto.LogEntryInfo
@@ -449,6 +450,35 @@ class AdminControllerTest : ApplicationTest() {
             client.hideRecipe(hidden!!.id, "spam")
             assertEquals(listOf(hidden!!.id), client.listAdminRecipes(hidden = true).items.map { it.id })
             assertEquals(listOf(visible!!.id), client.listAdminRecipes(hidden = false).items.map { it.id })
+        }
+    }
+
+    @Test
+    fun `users are listed newest account first`() = runTestAsAdmin {
+        // `joinDate` is stated to the second and the test accounts are made within one, so the
+        // order is read off the ids — the accounts are created in id order.
+        val ids = client.listAdminUsers().items.map { it.id }
+        assertTrue(ids.size >= 2)
+        assertEquals(ids.sortedDescending(), ids)
+    }
+
+    @Test
+    fun `recipes are listed in the order asked for`() = runTest {
+        // Titles alphabetised against the order they are written in, so that neither the
+        // creation date nor the id can pass for the title order
+        var first: Long = 0
+        var second: Long = 0
+        var third: Long = 0
+        runAsUser1 {
+            first = client.createRecipe(RecipeDTO(title = "Tarte")).id
+            second = client.createRecipe(RecipeDTO(title = "Crumble")).id
+            third = client.createRecipe(RecipeDTO(title = "Pudding")).id
+        }
+        runAsAdmin {
+            assertEquals(listOf(third, second, first), client.listAdminRecipes().items.map { it.id })
+            assertEquals(listOf(first, second, third), client.listAdminRecipes(sort = Sort.DATE_ASCENDING).items.map { it.id })
+            assertEquals(listOf(second, third, first), client.listAdminRecipes(sort = Sort.NAME_ASCENDING).items.map { it.id })
+            assertEquals(listOf(first, third, second), client.listAdminRecipes(sort = Sort.NAME_DESCENDING).items.map { it.id })
         }
     }
 

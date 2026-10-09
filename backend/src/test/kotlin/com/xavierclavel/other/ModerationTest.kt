@@ -241,6 +241,26 @@ class ModerationTest : ApplicationTest() {
     }
 
     @Test
+    fun `the queue lists the newest report first`() = runTest {
+        var recipe: RecipeInfo? = null
+        var authorId: Long = 0
+        runAsUser1 {
+            recipe = client.createRecipe()
+            authorId = client.getMe().id
+        }
+        var older: Long = 0
+        var newer: Long = 0
+        runAsUser2 {
+            older = client.report(ReportTargetType.RECIPE, recipe!!.id).id
+            newer = client.report(ReportTargetType.USER, authorId).id
+        }
+
+        runAsAdmin {
+            assertEquals(listOf(newer, older), client.listReports().items.map { it.id })
+        }
+    }
+
+    @Test
     fun `admin recipe listing can show only reported recipes`() = runTest {
         var reported: RecipeInfo? = null
         runAsUser1 { reported = client.createRecipe() }
