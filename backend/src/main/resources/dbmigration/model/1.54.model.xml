@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <createTable name="meal_plan_entries" identityType="identity" pkName="pk_meal_plan_entries">
+            <column name="id" type="bigint" primaryKey="true"/>
+            <column name="owner_id" type="bigint" notnull="true" references="users.id" foreignKeyName="fk_meal_plan_entries_owner_id" foreignKeyIndex="ix_meal_plan_entries_owner_id"/>
+            <column name="date" type="date" notnull="true"/>
+            <column name="slot" type="varchar(16)" notnull="true" checkConstraint="check ( slot in ('BREAKFAST','LUNCH','SNACK','DINNER'))" checkConstraintName="ck_meal_plan_entries_slot"/>
+            <column name="position" type="integer" notnull="true"/>
+            <column name="recipe_id" type="bigint" references="recipes.id" foreignKeyName="fk_meal_plan_entries_recipe_id" foreignKeyIndex="ix_meal_plan_entries_recipe_id" foreignKeyOnDelete="SET_NULL" foreignKeyOnUpdate="RESTRICT"/>
+            <column name="title" type="varchar(255)" notnull="true"/>
+            <column name="servings" type="integer"/>
+        </createTable>
+        <createIndex indexName="ix_meal_plan_entries_owner_id_date" tableName="meal_plan_entries" columns="owner_id,date"/>
+    </changeSet>
+</migration>

@@ -853,6 +853,35 @@ a second launcher rather than a mode of the scanner, whose promise is that nothi
 The prompt (`RecipePhotoReader.PROMPT`) and the parser are a contract: changing a field name in
 one is changing it in the other, and `RecipeScanControllerTest` is what notices.
 
+## The meal plan keeps the meal when the recipe goes
+
+An account notes, for every meal, what is (or was) cooked: one of its recipes, or a few words
+("Leftovers"), with how many it is for. `meal_plan_entries` holds one row per *dish*; there is
+no meal row — a meal is a day and a `MealSlot`, and the dishes sharing both are it. Private to
+the account, premium on every route (`MealPlanController`), and in the app a tab of its own
+that is shown locked rather than hidden.
+
+Three things not to undo:
+
+- **`title` is always set, and a recipe is resolved when the plan is read.** A planned recipe
+  keeps the title it had when planned; on each read `RecipeService.findReadable` asks, in one
+  query for the whole week, which of the plan's recipes the reader can still open, and the
+  rest come back as words with `recipe: null`. Deleted, hidden, gone private — none of those
+  places knows a plan exists, and none should (pull, not push). Re-checking on write would be
+  worse: a dish whose recipe went away could then not be moved to Thursday, which is why the
+  edit DTO cannot change which recipe a dish is.
+- **`recipe_id` is `ON DELETE SET NULL`** (`@DbForeignKey`), not Ebean's default `RESTRICT`. A
+  recipe's own delete is soft, but an account's deletion takes its recipes for real, and with
+  `RESTRICT` anybody who had planned one of them would make its author unable to leave.
+  `MealPlanControllerTest` deletes an author's account to hold this.
+- **A date is `yyyy-MM-dd`, not epoch seconds** like every other date in the API. A dinner on
+  Tuesday is on Tuesday wherever the phone is. The listing takes a `from`/`to` range bounded at
+  `MAX_RANGE_DAYS` instead of a page, so a page boundary never splits a meal.
+
+A dish shown as words renames like words — including one whose recipe went out of reach,
+which the rename then detaches for good. The app therefore sends a title only when it
+changed, or a save that merely moved such a dish would cut a link that might have come back.
+
 ## Build and test
 
 Use `sh ./gradlew` (the wrapper lacks the exec bit in worktrees) with JDK 23 — Gradle 8.10.2

@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Search
@@ -52,6 +53,8 @@ import com.xavierclavel.cooknco.ui.cookbook.CookbooksScreen
 import com.xavierclavel.cooknco.ui.cookbook.CookbooksViewModel
 import com.xavierclavel.cooknco.ui.home.HomeScreen
 import com.xavierclavel.cooknco.ui.home.HomeViewModel
+import com.xavierclavel.cooknco.ui.plan.MealPlanScreen
+import com.xavierclavel.cooknco.ui.plan.MealPlanViewModel
 import com.xavierclavel.cooknco.ui.recipe.RecipesScreen
 import com.xavierclavel.cooknco.ui.recipe.RecipesViewModel
 import com.xavierclavel.cooknco.ui.i18n.strings
@@ -68,13 +71,14 @@ import com.xavierclavel.cooknco.ui.theme.stickerShadow
 import com.xavierclavel.cooknco.ui.user.UserProfileScreen
 import com.xavierclavel.cooknco.ui.user.UserProfileViewModel
 
-private enum class MainTab { FEED, SEARCH, COOKBOOKS, PROFILE }
+private enum class MainTab { FEED, SEARCH, COOKBOOKS, PLAN, PROFILE }
 
 /**
- * The four tabs behind the sticker-pill bottom bar, in the order the mockup lays them
- * out left to right — see `Cooknco Mobile.dc.html`, turn 5 / option `5a`, the Feed /
- * Search / Cookbooks / Profile screenshots (their nav bar is otherwise identical, only
- * the active segment differs).
+ * The tabs behind the sticker-pill bottom bar, in the order the mockup lays them out left
+ * to right — see `Cooknco Mobile.dc.html`, turn 5 / option `5a`, the Feed / Search /
+ * Cookbooks / Profile screenshots (their nav bar is otherwise identical, only the active
+ * segment differs). The meal plan came after the mockup and sits before Profile, beside the
+ * other tab about the cook's own cooking.
  *
  * The old shared `MainTopBar` (hamburger + search pill + avatar) that used to sit above
  * whichever tab was showing is gone — each tab draws its own header instead (Feed's
@@ -103,6 +107,7 @@ fun MainScreen(
     val recipesViewModel: RecipesViewModel = viewModel(factory = RecipesViewModel.factory())
     val cookbooksViewModel: CookbooksViewModel = viewModel(factory = CookbooksViewModel.factory(user.id))
     val profileViewModel: UserProfileViewModel = viewModel(factory = UserProfileViewModel.factory(user.id, user.id))
+    val mealPlanViewModel: MealPlanViewModel = viewModel(factory = MealPlanViewModel.factory(user.id))
 
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.FEED) }
 
@@ -164,6 +169,13 @@ fun MainScreen(
                 onNewCookbook = { onNavigateToEditCookbook(null) },
                 modifier = Modifier.padding(innerPadding),
             )
+            MainTab.PLAN -> MealPlanScreen(
+                viewModel = mealPlanViewModel,
+                // Shown either way: locked, it says what a subscription would open.
+                isPremium = user.isPremium,
+                onRecipeClick = onNavigateToRecipe,
+                modifier = Modifier.padding(innerPadding),
+            )
             MainTab.PROFILE -> UserProfileScreen(
                 viewModel = profileViewModel,
                 onNavigateToEdit = onNavigateToEditProfile,
@@ -181,10 +193,10 @@ fun MainScreen(
 
 /**
  * The sticker-pill bottom nav: a cream, navy-bordered, fully-rounded pill holding the
- * four tabs, plus a separate raised gold Create square that always starts a new recipe.
+ * five tabs, plus a separate raised gold Create square that always starts a new recipe.
  * Inactive tabs show only a navy icon; the active one becomes an orange segment with a
  * white icon and label, sized to its content rather than sharing the pill equally — the
- * three inactive icon-only slots split whatever width that leaves.
+ * four inactive icon-only slots split whatever width that leaves.
  */
 @Composable
 private fun MainBottomBar(
@@ -233,6 +245,12 @@ private fun MainBottomBar(
             ) { tint -> Icon(Icons.Outlined.MenuBook, contentDescription = s.cookbooks, tint = tint, modifier = Modifier.size(20.dp)) }
 
             NavTabItem(
+                selected = selectedTab == MainTab.PLAN,
+                label = s.navPlan,
+                onClick = { onTabSelected(MainTab.PLAN) },
+            ) { tint -> Icon(Icons.Outlined.CalendarMonth, contentDescription = s.mealPlan, tint = tint, modifier = Modifier.size(20.dp)) }
+
+            NavTabItem(
                 selected = selectedTab == MainTab.PROFILE,
                 label = s.navMe,
                 onClick = { onTabSelected(MainTab.PROFILE) },
@@ -265,7 +283,7 @@ private fun MainBottomBar(
  * One nav-bar slot: an orange pill with its label when selected, a bare icon when not.
  *
  * Every slot is a weight, and the weight is what animates — the selected one grows to make
- * room for its label while the other three give the width up, all on the same spec, so the
+ * room for its label while the other four give the width up, all on the same spec, so the
  * pill slides along the bar instead of appearing in the next slot. Doing it the obvious way
  * (wrap-content when selected, `weight(1f)` when not) cannot be animated at all: the slot
  * changes how it is measured, and there is no value in between to tween.
@@ -327,10 +345,12 @@ private fun RowScope.NavTabItem(
 /**
  * How much wider the selected slot is than an unselected one.
  *
- * Enough for the longest label the bar carries and no more: the three icons it takes the
- * room from still have to be comfortably tappable.
+ * Enough for the longest label the bar carries and no more: the four icons it takes the
+ * room from still have to be comfortably tappable. Raised from 2.6 when the fifth tab came:
+ * the selected slot's share of the pill fell with it, and "Recherche" no longer fitted on a
+ * 360dp phone. At 3.2 it does, and an icon slot keeps about 34dp for its 20dp icon.
  */
-private const val SELECTED_NAV_WEIGHT = 2.6f
+private const val SELECTED_NAV_WEIGHT = 3.2f
 
 private val previewUser = UserInfo(
     id = 1L, version = 1L, username = "Xavier",

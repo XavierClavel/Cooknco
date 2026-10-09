@@ -56,8 +56,8 @@ const documents: LegalDocuments = {
       {
         heading: "Ce que vous écrivez",
         body: [
-          "Vos recettes et leurs photos, leurs étapes, leurs durées et leurs ingrédients ; vos livres de recettes ; ce que vous avez aimé et les personnes que vous suivez ; et les notes privées que vous gardez sur une recette.",
-          "Votre compte est public ou sur demande, et c'est ce réglage qui décide qui lit vos recettes. Vos notes privées sont la seule chose qui n'a aucun réglage : elles ne sont montrées qu'à vous, jamais à personne d'autre.",
+          "Vos recettes et leurs photos, leurs étapes, leurs durées et leurs ingrédients ; vos livres de recettes ; ce que vous avez aimé et les personnes que vous suivez ; les notes privées que vous gardez sur une recette ; et votre planning des repas — quel plat vous avez prévu pour quel repas de quel jour, et pour combien de personnes.",
+          "Votre compte est public ou sur demande, et c'est ce réglage qui décide qui lit vos recettes. Vos notes privées et votre planning des repas sont les seules choses qui n'ont aucun réglage : ils ne sont montrés qu'à vous, jamais à personne d'autre.",
         ],
       },
       {
@@ -210,6 +210,7 @@ const documents: LegalDocuments = {
           { text: "Le compte lui-même : pseudonyme, adresse e-mail, mot de passe, photo, biographie." },
           { text: "Vos recettes, leurs photos, leurs étapes et leurs ingrédients." },
           { text: "Vos notes privées sur les recettes." },
+          { text: "Votre planning des repas." },
           { text: "Ce que vous avez aimé, les personnes que vous suiviez et celles qui vous suivaient." },
           { text: "Votre appartenance à tous les livres de recettes." },
           { text: "Vos appareils et les jetons par lesquels ils recevaient les notifications." },
@@ -231,6 +232,10 @@ const documents: LegalDocuments = {
           {
             term: "Un livre de recettes partagé",
             text: "reste à ses autres membres, parce qu'il est aussi le leur. Vos recettes partent avec vous, y compris celles que vous y aviez mises.",
+          },
+          {
+            term: "Vos recettes dans le planning des autres",
+            text: "une de vos recettes que quelqu'un avait prévue reste dans son planning sous son seul titre, sans rien qui la rattache à vous ni à la recette : c'est une note de ce qui devait y être cuisiné.",
           },
           {
             term: "Les sauvegardes de nuit",

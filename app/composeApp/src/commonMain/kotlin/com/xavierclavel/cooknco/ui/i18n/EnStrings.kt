@@ -1,5 +1,6 @@
 package com.xavierclavel.cooknco.ui.i18n
 
+import com.xavierclavel.cooknco.data.MealSlot
 import com.xavierclavel.cooknco.ui.home.DateGroupKey
 import com.xavierclavel.cooknco.network.IngredientSort
 import com.xavierclavel.cooknco.network.ReportReason
@@ -45,6 +46,7 @@ object EnStrings : Strings {
     override val navSearch = "Search"
     override val navBooks = "Books"
     override val navMe = "Me"
+    override val navPlan = "Plan"
     override val newRecipe = "New recipe"
 
     override val today = "Today"
@@ -559,6 +561,47 @@ object EnStrings : Strings {
     override val exportFailed = "The PDF could not be prepared. Please try again."
     override val cookbookTooLargeToExport = "This cookbook holds too many recipes to be printed as one book."
     override val exportRendererBusy = "Too many exports are being printed right now. Try again in a moment."
+
+    override val mealPlan = "Meal plan"
+    override fun weekRange(start: LocalDate, end: LocalDate) =
+        if (start.month == end.month) "${start.day} – ${end.day} ${monthName(end.month)}"
+        else "${start.day} ${monthName(start.month)} – ${end.day} ${monthName(end.month)}"
+    override val thisWeek = "This week"
+    override val previousWeek = "Previous week"
+    override val nextWeek = "Next week"
+    override fun mealSlot(slot: MealSlot) = when (slot) {
+        MealSlot.BREAKFAST -> "Breakfast"
+        MealSlot.LUNCH -> "Lunch"
+        MealSlot.SNACK -> "Snack"
+        MealSlot.DINNER -> "Dinner"
+    }
+    override fun mealSlotShort(slot: MealSlot) = mealSlot(slot)
+    override fun shortDay(date: LocalDate) = "${weekday(date.dayOfWeek).take(3)} ${date.day}"
+    override fun mealOn(date: LocalDate, slot: MealSlot) =
+        "${weekday(date.dayOfWeek)} ${date.day} ${monthName(date.month)} · ${mealSlot(slot)}"
+    override val nothingPlanned = "Nothing planned"
+    override val addADish = "Add a dish"
+    override val searchOrTypeADish = "Search your recipes, or type a dish…"
+    override fun addTypedDish(text: String) = "Add “$text”"
+    override val plannedBeforeCaps = "PLANNED BEFORE"
+    override val yourRecipesCaps = "YOUR RECIPES"
+    override val noRecipeMatches = "None of your recipes match."
+    override val dishName = "Dish"
+    override val servingsLabel = "Servings"
+    override fun servingsCount(count: Int) = "Serves $count"
+    override val servingsNotSet = "Not set"
+    override val dayLabel = "Day"
+    override val mealLabel = "Meal"
+    override val openRecipe = "Open the recipe"
+    override val removeFromPlan = "Remove from the plan"
+    override val addToMealPlan = "Add to meal plan"
+    override val planIt = "Plan it"
+    override val mealPlanLoadFailed = "The plan could not be loaded."
+    override val mealPlanSaveFailed = "That could not be saved. Try again."
+    override val mealPlanLockedTitle = "Plan your meals"
+    override val mealPlanLockedMessage =
+        "Write down what you will cook — or what you cooked — for every meal of the week, " +
+            "from your recipes or in a few words. Meal planning comes with a premium account."
 
     override val timerChannelName = "Cook timer"
     override val timerChannelDescription = "The countdown of a timer you started in cook mode."

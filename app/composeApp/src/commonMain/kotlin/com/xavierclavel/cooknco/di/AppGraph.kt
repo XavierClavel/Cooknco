@@ -11,6 +11,7 @@ import com.xavierclavel.cooknco.data.CookTimerStore
 import com.xavierclavel.cooknco.data.CookbookRepository
 import com.xavierclavel.cooknco.data.DevicePreferences
 import com.xavierclavel.cooknco.data.ExportRepository
+import com.xavierclavel.cooknco.data.MealPlanRepository
 import com.xavierclavel.cooknco.data.OfflineImages
 import com.xavierclavel.cooknco.data.OfflineStore
 import com.xavierclavel.cooknco.data.OfflineSync
@@ -25,6 +26,7 @@ import com.xavierclavel.cooknco.network.AppVersionApi
 import com.xavierclavel.cooknco.network.AuthApi
 import com.xavierclavel.cooknco.network.CookbookApi
 import com.xavierclavel.cooknco.network.ExportApi
+import com.xavierclavel.cooknco.network.MealPlanApi
 import com.xavierclavel.cooknco.network.NotificationApi
 import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.ReportApi
@@ -98,6 +100,7 @@ object AppGraph {
     private val notificationApi by lazy { NotificationApi(ApiClient.httpClient) }
     private val reportApi by lazy { ReportApi(ApiClient.httpClient) }
     private val exportApi by lazy { ExportApi(ApiClient.httpClient) }
+    private val mealPlanApi by lazy { MealPlanApi(ApiClient.httpClient) }
 
     val recipeApi by lazy { RecipeApi(ApiClient.httpClient) }
 
@@ -113,6 +116,7 @@ object AppGraph {
     val userRepository by lazy { UserRepository(userApi, tokenDataStore, offlineStore) }
     val recipeRepository by lazy { RecipeRepository(recipeApi, tokenDataStore, offlineStore) }
     val cookbookRepository by lazy { CookbookRepository(cookbookApi, tokenDataStore, offlineStore) }
+    val mealPlanRepository by lazy { MealPlanRepository(mealPlanApi, tokenDataStore) }
 
     /**
      * Keeps the offline copy up to date. Asked at launch, at sign-in and on a pull to refresh;

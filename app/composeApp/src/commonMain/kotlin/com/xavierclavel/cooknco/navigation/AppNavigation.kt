@@ -189,7 +189,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             RecipeScreen(
                 recipeId = recipeId,
                 currentUserId = currentUserId,
-                canExport = (authState as? AuthState.Authenticated)?.user?.isPremium == true,
+                isPremium = (authState as? AuthState.Authenticated)?.user?.isPremium == true,
                 onNavigateToEdit = { id -> navController.navigate("recipe/$id/edit") },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToUser = { userId -> navController.navigate("user/$userId") },

@@ -7,6 +7,7 @@ object URL {
     const val UNIT_URL = "api/v1/unit"
     const val RECIPE_URL = "api/v1/recipe"
     const val RECIPE_NOTES_URL = "api/v1/recipe-notes"
+    const val MEAL_PLAN_URL = "api/v1/meal-plan"
     const val LIKE_URL = "api/v1/like"
     const val DASHBOARD_URL = "api/v1/dashboard"
     const val COOKBOOK_URL = "api/v1/cookbook"
