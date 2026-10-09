@@ -38,6 +38,7 @@ import com.xavierclavel.services.PushSender
 import com.xavierclavel.services.PdfTemplateService
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
+import com.xavierclavel.services.MealPlanService
 import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.BackupService
 import com.xavierclavel.services.RecipeStepService
@@ -71,6 +72,7 @@ val appModules = module {
     single { RecipeIngredientService() }
     single { FollowService() }
     single { RecipeNotesService() }
+    single { MealPlanService() }
     single { ModerationService() }
     single { AdminService() }
     single { StorageService() }

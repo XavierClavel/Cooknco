@@ -72,6 +72,9 @@ enum class NotFoundCause(val key: String) {
     MAIL_TEMPLATE_NOT_FOUND("mail_template_not_found"),
     PDF_TEMPLATE_NOT_FOUND("pdf_template_not_found"),
     NOTIFICATION_NOT_FOUND("notification_not_found"),
+    // Also what another account's entry answers: a plan is private, so whether an id exists
+    // in somebody else's is not the caller's to learn.
+    MEAL_PLAN_ENTRY_NOT_FOUND("meal_plan_entry_not_found"),
 }
 
 enum class ServiceUnavailableCause(val key: String) {
@@ -171,5 +174,13 @@ enum class BadRequestCause (val key: String) {
     // either one, since both readings hand out something nobody asked for.
     PREMIUM_GRANT_HAS_NO_TERM("premium_grant_has_no_term"),
     PREMIUM_EXPIRY_IN_THE_PAST("premium_expiry_in_the_past"),
+
+    // The meal plan. A date is a calendar day, `yyyy-MM-dd`; a range is read whole, so it
+    // is bounded rather than paged — see MealPlanService.MAX_RANGE_DAYS.
+    MEAL_PLAN_DATE_INVALID("meal_plan_date_invalid"),
+    MEAL_PLAN_RANGE_INVALID("meal_plan_range_invalid"),
+    MEAL_PLAN_TITLE_EMPTY("meal_plan_title_empty"),
+    MEAL_PLAN_TITLE_TOO_LONG("meal_plan_title_too_long"),
+    MEAL_PLAN_SERVINGS_INVALID("meal_plan_servings_invalid"),
 
 }

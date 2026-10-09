@@ -15,6 +15,7 @@ import com.xavierclavel.models.query.QEmailTemplate
 import com.xavierclavel.models.query.QPdfTemplate
 import com.xavierclavel.models.query.QDietaryRestrictions
 import com.xavierclavel.models.query.QIngredient
+import com.xavierclavel.models.query.QMealPlanEntry
 import com.xavierclavel.models.query.QNotification
 import com.xavierclavel.models.query.QOAuthClient
 import com.xavierclavel.models.query.QOAuthGrant
@@ -57,6 +58,9 @@ object DatabaseManager {
         // AI usage rows point at users too, and nothing clears them — an account's deletion
         // detaches them on purpose (UserService.deleteUserById), so its spend stays counted
         QAiUsage(),
+        // Meal plan entries point at users and at recipes. The account owns its own and the
+        // recipe end is SET NULL, so neither delete trips on them; listed for the wipe's sake
+        QMealPlanEntry(),
         // Before both tables it points at: a step's ingredient links restrict deletes at
         // either end, and nothing else clears them — a recipe's own delete is soft, so its
         // steps and their links outlive it

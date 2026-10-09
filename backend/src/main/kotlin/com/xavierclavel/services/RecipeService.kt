@@ -174,6 +174,28 @@ class RecipeService: KoinComponent {
             .setMaxRows(limit)
             .findList()
 
+    /**
+     * Which of [ids] [viewerId] may open, by id — the ones [getById] would serve them rather
+     * than refuse, in one query however many are asked about.
+     *
+     * For what keeps a pointer to somebody else's recipe and has to show it as long as it can:
+     * the meal plan. A recipe missing from the answer was deleted, hidden, or put out of the
+     * viewer's reach, and the caller says so in its own way rather than failing.
+     *
+     * Only what a pointer needs is read: the title it is shown under, the picture's version,
+     * and how many it makes.
+     */
+    fun findReadable(viewerId: Long, ids: Collection<Long>): Map<Long, Recipe> {
+        if (ids.isEmpty()) return emptyMap()
+        return QRecipe()
+            .select(QRecipe.Alias.id, QRecipe.Alias.title, QRecipe.Alias.imageVersion, QRecipe.Alias.`yield`)
+            .id.`in`(ids)
+            .filterOutDeletion(viewerId)
+            .filterByVisibility(viewerId)
+            .findList()
+            .associateBy { it.id }
+    }
+
     fun existsById(recipeId:Long, userId: Long?) =
         QRecipe()
             .id.eq(recipeId)

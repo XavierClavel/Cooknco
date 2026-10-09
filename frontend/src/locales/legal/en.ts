@@ -54,8 +54,8 @@ const documents: LegalDocuments = {
       {
         heading: "What you write",
         body: [
-          "Your recipes and their photos, their steps, times and ingredients; your cookbooks; what you liked and who you follow; and the private notes you keep on a recipe.",
-          "Your account is public or on request, and that setting is what decides who reads your recipes. Your private notes are the exception with no setting at all: they are shown to you and to nobody else, ever.",
+          "Your recipes and their photos, their steps, times and ingredients; your cookbooks; what you liked and who you follow; the private notes you keep on a recipe; and your meal plan — which dish you planned for which meal of which day, and for how many.",
+          "Your account is public or on request, and that setting is what decides who reads your recipes. Your private notes and your meal plan are the exceptions with no setting at all: they are shown to you and to nobody else, ever.",
         ],
       },
       {
@@ -208,6 +208,7 @@ const documents: LegalDocuments = {
           { text: "The account itself: username, email address, password, profile picture, bio." },
           { text: "Your recipes, their photos, their steps and their ingredients." },
           { text: "Your private notes on recipes." },
+          { text: "Your meal plan." },
           { text: "What you liked, who you followed, and who followed you." },
           { text: "Your membership of every cookbook." },
           { text: "Your devices, and the push tokens they were reachable at." },
@@ -229,6 +230,10 @@ const documents: LegalDocuments = {
           {
             term: "A cookbook shared with other people",
             text: "stays with its remaining members, because it is theirs too. Your recipes leave with you, including the ones you had put in it.",
+          },
+          {
+            term: "Your recipes in other people's meal plans",
+            text: "a recipe of yours somebody had planned stays in their plan as its title alone, with nothing linking it back to you or to the recipe. It is their note of what they meant to cook.",
           },
           {
             term: "The nightly backups",

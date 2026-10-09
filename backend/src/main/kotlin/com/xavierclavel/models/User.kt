@@ -162,6 +162,10 @@ class User (
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     var oauthGrants: Set<OAuthGrant> = setOf(),
 
+    /** Nobody else's to keep, so it goes with the account. See [MealPlanEntry]. */
+    @OneToMany(mappedBy = "owner", cascade = [CascadeType.ALL], orphanRemoval = true)
+    var mealPlanEntries: Set<MealPlanEntry> = setOf(),
+
     @OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true)
     var dietaryRestrictions: DietaryRestrictions = DietaryRestrictions(),
 
