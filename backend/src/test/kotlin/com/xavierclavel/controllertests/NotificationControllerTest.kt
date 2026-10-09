@@ -147,6 +147,15 @@ class NotificationControllerTest : ApplicationTest() {
         assertNull(notification.actor, "nobody caused an announcement")
     }
 
+    @Test
+    fun `the newest notification is listed first`() = runTestAsAdmin {
+        client.registerDevice("token-order")
+        client.sendTestNotification(title = "Older", body = "Body")
+        client.sendTestNotification(title = "Newer", body = "Body")
+
+        assertEquals(listOf("Newer", "Older"), client.listNotifications().map { it.title })
+    }
+
     // ------------------------------------------------------------ marking read
 
     @Test

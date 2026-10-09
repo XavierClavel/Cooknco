@@ -185,8 +185,9 @@ class AdminService: KoinComponent {
 
         val count = ebeanQuery.findCount()
         val users = ebeanQuery
-            .orderBy().joinDate.desc()
+            // Paging before the order: `setPaging` replaces it (see `IngredientService.search`)
             .setPaging(paging)
+            .orderBy().joinDate.desc()
             .findList()
 
         return Pair(count, moderationService.adminInfoOfUsers(users))
@@ -250,14 +251,15 @@ class AdminService: KoinComponent {
                 // An empty id set would be an unbounded `in ()`, so short-circuit on 0
                 if (reportedRecipeIds.isEmpty()) this.id.eq(-1) else this.id.`in`(reportedRecipeIds)
             }
-            .adminSort(sort)
 
         val count = ebeanQuery.findCount()
         val recipes = ebeanQuery
             // The table states each recipe's author, so the owner is joined in. See
             // `RecipeService.findList`: the counts below cannot be, and are resolved per page.
             .owner.fetch()
+            // Paging before the order: `setPaging` replaces it (see `IngredientService.search`)
             .setPaging(paging)
+            .adminSort(sort)
             .findList()
         return Pair(count, moderationService.adminInfoOfRecipes(recipes))
     }

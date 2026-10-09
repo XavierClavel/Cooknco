@@ -111,8 +111,9 @@ class ModerationService: KoinComponent {
 
         val count = query.findCount()
         val reports = query
-            .orderBy().creationDate.desc()
+            // Paging before the order: `setPaging` replaces it (see `IngredientService.search`)
             .setPaging(paging)
+            .orderBy().creationDate.desc()
             .findList()
             .map { it.toInfoResolvingTarget() }
         return Pair(count, reports)

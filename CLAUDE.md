@@ -145,6 +145,12 @@ versions rot silently on a rename:
 Subqueries take a nested query bean — `.id.isIn(QOther()....query())`, `.exists(query)` — never the
 `inSubQuery(sql)` / `eqSubQuery(sql)` family, which parses its argument as raw SQL.
 
+**`setPaging` goes before `orderBy`, never after.** It replaces the query's order with the one
+the `Paging` carries, and `getPaging()` carries none, so an order set first is dropped without a
+word and the page comes back `order by id` — which reads as "the sort does nothing", or as a list
+that is oldest-first. Count first if the count is wanted, then page, then order
+(`IngredientService.search`, `RecipeService.findList`).
+
 Where no typed overload exists (an aggregate column expression such as
 `fetch(path, "count(*)", ofLazy())`, an aggregate in `having()`, or a SQL function in `orderBy()`),
 keep the string API but derive every path from `Alias`:

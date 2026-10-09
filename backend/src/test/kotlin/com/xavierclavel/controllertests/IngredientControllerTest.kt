@@ -7,6 +7,7 @@ import shared.enums.AmountUnit
 import shared.enums.IngredientType
 import shared.enums.Locale
 import shared.enums.MeasurementType
+import shared.enums.Sort
 import shared.utils.URL.INGREDIENT_URL
 import io.ktor.client.request.header
 import io.ktor.client.request.setBody
@@ -54,6 +55,48 @@ class IngredientControllerTest : ApplicationTest() {
         // exact match ranks before fuzzy match, unrelated ingredient is excluded
         val result = client.searchIngredients("tomato")
         assertEquals(listOf(tomato.id, tomatillo.id), result.items.map { it.id })
+    }
+
+    @Test
+    fun `best match ranks by similarity, not by id or by name`() = runTestAsAdmin {
+        suspend fun named(fr: String, en: String) = client.createIngredient(
+            IngredientDTO(name = mapOf(Locale.FR to fr, Locale.EN to en), type = IngredientType.CONDIMENT)
+        )
+        // Created in the reverse of the ranking, and alphabetised against it too, so neither
+        // the id nor the name can pass for it.
+        val partial = named(fr = "selleri", en = "celeriac")
+        val containing = named(fr = "aaa sel de mer", en = "aaa sea salt")
+        val exact = named(fr = "sel", en = "salt")
+
+        // "sel" and "aaa sel de mer" both contain the term whole and tie on word similarity;
+        // the name with nothing else in it wins
+        val bestMatch = client.searchIngredients("sel", locale = Locale.FR)
+        assertEquals(listOf(exact.id, containing.id, partial.id), bestMatch.items.map { it.id })
+        assertEquals(3, bestMatch.count)
+
+        val byName = client.searchIngredients("sel", Sort.NAME_ASCENDING, Locale.FR)
+        assertEquals(listOf(containing.id, exact.id, partial.id), byName.items.map { it.id })
+    }
+
+    @Test
+    fun `browsing sorts by the name in the requested language, once per ingredient`() = runTestAsAdmin {
+        suspend fun named(fr: String, en: String) = client.createIngredient(
+            IngredientDTO(name = mapOf(Locale.FR to fr, Locale.EN to en), type = IngredientType.VEGETABLE)
+        )
+        // French A-Z is ail, navet, poireau; English A-Z is garlic, leek, turnip; ids follow neither
+        val leek = named(fr = "poireau", en = "leek")
+        val garlic = named(fr = "ail", en = "garlic")
+        val turnip = named(fr = "navet", en = "turnip")
+
+        val frenchAZ = listOf(garlic.id, turnip.id, leek.id)
+        // No term to be similar to, so best match falls back to A-Z
+        assertEquals(frenchAZ, client.searchIngredients("", locale = Locale.FR).items.map { it.id })
+        assertEquals(frenchAZ, client.searchIngredients("", Sort.NAME_ASCENDING, Locale.FR).items.map { it.id })
+        assertEquals(frenchAZ.reversed(), client.searchIngredients("", Sort.NAME_DESCENDING, Locale.FR).items.map { it.id })
+
+        val english = client.searchIngredients("", Sort.NAME_ASCENDING, Locale.EN)
+        assertEquals(listOf(garlic.id, leek.id, turnip.id), english.items.map { it.id })
+        assertEquals(3, english.count)
     }
 
     @Test

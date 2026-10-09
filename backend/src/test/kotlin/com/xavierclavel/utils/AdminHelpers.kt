@@ -39,6 +39,7 @@ import shared.enums.ImageSort
 import shared.enums.ImageStatus
 import shared.enums.Locale
 import shared.enums.ReportTargetType
+import shared.enums.Sort
 import shared.enums.UserRole
 import shared.infodto.AdminDefaultImageInfo
 import shared.infodto.AdminEmailTemplateInfo
@@ -192,12 +193,14 @@ suspend fun HttpClient.listAdminRecipes(
     query: String? = null,
     hidden: Boolean? = null,
     reported: Boolean? = null,
+    sort: Sort? = null,
 ): SearchResult<AdminRecipeInfo> =
     this.get("$ADMIN_URL/recipes") {
         url {
             query?.let { parameters.append("query", it) }
             hidden?.let { parameters.append("hidden", it.toString()) }
             reported?.let { parameters.append("reported", it.toString()) }
+            sort?.let { parameters.append("sort", it.name) }
         }
     }.let {
         assertEquals(HttpStatusCode.OK, it.status)

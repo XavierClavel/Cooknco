@@ -94,8 +94,9 @@ class NotificationService : KoinComponent {
         QNotification()
             .user.id.eq(userId)
             .actor.fetch()
-            .orderBy().createdAt.desc()
+            // Paging before the order: `setPaging` replaces it (see `IngredientService.search`)
             .setPaging(paging)
+            .orderBy().createdAt.desc()
             .findList()
             .map { it.toInfo() }
 
