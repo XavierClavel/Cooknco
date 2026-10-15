@@ -505,21 +505,6 @@ jobs:
           git push origin "refs/tags/android-build-${CODE}"
           echo "Build \`${{ needs.check.outputs.version }}\` (\`$CODE\`) published to the \`${{ inputs.track }}\` track and tagged \`android-build-$CODE\`." >> "$GITHUB_STEP_SUMMARY"
 
-      # Kept independently of Play: this is the exact artifact that was published, and the only
-      # archived copy of the bundle `master` will later promote without rebuilding it.
-      #
-      # `mapping.txt` is listed too, for the day minification is turned on — the release variant
-      # does not minify today, so `if-no-files-found` stays at its default (`warn`) and the file
-      # simply is not there.
-      - name: Archive the published bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: cooknco-${{ inputs.track }}-${{ needs.check.outputs.version }}-${{ needs.check.outputs.code }}
-          path: |
-            ${{ env.AAB_PATH }}
-            app/androidApp/build/outputs/mapping/release/mapping.txt
-          retention-days: 30
-
   # Promotes an existing release from one track to another, rebuilding nothing. The `master`
   # case.
   #
