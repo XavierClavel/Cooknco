@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MenuBook
@@ -85,8 +86,8 @@ import kotlinx.datetime.LocalDate
  * list, so the shortest path is always there; the recipes they have to hand follow. A recipe
  * that is none of theirs is planned from its own page instead.
  *
- * A tap adds and closes. How many it is for is the dish's own sheet's business: a recipe
- * already says how many it makes, and asking every time would be a step most dishes do not need.
+ * A tap adds and closes, for one (`DEFAULT_MEAL_SERVINGS`). Any other number is the dish's own
+ * sheet's business: asking every time would be a step most dishes do not need.
  */
 @Composable
 fun AddDishSheet(
@@ -190,7 +191,7 @@ fun AddDishSheet(
  * button says, and what else the sheet offers, so they are one sheet.
  *
  * @param titleEditable for a dish shown as words, whose name the cook wrote and may change.
- * @param days the days on offer, scrolled to [initial]'s.
+ * @param days the days offered as chips, scrolled to [initial]'s. The calendar reaches any other.
  */
 @Composable
 fun MealEntrySheet(
@@ -209,6 +210,7 @@ fun MealEntrySheet(
 ) {
     val s = strings()
     var draft by remember(initial) { mutableStateOf(initial) }
+    var pickingDate by remember { mutableStateOf(false) }
     val canSave = !isSaving && (!titleEditable || draft.title.isNotBlank())
 
     PlanSheetScaffold(
@@ -230,7 +232,13 @@ fun MealEntrySheet(
                 modifier = Modifier.padding(horizontal = 18.dp).padding(bottom = 6.dp),
             )
         }
-        FieldLabel(s.dayLabel)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FieldLabel(s.dayLabel, modifier = Modifier.weight(1f))
+            DateButton(date = draft.date, isOutsideChips = draft.date !in days, onClick = { pickingDate = true })
+        }
         DayChips(days = days, selected = draft.date, onSelect = { draft = draft.copy(date = it) })
         FieldLabel(s.mealLabel)
         StickerSegmentedControl(
@@ -258,6 +266,17 @@ fun MealEntrySheet(
             }
         }
         if (saveFailed) SaveFailed()
+    }
+
+    // Beside the sheet rather than inside it, so it is a second dialog over the first and not
+    // one nested in the other's content.
+    if (pickingDate) {
+        MealDatePickerDialog(
+            selection = draft.date..draft.date,
+            today = remember { currentDay() },
+            onPick = { draft = draft.copy(date = it); pickingDate = false },
+            onDismissRequest = { pickingDate = false },
+        )
     }
 }
 
@@ -350,14 +369,39 @@ private fun SheetHeader(title: String, subtitle: String?) {
 }
 
 @Composable
-private fun FieldLabel(text: String) {
+private fun FieldLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
         color = CookncoNavy,
-        modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 8.dp),
+        modifier = modifier.padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 8.dp),
     )
+}
+
+/**
+ * The dish's day in full, which opens the calendar. It says the month the chips leave out, and
+ * is the only thing showing the day once the calendar has picked one past them — so it is
+ * filled then, as a chip would be.
+ */
+@Composable
+private fun DateButton(date: LocalDate, isOutsideChips: Boolean, onClick: () -> Unit) {
+    val s = strings()
+    val shape = RoundedCornerShape(12.dp)
+    val content = if (isOutsideChips) CookncoWhite else CookncoNavy
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(if (isOutsideChips) CookncoOrange else CookncoBackground)
+            .border(2.dp, CookncoNavy, shape)
+            .clickable(onClickLabel = s.pickADate, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+        Text(s.fullDate(date), fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = content, maxLines = 1)
+    }
 }
 
 @Composable

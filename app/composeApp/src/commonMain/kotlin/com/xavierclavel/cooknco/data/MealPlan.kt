@@ -29,6 +29,26 @@ fun weekStartOf(date: LocalDate): LocalDate = date.minus(date.dayOfWeek.isoDayNu
 /** The [count] days from [start], in order. */
 fun daysFrom(start: LocalDate, count: Int): List<LocalDate> = (0 until count).map { start.plus(it, DateTimeUnit.DAY) }
 
+/** The first day of the month [date] falls in, which is how the calendar names a month. */
+fun monthOf(date: LocalDate): LocalDate = LocalDate(date.year, date.month, 1)
+
+/**
+ * The days the calendar draws for the month starting on [month]: six whole weeks, Monday
+ * first, from the week the 1st falls in.
+ *
+ * Always six, although most months fit in five: a grid whose height changed from one month to
+ * the next would move the arrows out from under a thumb tapping through the months.
+ */
+fun monthGrid(month: LocalDate): List<LocalDate> = daysFrom(weekStartOf(monthOf(month)), CALENDAR_DAYS)
+
+private const val CALENDAR_DAYS = 6 * 7
+
+/**
+ * How many a dish is planned for when nobody said: one. Everything added to the plan starts
+ * there — a recipe too, whose yield says how many it makes rather than how many sit down to it.
+ */
+const val DEFAULT_MEAL_SERVINGS = 1
+
 /** The dishes of one meal, in the order they were planned. */
 data class PlannedMeal(val slot: MealSlot, val dishes: List<MealPlanEntry>)
 

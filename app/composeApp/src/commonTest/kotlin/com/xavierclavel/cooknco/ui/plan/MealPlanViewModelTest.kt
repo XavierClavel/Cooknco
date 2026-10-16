@@ -14,6 +14,8 @@ import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.dto.MealPlanEntry
 import com.xavierclavel.cooknco.network.dto.MealPlanEntrySaveDto
 import com.xavierclavel.cooknco.network.dto.MealPlanRecipe
+import com.xavierclavel.cooknco.network.dto.RecipeOverview
+import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -176,8 +178,54 @@ class MealPlanViewModelTest {
         val state = viewModel.uiState.first { it.adding == null }
 
         val sent = ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(bodies.single())
-        assertEquals(MealPlanEntrySaveDto(date = "2026-10-14", slot = "DINNER", title = "Leftovers"), sent)
+        assertEquals(MealPlanEntrySaveDto(date = "2026-10-14", slot = "DINNER", title = "Leftovers", servings = 1), sent)
         assertEquals(listOf("Leftovers"), state.days[2].meals.single { it.slot == MealSlot.DINNER }.dishes.map { it.title })
+    }
+
+    /**
+     * Sent as one rather than left out: a recipe sent with no servings is put down by the
+     * backend for its whole yield, which is a family's dinner for somebody cooking for one.
+     */
+    @Test
+    fun everything_added_from_the_tab_is_for_one() = planTest { viewModel ->
+        viewModel.load()
+        val loaded = viewModel.awaitLoaded()
+        val recipe = RecipeOverview(
+            id = 5,
+            version = 0,
+            title = "Stew",
+            owner = RecipeOwner(id = 7, version = 0, username = "xavier"),
+            likesCount = 0,
+            creationDate = 0,
+        )
+
+        viewModel.openAdd(loaded.days[0])
+        viewModel.addRecipe(recipe)
+        viewModel.uiState.first { it.adding == null }
+        viewModel.openAdd(loaded.days[1])
+        viewModel.addSuggestion("Pizza night")
+        viewModel.uiState.first { it.adding == null }
+
+        val sent = bodies.map { ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(it) }
+        assertEquals(listOf(5L, null), sent.map { it.recipeId })
+        assertEquals(listOf<Int?>(1, 1), sent.map { it.servings })
+    }
+
+    @Test
+    fun the_calendar_shows_the_week_of_whatever_day_it_picked() = planTest { viewModel ->
+        viewModel.load()
+        viewModel.awaitLoaded()
+
+        viewModel.showWeekOf(LocalDate(2026, 12, 25))
+        val state = viewModel.awaitLoaded()
+
+        assertEquals(LocalDate(2026, 12, 21), state.weekStart, "the Monday before Christmas")
+        assertEquals("2026-12-21", weekRequests().last().url.parameters["from"])
+        assertEquals("2026-12-27", weekRequests().last().url.parameters["to"])
+        val asked = weekRequests().size
+        viewModel.showWeekOf(LocalDate(2026, 12, 23))
+        viewModel.awaitIdle()
+        assertEquals(asked, weekRequests().size, "a day of the week on screen asks for nothing")
     }
 
     @Test

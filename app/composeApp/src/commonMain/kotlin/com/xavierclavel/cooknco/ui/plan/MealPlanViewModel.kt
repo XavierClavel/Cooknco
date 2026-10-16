@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.xavierclavel.cooknco.data.DEFAULT_MEAL_SERVINGS
 import com.xavierclavel.cooknco.data.MealPlanRepository
 import com.xavierclavel.cooknco.data.MealSlot
 import com.xavierclavel.cooknco.data.PlannedDay
@@ -127,6 +128,9 @@ class MealPlanViewModel(
     fun nextWeek() = showWeek(_uiState.value.weekStart.plus(7, DateTimeUnit.DAY))
     fun thisWeek() = showWeek(weekStartOf(_uiState.value.today))
 
+    /** The week [date] falls in, however far from this one: what the calendar jumps to. */
+    fun showWeekOf(date: LocalDate) = showWeek(weekStartOf(date))
+
     private fun showWeek(start: LocalDate) {
         if (start == _uiState.value.weekStart) return
         _uiState.update { it.copy(weekStart = start, entries = emptyList(), hasLoaded = false, loadFailed = false) }
@@ -168,19 +172,23 @@ class MealPlanViewModel(
         }
     }
 
+    /**
+     * For [DEFAULT_MEAL_SERVINGS], not for the recipe's yield, which is what the backend would
+     * put down for a recipe sent with none.
+     */
     fun addRecipe(recipe: RecipeOverview) = saveNew { date, slot ->
-        mealPlanRepository.planRecipe(recipe.id, date, slot, servings = null)
+        mealPlanRepository.planRecipe(recipe.id, date, slot, servings = DEFAULT_MEAL_SERVINGS)
     }
 
     /** What was typed, as it is. */
     fun addTypedDish() {
         val title = _uiState.value.adding?.query?.trim().orEmpty()
         if (title.isEmpty()) return
-        saveNew { date, slot -> mealPlanRepository.planDish(title, date, slot, servings = null) }
+        saveNew { date, slot -> mealPlanRepository.planDish(title, date, slot, servings = DEFAULT_MEAL_SERVINGS) }
     }
 
     fun addSuggestion(title: String) = saveNew { date, slot ->
-        mealPlanRepository.planDish(title, date, slot, servings = null)
+        mealPlanRepository.planDish(title, date, slot, servings = DEFAULT_MEAL_SERVINGS)
     }
 
     private fun saveNew(plan: suspend (LocalDate, MealSlot) -> Result<MealPlanEntry>) {
