@@ -90,6 +90,7 @@ import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.components.StepImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
 import com.xavierclavel.cooknco.ui.cookbook.AddToCookbookSheet
+import com.xavierclavel.cooknco.data.DEFAULT_MEAL_SERVINGS
 import com.xavierclavel.cooknco.data.MealSlot
 import com.xavierclavel.cooknco.data.daysFrom
 import com.xavierclavel.cooknco.ui.plan.MealEntryDraft
@@ -250,9 +251,10 @@ fun RecipeScreen(
             initial = MealEntryDraft(
                 date = today,
                 slot = MealSlot.DINNER,
-                // As many as the cook has dialled in on this page; nothing for a recipe that
-                // states no yield, which the backend then leaves unsaid as well.
-                servings = uiState.selectedYield.takeIf { recipe.yield != null },
+                // As many as the cook has dialled in on this page, if they moved the dial;
+                // one otherwise, as in the tab. The dial opens on the recipe's yield, which
+                // says how many it makes rather than how many sit down to it.
+                servings = uiState.selectedYield.takeIf { it != recipe.yield } ?: DEFAULT_MEAL_SERVINGS,
                 title = recipe.title,
             ),
             days = daysFrom(today, 14),

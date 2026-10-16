@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -29,6 +31,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,6 +102,7 @@ fun MealPlanScreen(
         onPreviousWeek = viewModel::previousWeek,
         onNextWeek = viewModel::nextWeek,
         onThisWeek = viewModel::thisWeek,
+        onPickDate = viewModel::showWeekOf,
         onRetry = viewModel::load,
         onAdd = viewModel::openAdd,
         onDish = { entry ->
@@ -148,6 +155,7 @@ private fun MealPlanContent(
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onThisWeek: () -> Unit,
+    onPickDate: (LocalDate) -> Unit,
     onRetry: () -> Unit,
     onAdd: (PlannedDay) -> Unit,
     onDish: (MealPlanEntry) -> Unit,
@@ -155,14 +163,30 @@ private fun MealPlanContent(
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
+    val weekEnd = uiState.weekStart.plus(6, DateTimeUnit.DAY)
+    var pickingDate by remember { mutableStateOf(false) }
+    // A new week starts at its Monday, as it did when every week had a list of its own
+    val listState = rememberSaveable(uiState.weekStart, saver = LazyListState.Saver) { LazyListState() }
+    // The day the calendar picked, until the list has scrolled to it — which waits for the
+    // week's answer, since there is no list to scroll before it
+    var scrollTo by remember { mutableStateOf<LocalDate?>(null) }
+    LaunchedEffect(scrollTo, uiState.hasLoaded) {
+        val day = scrollTo ?: return@LaunchedEffect
+        if (!uiState.hasLoaded) return@LaunchedEffect
+        val index = uiState.days.indexOfFirst { it.date == day }
+        if (index >= 0) listState.animateScrollToItem(index)
+        scrollTo = null
+    }
+
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         MealPlanHeader(title = s.mealPlan) {
             WeekNavigation(
-                label = s.weekRange(uiState.weekStart, uiState.weekStart.plus(6, DateTimeUnit.DAY)),
+                label = s.weekRange(uiState.weekStart, weekEnd),
                 isCurrentWeek = uiState.isCurrentWeek,
                 onPrevious = onPreviousWeek,
                 onNext = onNextWeek,
                 onThisWeek = onThisWeek,
+                onPickDate = { pickingDate = true },
             )
         }
 
@@ -185,6 +209,7 @@ private fun MealPlanContent(
             }
 
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -200,6 +225,19 @@ private fun MealPlanContent(
                 }
             }
         }
+    }
+
+    if (pickingDate) {
+        MealDatePickerDialog(
+            selection = uiState.weekStart..weekEnd,
+            today = uiState.today,
+            onPick = { day ->
+                pickingDate = false
+                onPickDate(day)
+                scrollTo = day
+            },
+            onDismissRequest = { pickingDate = false },
+        )
     }
 }
 
@@ -223,6 +261,7 @@ private fun WeekNavigation(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onThisWeek: () -> Unit,
+    onPickDate: () -> Unit,
 ) {
     val s = strings()
     Row(
@@ -230,7 +269,21 @@ private fun WeekNavigation(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy, modifier = Modifier.weight(1f))
+        // The week's dates are what opens the calendar: the arrows go one week at a time,
+        // and this is the way to a dinner two months out without tapping eight times
+        Box(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClickLabel = s.pickADate, onClick = onPickDate)
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = CookncoNavy, modifier = Modifier.weight(1f, fill = false))
+                Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = CookncoNavy, modifier = Modifier.size(18.dp))
+            }
+        }
         if (!isCurrentWeek) {
             StickerPill(onClick = onThisWeek, height = 36.dp, shadowOffset = 3.dp, contentPadding = PaddingValues(horizontal = 12.dp)) {
                 Text(s.thisWeek, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
@@ -384,7 +437,7 @@ fun MealPlanScreenPreview() {
                 entries = previewEntries,
                 hasLoaded = true,
             ),
-            onPreviousWeek = {}, onNextWeek = {}, onThisWeek = {}, onRetry = {},
+            onPreviousWeek = {}, onNextWeek = {}, onThisWeek = {}, onPickDate = {}, onRetry = {},
             onAdd = {}, onDish = {}, onDishMenu = {},
         )
     }

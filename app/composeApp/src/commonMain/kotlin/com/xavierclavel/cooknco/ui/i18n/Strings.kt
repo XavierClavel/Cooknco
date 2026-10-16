@@ -575,6 +575,12 @@ interface Strings {
     fun servingsCount(count: Int): String
     val servingsNotSet: String
     val dayLabel: String
+    /** What opens the calendar, from the week on screen and from a dish's day. */
+    val pickADate: String
+    /** The calendar's heading, for the month [month] falls in: "October 2026". */
+    fun monthYear(month: LocalDate): String
+    val previousMonth: String
+    val nextMonth: String
     val mealLabel: String
     val openRecipe: String
     val removeFromPlan: String

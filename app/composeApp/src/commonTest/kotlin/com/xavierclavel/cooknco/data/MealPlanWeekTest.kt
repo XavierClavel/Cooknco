@@ -66,6 +66,23 @@ class MealPlanWeekTest {
     }
 
     @Test
+    fun a_month_is_drawn_as_six_whole_weeks_from_the_monday_before_its_first() {
+        val october = monthGrid(LocalDate(2026, 10, 14))
+
+        assertEquals(42, october.size)
+        assertEquals(LocalDate(2026, 9, 28), october.first(), "the 1st is a Thursday")
+        assertEquals(LocalDate(2026, 11, 8), october.last())
+        assertTrue((1..31).all { LocalDate(2026, 10, it) in october })
+
+        // February 2027 starts on a Monday and fills four weeks exactly: still six, with two
+        // of March's, so the grid does not shrink under the arrows
+        val february = monthGrid(LocalDate(2027, 2, 1))
+        assertEquals(LocalDate(2027, 2, 1), february.first())
+        assertEquals(42, february.size)
+        assertEquals(LocalDate(2027, 3, 14), february.last())
+    }
+
+    @Test
     fun a_dish_is_offered_for_the_first_main_meal_with_nothing_in_it() {
         fun nextOpen(vararg slots: String) =
             planWeek(monday, slots.mapIndexed { i, slot -> dish(i.toLong(), "2026-10-12", slot) }).first().nextOpenSlot
