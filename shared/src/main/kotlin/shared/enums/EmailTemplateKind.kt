@@ -12,7 +12,15 @@ package shared.enums
 enum class EmailTemplateKind(val key: String, val placeholders: List<String>) {
     ACCOUNT_VERIFICATION("account_verification", listOf(MailPlaceholder.LINK)),
     PASSWORD_RESET("password_reset", listOf(MailPlaceholder.LINK)),
-    NEW_RECIPE("new_recipe", listOf(MailPlaceholder.LINK, MailPlaceholder.USERNAME, MailPlaceholder.TITLE)),
+    NEW_RECIPE(
+        "new_recipe",
+        listOf(
+            MailPlaceholder.LINK,
+            MailPlaceholder.USERNAME,
+            MailPlaceholder.TITLE,
+            MailPlaceholder.UNSUBSCRIBE,
+        ),
+    ),
     ;
 
     /**
@@ -49,6 +57,19 @@ enum class EmailTemplateKind(val key: String, val placeholders: List<String>) {
     companion object {
         /** The built-in kind a key names, or null when an operator added it. */
         fun of(key: String): EmailTemplateKind? = entries.find { it.key == key }
+
+        /**
+         * Where the way out of these mails points.
+         *
+         * Not per kind, unlike [link]: it is the same page whatever the mail announced, and
+         * only the mails somebody can say no to carry one at all — [isTransactional] is what
+         * decides. Here for the reason [link] is: the backoffice previews this link and
+         * mail-service sends it, so a preview that built it differently would be a lie.
+         *
+         * [token] names the account and is signed, so the page needs no session — see
+         * `UnsubscribeService`.
+         */
+        fun unsubscribeLink(frontendUrl: String, token: String) = "$frontendUrl/user/unsubscribe?token=$token"
     }
 }
 
@@ -67,4 +88,15 @@ object MailPlaceholder {
 
     /** The title of the recipe the mail is about. */
     const val TITLE = "title"
+
+    /**
+     * Where the reader turns these mails off, without signing in first.
+     *
+     * Declared by every kind that is not [EmailTemplateKind.isTransactional], which is what
+     * makes the backoffice refuse a notification wording that drops it: a mail somebody
+     * else's doing put in an inbox has to carry its own way out. A transactional mail
+     * declares it nowhere — there is nothing to unsubscribe from a password reset, and
+     * offering it would be an offer we could not keep.
+     */
+    const val UNSUBSCRIBE = "unsubscribe"
 }

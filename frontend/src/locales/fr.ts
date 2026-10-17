@@ -267,6 +267,11 @@ export default {
   public_account: "Compte public",
   mail_notifications: "Me prévenir des nouvelles recettes par mail",
   mail_notifications_hint: "De la part des personnes que tu suis. Les mails liés au compte, comme la réinitialisation du mot de passe, sont envoyés dans tous les cas.",
+
+  unsubscribe_title: "Notifications par mail",
+  unsubscribe_done: "Tu ne recevras plus de mail pour les nouvelles recettes des personnes que tu suis.",
+  unsubscribe_done_hint: "Les mails liés au compte, comme la réinitialisation du mot de passe, continuent d'être envoyés. Tu peux réactiver les mails de recettes dans tes paramètres.",
+  unsubscribe_failed: "Ce lien de désabonnement n'est pas valide. Tu peux tout de même désactiver ces mails dans les paramètres de ton compte.",
   no_data: "Aucune donnée",
 
   unit_teaspoon: "cuillères à café",

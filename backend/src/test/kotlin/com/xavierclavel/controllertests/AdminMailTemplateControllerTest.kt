@@ -44,7 +44,9 @@ class AdminMailTemplateControllerTest : ApplicationTest() {
 
     private val reset = EmailTemplateKind.PASSWORD_RESET.key
     private val verification = EmailTemplateKind.ACCOUNT_VERIFICATION.key
+    private val newRecipe = EmailTemplateKind.NEW_RECIPE.key
     private val link = "{{${MailPlaceholder.LINK}}}"
+    private val unsubscribe = "{{${MailPlaceholder.UNSUBSCRIBE}}}"
 
     // ----------------------------------------------------------- authorisation
 
@@ -146,6 +148,35 @@ class AdminMailTemplateControllerTest : ApplicationTest() {
         assertEquals(HttpStatusCode.BadRequest, response.status)
         assertEquals("mail_template_missing_placeholder", response.bodyAsText())
         assertFalse(client.mailTemplate(reset).locales.first { it.locale == Locale.EN }.custom)
+    }
+
+    /**
+     * The rule that keeps a reworded notification mail from losing its way out. A mail
+     * somebody else's doing put in an inbox has to say how to stop it, and the placeholder
+     * the kind declares is what makes that a save the backoffice refuses rather than a
+     * footer an operator can quietly delete.
+     */
+    @Test
+    fun `a notification wording that drops the unsubscribe link is refused`() = runTestAsAdmin {
+        val values = "{{username}} {{title}} $link"
+
+        client.saveMailTemplateRaw(newRecipe, Locale.EN, "New recipe", "<div>$values</div>").apply {
+            assertEquals(HttpStatusCode.BadRequest, status)
+            assertEquals("mail_template_missing_placeholder", bodyAsText())
+        }
+        client.saveMailTemplateRaw(newRecipe, Locale.EN, "New recipe", "<div>$values $unsubscribe</div>")
+            .apply { assertEquals(HttpStatusCode.OK, status) }
+    }
+
+    /** Nothing to unsubscribe from a password reset: it goes out whatever the setting says. */
+    @Test
+    fun `an account wording needs no unsubscribe link`() = runTestAsAdmin {
+        client.saveMailTemplateRaw(reset, Locale.EN, "Reset", "<div>$link</div>")
+            .apply { assertEquals(HttpStatusCode.OK, status) }
+
+        val preview = client.previewMailTemplate(reset, "Reset", "<div>$link $unsubscribe</div>")
+        // And nothing fills one in either, so an operator who adds it anyway is told
+        assertEquals(listOf(MailPlaceholder.UNSUBSCRIBE), preview.unfilled)
     }
 
     @Test

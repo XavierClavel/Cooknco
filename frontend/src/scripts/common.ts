@@ -135,6 +135,7 @@ const noLoginRedirect = [
   '/logout',
   '/signup',
   '/user/verify',
+  '/user/unsubscribe',
   '/maintenance',
   '/verification-email-sent',
   '/password/update/success',
