@@ -1,6 +1,8 @@
 package com.xavierclavel.models
 
 import io.ebean.Model
+import io.ebean.annotation.DbArray
+import io.ebean.annotation.DbDefault
 import io.ebean.annotation.WhenModified
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -46,6 +48,19 @@ class AppVersion(
     @Column(name = "store_url", nullable = false, length = 511)
     var storeUrl: String = "",
 
+    /**
+     * Builds blocked even though they are above [minimumVersion] — one with a bug bad enough
+     * that nobody should stay on it, while the builds either side of it are fine.
+     *
+     * Each is strictly older than [latestVersion], for the reason a floor may not pass the
+     * ceiling: the store hands a blocked user the latest build, so blocking that one sends
+     * them in a circle. Kept when the floor later passes them rather than tidied away, so
+     * that lowering the floor again never quietly lets a broken build back in.
+     */
+    @DbArray(name = "blocked_versions", length = AppVersions.MAX_LENGTH, nullable = false)
+    @DbDefault("{}")
+    var blockedVersions: MutableList<String> = mutableListOf(),
+
     @WhenModified
     var updatedAt: LocalDateTime = LocalDateTime.now(),
 
@@ -56,6 +71,7 @@ class AppVersion(
         minimumVersion = minimumVersion,
         latestVersion = latestVersion,
         storeUrl = storeUrl,
+        blockedVersions = blockedVersions.toList(),
         updatedAt = updatedAt.toEpochSecond(ZoneOffset.UTC),
     )
 }

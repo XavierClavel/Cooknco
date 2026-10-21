@@ -64,4 +64,12 @@ object AppVersions {
     /** True when [version] is strictly older than [other]. False when either is unreadable. */
     fun isOlderThan(version: String, other: String): Boolean =
         (compare(version, other) ?: 0) < 0
+
+    /**
+     * True when the two name the same build, so `1.301` and `1.301.0` are one entry on a
+     * blocked list rather than two. False when either is unreadable, for the reason [compare]
+     * gives: a version nobody can read is not one anybody blocked.
+     */
+    fun isSameBuild(version: String, other: String): Boolean =
+        compare(version, other) == 0
 }

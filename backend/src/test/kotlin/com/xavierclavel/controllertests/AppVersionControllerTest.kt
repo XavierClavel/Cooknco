@@ -4,6 +4,7 @@ import com.xavierclavel.ApplicationTest
 import com.xavierclavel.models.query.QAppVersion
 import com.xavierclavel.models.query.QDevice
 import io.ebean.DB
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import main.com.xavierclavel.utils.appVersion
 import main.com.xavierclavel.utils.appVersionReach
@@ -19,6 +20,7 @@ import main.com.xavierclavel.utils.createUser
 import main.com.xavierclavel.utils.registerDevice
 import main.com.xavierclavel.utils.registerLegacyDeviceRaw
 import main.com.xavierclavel.utils.saveAppVersionRaw
+import main.com.xavierclavel.utils.saveAppVersionWithoutBlockedRaw
 import org.junit.jupiter.api.Test
 import shared.enums.DevicePlatform
 import shared.enums.AppPlatform
@@ -91,7 +93,7 @@ class AppVersionControllerTest : ApplicationTest() {
     fun `an ungated platform still carries every field on the wire`() = runTestAsAdmin {
         val row = client.listAppVersionsJson().first()
 
-        listOf("platform", "configured", "minimumVersion", "latestVersion", "storeUrl").forEach {
+        listOf("platform", "configured", "minimumVersion", "latestVersion", "storeUrl", "blockedVersions").forEach {
             assertTrue(row.containsKey(it), "$it is missing from the payload")
         }
     }
@@ -273,6 +275,180 @@ class AppVersionControllerTest : ApplicationTest() {
         assertEquals(0, QAppVersion().findCount())
     }
 
+    // ---------------------------------------------------- blocking one build
+
+    /**
+     * The case the list exists for: one build has a severe bug, the ones either side of it
+     * are fine, and raising the floor past it would lock out everybody below it as well.
+     */
+    @Test
+    fun `a blocked build is required to update even above the floor`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.302", blocked = listOf("1.301"))
+
+        val check = client.checkAppVersion(AppPlatform.ANDROID, "1.301")
+
+        assertEquals(AppVersionStatus.UPDATE_REQUIRED, check.status)
+        assertTrue(check.blocked, "the verdict does not say the build is on the list")
+        assertEquals("1.302", check.latestVersion)
+        assertEquals(store, check.storeUrl)
+    }
+
+    @Test
+    fun `the builds either side of a blocked one are left as they were`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.302", blocked = listOf("1.301"))
+
+        client.checkAppVersion(AppPlatform.ANDROID, "1.300").apply {
+            assertEquals(AppVersionStatus.UPDATE_AVAILABLE, status)
+            assertFalse(blocked)
+        }
+        client.checkAppVersion(AppPlatform.ANDROID, "1.302").apply {
+            assertEquals(AppVersionStatus.OK, status)
+            assertFalse(blocked)
+        }
+        // Below the floor is still the floor's doing, not the list's
+        client.checkAppVersion(AppPlatform.ANDROID, "1.100").apply {
+            assertEquals(AppVersionStatus.UPDATE_REQUIRED, status)
+            assertFalse(blocked)
+        }
+    }
+
+    /** One build, however it is spelled: trailing zeroes are the same build to the gate. */
+    @Test
+    fun `a block matches the build, not the string`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.0", latest = "1.302", blocked = listOf("1.301"))
+
+        assertEquals(
+            AppVersionStatus.UPDATE_REQUIRED,
+            client.checkAppVersion(AppPlatform.ANDROID, "1.301.0").status,
+        )
+        // and not a prefix of it: 1.30 is a different build that happens to start the same
+        assertEquals(
+            AppVersionStatus.UPDATE_AVAILABLE,
+            client.checkAppVersion(AppPlatform.ANDROID, "1.30").status,
+        )
+    }
+
+    @Test
+    fun `a block applies to its own platform only`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.0", latest = "1.302", blocked = listOf("1.301"))
+        client.saveAppVersion(AppPlatform.IOS, minimum = "1.0", latest = "1.302")
+
+        assertEquals(AppVersionStatus.UPDATE_AVAILABLE, client.checkAppVersion(AppPlatform.IOS, "1.301").status)
+    }
+
+    /**
+     * The store hands a blocked user the latest build, so blocking that one — or a tester's
+     * build past it — sends them round in a circle with no way out. The fix is published,
+     * and named latest, first.
+     */
+    @Test
+    fun `blocking the latest build or a newer one is refused`() = runTestAsAdmin {
+        listOf("1.302", "1.302.0", "1.303").forEach {
+            client.saveAppVersionRaw(AppPlatform.ANDROID, "1.200", "1.302", blocked = listOf(it)).apply {
+                assertEquals(HttpStatusCode.BadRequest, status, "blocking $it past the latest was accepted")
+                assertEquals("app_version_blocked_not_below_latest", bodyAsText())
+            }
+        }
+        assertEquals(0, QAppVersion().findCount())
+    }
+
+    /** Lowering the latest under a build already blocked is the same loop, reached the other way. */
+    @Test
+    fun `the latest cannot be lowered onto a blocked build`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.302", blocked = listOf("1.301"))
+
+        client.saveAppVersionRaw(AppPlatform.ANDROID, "1.200", "1.301")
+            .apply { assertEquals(HttpStatusCode.BadRequest, status) }
+        assertEquals("1.302", client.appVersion(AppPlatform.ANDROID).latestVersion)
+    }
+
+    @Test
+    fun `a blocked entry that is not a version is refused`() = runTestAsAdmin {
+        listOf("latest", "v1.301", "1.301-rc1", "1.301.0.0.1").forEach {
+            client.saveAppVersionRaw(AppPlatform.ANDROID, "1.0", "9.9.9", blocked = listOf("1.301", it)).apply {
+                assertEquals(HttpStatusCode.BadRequest, status, "\"$it\" was accepted on the blocked list")
+                assertEquals("app_version_invalid", bodyAsText())
+            }
+        }
+        assertEquals(0, QAppVersion().findCount())
+    }
+
+    @Test
+    fun `a blocked list is bounded`() = runTestAsAdmin {
+        val many = (1..51).map { "1.$it" }
+        client.saveAppVersionRaw(AppPlatform.ANDROID, "1.0", "9.9.9", blocked = many).apply {
+            assertEquals(HttpStatusCode.BadRequest, status)
+            assertEquals("app_version_too_many_blocked", bodyAsText())
+        }
+        client.saveAppVersion(AppPlatform.ANDROID, "1.0", "9.9.9", blocked = many.take(50))
+    }
+
+    /** One entry per build, newest first, and the empty chip a form left behind is nothing. */
+    @Test
+    fun `a blocked list is saved once per build, newest first`() = runTestAsAdmin {
+        val saved = client.saveAppVersion(
+            AppPlatform.ANDROID, minimum = "1.0", latest = "1.400",
+            blocked = listOf("1.9", " 1.301 ", "1.301.0", "", "1.10", "1.301"),
+        )
+
+        assertEquals(listOf("1.301", "1.10", "1.9"), saved.blockedVersions)
+        assertEquals(saved.blockedVersions, client.appVersion(AppPlatform.ANDROID).blockedVersions)
+    }
+
+    /**
+     * A backoffice tab opened before the list existed still saves the floor — and must not
+     * unblock the build somebody blocked from a newer tab while doing it.
+     */
+    @Test
+    fun `a save that does not mention the list keeps it`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.302", blocked = listOf("1.301"))
+
+        client.saveAppVersionWithoutBlockedRaw(AppPlatform.ANDROID, minimum = "1.250", latest = "1.302")
+            .apply { assertEquals(HttpStatusCode.OK, status) }
+
+        val gate = client.appVersion(AppPlatform.ANDROID)
+        assertEquals("1.250", gate.minimumVersion)
+        assertEquals(listOf("1.301"), gate.blockedVersions)
+        assertEquals(AppVersionStatus.UPDATE_REQUIRED, client.checkAppVersion(AppPlatform.ANDROID, "1.301").status)
+    }
+
+    @Test
+    fun `an empty list unblocks every build on it`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.302", blocked = listOf("1.301"))
+
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.302", blocked = emptyList())
+
+        assertEquals(emptyList(), client.appVersion(AppPlatform.ANDROID).blockedVersions)
+        assertEquals(AppVersionStatus.UPDATE_AVAILABLE, client.checkAppVersion(AppPlatform.ANDROID, "1.301").status)
+    }
+
+    /**
+     * A block the floor has since passed is kept rather than tidied away, so that taking
+     * the floor back down — a typo corrected, a raise undone — never quietly lets the
+     * broken build back in with it.
+     */
+    @Test
+    fun `a block the floor has passed still holds when the floor comes back down`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.400", blocked = listOf("1.301"))
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.350", latest = "1.400", blocked = listOf("1.301"))
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.400", blocked = listOf("1.301"))
+
+        assertEquals(AppVersionStatus.UPDATE_REQUIRED, client.checkAppVersion(AppPlatform.ANDROID, "1.301").status)
+    }
+
+    /** A blocked build is still a build: what cannot be read is not on anybody's list. */
+    @Test
+    fun `a version that cannot be read is not blocked by the list either`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.0", latest = "1.302", blocked = listOf("1.301"))
+
+        listOf("", "dev").forEach {
+            client.checkAppVersion(AppPlatform.ANDROID, it).apply {
+                assertEquals(AppVersionStatus.OK, status, "\"$it\" was blocked")
+                assertFalse(blocked)
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- clearing
 
     @Test
@@ -288,6 +464,17 @@ class AppVersionControllerTest : ApplicationTest() {
         assertEquals(0, QAppVersion().findCount())
         assertFalse(client.appVersion(AppPlatform.ANDROID).configured)
         assertEquals(AppVersionStatus.OK, client.checkAppVersion(AppPlatform.ANDROID, "1.0.0").status)
+    }
+
+    /** The list lives on the gate, so no gate is no list: every build runs, as before. */
+    @Test
+    fun `clearing a gate lifts its blocks too`() = runTestAsAdmin {
+        client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.0", latest = "1.302", blocked = listOf("1.301"))
+
+        client.clearAppVersionRaw(AppPlatform.ANDROID).apply { assertEquals(HttpStatusCode.OK, status) }
+
+        assertEquals(emptyList(), client.appVersion(AppPlatform.ANDROID).blockedVersions)
+        assertEquals(AppVersionStatus.OK, client.checkAppVersion(AppPlatform.ANDROID, "1.301").status)
     }
 
     @Test
@@ -550,6 +737,70 @@ class AppVersionControllerTest : ApplicationTest() {
                 .distribution.associate { it.version to it.blocked }
 
             assertEquals(mapOf("1.6.0" to false, "1.2.0" to true), rows)
+        }
+    }
+
+    /** A blocked build costs what the people on it are, and the panel has to say so. */
+    @Test
+    fun `reach counts a blocked build alongside the floor`() = runTest {
+        runAsUser1 {
+            client.registerDevice("old", appVersion = "1.100")
+            client.registerDevice("broken", appVersion = "1.301")
+            client.registerDevice("fixed", appVersion = "1.302")
+        }
+
+        runAsAdmin {
+            val reach = client.appVersionReach(AppPlatform.ANDROID, minimum = "1.200", blocked = listOf("1.301"))
+
+            assertEquals(2, reach.blockedDevices)
+            assertEquals(listOf("1.301"), reach.blockedVersions)
+            assertEquals(
+                mapOf("1.302" to false, "1.301" to true, "1.100" to true),
+                reach.distribution.associate { it.version to it.blocked },
+            )
+        }
+    }
+
+    /** With no candidate list, the panel opens on the blocks in force, as it does the floor. */
+    @Test
+    fun `reach defaults to the blocks in force`() = runTest {
+        runAsUser1 { client.registerDevice("broken", appVersion = "1.301") }
+
+        runAsAdmin {
+            client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.302", blocked = listOf("1.301"))
+
+            val reach = client.appVersionReach(AppPlatform.ANDROID)
+            assertEquals(listOf("1.301"), reach.blockedVersions)
+            assertEquals(1, reach.blockedDevices)
+        }
+    }
+
+    /**
+     * A draft with every block removed measures as that, not as the blocks it is about to
+     * lift — which is what `blocked=` has to mean, and why it is not read as absent.
+     */
+    @Test
+    fun `an empty candidate list measures no blocks at all`() = runTest {
+        runAsUser1 { client.registerDevice("broken", appVersion = "1.301") }
+
+        runAsAdmin {
+            client.saveAppVersion(AppPlatform.ANDROID, minimum = "1.200", latest = "1.302", blocked = listOf("1.301"))
+
+            val reach = client.appVersionReach(AppPlatform.ANDROID, minimum = "1.200", blocked = emptyList())
+            assertEquals(emptyList(), reach.blockedVersions)
+            assertEquals(0, reach.blockedDevices)
+        }
+    }
+
+    /** A half-typed entry is no more a block than a half-typed floor is a floor. */
+    @Test
+    fun `a candidate block that is not a version blocks nothing`() = runTest {
+        runAsUser1 { client.registerDevice("phone", appVersion = "1.301") }
+
+        runAsAdmin {
+            val reach = client.appVersionReach(AppPlatform.ANDROID, minimum = "1.0", blocked = listOf("1.", "x"))
+            assertEquals(emptyList(), reach.blockedVersions)
+            assertEquals(0, reach.blockedDevices)
         }
     }
 

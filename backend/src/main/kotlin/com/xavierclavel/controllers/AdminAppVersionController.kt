@@ -48,12 +48,17 @@ object AdminAppVersionController: Controller("app-versions") {
      *
      * @param minimum the candidate floor; defaults to the one already in force, which is
      *   what makes opening the tab show what today's gate is blocking
+     * @param blocked the candidate blocked builds, comma-separated; defaults to the ones in
+     *   force. Read raw rather than through [getStringQueryParam], which treats blank as
+     *   absent: `blocked=` is the draft with every block removed, and has to measure as that
+     *   rather than as the blocks it is about to lift.
      */
     private fun Route.getReach() = get("/{platform}/reach") {
         call.respond(
             appVersionService.reach(
                 platform = getEnumPathParam<AppPlatform>("platform"),
                 candidateMinimum = getStringQueryParam("minimum"),
+                candidateBlocked = call.request.queryParameters["blocked"]?.split(','),
             )
         )
     }
@@ -62,7 +67,10 @@ object AdminAppVersionController: Controller("app-versions") {
         val platform = getEnumPathParam<AppPlatform>("platform")
         val dto = call.receive<AppVersionDTO>()
         val saved = appVersionService.save(platform = platform, dto = dto)
-        logEdit { "$platform version floor set to ${dto.minimumVersion}" }
+        logEdit {
+            "$platform version floor set to ${saved.minimumVersion}" +
+                (if (saved.blockedVersions.isEmpty()) "" else ", blocking ${saved.blockedVersions.joinToString()}")
+        }
         call.respond(saved)
     }
 
