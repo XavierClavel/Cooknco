@@ -6,6 +6,8 @@ import shared.enums.AmountUnit
 import shared.enums.IngredientType
 import shared.enums.Locale
 import shared.enums.MeasurementType
+import shared.infodto.CiqualFoodInfo
+import shared.infodto.CiqualSource
 import shared.infodto.IngredientInfo
 import shared.utils.UnitCapabilities
 import jakarta.persistence.Entity
@@ -32,25 +34,30 @@ class Ingredient (
 
     var type: IngredientType = IngredientType.MISCELLANEOUS,
 
-    var calories: Int = 0,
+    /*
+     * Nutrition per 100 g: kcal for calories, mg for cholesterol, g for the rest. Null is unknown,
+     * which is not the same as none — Ciqual has no cholesterol figure for a quarter of its foods.
+     * The columns were not null until 1.55, so a 0 typed in before then may mean either.
+     */
+    var calories: Int? = null,
+    var cholesterol: Float? = null,
+    var saturatedFat: Float? = null,
+    var unsaturatedFat: Float? = null,
+    var carbohydrates: Float? = null,
+    var sugars: Float? = null,
+    var fibers: Float? = null,
+    var proteins: Float? = null,
+    /** Salt, not sodium (2.5 times the sodium in it): what Ciqual states, and what the French label always said. */
+    var salt: Float? = null,
 
-    var cholesterol: Float = 0f,
+    /**
+     * The Ciqual food the nutrition above was copied from, or null when it was typed in by hand.
+     * While set, the values are Ciqual's and nothing else: see [linkCiqual].
+     */
+    var ciqualCode: Int? = null,
 
-    @DbDefault(value = "0")
-    var saturatedFat: Float = 0f,
-
-    @DbDefault(value = "0")
-    var unsaturatedFat: Float = 0f,
-
-    @DbDefault(value = "0")
-    var carbohydrates: Float = 0f,
-
-    @DbDefault(value = "0")
-    var sugars: Float = 0f,
-
-    var fibers: Float = 0f,
-    var proteins: Float = 0f,
-    var sodium: Float = 0f,
+    /** The edition of the table [ciqualCode] was read in, which the citation names. Set with it. */
+    var ciqualEdition: Int? = null,
 
     /**
      * Weight of one piece, in grams. Non-null means the ingredient is countable, so [AmountUnit] values
@@ -76,6 +83,7 @@ class Ingredient (
     fun allowedTypes(): Set<MeasurementType> =
         UnitCapabilities.allowedTypes(gramsPerUnit, gramsPerMilliliter, measurableByWeight)
 
+    /** Takes everything from [ingredientDTO], nutrition typed in by hand included; see [linkCiqual]. */
     fun mergeDTO(ingredientDTO: IngredientDTO): Ingredient {
         this.type = ingredientDTO.type
 
@@ -87,7 +95,9 @@ class Ingredient (
         this.fibers = ingredientDTO.fibers
         this.sugars = ingredientDTO.sugars
         this.proteins = ingredientDTO.proteins
-        this.sodium = ingredientDTO.sodium
+        this.salt = ingredientDTO.salt
+        this.ciqualCode = null
+        this.ciqualEdition = null
 
         this.gramsPerUnit = ingredientDTO.gramsPerUnit
         this.gramsPerMilliliter = ingredientDTO.gramsPerMilliliter
@@ -98,13 +108,35 @@ class Ingredient (
     }
 
     /**
+     * Replaces the nutrition with [food]'s, overwriting whatever [mergeDTO] took from the request.
+     * A linked ingredient cites Anses, so it holds Anses's figures and no others: a value can only
+     * be changed by unlinking it first.
+     */
+    fun linkCiqual(food: CiqualFoodInfo, edition: Int): Ingredient {
+        this.calories = food.calories
+        this.carbohydrates = food.carbohydrates
+        this.cholesterol = food.cholesterol
+        this.saturatedFat = food.saturatedFat
+        this.unsaturatedFat = food.unsaturatedFat
+        this.fibers = food.fibers
+        this.sugars = food.sugars
+        this.proteins = food.proteins
+        this.salt = food.salt
+        this.ciqualCode = food.code
+        this.ciqualEdition = edition
+        return this
+    }
+
+    /**
      * @param names what this ingredient is called, per language, resolved by
      *   [com.xavierclavel.services.IngredientService.namesOf] rather than read off [translations].
      *   An ingredient has no name of its own, so a catalogue listing reading the collection costs a
      *   round trip per entry — and a paged one cannot fetch it: Ebean drops a `-to-many` from the
      *   plan as soon as `maxRows` is set. `IngredientFetchPlanTest` is what keeps this in use.
+     * @param ciqual what [ciqualCode] cites, named from the bundled table by
+     *   [com.xavierclavel.services.CiqualService.sourceOf]; null when the nutrition was typed in.
      */
-    fun toInfo(names: Map<Locale, String>) = IngredientInfo(
+    fun toInfo(names: Map<Locale, String>, ciqual: CiqualSource?) = IngredientInfo(
         id = this.id,
         type = this.type,
 
@@ -116,7 +148,8 @@ class Ingredient (
         sugars = this.sugars,
         fibers = this.fibers,
         proteins = this.proteins,
-        sodium = this.sodium,
+        salt = this.salt,
+        ciqual = ciqual,
 
         gramsPerUnit = this.gramsPerUnit,
         gramsPerMilliliter = this.gramsPerMilliliter,

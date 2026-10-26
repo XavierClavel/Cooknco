@@ -1,6 +1,7 @@
 package main.com.xavierclavel.controllertests
 
 import com.xavierclavel.ApplicationTest
+import com.xavierclavel.services.CiqualService
 import shared.dto.IngredientDTO
 import shared.dto.RecipeDTO
 import shared.enums.AmountUnit
@@ -8,9 +9,11 @@ import shared.enums.IngredientType
 import shared.enums.Locale
 import shared.enums.MeasurementType
 import shared.enums.Sort
+import shared.infodto.CiqualSource
 import shared.utils.URL.INGREDIENT_URL
 import io.ktor.client.request.header
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -30,9 +33,12 @@ import main.com.xavierclavel.utils.deleteIngredient
 import main.com.xavierclavel.utils.getCustomIngredientUsage
 import main.com.xavierclavel.utils.getIngredient
 import main.com.xavierclavel.utils.getRecipe
+import main.com.xavierclavel.utils.listAdminIngredients
 import main.com.xavierclavel.utils.searchIngredients
 import main.com.xavierclavel.utils.updateIngredient
+import main.com.xavierclavel.utils.updateIngredientRaw
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 class IngredientControllerTest : ApplicationTest() {
     @Test
@@ -317,5 +323,69 @@ class IngredientControllerTest : ApplicationTest() {
         client.absorbCustomIngredientRaw(-1, "yuzu").apply {
             assertEquals(HttpStatusCode.NotFound, status)
         }
+    }
+    // ----------------------------------------------------------------- Ciqual
+
+    @Test
+    fun `linking to Ciqual copies its figures, whatever the request said`() = runTestAsAdmin {
+        val egg = client.createIngredient(IngredientDTO(
+            name = mapOf(Locale.FR to "oeuf", Locale.EN to "egg"),
+            calories = 999,
+            salt = 99f,
+            ciqualCode = 22000,
+        ))
+        assertEquals(140, egg.calories)
+        assertEquals(372f, egg.cholesterol)
+        assertEquals(0.31f, egg.salt)
+        assertEquals(
+            CiqualSource(22000, CiqualService.EDITION, mapOf(Locale.FR to "Oeuf cru", Locale.EN to "Egg, raw")),
+            egg.ciqual,
+        )
+        // What was stored, not only what the write answered
+        assertEquals(egg, client.getIngredient(egg.id))
+        assertEquals(22000, client.listAdminIngredients().items.single { it.id == egg.id }.ciqualCode)
+    }
+
+    @Test
+    fun `a figure Ciqual does not have is unknown, not zero`() = runTestAsAdmin {
+        // Ciqual has no cholesterol figure for this spread, and only traces of sugar
+        val spread = client.createIngredient(IngredientDTO(cholesterol = 5f, ciqualCode = 1027))
+        assertNull(spread.cholesterol)
+        assertEquals(0f, spread.sugars)
+        assertNull(client.getIngredient(spread.id).cholesterol)
+    }
+
+    @Test
+    fun `a Ciqual food the table does not list is refused, and nothing is written`() = runTestAsAdmin {
+        client.createIngredientRaw(IngredientDTO(ciqualCode = 999_999)).apply {
+            assertEquals(HttpStatusCode.BadRequest, status)
+            assertEquals("unknown_ciqual_food", bodyAsText())
+        }
+        val typed = client.createIngredient(IngredientDTO(calories = 10))
+        client.updateIngredientRaw(typed.id, IngredientDTO(ciqualCode = 999_999)).apply {
+            assertEquals(HttpStatusCode.BadRequest, status)
+        }
+        assertEquals(10, client.getIngredient(typed.id).calories)
+    }
+
+    @Test
+    fun `unlinking keeps the figures sent and forgets the source`() = runTestAsAdmin {
+        val linked = client.createIngredient(IngredientDTO(ciqualCode = 22000))
+        val unlinked = client.updateIngredient(linked.id, IngredientDTO(calories = 150, salt = 0.3f))
+        assertNull(unlinked.ciqual)
+        assertEquals(150, unlinked.calories)
+        assertEquals(0.3f, unlinked.salt)
+        assertNull(unlinked.cholesterol)
+        assertNull(client.listAdminIngredients().items.single { it.id == linked.id }.ciqualCode)
+    }
+
+    @Test
+    fun `nutrition typed in by hand keeps what was left unknown`() = runTestAsAdmin {
+        val typed = client.createIngredient(IngredientDTO(calories = 52, salt = 0.002f))
+        val read = client.getIngredient(typed.id)
+        assertEquals(52, read.calories)
+        assertEquals(0.002f, read.salt)
+        assertNull(read.cholesterol)
+        assertNull(read.ciqual)
     }
 }

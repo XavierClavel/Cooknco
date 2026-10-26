@@ -127,6 +127,8 @@ enum class BadRequestCause (val key: String) {
     // recipe lists for it. See RecipeIngredientService.validateStepIngredients.
     STEP_AMOUNTS_DO_NOT_ADD_UP("step_amounts_do_not_add_up"),
     INVALID_CONVERSION_FACTOR("invalid_conversion_factor"),
+    // An ingredient linked to a Ciqual code the bundled table does not list.
+    UNKNOWN_CIQUAL_FOOD("unknown_ciqual_food"),
 
     INVALID_MAIL_ADDRESS("invalid_mail_address"),
     MAIL_TEMPLATE_KEY_INVALID("mail_template_key_invalid"),

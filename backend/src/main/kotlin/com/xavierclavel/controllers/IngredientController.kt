@@ -72,7 +72,7 @@ object IngredientController: Controller(INGREDIENT_URL) {
     private fun Route.createIngredient() = post {
         val ingredientDTO = call.receive<IngredientDTO>()
         val ingredient = ingredientService.createIngredient(ingredientDTO)
-        logEdit { "Ingredient ${ingredient.id} (${ingredient.label()}) created" }
+        logEdit { "Ingredient ${ingredient.id} (${ingredient.label()}) created${ingredient.nutritionSource()}" }
         call.respond(HttpStatusCode.Created, ingredient)
     }
 
@@ -91,7 +91,7 @@ object IngredientController: Controller(INGREDIENT_URL) {
         val id = getPathId()
         val ingredientDTO = call.receive<IngredientDTO>()
         val ingredient = ingredientService.updateIngredient(id, ingredientDTO)
-        logEdit { "Ingredient $id (${ingredient.label()}) edited" }
+        logEdit { "Ingredient $id (${ingredient.label()}) edited${ingredient.nutritionSource()}" }
         call.respond(ingredient)
     }
 
@@ -121,6 +121,10 @@ object IngredientController: Controller(INGREDIENT_URL) {
     /** An ingredient is named once per locale, and a log line wants one name. */
     private fun IngredientInfo.label(): String =
         name[Locale.EN] ?: name.values.firstOrNull() ?: "unnamed"
+
+    /** Which Ciqual food a write linked, so the trail says where the figures came from. */
+    private fun IngredientInfo.nutritionSource(): String =
+        ciqual?.let { ", nutrition from Ciqual ${it.edition} food ${it.code}" }.orEmpty()
 
     private fun Route.getCount() = get("/count") {
         call.respond(ingredientService.countAll())

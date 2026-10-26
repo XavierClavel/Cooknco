@@ -323,6 +323,7 @@ class AdminService: KoinComponent {
                     type = it.type,
                     calories = it.calories,
                     recipesCount = usage[it.id] ?: 0,
+                    ciqualCode = it.ciqualCode,
                     allowedTypes = it.allowedTypes(),
                     defaultUnit = it.defaultUnit,
                 )

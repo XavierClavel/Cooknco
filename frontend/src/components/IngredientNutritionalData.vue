@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {computed} from "vue";
 import {useI18n} from "vue-i18n";
 
 const {t} = useI18n()
@@ -10,19 +11,36 @@ const props = defineProps({
   },
 })
 
+/** Per 100 g, in the order the table lays them out, in the unit each is stated in. */
+const FIELDS = [
+  {key: 'calories', unit: 'kcal'},
+  {key: 'carbohydrates', unit: 'g'},
+  {key: 'sugars', unit: 'g'},
+  {key: 'fibers', unit: 'g'},
+  {key: 'cholesterol', unit: 'mg'},
+  {key: 'unsaturatedFat', unit: 'g'},
+  {key: 'saturatedFat', unit: 'g'},
+  {key: 'proteins', unit: 'g'},
+  {key: 'salt', unit: 'g'},
+]
+
+// Unknown is not zero: Ciqual leaves some figures unmeasured, and printing 0 would say "none"
+const UNKNOWN = '—'
+
 const format = v => v.toFixed(2).replace(/[.,]00$/, '')
 
-const getValueAmount = v => v == null ? v : format(v * props.ingredient.gramsPerUnit / 100)
+const getValueAmount = v => v == null ? UNKNOWN : format(v * props.ingredient.gramsPerUnit / 100)
 
-const getValueWeight = v => v
+const getValueWeight = v => v == null ? UNKNOWN : v
 
-const getValueVolume = v => v == null ? v : format(v * props.ingredient.gramsPerMilliliter)
+const getValueVolume = v => v == null ? UNKNOWN : format(v * props.ingredient.gramsPerMilliliter)
 
-
+const hasUnknown = computed(() => props.ingredient.id != null && FIELDS.some(f => props.ingredient[f.key] == null))
 
 </script>
 
 <template>
+  <div>
   <v-table
     style="width: 1000px"
     fixed-header
@@ -38,143 +56,32 @@ const getValueVolume = v => v == null ? v : format(v * props.ingredient.gramsPer
     </tr>
     </thead>
     <tbody>
-    <tr>
+    <tr v-for="f in FIELDS" :key="f.key">
       <th class="text-left">
-        {{$t('calories')}}
+        {{$t(f.key)}} ({{ f.unit }})
       </th>
       <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.calories)}}
+        {{ getValueAmount(ingredient[f.key])}}
       </th>
       <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.calories)}}
+        {{ getValueWeight(ingredient[f.key])}}
       </th>
       <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.calories)}}
-      </th>
-    </tr>
-
-    <tr>
-      <th class="text-left">
-        {{$t('carbohydrates')}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.carbohydrates)}}
-      </th>
-      <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.carbohydrates)}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.carbohydrates)}}
-      </th>
-    </tr>
-
-    <tr>
-      <th class="text-left">
-        {{$t('sugars')}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.sugars)}}
-      </th>
-      <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.sugars)}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.sugars)}}
-      </th>
-    </tr>
-
-    <tr>
-      <th class="text-left">
-        {{$t('fibers')}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.fibers)}}
-      </th>
-      <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.fibers)}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.fibers)}}
-      </th>
-    </tr>
-
-    <tr>
-      <th class="text-left">
-        {{$t('cholesterol')}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.cholesterol)}}
-      </th>
-      <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.cholesterol)}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.cholesterol)}}
-      </th>
-    </tr>
-
-    <tr>
-      <th class="text-left">
-        {{$t('unsaturatedFat')}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.unsaturatedFat)}}
-      </th>
-      <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.unsaturatedFat)}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.unsaturatedFat)}}
-      </th>
-    </tr>
-
-    <tr>
-      <th class="text-left">
-        {{$t('saturatedFat')}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.saturatedFat)}}
-      </th>
-      <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.saturatedFat)}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.saturatedFat)}}
-      </th>
-    </tr>
-
-    <tr>
-      <th class="text-left">
-        {{$t('proteins')}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.proteins)}}
-      </th>
-      <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.proteins)}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.proteins)}}
-      </th>
-    </tr>
-
-    <tr>
-      <th class="text-left">
-        {{$t('sodium')}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerUnit != null">
-        {{ getValueAmount(ingredient.sodium)}}
-      </th>
-      <th class="text-center" v-if="ingredient.measurableByWeight">
-        {{ getValueWeight(ingredient.sodium)}}
-      </th>
-      <th class="text-center" v-if="ingredient.gramsPerMilliliter != null">
-        {{ getValueVolume(ingredient.sodium)}}
+        {{ getValueVolume(ingredient[f.key])}}
       </th>
     </tr>
 
     </tbody>
   </v-table>
+  <p v-if="hasUnknown" class="text-caption mt-2">{{ $t('nutrition_unknown') }}</p>
+  <!-- The citation is a condition of the licence: every reuse of Ciqual names Anses and the edition -->
+  <p v-if="ingredient.ciqual" class="text-caption mt-2">
+    {{ $t('nutrition_source') }}
+    <a href="https://ciqual.anses.fr" target="_blank" rel="noopener">
+      Anses. {{ ingredient.ciqual.edition }}. Table de composition nutritionnelle des aliments Ciqual
+    </a>
+  </p>
+  </div>
 </template>
 
 <style scoped>

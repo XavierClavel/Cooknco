@@ -95,6 +95,10 @@ export const getCustomIngredientUsage = (page: number, size: number) =>
 export const absorbCustomIngredient = (id: number, name: string) =>
   api.post(`/ingredient/${id}/absorb-custom`, {name})
 
+/** The Ciqual foods whose name holds every word of `query`, with the figures linking one would copy. */
+export const searchCiqual = (query: string, limit: number) =>
+  api.get(`/admin/ciqual?${qs({query, limit})}`)
+
 // --------------------------------------------------------------- moderation
 export const listReports = (f: Record<string, unknown>, page: number, size: number) =>
   api.get(`/admin/reports?${qs(f, page, size)}`)

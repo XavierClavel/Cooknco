@@ -13,15 +13,19 @@ data class IngredientInfo(
     val name: Map<Locale, String>,
     val type: IngredientType,
 
-    val calories: Int = 0,
-    val carbohydrates: Float = 0f,
-    val cholesterol: Float = 0f,
-    val saturatedFat: Float = 0f,
-    val unsaturatedFat: Float = 0f,
-    val sugars: Float = 0f,
-    val fibers: Float = 0f,
-    val proteins: Float = 0f,
-    val sodium: Float = 0f,
+    /** Per 100 g, kcal for calories and mg for cholesterol, g for the rest. Null means unknown. */
+    val calories: Int? = null,
+    val carbohydrates: Float? = null,
+    val cholesterol: Float? = null,
+    val saturatedFat: Float? = null,
+    val unsaturatedFat: Float? = null,
+    val sugars: Float? = null,
+    val fibers: Float? = null,
+    val proteins: Float? = null,
+    val salt: Float? = null,
+
+    /** Where the nutrition above was copied from; null when it was typed in by hand. */
+    val ciqual: CiqualSource? = null,
 
     val gramsPerUnit: Float? = null,
     val gramsPerMilliliter: Float? = null,
