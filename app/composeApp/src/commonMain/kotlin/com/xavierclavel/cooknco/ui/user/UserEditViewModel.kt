@@ -69,7 +69,7 @@ class UserEditViewModel(
             // Upload image if a new one was selected
             val pendingImage = state.pendingImage
             if (pendingImage != null) {
-                val uploaded = userRepo.uploadProfileImage(currentUserId, pendingImage.bytes, pendingImage.mimeType)
+                val uploaded = userRepo.uploadProfileImage(currentUserId, pendingImage)
                 if (uploaded.isFailure) {
                     _uiState.update { it.copy(isSaving = false, error = "Failed to upload the image") }
                     return@launch

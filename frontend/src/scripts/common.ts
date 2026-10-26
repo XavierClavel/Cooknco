@@ -1,6 +1,7 @@
 import axios from "axios";
 import router from "@/router";
 import apiClient, {imageClient} from '@/plugins/axios.js';
+import {cropParam, type ImageCrop} from "@/scripts/crop";
 import {useAuthStore, declareLogin} from "@/stores/auth";
 import {deleteCookie, getCookie} from "@/scripts/cookies";
 import {getLocale} from "@/scripts/localization";
@@ -316,7 +317,11 @@ async function doDeleteImage(path,id) {
   return await imageClient.delete( `/${path}/${id}`)
 }
 
-async function uploadImage(id, file, path) {
+/**
+ * Posts the picture as it was picked, with the part of it to keep: the backend cuts the
+ * crop out of the original, so nothing is re-encoded here. No crop keeps the centred frame.
+ */
+async function uploadImage(id, file, path, crop: ImageCrop | null = null) {
   if (id == null) throw new Error(`Cannot upload image: missing ${path} id`)
   if (!file) throw new Error("Cannot upload image: no file selected")
   let formData = new FormData()
@@ -324,6 +329,7 @@ async function uploadImage(id, file, path) {
   return await imageClient.post( `/${path}/${id}`,
     formData,
     {
+      params: crop ? {crop: cropParam(crop)} : undefined,
       // Overrides the client's json default: axios serializes a FormData body to
       // json when the content type says json, and replaces this one with a
       // properly delimited multipart type when sending.

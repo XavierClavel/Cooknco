@@ -189,6 +189,16 @@ export default {
   invalid_request: "Requête invalide",
   invalid_image: "Image non valide",
   image_upload_failed: "L'image n'a pas pu être envoyée, réessaie",
+  invalid_image_crop: "Ce cadrage ne tient pas dans l'image",
+
+  crop_title: "Cadrer la photo",
+  crop_hint: "Fais glisser la photo pour la déplacer ; molette, pincement ou curseur pour zoomer.",
+  crop_apply: "Garder ce cadrage",
+  crop_adjust: "Modifier le cadrage",
+  crop_zoom: "Zoom",
+  crop_zoom_in: "Zoomer",
+  crop_zoom_out: "Dézoomer",
+
   unknown_error: "Une erreur est survenue, réessaie",
   token_missing: "Token manquant",
   mail_missing: "Adresse mail manquante",

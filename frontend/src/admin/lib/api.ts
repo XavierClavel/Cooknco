@@ -1,4 +1,5 @@
 import axios from 'axios'
+import {cropParam, type ImageCrop} from '@/scripts/crop'
 
 /**
  * Backoffice API client.
@@ -116,12 +117,14 @@ export const imageUrl = (dir: string, filename: string) =>
 // --------------------------------------------------------- default images
 export const getDefaultImages = () => api.get('/admin/storage/defaults')
 
-export const uploadDefaultImage = (image: string, file: File) => {
+/** With the part of the picture to keep, cut out by the backend as for any other upload. */
+export const uploadDefaultImage = (image: string, file: File, crop: ImageCrop | null) => {
   const body = new FormData()
   body.append('file', file)
   // Overrides the client's JSON default; axios drops it again so the browser can add the
   // boundary, which is the same dance the consumer app does for its own uploads.
   return api.post(`/admin/storage/defaults/${image}`, body, {
+    params: crop ? {crop: cropParam(crop)} : undefined,
     headers: {'Content-Type': 'multipart/form-data'},
   })
 }

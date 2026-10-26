@@ -882,6 +882,36 @@ A dish shown as words renames like words — including one whose recipe went out
 which the rename then detaches for good. The app therefore sends a title only when it
 changed, or a save that merely moved such a dish would cut a link that might have come back.
 
+## A picture is framed on the client, and cut out on the backend
+
+Every upload goes through a cropper first — the site's `EditablePicture`, the backoffice's
+defaults, and the app's recipe, step, avatar and cookbook pictures (`rememberImageFraming`):
+the picture under a frame of its bucket's ratio, dragged and zoomed until the frame holds what
+to keep. What is sent is the file **as picked** plus `?crop=left,top,width,height`, fractions
+(`ImageCrop` on the backend), and `ImageService.render` cuts it out. No client re-encodes a
+photograph, and the backend crops the original rather than a downsampled copy.
+
+Three things not to undo:
+
+- **The fractions are of the picture as shown**, after its EXIF rotation. A browser turns an
+  `<img>` by its tag and Coil turns what it decodes, so that is the picture both croppers
+  measure; the backend therefore orients, *then* crops, then centres into the bucket.
+  `ImageControllerTest` uploads a sideways jpeg tagged orientation 6 to hold that order.
+- **The crop rides in the query**, not as a second part of the body. `receiveImage` refuses any
+  part that is not the file, so a part would fail every upload a new client made against an
+  older backend; a query parameter is ignored there and the picture saved centred. With no
+  crop the backend centres exactly as it always did, and a cropper zoomed all the way out
+  reports that same centred frame — an old app build and an untouched picture store the same.
+- **A crop that leaves the picture is refused** (`invalid_image_crop`), not clamped into it: it
+  means a client measured against some other picture. Only rounding past an edge is tolerated.
+
+The frame's ratio is restated on each client — `CropFrame` in the app (`shared` is JVM-only),
+the `aspect-ratio` each page hands `EditablePicture`, the bucket's own size in the backoffice.
+A drift costs a sliver, not a failure: the backend still centres what it is sent into
+`ImageBucket`'s frame. The arithmetic exists twice, `frontend/src/scripts/crop.ts` and the
+app's `data/ImageCrop.kt`; the app's copy is what `ImageCropTest` holds, the site having no
+test runner.
+
 ## Build and test
 
 Use `sh ./gradlew` (the wrapper lacks the exec bit in worktrees) with JDK 23 — Gradle 8.10.2

@@ -83,10 +83,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.addOutline
-import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
@@ -104,6 +102,7 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import coil3.compose.AsyncImage
+import com.xavierclavel.cooknco.data.CropFrame
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.UnitInfo
@@ -114,8 +113,10 @@ import com.xavierclavel.cooknco.platform.COOKLANG_PICKER_MIME_TYPES
 import com.xavierclavel.cooknco.platform.rememberTextFilePicker
 import com.xavierclavel.cooknco.platform.rememberRecipeScanner
 import com.xavierclavel.cooknco.platform.rememberRecipePhotoCapture
+import com.xavierclavel.cooknco.ui.components.FramedImage
 import com.xavierclavel.cooknco.ui.components.PremiumLockDialog
 import com.xavierclavel.cooknco.ui.components.premiumSheetAction
+import com.xavierclavel.cooknco.ui.components.rememberImageFraming
 import kotlinx.coroutines.delay
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.RecipeImage
@@ -1965,12 +1966,10 @@ private fun StepPhotoField(
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
-    val imagePicker = rememberImagePicker(onPicked = onPicked)
-    val cameraCapture = rememberCameraCapture(onPicked = onPicked)
+    val frameImage = rememberImageFraming(CropFrame.RECIPE_STEP, onFramed = onPicked)
+    val imagePicker = rememberImagePicker(onPicked = frameImage)
+    val cameraCapture = rememberCameraCapture(onPicked = frameImage)
     val picked = step.pendingImage
-    val pickedBitmap = picked?.let { image ->
-        remember(image) { runCatching { image.bytes.decodeToImageBitmap() }.getOrNull() }
-    }
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(
@@ -1984,10 +1983,9 @@ private fun StepPhotoField(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                pickedBitmap != null -> Image(
-                    bitmap = pickedBitmap,
+                picked != null -> FramedImage(
+                    image = picked,
                     contentDescription = s.recipeStepPhoto,
-                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
 
@@ -2324,11 +2322,9 @@ private fun PhotoStep(
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
-    val imagePicker = rememberImagePicker(onPicked = onImagePicked)
-    val cameraCapture = rememberCameraCapture(onPicked = onImagePicked)
-    val pickedBitmap = pickedImage?.let { picked ->
-        remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
-    }
+    val frameImage = rememberImageFraming(CropFrame.RECIPE, onFramed = onImagePicked)
+    val imagePicker = rememberImagePicker(onPicked = frameImage)
+    val cameraCapture = rememberCameraCapture(onPicked = frameImage)
     val hasExistingPhoto = uiState.hasSavedPhoto
 
     LazyColumn(
@@ -2344,16 +2340,17 @@ private fun PhotoStep(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
+                            // The frame the photo is stored and cropped in, so the preview
+                            // shows all of what the cook kept and nothing they cut away.
+                            .aspectRatio(CropFrame.RECIPE.aspectRatio.toFloat())
                             .background(CookncoGreenLight)
                             .clickable { imagePicker.launch() },
                         contentAlignment = Alignment.Center,
                     ) {
                         when {
-                            pickedBitmap != null -> Image(
-                                bitmap = pickedBitmap,
+                            pickedImage != null -> FramedImage(
+                                image = pickedImage,
                                 contentDescription = s.recipePhoto,
-                                contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
                             )
                             hasExistingPhoto -> RecipeImage(

@@ -348,6 +348,12 @@ interface Strings {
     val tapToAddPhoto: String
     val takeAPhoto: String
     val chooseAnother: String
+    val cropTitle: String
+    val cropHint: String
+    val cropConfirm: String
+    val cropZoomIn: String
+    val cropZoomOut: String
+    val cropUnavailable: String
     val readyToPublish: String
     val noIngredientsYet: String
     val recipePhotoAdded: String

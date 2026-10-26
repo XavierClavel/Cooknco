@@ -4,6 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -377,8 +378,9 @@ suspend fun HttpClient.listDefaultImages(): List<AdminDefaultImageInfo> =
         json.decodeFromString<List<AdminDefaultImageInfo>>(it.bodyAsText())
     }
 
-suspend fun HttpClient.uploadDefaultImageRaw(image: DefaultImage, bytes: ByteArray) =
+suspend fun HttpClient.uploadDefaultImageRaw(image: DefaultImage, bytes: ByteArray, crop: String? = null) =
     this.post("$ADMIN_URL/storage/defaults/${image.name}") {
+        crop?.let { parameter("crop", it) }
         setBody(MultiPartFormDataContent(formData {
             append("file", bytes, Headers.build {
                 append(HttpHeaders.ContentType, ContentType.Image.PNG.toString())

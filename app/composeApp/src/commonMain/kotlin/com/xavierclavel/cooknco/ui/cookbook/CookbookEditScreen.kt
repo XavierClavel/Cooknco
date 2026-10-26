@@ -1,7 +1,6 @@
 package com.xavierclavel.cooknco.ui.cookbook
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,17 +45,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.decodeToImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xavierclavel.cooknco.data.CropFrame
 import com.xavierclavel.cooknco.network.dto.UserSummary
 import com.xavierclavel.cooknco.platform.rememberImagePicker
 import com.xavierclavel.cooknco.ui.components.CookbookImage
+import com.xavierclavel.cooknco.ui.components.FramedImage
 import com.xavierclavel.cooknco.ui.components.UserAvatar
+import com.xavierclavel.cooknco.ui.components.rememberImageFraming
 import com.xavierclavel.cooknco.ui.i18n.Strings
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
@@ -113,7 +113,8 @@ fun CookbookEditScreen(
 ) {
     val s = strings()
     val uiState by viewModel.uiState.collectAsState()
-    val imagePicker = rememberImagePicker(onPicked = viewModel::setPendingImage)
+    val frameImage = rememberImageFraming(CropFrame.COOKBOOK, onFramed = viewModel::setPendingImage)
+    val imagePicker = rememberImagePicker(onPicked = frameImage)
 
     LaunchedEffect(uiState.saved) {
         if (uiState.saved) {
@@ -152,9 +153,6 @@ fun CookbookEditScreen(
         }
 
         val pickedImage = uiState.pendingImage
-        val pickedBitmap = pickedImage?.let { picked ->
-            remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
-        }
         // A version of 0 means the cookbook is still on the backend's default placeholder —
         // CookbookInfo.version doubles as the image version (see ImageController on the backend).
         val hasExistingPhoto = uiState.cookbookId != null && (uiState.cookbookVersion ?: 0) > 0
@@ -166,7 +164,7 @@ fun CookbookEditScreen(
         ) {
             // ── Photo ─────────────────────────────────────────────────────────
             item {
-                val hasAnyPhoto = pickedBitmap != null || hasExistingPhoto
+                val hasAnyPhoto = pickedImage != null || hasExistingPhoto
                 val photoShape = RoundedCornerShape(20.dp)
                 Box(
                     modifier = Modifier
@@ -179,10 +177,9 @@ fun CookbookEditScreen(
                         .clickable { imagePicker.launch() },
                 ) {
                     when {
-                        pickedBitmap != null -> Image(
-                            bitmap = pickedBitmap,
+                        pickedImage != null -> FramedImage(
+                            image = pickedImage,
                             contentDescription = s.cookbookPhoto,
-                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
                         hasExistingPhoto -> CookbookImage(

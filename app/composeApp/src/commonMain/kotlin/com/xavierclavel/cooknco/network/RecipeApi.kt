@@ -8,6 +8,7 @@ import com.xavierclavel.cooknco.network.dto.CooklangImportDto
 import com.xavierclavel.cooknco.platform.CapturedPage
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.dto.UnitInfo
+import com.xavierclavel.cooknco.platform.PickedImage
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.timeout
@@ -248,15 +249,10 @@ class RecipeApi(private val client: HttpClient) {
     }
 
     /** Images live outside the api: POST {IMAGE_URL}/recipes/{id}, answering with an empty body. */
-    suspend fun uploadRecipeImage(token: String, recipeId: Long, imageBytes: ByteArray, mimeType: String) {
+    suspend fun uploadRecipeImage(token: String, recipeId: Long, image: PickedImage) {
         val response = client.post("${ApiClient.IMAGE_URL}/recipes/$recipeId") {
             bearerAuth(token)
-            setBody(MultiPartFormDataContent(formData {
-                append("file", imageBytes, Headers.build {
-                    append(HttpHeaders.ContentType, mimeType)
-                    append(HttpHeaders.ContentDisposition, "filename=recipe.webp")
-                })
-            }))
+            imageUpload(image, "recipe.webp")
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }
@@ -267,15 +263,10 @@ class RecipeApi(private val client: HttpClient) {
      * A step has no id before then, which is why this cannot ride along with the save - the
      * same order the recipe's own photograph follows.
      */
-    suspend fun uploadStepImage(token: String, stepId: Long, imageBytes: ByteArray, mimeType: String) {
+    suspend fun uploadStepImage(token: String, stepId: Long, image: PickedImage) {
         val response = client.post("${ApiClient.IMAGE_URL}/recipe-steps/$stepId") {
             bearerAuth(token)
-            setBody(MultiPartFormDataContent(formData {
-                append("file", imageBytes, Headers.build {
-                    append(HttpHeaders.ContentType, mimeType)
-                    append(HttpHeaders.ContentDisposition, "filename=step.webp")
-                })
-            }))
+            imageUpload(image, "step.webp")
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
     }

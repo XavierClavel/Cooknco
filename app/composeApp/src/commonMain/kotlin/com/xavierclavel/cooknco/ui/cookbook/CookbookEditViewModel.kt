@@ -254,7 +254,7 @@ class CookbookEditViewModel(
                     // on. Clearing it only on success keeps a later save from re-uploading
                     // (and re-bumping the image version for) the same picture.
                     val imageUploaded = state.pendingImage?.let { image ->
-                        repo.uploadCookbookImage(savedCookbook.id, image.bytes, image.mimeType).isSuccess
+                        repo.uploadCookbookImage(savedCookbook.id, image).isSuccess
                     } ?: false
                     _uiState.update {
                         it.copy(

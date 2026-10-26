@@ -10,6 +10,7 @@ import com.xavierclavel.services.RecipeService
 import com.xavierclavel.services.RecipeStepService
 import com.xavierclavel.services.UserService
 import com.xavierclavel.utils.Controller
+import com.xavierclavel.utils.UploadedImage
 import com.xavierclavel.utils.checkCookbookAdminRights
 import com.xavierclavel.utils.checkRecipeEditionRights
 import com.xavierclavel.utils.checkUserEditionRights
@@ -38,8 +39,6 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import org.koin.java.KoinJavaComponent.inject
-import com.drew.metadata.Metadata
-import java.awt.image.BufferedImage
 import java.io.File
 
 object ImageController: Controller(IMAGE_URL) {
@@ -103,8 +102,7 @@ object ImageController: Controller(IMAGE_URL) {
     private fun Route.uploadRecipeImage() = post("/recipes/{id}") {
         val id = getPathId()
         checkRecipeEditionRights(recipeService.getRecipeOwner(id).id)
-        val (image, metadata) = receiveImage()
-        saveRecipeImage(id, image, metadata)
+        saveRecipeImage(id, receiveImage())
         logEdit { "Recipe $id given a picture" }
         call.respond(HttpStatusCode.OK)
     }
@@ -120,8 +118,7 @@ object ImageController: Controller(IMAGE_URL) {
     private fun Route.redeemRecipeImageTicket() = post("/upload/{ticket}") {
         val ticket = call.parameters["ticket"] ?: throw BadRequestException(BadRequestCause.INVALID_REQUEST)
         val redeemed = imageUploadTicketService.redeemRecipeTicket(ticket)
-        val (image, metadata) = receiveImage(maxBytes = imageUploadTicketService.maxUploadBytes)
-        saveRecipeImage(redeemed.recipeId, image, metadata)
+        saveRecipeImage(redeemed.recipeId, receiveImage(maxBytes = imageUploadTicketService.maxUploadBytes))
         logEdit(redeemed.userId) { "Recipe ${redeemed.recipeId} given a picture over an upload ticket" }
         call.respond(HttpStatusCode.OK)
     }
@@ -133,11 +130,11 @@ object ImageController: Controller(IMAGE_URL) {
      * to the picture is built from, and a caller that wrote the files without it would leave
      * every reader on the old one.
      */
-    private fun saveRecipeImage(id: Long, image: BufferedImage, metadata: Metadata) {
+    private fun saveRecipeImage(id: Long, upload: UploadedImage) {
         val recipe = recipeService.getEntityById(id)
 
-        imageService.saveImage(RECIPES_IMG_PATH, id, recipe.imageVersion + 1, ImageBucket.RECIPE.size, image, metadata)
-        imageService.saveImage(RECIPES_THUMBNAIL_PATH, id, recipe.imageVersion + 1, ImageBucket.RECIPE_THUMBNAIL.size, image, metadata)
+        imageService.saveImage(RECIPES_IMG_PATH, id, recipe.imageVersion + 1, ImageBucket.RECIPE.size, upload)
+        imageService.saveImage(RECIPES_THUMBNAIL_PATH, id, recipe.imageVersion + 1, ImageBucket.RECIPE_THUMBNAIL.size, upload)
 
         recipe.increaseVersion()
         imageService.deleteImage(RECIPES_IMG_PATH, id, recipe.imageVersion - 1)
@@ -149,9 +146,9 @@ object ImageController: Controller(IMAGE_URL) {
         // Before the body is read, as on every other upload here: a caller who may not write
         // this cookbook should be refused without first sending a picture.
         checkCookbookAdminRights(id)
-        val (image, metadata) = receiveImage()
+        val upload = receiveImage()
         val cookbook = cookbookService.getEntityById(id)
-        imageService.saveImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion + 1, ImageBucket.COOKBOOK.size, image, metadata)
+        imageService.saveImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion + 1, ImageBucket.COOKBOOK.size, upload)
         cookbook.increaseVersion()
         imageService.deleteImage(COOKBOOKS_IMG_PATH, id, cookbook.imageVersion - 1)
         logEdit { "Cookbook $id given a picture" }
@@ -161,9 +158,9 @@ object ImageController: Controller(IMAGE_URL) {
     private fun Route.uploadUserIcon() = post("/users/{id}") {
         val id = getPathId()
         checkUserEditionRights(id)
-        val (image, metadata) = receiveImage()
+        val upload = receiveImage()
         val user = userService.getEntityById(id)
-        imageService.saveImage(USERS_IMG_PATH, id, user.imageVersion + 1, ImageBucket.USER.size, image, metadata)
+        imageService.saveImage(USERS_IMG_PATH, id, user.imageVersion + 1, ImageBucket.USER.size, upload)
         user.increaseVersion()
         imageService.deleteImage(USERS_IMG_PATH, id, user.imageVersion - 1)
         logEdit { "User $id given an icon" }
@@ -185,10 +182,8 @@ object ImageController: Controller(IMAGE_URL) {
         val step = recipeStepService.getEntityById(id)
         checkRecipeEditionRights(recipeService.getRecipeOwner(step.recipe!!.id).id)
 
-        val (image, metadata) = receiveImage()
-        imageService.saveImage(
-            RECIPE_STEPS_IMG_PATH, id, step.imageVersion + 1, ImageBucket.RECIPE_STEP.size, image, metadata,
-        )
+        val upload = receiveImage()
+        imageService.saveImage(RECIPE_STEPS_IMG_PATH, id, step.imageVersion + 1, ImageBucket.RECIPE_STEP.size, upload)
         step.increaseImageVersion()
         imageService.deleteImage(RECIPE_STEPS_IMG_PATH, id, step.imageVersion - 1)
         logEdit { "Step $id of recipe ${step.recipe!!.id} given a picture" }
