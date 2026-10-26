@@ -1545,7 +1545,7 @@ private fun AddedIngredientCard(
                 ) {
                     // Empty, the box is a white square beside the unit, and nothing about it
                     // says it is where the quantity goes.
-                    if (ingredient.amount == null) {
+                    if (ingredient.amount.isEmpty()) {
                         Text(
                             text = s.amountPlaceholder,
                             fontSize = 14.sp,
@@ -1554,9 +1554,7 @@ private fun AddedIngredientCard(
                         )
                     }
                     BasicTextField(
-                        value = ingredient.amount?.let { amount ->
-                            if (amount % 1f == 0f) amount.toInt().toString() else amount.toString()
-                        } ?: "",
+                        value = ingredient.amount,
                         onValueChange = onAmountChange,
                         singleLine = true,
                         textStyle = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoNavy),
@@ -2106,7 +2104,7 @@ private fun StepIngredientPicker(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (used != null && ingredient.amount != null) {
+                if (used != null && ingredient.savedAmount != null) {
                     Box(
                         modifier = Modifier
                             .width(52.dp)
@@ -2134,7 +2132,7 @@ private fun StepIngredientPicker(
                             onValueChange = { onAmountChange(index, it) },
                             singleLine = true,
                             textStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CookncoNavy),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             cursorBrush = SolidColor(CookncoOrange),
                             modifier = Modifier.fillMaxWidth(),
                         )

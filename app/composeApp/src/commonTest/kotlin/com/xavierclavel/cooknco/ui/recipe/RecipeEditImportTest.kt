@@ -149,7 +149,7 @@ class RecipeEditImportTest {
         assertNull(rows[0].customName)
         assertEquals("flour", rows[0].ingredientName)
         assertEquals("GRAM", rows[0].unit)
-        assertEquals(125f, rows[0].amount)
+        assertEquals("125", rows[0].amount)
 
         assertNull(rows[1].ingredientId)
         assertEquals("buttermilk", rows[1].customName)

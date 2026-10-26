@@ -107,6 +107,31 @@ class AmountsTest {
         assertEquals("1.5 kg", label(1_500f, "GRAM", 1, 1, AppUnitSystem.METRIC))
     }
 
+    // ------------------------------------------------- what an amount box keeps
+
+    @Test
+    fun `a decimal survives being typed one keystroke at a time`() {
+        // Each step is what the box holds after the next key, fed back in as the box does
+        assertEquals("1.", amountInput("1."))
+        assertEquals("1.5", amountInput("1.5"))
+        assertEquals(".5", amountInput(".5"))
+    }
+
+    @Test
+    fun `a comma is read as the decimal point`() {
+        // What a French keyboard's decimal key types. Dropping it made this five
+        assertEquals("0.5", amountInput("0,5"))
+        assertEquals(0.5f, amountInput("0,5").toFloatOrNull())
+    }
+
+    @Test
+    fun `a second separator and anything that is not a digit are dropped`() {
+        assertEquals("1.25", amountInput("1.2.5"))
+        assertEquals("1.25", amountInput("1,2.5"))
+        assertEquals("12", amountInput("1-2 g"))
+        assertEquals("", amountInput("abc"))
+    }
+
     // ------------------------------------------------- what a picker opens on
 
     @Test
