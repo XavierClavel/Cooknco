@@ -3,6 +3,8 @@ package com.xavierclavel.services
 import com.drew.metadata.Metadata
 import com.drew.metadata.exif.ExifIFD0Directory
 import com.xavierclavel.enums.ExifOrientation
+import com.xavierclavel.utils.ImageCrop
+import com.xavierclavel.utils.UploadedImage
 import shared.enums.ImageBucket
 import shared.utils.Filepath.DEFAULT_IMAGE
 import org.koin.core.component.KoinComponent
@@ -30,8 +32,8 @@ import javax.imageio.ImageWriter
 class ImageService: KoinComponent {
 
 
-    fun saveImage(path: String, id: Long, version: Long, targetSize: Pair<Int, Int>, image: BufferedImage, metadata: Metadata) =
-        saveImage("$path/$id-v$version.webp", targetSize, image, metadata)
+    fun saveImage(path: String, id: Long, version: Long, targetSize: Pair<Int, Int>, upload: UploadedImage) =
+        saveImage("$path/$id-v$version.webp", targetSize, upload)
 
     fun deleteImage(path: String, id: Long, version: Long) {
         if (version == 0L) return
@@ -50,10 +52,10 @@ class ImageService: KoinComponent {
      * what was given: a default is decoration shown to everyone, and upscaling a small
      * placeholder to a bucket's full size only costs bytes on every page that shows it.
      */
-    fun saveDefaultImage(bucket: ImageBucket, image: BufferedImage, metadata: Metadata) {
+    fun saveDefaultImage(bucket: ImageBucket, upload: UploadedImage) {
         val file = Path("${bucket.path}/$DEFAULT_IMAGE")
         file.createParentDirectories()
-        ImageIO.write(render(image, orientationOf(metadata), bucket.size, upscale = false), "webp", file.toFile())
+        ImageIO.write(render(upload, bucket.size, upscale = false), "webp", file.toFile())
     }
 
     /**
@@ -65,18 +67,18 @@ class ImageService: KoinComponent {
     fun encodeWebp(image: BufferedImage, bucket: ImageBucket): ByteArray =
         ByteArrayOutputStream().use { out ->
             // Packaged pictures are stored upright; there is no EXIF to read them from
-            ImageIO.write(render(image, ExifOrientation.NORMAL, bucket.size, upscale = false), "webp", out)
+            ImageIO.write(render(image, ExifOrientation.NORMAL, crop = null, bucket.size, upscale = false), "webp", out)
             out.toByteArray()
         }
 
-    private fun saveImage(path: String, targetSize: Pair<Int, Int>, image: BufferedImage, metadata: Metadata) {
+    private fun saveImage(path: String, targetSize: Pair<Int, Int>, upload: UploadedImage) {
         val file = Path(path)
         file.createParentDirectories()
         if (!file.exists()) {
             file.createFile()
         }
 
-        ImageIO.write(render(image, orientationOf(metadata), targetSize), "webp", file.toFile())
+        ImageIO.write(render(upload, targetSize), "webp", file.toFile())
     }
 
     private fun orientationOf(metadata: Metadata): ExifOrientation {
@@ -84,16 +86,28 @@ class ImageService: KoinComponent {
         return ExifOrientation.fromInt(directory?.getInt(ExifIFD0Directory.TAG_ORIENTATION) ?: 1)
     }
 
-    /** Turns what was uploaded into what a bucket stores: upright, and cropped to its frame. */
+    private fun render(upload: UploadedImage, targetSize: Pair<Int, Int>, upscale: Boolean = true): BufferedImage =
+        render(upload.image, orientationOf(upload.metadata), upload.crop, targetSize, upscale)
+
+    /**
+     * Turns what was uploaded into what a bucket stores: upright, then cut down to the part its
+     * uploader kept, then centred into the bucket's frame.
+     *
+     * In that order, because the crop is measured on the picture as it is shown — see
+     * [ImageCrop]. Without one, the centring is all there is, which is what every upload got
+     * before there was a crop to send and what a client that sends none still gets.
+     */
     private fun render(
         image: BufferedImage,
         orientation: ExifOrientation,
+        crop: ImageCrop?,
         targetSize: Pair<Int, Int>,
         upscale: Boolean = true,
     ): BufferedImage {
-        logger.info { "Processing image with orientation $orientation" }
+        logger.info { "Processing image with orientation $orientation and crop $crop" }
         val orientedImage = applyOrientation(image, orientation)
-        return cropAndResizeImage(orientedImage, targetSize.first, targetSize.second, upscale)
+        val keptImage = crop?.applyTo(orientedImage) ?: orientedImage
+        return cropAndResizeImage(keptImage, targetSize.first, targetSize.second, upscale)
     }
 
     private fun applyOrientation(image: BufferedImage, orientation: ExifOrientation): BufferedImage {

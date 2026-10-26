@@ -17,6 +17,7 @@ declare module 'vue' {
     EditablePicture: typeof import('./components/EditablePicture.vue')['default']
     Error: typeof import('./components/Error.vue')['default']
     FollowersDisplay: typeof import('./components/FollowersDisplay.vue')['default']
+    ImageCropper: typeof import('./components/ImageCropper.vue')['default']
     Ingredient: typeof import('./components/Ingredient.vue')['default']
     IngredientNutritionalData: typeof import('./components/IngredientNutritionalData.vue')['default']
     IngredientsGrid: typeof import('./components/IngredientsGrid.vue')['default']

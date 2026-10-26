@@ -7,6 +7,7 @@ import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.network.dto.McpClientInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
 import com.xavierclavel.cooknco.network.isOffline
+import com.xavierclavel.cooknco.platform.PickedImage
 import kotlinx.coroutines.flow.first
 
 class UserRepository(
@@ -33,8 +34,8 @@ class UserRepository(
         userApi.updateUser(requireToken(), username, bio)
     }
 
-    suspend fun uploadProfileImage(userId: Long, imageBytes: ByteArray, mimeType: String): Result<Unit> = runCatching {
-        userApi.uploadProfileImage(requireToken(), userId, imageBytes, mimeType)
+    suspend fun uploadProfileImage(userId: Long, image: PickedImage): Result<Unit> = runCatching {
+        userApi.uploadProfileImage(requireToken(), userId, image)
     }
 
     suspend fun isFollowing(userId: Long, currentUserId: Long): Result<Boolean> = runCatching {

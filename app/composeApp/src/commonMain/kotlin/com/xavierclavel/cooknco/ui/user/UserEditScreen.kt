@@ -1,6 +1,5 @@
 package com.xavierclavel.cooknco.ui.user
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,11 +32,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,10 +42,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.xavierclavel.cooknco.data.CropFrame
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberImagePicker
+import com.xavierclavel.cooknco.ui.components.FramedImage
+import com.xavierclavel.cooknco.ui.components.rememberImageFraming
 import com.xavierclavel.cooknco.ui.i18n.strings
 import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoGreen
@@ -138,7 +138,8 @@ private fun UserEditContent(
 ) {
     val s = strings()
     val user = uiState.user
-    val imagePicker = rememberImagePicker(onPicked = onImageSelected)
+    val frameImage = rememberImageFraming(CropFrame.USER, onFramed = onImageSelected)
+    val imagePicker = rememberImagePicker(onPicked = frameImage)
     val avatarShape = CircleShape
 
     Column(
@@ -155,9 +156,7 @@ private fun UserEditContent(
             modifier = Modifier.size(130.dp).clickable { imagePicker.launch() },
             contentAlignment = Alignment.Center,
         ) {
-            val pickedBitmap = uiState.pendingImage?.let { picked ->
-                remember(picked) { runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull() }
-            }
+            val pickedImage = uiState.pendingImage
 
             Box(
                 modifier = Modifier
@@ -174,11 +173,10 @@ private fun UserEditContent(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(72.dp),
                 )
-                if (pickedBitmap != null) {
-                    Image(
-                        bitmap = pickedBitmap,
+                if (pickedImage != null) {
+                    FramedImage(
+                        image = pickedImage,
                         contentDescription = s.profilePhoto,
-                        contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {

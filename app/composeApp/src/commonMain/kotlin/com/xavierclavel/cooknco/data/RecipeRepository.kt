@@ -11,6 +11,7 @@ import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.isOffline
 import com.xavierclavel.cooknco.platform.CapturedPage
+import com.xavierclavel.cooknco.platform.PickedImage
 import kotlinx.coroutines.flow.first
 
 class RecipeRepository(
@@ -113,14 +114,14 @@ class RecipeRepository(
         recipeApi.deleteRecipe(id, token)
     }
 
-    suspend fun uploadRecipeImage(recipeId: Long, imageBytes: ByteArray, mimeType: String): Result<Unit> = runCatching {
+    suspend fun uploadRecipeImage(recipeId: Long, image: PickedImage): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
-        recipeApi.uploadRecipeImage(token, recipeId, imageBytes, mimeType)
+        recipeApi.uploadRecipeImage(token, recipeId, image)
     }
 
-    suspend fun uploadStepImage(stepId: Long, imageBytes: ByteArray, mimeType: String): Result<Unit> = runCatching {
+    suspend fun uploadStepImage(stepId: Long, image: PickedImage): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
-        recipeApi.uploadStepImage(token, stepId, imageBytes, mimeType)
+        recipeApi.uploadStepImage(token, stepId, image)
     }
 
     suspend fun deleteStepImage(stepId: Long): Result<Unit> = runCatching {

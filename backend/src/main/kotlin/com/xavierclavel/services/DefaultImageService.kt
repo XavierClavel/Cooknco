@@ -1,6 +1,6 @@
 package com.xavierclavel.services
 
-import com.drew.metadata.Metadata
+import com.xavierclavel.utils.UploadedImage
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import shared.enums.DefaultImage
@@ -9,7 +9,6 @@ import shared.infodto.AdminDefaultImageFile
 import shared.infodto.AdminDefaultImageInfo
 import shared.utils.Filepath.DEFAULT_IMAGE
 import shared.utils.logger
-import java.awt.image.BufferedImage
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
@@ -100,8 +99,8 @@ class DefaultImageService: KoinComponent {
      * Replaces a default with what was uploaded, in every bucket that shows it — a recipe
      * default is written full size and as a thumbnail, from the one source.
      */
-    fun replace(image: DefaultImage, source: BufferedImage, metadata: Metadata) {
-        image.buckets.forEach { imageService.saveDefaultImage(it, source, metadata) }
+    fun replace(image: DefaultImage, upload: UploadedImage) {
+        image.buckets.forEach { imageService.saveDefaultImage(it, upload) }
         logger.info { "Default image ${image.name} replaced" }
     }
 

@@ -1,9 +1,18 @@
 package com.xavierclavel.cooknco.platform
 
 import androidx.compose.runtime.Composable
+import com.xavierclavel.cooknco.data.ImageCrop
 
-/** An image the user picked from their device, already read into memory. */
-class PickedImage(val bytes: ByteArray, val mimeType: String)
+/**
+ * An image the user picked from their device, already read into memory.
+ *
+ * [crop] is the part of it they framed, uploaded beside the untouched [bytes] for the backend to
+ * cut out; null keeps the centred frame the backend makes on its own. The pickers below hand
+ * over none — framing is the crop dialog's, after them (`rememberImageFraming`).
+ */
+class PickedImage(val bytes: ByteArray, val mimeType: String, val crop: ImageCrop? = null) {
+    fun framed(crop: ImageCrop?) = PickedImage(bytes, mimeType, crop)
+}
 
 fun interface ImagePickerLauncher {
     fun launch()

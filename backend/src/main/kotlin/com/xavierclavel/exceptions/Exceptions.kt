@@ -98,6 +98,7 @@ enum class BadRequestCause (val key: String) {
     INVALID_REQUEST("invalid_request"),
     INVALID_IMAGE("invalid_image"),
     IMAGE_TOO_LARGE("image_too_large"),
+    INVALID_IMAGE_CROP("invalid_image_crop"),
 
     TOKEN_MISSING("token_missing"),
     MAIL_MISSING("mail_missing"),

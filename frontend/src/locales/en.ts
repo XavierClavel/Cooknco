@@ -189,6 +189,16 @@ export default {
   invalid_request: "Invalid request",
   invalid_image: "Invalid image",
   image_upload_failed: "The image could not be uploaded, please try again",
+  invalid_image_crop: "That framing does not fit the picture",
+
+  crop_title: "Frame the picture",
+  crop_hint: "Drag the picture to move it; scroll, pinch or use the slider to zoom.",
+  crop_apply: "Use this framing",
+  crop_adjust: "Adjust the framing",
+  crop_zoom: "Zoom",
+  crop_zoom_in: "Zoom in",
+  crop_zoom_out: "Zoom out",
+
   unknown_error: "Something went wrong, please try again",
   token_missing: "Missing token",
   mail_missing: "Mail missing",

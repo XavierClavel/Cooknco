@@ -117,8 +117,7 @@ object AdminStorageController: Controller("storage") {
 
     private fun Route.replaceDefault() = post("/{image}") {
         val image = getEnumPathParam<DefaultImage>("image")
-        val (source, metadata) = receiveImage()
-        defaultImageService.replace(image, source, metadata)
+        defaultImageService.replace(image, receiveImage())
         logEdit { "Default image $image replaced" }
         call.respond(HttpStatusCode.OK)
     }

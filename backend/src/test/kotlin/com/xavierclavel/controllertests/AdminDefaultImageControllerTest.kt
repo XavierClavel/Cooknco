@@ -5,7 +5,10 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.HttpStatusCode
+import main.com.xavierclavel.utils.GREEN
+import main.com.xavierclavel.utils.assertFilledWith
 import main.com.xavierclavel.utils.listDefaultImages
+import main.com.xavierclavel.utils.quartersImageBytes
 import main.com.xavierclavel.utils.listDefaultImagesRaw
 import main.com.xavierclavel.utils.resetDefaultImageRaw
 import main.com.xavierclavel.utils.uploadDefaultImageRaw
@@ -176,6 +179,17 @@ class AdminDefaultImageControllerTest : ApplicationTest() {
             .apply { assertEquals(HttpStatusCode.OK, status) }
 
         assertEquals(120 to 120, dimensionsOf(client.get("/image/users/$DEFAULT_IMAGE").bodyAsBytes()))
+    }
+
+    /** The backoffice frames a default the way the editors frame an upload, and both sizes keep it. */
+    @Test
+    fun `a default keeps the part of the picture its crop names`() = runTestAsAdmin {
+        client.uploadDefaultImageRaw(DefaultImage.RECIPE, quartersImageBytes(800, 600), crop = "0.5,0,0.5,0.5")
+            .apply { assertEquals(HttpStatusCode.OK, status) }
+
+        listOf(ImageBucket.RECIPE, ImageBucket.RECIPE_THUMBNAIL).forEach { bucket ->
+            assertFilledWith(GREEN, ImageIO.read(uploadedFile(bucket).toFile()))
+        }
     }
 
     // ---------------------------------------------------------------- reset

@@ -263,6 +263,23 @@
       </template>
     </ui-modal>
 
+    <!-- ---------------------------------------------- frame a default image -->
+    <ui-modal v-model="cropDialog" :title="$t('crop_title')" :width="640">
+      <image-cropper
+        v-if="cropTarget"
+        :src="cropTarget.source"
+        :aspect-ratio="cropTarget.aspectRatio"
+        :round="cropTarget.image === 'USER'"
+        @update:crop="crop => { if (cropTarget) cropTarget.crop = crop }"
+      />
+      <template #actions>
+        <button class="btn" @click="cropDialog = false">{{ $t('cancel') }}</button>
+        <button class="btn primary" :disabled="!cropTarget?.crop" @click="confirmCrop">
+          {{ $t('admin_defaults_replace') }}
+        </button>
+      </template>
+    </ui-modal>
+
     <!-- --------------------------------------------- reset a default image -->
     <ui-modal v-model="resetDialog" :title="$t('admin_defaults_reset')">
       <p class="small muted">{{ $t('admin_defaults_reset_hint') }}</p>
@@ -321,7 +338,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, onMounted, reactive, ref} from 'vue'
+import {computed, onMounted, reactive, ref, watch} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {
   cleanupStorage, defaultImageUrl, deleteImage, errorKey, getDefaultImages, getStorageOverview,
@@ -333,6 +350,8 @@ import UiIcon from '../components/UiIcon.vue'
 import UiModal from '../components/UiModal.vue'
 import UiPager from '../components/UiPager.vue'
 import UiEmpty from '../components/UiEmpty.vue'
+import ImageCropper from '@/components/ImageCropper.vue'
+import type {ImageCrop} from '@/scripts/crop'
 
 const {t, te} = useI18n()
 
@@ -405,6 +424,11 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const pendingImage = ref<string | null>(null)
 const resetTarget = ref<any>(null)
 const resetDialog = ref(false)
+/** A picked file being framed before it replaces a default. */
+const cropTarget = ref<{
+  image: string, file: File, source: string, aspectRatio: number, crop: ImageCrop | null,
+} | null>(null)
+const cropDialog = ref(false)
 
 const selected = ref<any>(null)
 const deleteDialog = ref(false)
@@ -509,20 +533,40 @@ function pickFile(image: string) {
   fileInput.value?.click()
 }
 
-async function onFilePicked(event: Event) {
+/**
+ * Framed before it is sent, in the frame of the buckets it fills — every bucket of one
+ * default shares a ratio, which is what lets one upload write them all.
+ */
+function onFilePicked(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   const image = pendingImage.value
   // Picking the same file twice fires no change event unless the input is cleared first
   input.value = ''
   if (!file || !image) return
+  const frame = defaults.value.find(d => d.image === image).files[0]
+  cropTarget.value = {
+    image, file, source: URL.createObjectURL(file), aspectRatio: frame.width / frame.height, crop: null,
+  }
+  cropDialog.value = true
+}
+
+async function confirmCrop() {
+  const {image, file, crop} = cropTarget.value!
+  cropDialog.value = false
   uploading.value = image
   try {
-    await uploadDefaultImage(image, file)
+    await uploadDefaultImage(image, file, crop)
     notifyOk(t('admin_action_done'))
     await Promise.all([loadDefaults(), reloadAll()])
   } catch (e) { fail(e) } finally { uploading.value = null }
 }
+
+watch(cropDialog, open => {
+  if (open || !cropTarget.value) return
+  URL.revokeObjectURL(cropTarget.value.source)
+  cropTarget.value = null
+})
 
 const askReset = (d: any) => { resetTarget.value = d; resetDialog.value = true }
 

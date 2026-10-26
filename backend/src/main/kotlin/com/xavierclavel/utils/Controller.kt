@@ -116,8 +116,14 @@ suspend fun RoutingContext.handleDeletion(deleted: Boolean?) {
  * [maxBytes] bounds what is read into memory. It is left off where a session is what got the
  * caller here — nginx's `client_max_body_size` is the bound there, as it always was — and set
  * on the ticket endpoint, which anyone holding a URL can reach.
+ *
+ * The crop rides in the query (`?crop=left,top,width,height`, see [ImageCrop]) rather than as a
+ * second part of the body, because this refuses any part that is not the file: a client that
+ * sends one is then still understood by a backend that predates it, which saves it centred.
+ * It is read first, so a refused crop costs no upload.
  */
-suspend fun RoutingContext.receiveImage(maxBytes: Long? = null): Pair<BufferedImage, Metadata> {
+suspend fun RoutingContext.receiveImage(maxBytes: Long? = null): UploadedImage {
+    val crop = call.queryParameters["crop"]?.let { ImageCrop.parse(it) }
     val multipart = call.receiveMultipart()
     var image: BufferedImage? = null
     var metadata: Metadata? = null
@@ -143,7 +149,7 @@ suspend fun RoutingContext.receiveImage(maxBytes: Long? = null): Pair<BufferedIm
         logger.error {"No metadata found"}
         throw BadRequestException(BadRequestCause.INVALID_IMAGE)
     }
-    return Pair(image, metadata)
+    return UploadedImage(image, metadata, crop)
 }
 
 /**

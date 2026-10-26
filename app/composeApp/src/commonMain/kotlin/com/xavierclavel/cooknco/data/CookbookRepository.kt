@@ -9,6 +9,7 @@ import com.xavierclavel.cooknco.network.dto.CookbookUserInfo
 import com.xavierclavel.cooknco.network.dto.CookbookUserSaveDto
 import com.xavierclavel.cooknco.network.dto.UserSearchResult
 import com.xavierclavel.cooknco.network.isOffline
+import com.xavierclavel.cooknco.platform.PickedImage
 import kotlinx.coroutines.flow.first
 
 class CookbookRepository(
@@ -58,9 +59,9 @@ class CookbookRepository(
         cookbookApi.updateCookbook(id, token, dto)
     }
 
-    suspend fun uploadCookbookImage(cookbookId: Long, imageBytes: ByteArray, mimeType: String): Result<Unit> = runCatching {
+    suspend fun uploadCookbookImage(cookbookId: Long, image: PickedImage): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
-        cookbookApi.uploadCookbookImage(token, cookbookId, imageBytes, mimeType)
+        cookbookApi.uploadCookbookImage(token, cookbookId, image)
     }
 
     suspend fun deleteCookbook(id: Long): Result<Unit> = runCatching {

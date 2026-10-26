@@ -1031,7 +1031,7 @@ class RecipeEditViewModel(
                     // Clearing it only on success keeps a later "Save draft" tap from
                     // re-uploading (and re-bumping the image version for) the same picture.
                     val imageUploaded = state.pendingImage?.let { image ->
-                        repo.uploadRecipeImage(recipe.id, image.bytes, image.mimeType).isSuccess
+                        repo.uploadRecipeImage(recipe.id, image).isSuccess
                     } ?: false
                     val stepVersions = syncStepImages(written, recipe.steps)
                     _uiState.update { current ->
@@ -1085,7 +1085,7 @@ class RecipeEditViewModel(
             val picked = step.pendingImage
             when {
                 picked != null ->
-                    if (repo.uploadStepImage(stepId, picked.bytes, picked.mimeType).isSuccess) {
+                    if (repo.uploadStepImage(stepId, picked).isSuccess) {
                         versions[step.id] = row.imageVersion + 1
                     }
                 // The cook took the photo off. Saving the words does not touch the file, so
