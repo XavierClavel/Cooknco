@@ -12,17 +12,17 @@ export const INGREDIENT_TYPES = [
   'CONDIMENT', 'OIL', 'BAKERY', 'BEVERAGE_INGREDIENT', 'ALCOHOL', 'MISCELLANEOUS',
 ]
 
-/** Per-100g figures, in the order the form lays them out. */
+/** Per-100g figures, in the order the form lays them out, in the unit Ciqual states each in. */
 export const NUTRITION_FIELDS = [
-  {key: 'calories', step: 1},
-  {key: 'proteins', step: 0.1},
-  {key: 'carbohydrates', step: 0.1},
-  {key: 'sugars', step: 0.1},
-  {key: 'fibers', step: 0.1},
-  {key: 'saturatedFat', step: 0.1},
-  {key: 'unsaturatedFat', step: 0.1},
-  {key: 'cholesterol', step: 0.1},
-  {key: 'sodium', step: 0.001},
+  {key: 'calories', step: 1, unit: 'kcal'},
+  {key: 'proteins', step: 0.1, unit: 'g'},
+  {key: 'carbohydrates', step: 0.1, unit: 'g'},
+  {key: 'sugars', step: 0.1, unit: 'g'},
+  {key: 'fibers', step: 0.1, unit: 'g'},
+  {key: 'saturatedFat', step: 0.1, unit: 'g'},
+  {key: 'unsaturatedFat', step: 0.1, unit: 'g'},
+  {key: 'cholesterol', step: 0.1, unit: 'mg'},
+  {key: 'salt', step: 0.001, unit: 'g'},
 ]
 
 const UNITS = [
@@ -71,6 +71,11 @@ export type IngredientForm = Record<string, any> & {
   gramsPerMilliliter: number | null
   measurableByWeight: boolean
   defaultUnit: string | null
+  /** The Ciqual food the figures are copied from; null while they are typed in. */
+  ciqualCode: number | null
+  ciqualName: Record<string, string> | null
+  /** Known for a saved link only: a food picked in the form is read in whichever edition the server carries. */
+  ciqualEdition: number | null
 }
 
 /** A cleared input means "unknown", which is what a null conversion says on the wire. */
@@ -95,8 +100,12 @@ export function emptyForm(): IngredientForm {
     gramsPerMilliliter: null,
     measurableByWeight: true,
     defaultUnit: 'GRAM',
+    ciqualCode: null,
+    ciqualName: null,
+    ciqualEdition: null,
   }
-  NUTRITION_FIELDS.forEach(f => { form[f.key] = 0 })
+  // Unknown until somebody says otherwise: a 0 would be printed as "contains none"
+  NUTRITION_FIELDS.forEach(f => { form[f.key] = null })
   return form
 }
 
@@ -110,8 +119,29 @@ export function formOf(ingredient: Record<string, any>): IngredientForm {
   form.gramsPerMilliliter = ingredient.gramsPerMilliliter ?? null
   form.measurableByWeight = ingredient.measurableByWeight ?? false
   form.defaultUnit = ingredient.defaultUnit ?? null
-  NUTRITION_FIELDS.forEach(f => { form[f.key] = ingredient[f.key] ?? 0 })
+  form.ciqualCode = ingredient.ciqual?.code ?? null
+  form.ciqualName = ingredient.ciqual?.name ?? null
+  form.ciqualEdition = ingredient.ciqual?.edition ?? null
+  NUTRITION_FIELDS.forEach(f => { form[f.key] = ingredient[f.key] ?? null })
   return form
+}
+
+/**
+ * Links the form to a Ciqual food, showing the figures linking it will copy. The server copies
+ * them again on save and ignores these, so this is a preview rather than the write.
+ */
+export function linkCiqual(form: IngredientForm, food: Record<string, any>) {
+  form.ciqualCode = food.code
+  form.ciqualName = food.name
+  form.ciqualEdition = null
+  NUTRITION_FIELDS.forEach(f => { form[f.key] = food[f.key] ?? null })
+}
+
+/** Back to typing the figures in, starting from the ones the link held. */
+export function unlinkCiqual(form: IngredientForm) {
+  form.ciqualCode = null
+  form.ciqualName = null
+  form.ciqualEdition = null
 }
 
 export function payloadOf(form: IngredientForm): Record<string, unknown> {
@@ -122,8 +152,9 @@ export function payloadOf(form: IngredientForm): Record<string, unknown> {
     gramsPerMilliliter: numberOrNull(form.gramsPerMilliliter),
     measurableByWeight: form.measurableByWeight,
     defaultUnit: form.defaultUnit || null,
+    ciqualCode: form.ciqualCode,
   }
-  NUTRITION_FIELDS.forEach(f => { body[f.key] = Number(form[f.key]) || 0 })
+  NUTRITION_FIELDS.forEach(f => { body[f.key] = numberOrNull(form[f.key]) })
   return body
 }
 

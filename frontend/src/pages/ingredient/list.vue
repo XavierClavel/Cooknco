@@ -48,7 +48,7 @@
                 {{$t("proteins")}}
               </th>
               <th class="text-center">
-                {{$t("sodium")}}
+                {{$t("salt")}}
               </th>
               <th class="text-center">
                 {{$t("saturatedFat")}}
@@ -74,15 +74,16 @@
                   ></v-img>
                 </v-avatar>
                 {{ ingredient.name[getLocale().toUpperCase()]}}</td>
-              <td class="text-center">{{ ingredient.calories }}</td>
-              <td class="text-center">{{ ingredient.cholesterol }}</td>
-              <td class="text-center">{{ ingredient.carbohydrates }}</td>
-              <td class="text-center">{{ ingredient.sugars }}</td>
-              <td class="text-center">{{ ingredient.fibers }}</td>
-              <td class="text-center">{{ ingredient.proteins }}</td>
-              <td class="text-center">{{ ingredient.sodium }}</td>
-              <td class="text-center">{{ ingredient.saturatedFat }}</td>
-              <td class="text-center">{{ ingredient.unsaturatedFat }}</td>
+              <!-- Unknown is not zero, so it is not printed as one -->
+              <td class="text-center">{{ ingredient.calories ?? '—' }}</td>
+              <td class="text-center">{{ ingredient.cholesterol ?? '—' }}</td>
+              <td class="text-center">{{ ingredient.carbohydrates ?? '—' }}</td>
+              <td class="text-center">{{ ingredient.sugars ?? '—' }}</td>
+              <td class="text-center">{{ ingredient.fibers ?? '—' }}</td>
+              <td class="text-center">{{ ingredient.proteins ?? '—' }}</td>
+              <td class="text-center">{{ ingredient.salt ?? '—' }}</td>
+              <td class="text-center">{{ ingredient.saturatedFat ?? '—' }}</td>
+              <td class="text-center">{{ ingredient.unsaturatedFat ?? '—' }}</td>
             </tr>
             </tbody>
           </v-table>

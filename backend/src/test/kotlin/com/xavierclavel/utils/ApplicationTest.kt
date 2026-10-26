@@ -6,6 +6,7 @@ import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.AppShellSource
 import com.xavierclavel.services.AppVersionService
 import com.xavierclavel.services.BackupService
+import com.xavierclavel.services.CiqualService
 import com.xavierclavel.services.CookbookService
 import com.xavierclavel.services.DashboardService
 import com.xavierclavel.services.DefaultImageService
@@ -112,6 +113,7 @@ abstract class ApplicationTest: KoinTest {
                 single { RecipeService() }
                 single { UserService() }
                 single { IngredientService() }
+                single { CiqualService() }
                 single { ImageService() }
                 single { ImageUploadTicketService() }
                 single { DefaultImageService() }

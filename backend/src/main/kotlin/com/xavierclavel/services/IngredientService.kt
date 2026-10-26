@@ -15,6 +15,7 @@ import shared.infodto.CustomIngredientUsage
 import io.ebean.DB
 import io.ebean.Paging
 import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import com.xavierclavel.utils.DbTransaction.deleteAndGet
 import com.xavierclavel.utils.DbTransaction.insertAndGet
 import com.xavierclavel.utils.DbTransaction.updateAndGet
@@ -26,6 +27,8 @@ import shared.enums.Sort
 import shared.infodto.IngredientInfo
 
 class IngredientService: KoinComponent {
+    val ciqualService: CiqualService by inject()
+
     fun countAll() =
         QIngredient().findCount()
 
@@ -76,7 +79,12 @@ class IngredientService: KoinComponent {
     /** [describe] for a whole page, at a fixed cost whatever the page holds. */
     fun describeAll(ingredients: List<Ingredient>): List<IngredientInfo> {
         val names = namesOf(ingredients.map { it.id })
-        return ingredients.map { it.toInfo(names[it.id].orEmpty()) }
+        return ingredients.map { ingredient ->
+            val ciqual = ingredient.ciqualCode?.let {
+                ciqualService.sourceOf(it, ingredient.ciqualEdition ?: CiqualService.EDITION)
+            }
+            ingredient.toInfo(names[ingredient.id].orEmpty(), ciqual)
+        }
     }
 
     fun findEntityById(ingredientId: Long) : Ingredient? =
@@ -87,7 +95,11 @@ class IngredientService: KoinComponent {
 
     fun createIngredient(ingredientDTO: IngredientDTO): IngredientInfo {
         validate(ingredientDTO)
-        val ingredient = Ingredient().mergeDTO(ingredientDTO).insertAndGet()
+        val ciqualFood = ciqualFoodOf(ingredientDTO)
+        val ingredient = Ingredient()
+            .mergeDTO(ingredientDTO)
+            .apply { ciqualFood?.let { linkCiqual(it, CiqualService.EDITION) } }
+            .insertAndGet()
         ingredientDTO.name.forEach {
             val localizedIngredientName = LocalizedIngredientName(ingredient = ingredient, locale = it.key, name = it.value)
             localizedIngredientName.insert()
@@ -98,6 +110,7 @@ class IngredientService: KoinComponent {
 
     fun updateIngredient(id:Long, ingredientDTO: IngredientDTO): IngredientInfo {
         validate(ingredientDTO)
+        val ciqualFood = ciqualFoodOf(ingredientDTO)
         val ingredient = findEntityById(id) ?: throw NotFoundException(NotFoundCause.INGREDIENT_NOT_FOUND)
 
         ingredientDTO.name.forEach {
@@ -109,13 +122,21 @@ class IngredientService: KoinComponent {
             localizedIngredientName.name = it.value
             localizedIngredientName.save()
         }
+        // Saving a linked ingredient copies the values again, which is how one picks up a new
+        // edition of the table: whatever the request said about them is not read.
         ingredient
             .mergeDTO(ingredientDTO)
+            .apply { ciqualFood?.let { linkCiqual(it, CiqualService.EDITION) } }
             .updateAndGet()
         return describe(QIngredient().id.eq(ingredient.id).findOne()!!)
     }
 
 
+
+    /** The Ciqual food [ingredientDTO] asks to be linked to, refused if the table does not list it. */
+    private fun ciqualFoodOf(ingredientDTO: IngredientDTO) = ingredientDTO.ciqualCode?.let {
+        ciqualService.find(it) ?: throw BadRequestException(BadRequestCause.UNKNOWN_CIQUAL_FOOD)
+    }
 
     /**
      * A conversion factor doubles as the "this ingredient can be measured this way" flag, so a
