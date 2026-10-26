@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
+    <changeSet type="apply">
+        <alterColumn columnName="calories" tableName="ingredients" currentType="integer" notnull="false" currentNotnull="true"/>
+        <alterColumn columnName="cholesterol" tableName="ingredients" currentType="float" notnull="false" currentNotnull="true"/>
+        <alterColumn columnName="saturated_fat" tableName="ingredients" currentType="float" defaultValue="DROP DEFAULT" notnull="false" currentNotnull="true"/>
+        <alterColumn columnName="unsaturated_fat" tableName="ingredients" currentType="float" defaultValue="DROP DEFAULT" notnull="false" currentNotnull="true"/>
+        <alterColumn columnName="carbohydrates" tableName="ingredients" currentType="float" defaultValue="DROP DEFAULT" notnull="false" currentNotnull="true"/>
+        <alterColumn columnName="sugars" tableName="ingredients" currentType="float" defaultValue="DROP DEFAULT" notnull="false" currentNotnull="true"/>
+        <alterColumn columnName="fibers" tableName="ingredients" currentType="float" notnull="false" currentNotnull="true"/>
+        <alterColumn columnName="proteins" tableName="ingredients" currentType="float" notnull="false" currentNotnull="true"/>
+        <addColumn tableName="ingredients">
+            <column name="salt" type="float"/>
+            <column name="ciqual_code" type="integer"/>
+            <column name="ciqual_edition" type="integer"/>
+        </addColumn>
+    </changeSet>
+    <changeSet type="pendingDrops">
+        <dropColumn columnName="sodium" tableName="ingredients"/>
+    </changeSet>
+</migration>

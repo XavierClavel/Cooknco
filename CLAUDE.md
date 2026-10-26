@@ -912,6 +912,50 @@ A drift costs a sliver, not a failure: the backend still centres what it is sent
 app's `data/ImageCrop.kt`; the app's copy is what `ImageCropTest` holds, the site having no
 test runner.
 
+## Nutrition is Ciqual's, and a linked ingredient cannot be edited
+
+The catalogue's nutrition comes from the Anses [Ciqual](https://ciqual.anses.fr) table — the
+reference composition of the foods eaten in France, 3 484 of them in the 2025 edition — rather
+than from whoever typed it in. `CiqualService` reads it from a file bundled with the backend
+(`resources/ciqual/ciqual-2025.tsv`) and holds it in memory; the backoffice's ingredient form
+searches it (`GET /admin/ciqual`), and an ingredient links to one food by its code. No table
+and no API call: 3 484 read-only rows, read by one admin screen, replaced every five years or so.
+
+Four things not to undo:
+
+- **A linked ingredient holds Ciqual's figures and no others.** The server copies the nine
+  values on every save (`Ingredient.linkCiqual`) and ignores the ones in the request, and the
+  form disables them. A page that cites Anses must not show a number Anses did not publish, so
+  changing one means unlinking first. Saving a linked ingredient again is also how it picks up
+  a new edition.
+- **Null is unknown, and unknown is not zero.** Ciqual prints `-` where it did not measure —
+  cholesterol for a quarter of its foods — and the columns are nullable since 1.55 so that
+  survives to the page, which shows "—". `traces` and `< x` read as 0: measured, and below
+  detection; the bounds that are not small (`< 700` mg of cholesterol) sit on foods that hold
+  none. Unsaturated fat is mono + poly, unknown if either is. The zeros typed in before 1.55
+  stay zeros, since nothing tells them from the old default.
+- **The column is salt, not sodium** — g/100 g, as Ciqual states it and as the French label
+  always said; sodium is 2.5 times less. `sodium` is waiting for a `pendingDropsFor(1.55)`
+  migration, and lost its `not null` meanwhile: it had no default, so with nothing writing it
+  every insert would have failed — which tests cannot see, their schema coming from the
+  entities. `scripts/verify-migrations.sh` holds it.
+- **The citation is a licence condition.** The table is under the Licence Ouverte 2.0, which
+  allows commercial reuse provided every reuse names "Anses. <year>. Table de composition
+  nutritionnelle des aliments Ciqual". The ingredient page prints it under a linked
+  ingredient's figures, from `IngredientInfo.ciqual` — naming the edition the figures were
+  *read in*, kept per row (`ciqual_edition`), so that it stays true once a newer one is bundled.
+
+The search is prefix matching over the French and English names, deliberately not fuzzy: a
+misspelt food finds nothing rather than a neighbour linked by accident. Among the names that
+start with the word asked, Ciqual's "aliment moyen" entries come first — its average over every
+variety of a food, which is what a generic catalogue entry such as "Tomate" means.
+
+The file is written by `:backend:extractCiqual` from the XML published on
+recherche.data.gouv.fr — not the spreadsheet, which names foods in French only — and keeps every
+value exactly as published; reading them is `CiqualService.parseValue`'s job, where
+`CiqualServiceTest` reads every row. A new edition is: download the XML, run the task with the
+new year, delete the old file, bump `CiqualService.EDITION`.
+
 ## Build and test
 
 Use `sh ./gradlew` (the wrapper lacks the exec bit in worktrees) with JDK 23 — Gradle 8.10.2

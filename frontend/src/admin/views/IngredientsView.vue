@@ -28,6 +28,7 @@
               <th>{{ $t('admin_name_fr') }}</th>
               <th>{{ $t('type') }}</th>
               <th class="right">{{ $t('calories') }}</th>
+              <th>{{ $t('admin_nutrition_source') }}</th>
               <th>{{ $t('admin_measurable_as') }}</th>
               <th>{{ $t('defaultUnit') }}</th>
               <th class="right">{{ $t('admin_used_in_recipes') }}</th>
@@ -39,7 +40,12 @@
               <td>{{ i.name?.EN || '—' }}</td>
               <td class="muted">{{ i.name?.FR || '—' }}</td>
               <td><span class="badge">{{ i.type }}</span></td>
-              <td class="right tnum">{{ i.calories }}</td>
+              <td class="right tnum">{{ i.calories ?? '—' }}</td>
+              <td>
+                <span v-if="i.ciqualCode !== null && i.ciqualCode !== undefined" class="badge info"
+                      :title="`#${i.ciqualCode}`">{{ $t('admin_ciqual') }}</span>
+                <span v-else class="subtle small">{{ $t('admin_nutrition_typed') }}</span>
+              </td>
               <td>
                 <!-- NONE is always allowed and says nothing, so only the real families show -->
                 <span class="row-wrap" style="gap:4px">
@@ -186,11 +192,47 @@
         </div>
 
         <div class="col" style="gap:8px">
+          <span class="panel-title">{{ $t('admin_ciqual_title') }}</span>
+          <p class="small muted">{{ $t('admin_ciqual_hint') }}</p>
+          <div v-if="form.ciqualCode !== null" class="alert info">
+            <ui-icon name="leaf" />
+            <span>
+              Ciqual{{ form.ciqualEdition ? ` ${form.ciqualEdition}` : '' }} —
+              {{ form.ciqualName?.FR || form.ciqualName?.EN || '' }}
+              <span class="mono small">#{{ form.ciqualCode }}</span>
+            </span>
+            <span class="spacer"></span>
+            <button class="btn sm" @click="unlink">
+              <ui-icon name="undo" :size="14" />{{ $t('admin_ciqual_unlink') }}
+            </button>
+          </div>
+          <template v-else>
+            <div class="search">
+              <ui-icon name="search" :size="15" />
+              <input v-model="ciqualQuery" class="input" :placeholder="$t('admin_ciqual_search')"
+                     @input="debouncedCiqual" />
+            </div>
+            <ul v-if="ciqualResults.length" class="candidates">
+              <li v-for="c in ciqualResults" :key="c.code">
+                <button class="btn sm" @click="pickCiqual(c)">
+                  <ui-icon name="arrowRight" :size="14" />{{ $t('admin_ciqual_use') }}
+                </button>
+                <span>{{ c.name?.FR || c.name?.EN }}</span>
+                <span class="subtle small">{{ c.group?.FR }} · {{ c.calories ?? '—' }} kcal</span>
+              </li>
+            </ul>
+            <p v-else-if="ciqualSearched" class="small muted">{{ $t('admin_ciqual_no_result') }}</p>
+          </template>
+        </div>
+
+        <div class="col" style="gap:8px">
           <span class="panel-title">{{ $t('admin_nutrition_per_100g') }}</span>
           <div class="grid3">
             <label v-for="f in NUTRITION_FIELDS" :key="f.key" class="field">
-              <span>{{ $t(f.key) }}</span>
-              <input v-model="form[f.key]" class="input" type="number" min="0" :step="f.step" />
+              <span>{{ $t(f.key) }} ({{ f.unit }})</span>
+              <!-- A linked ingredient holds Ciqual's figures and no others: unlink it to type -->
+              <input v-model="form[f.key]" class="input" type="number" min="0" :step="f.step"
+                     :disabled="form.ciqualCode !== null" :placeholder="$t('admin_conversion_unknown')" />
             </label>
           </div>
         </div>
@@ -222,11 +264,11 @@ import {computed, onMounted, reactive, ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {
   absorbCustomIngredient, createIngredient, deleteIngredient, errorKey, getCustomIngredientUsage,
-  getIngredient, listIngredients, listUnits, updateIngredient,
+  getIngredient, listIngredients, listUnits, searchCiqual, updateIngredient,
 } from '../lib/api'
 import {
-  allowedTypesOf, emptyForm, FALLBACK_UNITS, formOf, INGREDIENT_TYPES, NUTRITION_FIELDS, payloadOf,
-  typeDefaults, unitLabel, type IngredientForm,
+  allowedTypesOf, emptyForm, FALLBACK_UNITS, formOf, INGREDIENT_TYPES, linkCiqual, NUTRITION_FIELDS,
+  payloadOf, typeDefaults, unitLabel, unlinkCiqual, type IngredientForm,
 } from '../lib/ingredients'
 import {notifyError, notifyInfo, notifyOk} from '../lib/toast'
 import UiIcon from '../components/UiIcon.vue'
@@ -259,6 +301,10 @@ const editorTitle = ref('')
 const absorbName = ref<string | null>(null)
 const absorbQuery = ref('')
 const candidates = ref<any[]>([])
+const ciqualQuery = ref('')
+const ciqualResults = ref<any[]>([])
+/** Set once an answer for the query typed has arrived, so that an empty list can say so. */
+const ciqualSearched = ref(false)
 
 const selected = ref<any>(null)
 const dialog = ref(false)
@@ -309,6 +355,10 @@ function openForm(title: string, next: IngredientForm) {
   absorbQuery.value = ''
   candidates.value = []
   editor.value = true
+  // An ingredient whose figures are typed in is offered the Ciqual foods its name finds
+  ciqualResults.value = []
+  ciqualQuery.value = next.ciqualCode === null ? (next.name.FR || next.name.EN) : ''
+  loadCiqual()
 }
 
 const openCreate = () => openForm(t('admin_new_ingredient'), emptyForm())
@@ -347,6 +397,34 @@ async function loadCandidates() {
 
 let candidateTimer: any
 const debouncedCandidates = () => { clearTimeout(candidateTimer); candidateTimer = setTimeout(loadCandidates, 350) }
+
+async function loadCiqual() {
+  const query = ciqualQuery.value.trim()
+  ciqualSearched.value = false
+  if (!query) { ciqualResults.value = []; return }
+  try {
+    const {data} = await searchCiqual(query, 8)
+    // An answer to what was typed before the last keystroke is not one to show
+    if (query !== ciqualQuery.value.trim()) return
+    ciqualResults.value = data
+    ciqualSearched.value = true
+  } catch (e) { fail(e) }
+}
+
+let ciqualTimer: any
+const debouncedCiqual = () => { clearTimeout(ciqualTimer); ciqualTimer = setTimeout(loadCiqual, 350) }
+
+function pickCiqual(food: any) {
+  linkCiqual(form.value, food)
+  ciqualResults.value = []
+}
+
+/** The figures stay as the link left them, to be edited; the foods the name finds come back. */
+function unlink() {
+  unlinkCiqual(form.value)
+  ciqualQuery.value = form.value.name.FR || form.value.name.EN
+  loadCiqual()
+}
 
 /**
  * Rows the ingredient cannot be measured in stay free text, so say so rather than letting the

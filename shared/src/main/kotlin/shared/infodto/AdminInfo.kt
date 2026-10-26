@@ -99,8 +99,10 @@ data class AdminIngredientInfo(
     val id: Long,
     val name: Map<Locale, String>,
     val type: IngredientType,
-    val calories: Int,
+    val calories: Int?,
     val recipesCount: Int,
+    /** Set when the nutrition comes from Ciqual, so the catalogue shows what is left to link. */
+    val ciqualCode: Int? = null,
     /** Carried in the row so the catalogue shows which ingredients still lack a conversion. */
     val allowedTypes: Set<MeasurementType> = setOf(MeasurementType.NONE),
     val defaultUnit: AmountUnit? = null,

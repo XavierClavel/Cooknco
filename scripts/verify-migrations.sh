@@ -1,6 +1,6 @@
 #!/bin/bash
-# Applies the pre-change migrations, seeds realistic legacy data, then applies 1.34-1.37 and checks
-# the data migration did what it claims. Tests build the schema from the entity model, so this is
+# Applies the pre-change migrations, seeds realistic legacy data, then applies 1.34 onwards and checks
+# the data migrations did what they claim. Tests build the schema from the entity model, so this is
 # the only thing that exercises the migration SQL.
 set -euo pipefail
 
@@ -183,6 +183,12 @@ begin
   select count(*) into n from users where is_premium_forever or premium_until is not null;
   if n <> 0 then raise exception '% accounts came out of the migration premium', n; end if;
 
+  -- 1.55: `sodium` is read as salt, and every value came across as it stood
+  select count(*) into n from ingredients where salt is distinct from sodium;
+  if n <> 0 then raise exception '% ingredients lost their salt figure', n; end if;
+  select count(*) into n from ingredients where salt is null;
+  if n <> 0 then raise exception '% ingredients came out with no salt figure', n; end if;
+
   raise notice 'ALL ASSERTIONS PASSED';
 end $$;
 SQL
@@ -192,10 +198,10 @@ psql -c "select conname, pg_get_constraintdef(oid) from pg_constraint where conr
 
 # psql exits non-zero on a rejected insert, so capture the message instead of piping (pipefail).
 expect_rejected() {
-  local label="$1" sql="$2" out
+  local label="$1" sql="$2" constraint="${3:-ck_recipe_ingredients_ref_xor_custom}" out
   out=$(docker exec -i $CT psql -U postgres -d verify -c "$sql" 2>&1 || true)
   case "$out" in
-    *ck_recipe_ingredients_ref_xor_custom*) echo "OK: $label rejected" ;;
+    *"$constraint"*) echo "OK: $label rejected" ;;
     *) echo "FAIL: $label was accepted"; echo "$out"; exit 1 ;;
   esac
 }
@@ -206,6 +212,18 @@ expect_rejected "row that is both referenced and custom" \
    values (1, 1, 'both', 1, 'GRAM', 9);"
 expect_rejected "row that is neither" \
   "insert into recipe_ingredients (recipe_id, amount, unit, sort_order) values (1, 1, 'GRAM', 9);"
+
+# 1.55: the backend no longer writes `sodium`, and leaves unknown nutrition null. An insert
+# that does both has to go through, or every new ingredient fails until the drop migration.
+echo "== 1.55: an ingredient written the way the backend now writes one =="
+psql -q -c "insert into ingredients (id, type, calories, cholesterol, saturated_fat, unsaturated_fat,
+              carbohydrates, sugars, fibers, proteins, salt, ciqual_code, ciqual_edition)
+            values (3, 0, 19, null, 0, 0, 3.69, 3.22, 1.02, 0.6, 0, 20385, 2025);"
+echo "OK: inserted with no sodium and an unknown cholesterol"
+expect_rejected "a Ciqual code with no edition" \
+  "insert into ingredients (id, type, ciqual_code) values (4, 0, 20385);" ck_ingredients_ciqual_source
+expect_rejected "an edition with no Ciqual code" \
+  "insert into ingredients (id, type, ciqual_edition) values (4, 0, 2025);" ck_ingredients_ciqual_source
 
 echo
 echo "ALL MIGRATION CHECKS PASSED"
