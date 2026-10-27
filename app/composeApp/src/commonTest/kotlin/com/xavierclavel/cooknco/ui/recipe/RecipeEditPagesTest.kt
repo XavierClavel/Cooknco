@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.ui.recipe
 
 import androidx.lifecycle.viewModelScope
+import com.xavierclavel.cooknco.data.AppUnitSystem
 import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.ScannedIngredient
 import com.xavierclavel.cooknco.data.ScannedRecipe
@@ -10,7 +11,13 @@ import com.xavierclavel.cooknco.data.createPreferencesDataStore
 import com.xavierclavel.cooknco.data.testOfflineStore
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.RecipeApi
+import com.xavierclavel.cooknco.network.dto.RecipeInfo
+import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
+import com.xavierclavel.cooknco.network.dto.RecipeOwner
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
+import com.xavierclavel.cooknco.network.dto.RecipeStepIngredientInfo
+import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
+import com.xavierclavel.cooknco.ui.i18n.EnStrings
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -53,7 +60,7 @@ class RecipeEditPagesTest {
     private val storeFile = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
         "cooknco-pages-${Random.nextLong()}.preferences_pb"
 
-    /** What the view model posted to `/recipe`, in order. */
+    /** What the view model posted to `/recipe`, or put to `/recipe/{id}`, in order. */
     private val saved = mutableListOf<RecipeSaveDto>()
 
     /**
@@ -62,10 +69,15 @@ class RecipeEditPagesTest {
      *
      * The save is answered with a refusal: what was sent is the thing under test, and a
      * refusal ends the save without the image uploads a success would go on to.
+     *
+     * [opened] is a saved recipe the editor opens instead of a blank one.
      */
-    private fun pagesTest(body: suspend TestScope.(RecipeEditViewModel) -> Unit): TestResult = runTest {
+    private fun pagesTest(
+        opened: RecipeInfo? = null,
+        body: suspend TestScope.(RecipeEditViewModel) -> Unit,
+    ): TestResult = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val viewModel = viewModel()
+        val viewModel = viewModel(opened)
         try {
             body(viewModel)
         } finally {
@@ -237,14 +249,119 @@ class RecipeEditPagesTest {
         assertNull(used.amount)
     }
 
-    private suspend fun viewModel(): RecipeEditViewModel {
+    @Test
+    fun a_decimal_amount_can_be_typed_and_is_sent() = pagesTest { viewModel ->
+        viewModel.updateTitle("Pain")
+        viewModel.addCustom("farine", unit = "KILOGRAM")
+        // A key at a time, each added to what the box holds, as the box does. That is how the
+        // point was lost: "1." was held as the number 1 and written back into the box as "1".
+        "1.5".forEach { key ->
+            viewModel.updateIngredientAmount(0, viewModel.uiState.value.ingredients[0].amount + key)
+        }
+        assertEquals("1.5", viewModel.uiState.value.ingredients[0].amount)
+
+        viewModel.addStep()
+        val step = viewModel.uiState.value.steps.single().id
+        viewModel.updateStep(step, "Pétrir")
+        viewModel.attachToStep(step, StepAttachment.INGREDIENTS)
+        viewModel.toggleStepIngredient(step, 0)
+        // A French keyboard's decimal key types a comma. Dropping it made this 15, three
+        // times the bag, which the save would then refuse as more than the row lists.
+        "1,5".forEach { key ->
+            val share = viewModel.uiState.value.steps.single().ingredients.single().amount
+            viewModel.updateStepIngredientAmount(step, 0, share + key)
+        }
+        assertEquals("1.5", viewModel.uiState.value.steps.single().ingredients.single().amount)
+
+        viewModel.save()
+        viewModel.awaitSaveAttempt()
+
+        val sent = saved.single()
+        assertEquals(1.5f, sent.ingredients.single().amount)
+        assertEquals(1.5f, sent.steps.single().ingredients.single().amount)
+    }
+
+    /** A recipe saved with a third of a sachet, in a step that uses all of it. */
+    private val aThird = RecipeInfo(
+        id = 12L,
+        version = 1L,
+        title = "Pain",
+        dishClass = "MAIN_DISH",
+        owner = RecipeOwner(id = 1L, version = 1L, username = "Aya"),
+        yield = 1,
+        ingredients = listOf(RecipeIngredientInfo(name = "levure", amount = 1f / 3, unit = "UNIT")),
+        steps = listOf(RecipeStepInfo("Délayer", ingredients = listOf(RecipeStepIngredientInfo(0, 1f / 3)))),
+        creationDate = 0L,
+        likesCount = 0,
+    )
+
+    private suspend fun RecipeEditViewModel.awaitLoad() = uiState.first { !it.isLoading && it.ingredients.isNotEmpty() }
+
+    /** What the recipe screen and cook mode print for [amount] sachets, cooked for [servings]. */
+    private fun shown(amount: Float?, servings: Int) =
+        amountLabel(amount, "UNIT", servings, recipeYield = 1, AppUnitSystem.METRIC, UnitRepository.DEFAULT_UNITS, EnStrings)
+
+    @Test
+    fun a_recipe_opened_and_saved_untouched_keeps_its_amounts_exact() = pagesTest(opened = aThird) { viewModel ->
+        viewModel.awaitLoad()
+        // Shown as every other screen shows it...
+        assertEquals("0.33", viewModel.uiState.value.ingredients.single().amount)
+        assertEquals("0.33", viewModel.uiState.value.steps.single().ingredients.single().amount)
+
+        viewModel.save()
+        viewModel.awaitSaveAttempt()
+
+        // ...but saved as it was stored. Saving the 0.33 the box shows made a third cooked
+        // for three read 0.99.
+        val sent = saved.single()
+        assertEquals("1", shown(sent.ingredients.single().amount, servings = 3))
+        assertEquals("1", shown(sent.steps.single().ingredients.single().amount, servings = 3))
+    }
+
+    @Test
+    fun what_is_typed_over_an_opened_amount_is_what_is_saved() = pagesTest(opened = aThird) { viewModel ->
+        viewModel.awaitLoad()
+        val step = viewModel.uiState.value.steps.single().id
+        fun row() = viewModel.uiState.value.ingredients.single()
+        fun share() = viewModel.uiState.value.steps.single().ingredients.single()
+
+        // A key the box refuses leaves it as it was, and the exact amount with it.
+        viewModel.updateIngredientAmount(0, "0.33x")
+        viewModel.updateStepIngredientAmount(step, 0, "0.33x")
+        assertEquals(1f / 3, row().savedAmount)
+        assertEquals(1f / 3, share().savedAmount)
+
+        viewModel.updateIngredientAmount(0, "0.5")
+        viewModel.updateStepIngredientAmount(step, 0, "0.5")
+        assertEquals(0.5f, row().savedAmount)
+        assertEquals(0.5f, share().savedAmount)
+    }
+
+    @Test
+    fun clearing_an_opened_row_s_unit_does_not_keep_its_amount_out_of_sight() = pagesTest(opened = aThird) { viewModel ->
+        viewModel.awaitLoad()
+
+        // The box empties, and putting a unit back must not save the third it no longer shows.
+        viewModel.updateIngredientUnit(0, "NONE")
+        viewModel.updateIngredientUnit(0, "UNIT")
+
+        assertEquals("", viewModel.uiState.value.ingredients.single().amount)
+        assertNull(viewModel.uiState.value.ingredients.single().savedAmount)
+    }
+
+    private suspend fun viewModel(opened: RecipeInfo?): RecipeEditViewModel {
         val engine = MockEngine { request ->
-            if (request.method == HttpMethod.Post && request.url.encodedPath.endsWith("/recipe")) {
+            val path = request.url.encodedPath
+            if ((request.method == HttpMethod.Post && path.endsWith("/recipe")) || request.method == HttpMethod.Put) {
                 saved += ApiClient.json.decodeFromString<RecipeSaveDto>(request.body.toByteArray().decodeToString())
                 return@MockEngine respond("refused", HttpStatusCode.BadRequest)
             }
             respond(
-                content = """{"count":0,"page":0,"size":20,"items":[]}""",
+                content = if (opened != null && path.endsWith("/recipe/${opened.id}")) {
+                    ApiClient.json.encodeToString(opened)
+                } else {
+                    """{"count":0,"page":0,"size":20,"items":[]}"""
+                },
                 status = HttpStatusCode.OK,
                 headers = headersOf(HttpHeaders.ContentType, "application/json"),
             )
@@ -256,7 +373,7 @@ class RecipeEditPagesTest {
         return RecipeEditViewModel(
             repo = RecipeRepository(api, tokens, testOfflineStore().first),
             unitRepo = UnitRepository(api),
-            recipeId = null,
+            recipeId = opened?.id,
             userId = 1L,
         )
     }

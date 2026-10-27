@@ -45,7 +45,22 @@ data class EditIngredient(
     val query: String = "",
     // A fresh row carries no amount yet, and the server rejects a unit without one.
     val unit: String = "NONE",
-    val amount: Float? = null,
+    /**
+     * Text while it is being typed, like [StepIngredientDraft.amount], and read as a number
+     * only where it is checked and sent ([savedAmount]). A number could not hold "1." — what
+     * a cook has typed of "1.5" so far — and writing it back into the box took the point
+     * away again, so no amount with a decimal could be typed at all.
+     */
+    val amount: String = "",
+    /**
+     * The number [amount] was written from, for a row filled in rather than typed — a saved
+     * recipe, a scan, an import — and null once the cook changes what the box shows.
+     *
+     * The box shows two decimals at most ([formatAmount]), and saving what it shows would
+     * round a third down to 0.33 for good: a recipe opened only to fix its title would then
+     * read 0.99 instead of 1 cooked for three. Until it is typed over, this is what is saved.
+     */
+    val exactAmount: Float? = null,
     val complement: String = "",
     val allowedTypes: List<String> = emptyList(),
     val searchResults: List<IngredientSummary> = emptyList(),
@@ -104,10 +119,14 @@ enum class StepAttachment {
  * [amount] is text while it is being typed, and blank is meaningful: it says "the rest of it",
  * which is the whole line when no other step names an amount. The server works out what that
  * comes to, so nothing here has to do the subtraction.
+ *
+ * [exactAmount] is what a saved share was before it was written into the box, for the reason
+ * [EditIngredient.exactAmount] gives.
  */
 data class StepIngredientDraft(
     val index: Int,
     val amount: String = "",
+    val exactAmount: Float? = null,
 )
 
 data class StepItem(
@@ -257,7 +276,8 @@ class RecipeEditViewModel(
                             type = ing.type ?: "",
                             query = ing.name,
                             unit = ing.unit,
-                            amount = ing.amount,
+                            amount = ing.amount?.let { formatAmount(it) }.orEmpty(),
+                            exactAmount = ing.amount,
                             complement = ing.complement ?: "",
                             allowedTypes = ing.allowedTypes,
                         )
@@ -296,6 +316,7 @@ class RecipeEditViewModel(
                                             // Prefilling from the worked-out value would write
                                             // it back on the next save and freeze the blank.
                                             amount = used.amount?.let { formatAmount(it) }.orEmpty(),
+                                            exactAmount = used.amount,
                                         )
                                     },
                                     durationSeconds = duration,
@@ -349,7 +370,8 @@ class RecipeEditViewModel(
                 ingredientName = ingredient.name,
                 query = ingredient.name,
                 unit = ingredient.unit,
-                amount = ingredient.amount,
+                amount = ingredient.amount?.let { formatAmount(it) }.orEmpty(),
+                exactAmount = ingredient.amount,
                 complement = ingredient.complement.orEmpty(),
             )
         }
@@ -483,7 +505,8 @@ class RecipeEditViewModel(
                 ingredientName = name,
                 query = name,
                 unit = item.unit,
-                amount = item.amount,
+                amount = item.amount?.let { formatAmount(it) }.orEmpty(),
+                exactAmount = item.amount,
                 complement = item.complement.orEmpty(),
             )
         }
@@ -731,7 +754,8 @@ class RecipeEditViewModel(
             if (index < list.size) {
                 list[index] = list[index].copy(
                     unit = unit,
-                    amount = if (unit == "NONE") null else list[index].amount,
+                    amount = if (unit == "NONE") "" else list[index].amount,
+                    exactAmount = if (unit == "NONE") null else list[index].exactAmount,
                 )
             }
             state.copy(ingredients = list)
@@ -741,7 +765,11 @@ class RecipeEditViewModel(
     fun updateIngredientAmount(index: Int, amount: String) {
         _uiState.update { state ->
             val list = state.ingredients.toMutableList()
-            if (index < list.size) list[index] = list[index].copy(amount = amount.toFloatOrNull())
+            val typed = amountInput(amount)
+            // A key the box refuses changes nothing, and must not cost the exact amount either.
+            if (index < list.size && typed != list[index].amount) {
+                list[index] = list[index].copy(amount = typed, exactAmount = null)
+            }
             state.copy(ingredients = list)
         }
     }
@@ -890,7 +918,8 @@ class RecipeEditViewModel(
                 if (step.id != id) step
                 else step.copy(
                     ingredients = step.ingredients.map {
-                        if (it.index == index) it.copy(amount = amount.filter { c -> c.isDigit() || c == '.' })
+                        val typed = amountInput(amount)
+                        if (it.index == index && typed != it.amount) it.copy(amount = typed, exactAmount = null)
                         else it
                     },
                 )

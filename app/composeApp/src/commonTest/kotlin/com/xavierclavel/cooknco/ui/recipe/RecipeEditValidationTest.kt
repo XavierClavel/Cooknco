@@ -31,7 +31,7 @@ class RecipeEditValidationTest {
         units = UnitRepository.DEFAULT_UNITS,
     )
 
-    private fun custom(name: String, amount: Float? = null, unit: String = "NONE") =
+    private fun custom(name: String, amount: String = "", unit: String = "NONE") =
         EditIngredient(customName = name, ingredientName = name, query = name, unit = unit, amount = amount)
 
     private fun step(
@@ -71,8 +71,8 @@ class RecipeEditValidationTest {
             ingredients = listOf(
                 custom("sel"),
                 custom("farine", unit = "GRAM"),
-                custom("sucre", amount = 0f, unit = "GRAM"),
-                custom("lait", amount = 25f, unit = "CENTILITER"),
+                custom("sucre", amount = "0", unit = "GRAM"),
+                custom("lait", amount = "25", unit = "CENTILITER"),
             ),
         ).problems()
 
@@ -93,7 +93,7 @@ class RecipeEditValidationTest {
             ingredientId = 7,
             ingredientName = "farine",
             unit = "TABLESPOON",
-            amount = 2f,
+            amount = "2",
             allowedTypes = listOf("NONE", "WEIGHT"),
         )
         assertEquals(listOf(EditProblem.UnitNotAllowed(0)), form(ingredients = listOf(flour)).problems())
@@ -102,7 +102,7 @@ class RecipeEditValidationTest {
         // A custom row carries no capabilities, and takes any unit.
         assertEquals(
             emptyList(),
-            form(ingredients = listOf(custom("farine", amount = 2f, unit = "TABLESPOON"))).problems(),
+            form(ingredients = listOf(custom("farine", amount = "2", unit = "TABLESPOON"))).problems(),
         )
     }
 
@@ -134,7 +134,7 @@ class RecipeEditValidationTest {
         // A blank share beside them, which absorbs nothing when there is nothing left: this is
         // refused for spending too much, not for leaving a gap — and the blank step is not one
         // of the boxes to change.
-        val flour = custom("farine", amount = 100f, unit = "GRAM")
+        val flour = custom("farine", amount = "100", unit = "GRAM")
         val problems = form(
             ingredients = listOf(flour),
             steps = listOf(
@@ -155,7 +155,7 @@ class RecipeEditValidationTest {
 
     @Test
     fun spelling_out_every_share_and_falling_short_is_refused() {
-        val flour = custom("farine", amount = 100f, unit = "GRAM")
+        val flour = custom("farine", amount = "100", unit = "GRAM")
         val share = form(ingredients = listOf(flour), steps = listOf(step("a", used = listOf(0 to "30"))))
             .problems().single() as EditProblem.SharesDoNotAddUp
 
@@ -165,7 +165,7 @@ class RecipeEditValidationTest {
 
     @Test
     fun a_blank_share_absorbs_what_is_left_and_rounding_is_not_a_mistake() {
-        val flour = custom("farine", amount = 100f, unit = "GRAM")
+        val flour = custom("farine", amount = "100", unit = "GRAM")
         listOf(
             listOf(step("a", used = listOf(0 to "30")), step("b", used = listOf(0 to ""))),
             listOf(step("a", used = listOf(0 to "")), step("b", used = listOf(0 to ""))),
@@ -185,7 +185,7 @@ class RecipeEditValidationTest {
     fun only_shares_the_save_would_send_are_added_up() {
         // A blank step is not saved, so what it claims is not either; and a row with no
         // amount has no share to claim, which the save does not send.
-        val flour = custom("farine", amount = 100f, unit = "GRAM")
+        val flour = custom("farine", amount = "100", unit = "GRAM")
         val salt = custom("sel")
         assertEquals(
             emptyList(),
@@ -202,7 +202,7 @@ class RecipeEditValidationTest {
     fun problems_come_page_by_page_and_in_the_order_each_page_draws_them() {
         val problems = form(
             title = "",
-            ingredients = listOf(custom("farine", amount = 100f, unit = "GRAM"), custom("sucre", unit = "GRAM")),
+            ingredients = listOf(custom("farine", amount = "100", unit = "GRAM"), custom("sucre", unit = "GRAM")),
             steps = listOf(
                 StepItem(id = "a", text = "", attachments = setOf(StepAttachment.PHOTO)),
                 step("b", used = listOf(0 to "20")),

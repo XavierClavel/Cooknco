@@ -133,10 +133,10 @@ internal val EditIngredient.isSaved get() = ingredientId != null || !customName.
  * One place for it because three things have to agree on it — the payload, the check on the
  * row, and what the steps may claim a share of.
  */
-internal val EditIngredient.savedAmount get() = if (unit == "NONE") null else amount
+internal val EditIngredient.savedAmount get() = if (unit == "NONE") null else exactAmount ?: amount.toFloatOrNull()
 
 /** What a step's share is saved as. Blank, zero or unreadable all mean "the rest of it". */
-internal val StepIngredientDraft.savedAmount get() = amount.toFloatOrNull()?.takeIf { it > 0f }
+internal val StepIngredientDraft.savedAmount get() = (exactAmount ?: amount.toFloatOrNull())?.takeIf { it > 0f }
 
 /**
  * Everything wrong with the form, page by page, and within a page in the order it is drawn —
@@ -149,7 +149,7 @@ fun RecipeEditUiState.problems(): List<EditProblem> = buildList {
 
     ingredients.forEachIndexed { index, row ->
         if (!row.isSaved) return@forEachIndexed
-        if (row.unit != "NONE" && (row.amount ?: 0f) <= 0f) add(EditProblem.AmountMissing(index))
+        if (row.unit != "NONE" && (row.savedAmount ?: 0f) <= 0f) add(EditProblem.AmountMissing(index))
         // An empty list is a custom row, which carries no capabilities and takes any unit. A
         // unit missing from the catalogue is left to the server rather than guessed at.
         val unitType = units.firstOrNull { it.name == row.unit }?.type

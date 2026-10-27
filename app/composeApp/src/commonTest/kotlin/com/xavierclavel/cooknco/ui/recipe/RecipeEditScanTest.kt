@@ -197,7 +197,7 @@ class RecipeEditScanTest {
         val row = viewModel.uiState.value.ingredients.single()
         assertNull(row.ingredientId, "nothing matched, so nothing may be referenced")
         assertEquals("sucre vanillé", row.customName)
-        assertEquals(2f, row.amount)
+        assertEquals("2", row.amount)
         assertEquals("UNIT", row.unit)
         assertEquals("en sachets", row.complement)
     }

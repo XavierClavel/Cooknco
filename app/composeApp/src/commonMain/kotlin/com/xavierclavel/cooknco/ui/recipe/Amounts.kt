@@ -35,6 +35,29 @@ fun formatAmount(amount: Float): String =
     else ((amount * 100).roundToInt() / 100f).toString().trimEnd('0').trimEnd('.')
 
 /**
+ * What an amount box keeps of what was typed into it: digits, and one decimal separator.
+ *
+ * A comma is taken for the point. It is what a French keyboard's decimal key types, and
+ * filtering it out turned "0,5" into "05" — five, which nothing then flags. It is kept as the
+ * point because that is how [formatAmount] writes every amount the app shows, and what
+ * [String.toFloatOrNull] reads when the box is saved.
+ */
+fun amountInput(typed: String): String {
+    var separated = false
+    return buildString {
+        typed.forEach { c ->
+            when {
+                c in '0'..'9' -> append(c)
+                (c == '.' || c == ',') && !separated -> {
+                    append('.')
+                    separated = true
+                }
+            }
+        }
+    }
+}
+
+/**
  * The amount and unit to print, for a cook reading in [system].
  *
  * The same rule as `shared.utils.UnitConversion`, off the same catalogue: a unit belonging to
