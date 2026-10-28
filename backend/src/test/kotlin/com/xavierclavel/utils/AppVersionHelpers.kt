@@ -75,10 +75,18 @@ suspend fun HttpClient.saveAppVersionRaw(
     minimum: String,
     latest: String,
     storeUrl: String = "https://play.google.com/store/apps/details?id=com.xavierclavel.cooknco",
+    blocked: List<String>? = null,
 ) = this.put("$APP_VERSIONS_URL/${platform.name}") {
     contentType(ContentType.Application.Json)
     header(HttpHeaders.ContentType, ContentType.Application.Json)
-    setBody(AppVersionDTO(minimumVersion = minimum, latestVersion = latest, storeUrl = storeUrl))
+    setBody(
+        AppVersionDTO(
+            minimumVersion = minimum,
+            latestVersion = latest,
+            storeUrl = storeUrl,
+            blockedVersions = blocked,
+        )
+    )
 }
 
 suspend fun HttpClient.saveAppVersion(
@@ -86,9 +94,27 @@ suspend fun HttpClient.saveAppVersion(
     minimum: String,
     latest: String,
     storeUrl: String = "https://play.google.com/store/apps/details?id=com.xavierclavel.cooknco",
-): AdminAppVersionInfo = this.saveAppVersionRaw(platform, minimum, latest, storeUrl).let {
+    blocked: List<String>? = null,
+): AdminAppVersionInfo = this.saveAppVersionRaw(platform, minimum, latest, storeUrl, blocked).let {
     assertEquals(HttpStatusCode.OK, it.status)
     json.decodeFromString<AdminAppVersionInfo>(it.bodyAsText())
+}
+
+/**
+ * A save as a client that predates the blocked list sends it: the field is not null, it is
+ * not there at all.
+ *
+ * Written as text rather than through [AppVersionDTO], whose encoder may or may not leave a
+ * null out depending on the `Json` doing it — the one thing this helper has to pin down.
+ */
+suspend fun HttpClient.saveAppVersionWithoutBlockedRaw(
+    platform: AppPlatform,
+    minimum: String,
+    latest: String,
+    storeUrl: String = "https://play.google.com/store/apps/details?id=com.xavierclavel.cooknco",
+) = this.put("$APP_VERSIONS_URL/${platform.name}") {
+    contentType(ContentType.Application.Json)
+    setBody("""{"minimumVersion":"$minimum","latestVersion":"$latest","storeUrl":"$storeUrl"}""")
 }
 
 suspend fun HttpClient.clearAppVersionRaw(platform: AppPlatform) =
@@ -96,15 +122,21 @@ suspend fun HttpClient.clearAppVersionRaw(platform: AppPlatform) =
 
 // ---------------------------------------------------------- what a floor costs
 
-suspend fun HttpClient.appVersionReachRaw(platform: AppPlatform, minimum: String? = null) =
-    this.get("$APP_VERSIONS_URL/${platform.name}/reach") {
-        minimum?.let { parameter("minimum", it) }
-    }
+/** [blocked] travels comma-separated; null leaves it off, an empty list sends `blocked=`. */
+suspend fun HttpClient.appVersionReachRaw(
+    platform: AppPlatform,
+    minimum: String? = null,
+    blocked: List<String>? = null,
+) = this.get("$APP_VERSIONS_URL/${platform.name}/reach") {
+    minimum?.let { parameter("minimum", it) }
+    blocked?.let { parameter("blocked", it.joinToString(",")) }
+}
 
 suspend fun HttpClient.appVersionReach(
     platform: AppPlatform,
     minimum: String? = null,
-): AdminAppVersionReach = this.appVersionReachRaw(platform, minimum).let {
+    blocked: List<String>? = null,
+): AdminAppVersionReach = this.appVersionReachRaw(platform, minimum, blocked).let {
     assertEquals(HttpStatusCode.OK, it.status)
     json.decodeFromString<AdminAppVersionReach>(it.bodyAsText())
 }

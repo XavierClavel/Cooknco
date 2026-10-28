@@ -502,6 +502,33 @@ go is one nobody can fix. The block screen's copy lives in the app, not in the d
 unlike the mail and PDF wordings — because the app has no locale to render server copy in
 (`ApiClient.LOCALE` is a constant) and a wrong-language block screen is worse than none.
 
+### A single build can be blocked without moving the floor
+
+`app_versions.blocked_versions` lists builds stopped whatever the minimum — the one with a
+severe bug, while the builds either side of it keep running. It lives on the gate row, so a
+platform with no row still gates nothing, and removing the gate lifts its blocks with it.
+
+- **A blocked build gets `UPDATE_REQUIRED`, not a status of its own.** The build being blocked
+  has already shipped, and an app reads any status it predates as OK — a new verdict would
+  block nothing that exists. `AppVersionCheckInfo.blocked` is what tells the two causes apart,
+  for the backoffice checker; the app needs nothing new and its copy ("no longer supported")
+  holds for both.
+- **Every entry is strictly older than the latest version**, refused otherwise
+  (`APP_VERSION_BLOCKED_NOT_BELOW_LATEST`), for the floor's reason: the store hands a blocked
+  user the latest build, so blocking it is a loop with no way out. The order is therefore
+  publish the fix, name it latest, then block the broken one.
+- **A block outlives the floor passing it.** Tidying it away would let a later *lowering* of
+  the floor — a typo corrected, a raise undone — quietly put the broken build back in service.
+- **A save that omits the list keeps it** (`AppVersionDTO.blockedVersions` is nullable, the
+  `UserSettingsDTO.locale` rule), so a backoffice tab opened before a deploy cannot unblock
+  what a newer one blocked. An empty list is what unblocks.
+- **Entries are matched as builds, not strings** (`AppVersions.isSameBuild`): `1.301` blocks
+  `1.301.0`, and two spellings of one build are saved once. The Android `versionName` is
+  `<versionMajor>.<versionCode>`, so "build 301" is `1.301`.
+
+`check` and `reach` share one definition of what a gate stops (`AppVersionService.stops`), so
+what the tab says a save would cost and what phones are then told cannot disagree.
+
 ### What a floor costs is measured, not guessed
 
 `devices.app_version` is what each client reported at its last launch, and

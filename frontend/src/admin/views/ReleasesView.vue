@@ -38,6 +38,38 @@
           </label>
         </div>
 
+        <!--
+          Single builds taken out of service whatever the minimum: the one with a severe bug,
+          while the builds either side of it keep running. A list of chips rather than a text
+          field, so what is blocked is read one build at a time rather than parsed out of a
+          comma somebody forgot.
+        -->
+        <div class="field">
+          <span>{{ $t('admin_releases_blocked') }}</span>
+          <div class="chips">
+            <span v-for="version in gate.blockedVersions" :key="version" class="chip mono">
+              {{ version }}
+              <button class="chip-x" :title="$t('admin_releases_blocked_remove', {version})"
+                      :aria-label="$t('admin_releases_blocked_remove', {version})"
+                      @click="unblock(gate, version)">
+                <ui-icon name="x" :size="12" />
+              </button>
+            </span>
+            <span v-if="!gate.blockedVersions.length" class="small subtle">
+              {{ $t('admin_releases_blocked_none') }}
+            </span>
+          </div>
+          <div class="block-add">
+            <input v-model="blockInput[gate.platform]" class="input mono" placeholder="1.301"
+                   :maxlength="MAX_VERSION_LENGTH" @keyup.enter="blockTyped(gate)" />
+            <button class="btn" :disabled="!blockable(blockInput[gate.platform])" @click="blockTyped(gate)">
+              <ui-icon name="ban" :size="14" />
+              {{ $t('admin_releases_blocked_add') }}
+            </button>
+          </div>
+          <span class="small subtle">{{ $t('admin_releases_blocked_hint') }}</span>
+        </div>
+
         <label class="field">
           <span>{{ $t('admin_releases_store_url') }}</span>
           <input v-model="gate.storeUrl" class="input mono"
@@ -57,6 +89,10 @@
               <ui-icon name="ban" :size="14" />
               <span>{{ $t('admin_releases_band_blocked', {version: shown(gate.minimumVersion)}) }}</span>
             </div>
+            <div v-if="gate.blockedVersions.length" class="band danger">
+              <ui-icon name="ban" :size="14" />
+              <span>{{ $t('admin_releases_band_listed', {versions: gate.blockedVersions.join(', ')}) }}</span>
+            </div>
             <div class="band warn">
               <ui-icon name="arrowDown" :size="14" />
               <span>{{ $t('admin_releases_band_nudged', {
@@ -73,6 +109,11 @@
           <ui-icon name="alert" />
           <span>{{ $t('admin_releases_raising_floor', {
             from: saved(gate.platform)?.minimumVersion || '—', to: gate.minimumVersion}) }}</span>
+        </div>
+
+        <div v-if="addedBlocks(gate).length" class="alert warn">
+          <ui-icon name="alert" />
+          <span>{{ $t('admin_releases_adding_blocks', {versions: addedBlocks(gate).join(', ')}) }}</span>
         </div>
 
         <!--
@@ -125,6 +166,7 @@
                 <span class="small subtle dist-num">{{ $t('admin_releases_reach_col_share') }}</span>
                 <span class="small subtle dist-num">{{ $t('admin_releases_reach_col_users') }}</span>
                 <span class="small subtle dist-num">{{ $t('admin_releases_reach_col_devices') }}</span>
+                <span></span>
               </div>
               <div v-for="row in reach[gate.platform].distribution" :key="row.version || 'unknown'"
                    class="dist-row" :class="{blocked: row.blocked}">
@@ -137,6 +179,21 @@
                 </span>
                 <span class="small tnum dist-num">{{ row.users }}</span>
                 <span class="small tnum dist-num subtle">{{ row.devices }}</span>
+                <!--
+                  Blocking from the row names the build exactly as the devices report it,
+                  which a version typed from memory may not. Offered only where it would
+                  change something: a build already stopped has nothing to add. Not on the
+                  latest either, which the save refuses — and which is the row most people
+                  are on, so the likeliest wrong click. Compared as written: a build past the
+                  latest still offers it, and the server is what says no.
+                -->
+                <span class="dist-action">
+                  <button v-if="!row.blocked && blockable(row.version) && row.version !== gate.latestVersion.trim()"
+                          class="btn ghost sm"
+                          :title="$t('admin_releases_reach_block_title')" @click="block(gate, row.version)">
+                    {{ $t('admin_releases_blocked_add') }}
+                  </button>
+                </span>
               </div>
             </div>
             <p v-else class="small subtle" style="margin:0">{{ $t('admin_releases_reach_empty') }}</p>
@@ -217,7 +274,13 @@
           <span class="badge" :class="VERDICT_TONE[verdict.status]">
             {{ $t(`admin_releases_verdict_${verdict.status.toLowerCase()}`) }}
           </span>
-          <span class="small muted">
+          <span v-if="verdict.blocked" class="small muted">
+            {{ $t('admin_releases_verdict_blocked_detail', {
+              version: verdict.currentVersion,
+              latest: verdict.latestVersion ?? '—',
+            }) }}
+          </span>
+          <span v-else class="small muted">
             {{ $t('admin_releases_verdict_detail', {
               version: verdict.currentVersion || '—',
               minimum: verdict.minimumVersion ?? '—',
@@ -238,6 +301,9 @@
             latest: pending?.latestVersion,
           }) }}
         </p>
+        <p v-if="pending?.blockedVersions.length" class="small muted">
+          {{ $t('admin_releases_confirm_save_blocked', {versions: pending.blockedVersions.join(', ')}) }}
+        </p>
         <div v-if="pendingReach && pendingReach.blockedDevices > 0" class="alert danger">
           <ui-icon name="alert" />
           <span>{{ $t('admin_releases_confirm_blocked', {
@@ -255,6 +321,10 @@
         <div v-if="pending && raisesFloor(pending)" class="alert warn">
           <ui-icon name="alert" />
           <span>{{ $t('admin_releases_confirm_warning') }}</span>
+        </div>
+        <div v-if="pending && addedBlocks(pending).length" class="alert warn">
+          <ui-icon name="alert" />
+          <span>{{ $t('admin_releases_adding_blocks', {versions: addedBlocks(pending).join(', ')}) }}</span>
         </div>
       </div>
       <template #actions>
@@ -290,6 +360,13 @@ const {t, te} = useI18n()
 /** Must match AppVersions.MAX_LENGTH in the shared module, which refuses a longer one. */
 const MAX_VERSION_LENGTH = 23
 
+/**
+ * The shape AppVersions.STRICT accepts, so a chip is only ever something the save will
+ * take. A format check, not an ordering: which build is older is still only decided on
+ * the server, where the phones are judged.
+ */
+const VERSION_SHAPE = /^\d{1,6}(\.\d{1,6}){0,3}$/
+
 const STORE_PLACEHOLDER: Record<string, string> = {
   ANDROID: 'https://play.google.com/store/apps/details?id=com.xavierclavel.cooknco',
   IOS: 'https://apps.apple.com/app/id0000000000',
@@ -307,6 +384,7 @@ type Reach = {
   devices: number
   users: number
   minimumVersion: string
+  blockedVersions: string[]
   blockedDevices: number
   blockedUsers: number
   unknownDevices: number
@@ -319,6 +397,7 @@ type Gate = {
   minimumVersion: string
   latestVersion: string
   storeUrl: string
+  blockedVersions: string[]
   updatedAt: number | null
 }
 
@@ -333,6 +412,9 @@ const drafts = ref<Gate[]>([])
 
 /** Last answer per platform, so a card keeps its figures while the next one is in flight. */
 const reach = ref<Record<string, Reach | undefined>>({})
+
+/** What is being typed into each card's "block a build" field. */
+const blockInput = reactive<Record<string, string>>({})
 
 const probe = reactive({platform: 'ANDROID', version: ''})
 const verdict = ref<any>(null)
@@ -373,7 +455,15 @@ function dirty(gate: Gate): boolean {
   return was.minimumVersion !== gate.minimumVersion
     || was.latestVersion !== gate.latestVersion
     || was.storeUrl !== gate.storeUrl
+    || was.blockedVersions.join(',') !== gate.blockedVersions.join(',')
 }
+
+/**
+ * A row with its own copy of the list. A spread alone would leave the draft and the stored
+ * row sharing one array, and an edit to the draft would then be an edit to what it is
+ * compared against — a form that is never dirty, and an undo with nothing to go back to.
+ */
+const copy = (gate: Gate): Gate => ({...gate, blockedVersions: [...gate.blockedVersions]})
 
 /**
  * True while the edit would lock out builds that are running today.
@@ -388,6 +478,34 @@ function raisesFloor(gate: Gate): boolean {
   return was.minimumVersion !== gate.minimumVersion
 }
 
+/**
+ * Builds the draft blocks that are running today, which is the other way a save locks
+ * people out. Compared as written: a block respelled (1.301 as 1.301.0) is called out
+ * once for nothing, which is cheaper than a second implementation of "same build".
+ */
+function addedBlocks(gate: Gate): string[] {
+  const was = saved(gate.platform)?.blockedVersions ?? []
+  return gate.blockedVersions.filter(v => !was.includes(v))
+}
+
+const blockable = (version: string | undefined) => !!version && VERSION_SHAPE.test(version.trim())
+
+function block(gate: Gate, version: string) {
+  const v = version.trim()
+  if (!blockable(v) || gate.blockedVersions.includes(v)) return
+  gate.blockedVersions = [...gate.blockedVersions, v]
+}
+
+function blockTyped(gate: Gate) {
+  if (!blockable(blockInput[gate.platform])) return
+  block(gate, blockInput[gate.platform])
+  blockInput[gate.platform] = ''
+}
+
+function unblock(gate: Gate, version: string) {
+  gate.blockedVersions = gate.blockedVersions.filter(v => v !== version)
+}
+
 function fail(error: any) {
   const key = errorKey(error)
   notifyError(key && te(key) ? t(key) : t('admin_action_failed'))
@@ -398,7 +516,7 @@ async function load() {
   try {
     const {data} = await listAppVersions()
     stored.value = data
-    drafts.value = data.map((g: Gate) => ({...g}))
+    drafts.value = data.map(copy)
     if (!platforms.value.includes(probe.platform) && platforms.value.length) {
       probe.platform = platforms.value[0]
     }
@@ -410,7 +528,7 @@ async function load() {
 
 function replace(info: Gate) {
   stored.value = stored.value.map(g => (g.platform === info.platform ? info : g))
-  drafts.value = drafts.value.map(g => (g.platform === info.platform ? {...info} : g))
+  drafts.value = drafts.value.map(g => (g.platform === info.platform ? copy(info) : g))
   verdict.value = null
 }
 
@@ -429,10 +547,12 @@ function replace(info: Gate) {
 async function loadReach(platform: string) {
   const draft = drafts.value.find(g => g.platform === platform)
   try {
-    reach.value = {
-      ...reach.value,
-      [platform]: (await getAppVersionReach(platform, draft?.minimumVersion.trim() || '')).data,
-    }
+    const {data} = await getAppVersionReach(
+      platform, draft?.minimumVersion.trim() || '', draft?.blockedVersions ?? [],
+    )
+    // Spread only once the answer is in: spread first and the two cards loading side by
+    // side each write back the copy they started from, and the slower one erases the other
+    reach.value = {...reach.value, [platform]: data}
   } catch { /* keep whatever is on screen; the next keystroke asks again */ }
 }
 
@@ -450,10 +570,14 @@ function scheduleReach(platform: string) {
 }
 
 watch(
-  () => drafts.value.map(g => ({platform: g.platform, minimum: g.minimumVersion})),
+  () => drafts.value.map(g => ({
+    platform: g.platform, minimum: g.minimumVersion, blocked: g.blockedVersions.join(','),
+  })),
   (now, before) => {
     now.forEach((entry, i) => {
-      if (entry.minimum !== before?.[i]?.minimum) scheduleReach(entry.platform)
+      if (entry.minimum !== before?.[i]?.minimum || entry.blocked !== before?.[i]?.blocked) {
+        scheduleReach(entry.platform)
+      }
     })
   },
   {deep: true},
@@ -490,7 +614,7 @@ function overlapping(platform: string): number {
 
 function revert(platform: string) {
   const was = saved(platform)
-  if (was) drafts.value = drafts.value.map(g => (g.platform === platform ? {...was} : g))
+  if (was) drafts.value = drafts.value.map(g => (g.platform === platform ? copy(was) : g))
 }
 
 // -------------------------------------------------------------------- saving
@@ -512,6 +636,7 @@ async function save() {
       gate.minimumVersion.trim(),
       gate.latestVersion.trim(),
       gate.storeUrl.trim(),
+      gate.blockedVersions,
     )
     replace(data)
     await loadReach(gate.platform)
@@ -592,7 +717,7 @@ onMounted(load)
    header a translation is longest in, and the figures still line up under them. */
 .dist {
   display: grid;
-  grid-template-columns: max-content 1fr max-content max-content max-content;
+  grid-template-columns: max-content 1fr max-content max-content max-content max-content;
   align-items: center;
   gap: 3px 10px;
   margin-top: 4px;
@@ -608,6 +733,25 @@ onMounted(load)
 .dist-row.blocked .dist-name,
 .dist-row.blocked .dist-share { color: var(--c-danger); }
 .dist-row.blocked .bar > i { background: var(--c-danger); }
+.dist-action { display: flex; justify-content: flex-end; min-width: 0; }
+
+/* ------------------------------------------------------------ blocked builds */
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 26px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 9px;
+  border: 1px solid var(--c-danger-border); border-radius: 999px;
+  background: var(--c-danger-soft); color: var(--c-danger);
+  font-size: 12.5px;
+}
+.chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0;
+  border: 0; border-radius: 999px; background: transparent; color: inherit; cursor: pointer;
+}
+.chip-x:hover { background: var(--c-danger-border); }
+.block-add { display: flex; gap: 8px; max-width: 320px; }
+.block-add .input { flex: 1; min-width: 0; }
 
 /* ----------------------------------------------------------------- checker */
 .checker { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }

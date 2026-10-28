@@ -244,21 +244,30 @@ export const saveAiSettings = (settings: AiSettings) =>
 
 export const saveAppVersion = (
   platform: string, minimumVersion: string, latestVersion: string, storeUrl: string,
-) => api.put(`/admin/app-versions/${platform}`, {minimumVersion, latestVersion, storeUrl})
+  blockedVersions: string[],
+) => api.put(`/admin/app-versions/${platform}`, {minimumVersion, latestVersion, storeUrl, blockedVersions})
 
 /** Removes the gate, which lets every build of that platform run again. */
 export const clearAppVersion = (platform: string) => api.delete(`/admin/app-versions/${platform}`)
 
 /**
- * What a floor would cost, measured on the installs that are actually in use.
+ * What a floor and a list of blocked builds would cost, measured on the installs that are
+ * actually in use.
  *
  * Read against the draft rather than against what is saved, and read *before* the save,
  * for the same reason the notifications tab reads its audience first: the apps a version
  * gate applies to have stopped asking anything else by then. Omitting `minimum` measures
- * the gate already in force.
+ * the floor already in force.
+ *
+ * `blocked` is always sent, empty included, which is why it does not go through `qs`: that
+ * drops an empty value, and the server would then measure the blocks in force — the very
+ * ones a draft with every block removed is about to lift.
  */
-export const getAppVersionReach = (platform: string, minimum?: string) =>
-  api.get(`/admin/app-versions/${platform}/reach?${qs({minimum: minimum ?? ''})}`)
+export const getAppVersionReach = (platform: string, minimum: string, blocked: string[]) => {
+  const q = new URLSearchParams(qs({minimum}))
+  q.set('blocked', blocked.join(','))
+  return api.get(`/admin/app-versions/${platform}/reach?${q}`)
+}
 
 /**
  * The verdict a device on `version` would get, from the endpoint a device actually calls.

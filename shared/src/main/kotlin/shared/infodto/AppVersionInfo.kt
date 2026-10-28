@@ -21,6 +21,15 @@ data class AppVersionCheckInfo(
     val minimumVersion: String? = null,
     val latestVersion: String? = null,
     val storeUrl: String? = null,
+    /**
+     * True when this exact build is on the gate's blocked list, which is what explains an
+     * [AppVersionStatus.UPDATE_REQUIRED] for a build above [minimumVersion].
+     *
+     * The status is still UPDATE_REQUIRED rather than a verdict of its own: the build being
+     * blocked has already shipped, and it only knows how to obey the statuses it was built
+     * with — anything newer reads as OK to it.
+     */
+    val blocked: Boolean = false,
 )
 
 /**
@@ -30,20 +39,23 @@ data class AppVersionCheckInfo(
  * clients rather than the set of rows somebody happened to create. [configured] is what
  * says the difference.
  *
- * The three strings have no defaults on purpose. The tab binds an input to each of them,
- * including on an ungated row, so they have to be on the wire even when empty — and with
- * a default that would hold only for as long as the server keeps a `Json` that encodes
- * defaults (Ktor's does; a `json(Json { ... })` of our own would not). Without one it is
- * the payload's shape rather than the framework's setting. [ungated] builds the empty row.
+ * The fields after [configured] have no defaults on purpose. The tab binds an input to
+ * each of them, including on an ungated row, so they have to be on the wire even when
+ * empty — and with a default that would hold only for as long as the server keeps a `Json`
+ * that encodes defaults (Ktor's does; a `json(Json { ... })` of our own would not). Without
+ * one it is the payload's shape rather than the framework's setting. [ungated] builds the
+ * empty row.
  */
 @Serializable
 data class AdminAppVersionInfo(
     val platform: AppPlatform,
-    /** False while no gate exists, in which case the three fields below are empty. */
+    /** False while no gate exists, in which case the fields below are empty. */
     val configured: Boolean,
     val minimumVersion: String,
     val latestVersion: String,
     val storeUrl: String,
+    /** Builds above the floor blocked anyway, newest first. Empty on an ungated row. */
+    val blockedVersions: List<String>,
     /** Epoch seconds. Null while nothing has been saved. */
     val updatedAt: Long? = null,
 ) {
@@ -55,6 +67,7 @@ data class AdminAppVersionInfo(
             minimumVersion = "",
             latestVersion = "",
             storeUrl = "",
+            blockedVersions = emptyList(),
         )
     }
 }
@@ -81,6 +94,8 @@ data class AdminAppVersionReach(
     val users: Int,
     /** The candidate floor the counts below were measured against. */
     val minimumVersion: String,
+    /** The candidate blocked builds they were measured against, as well as the floor. */
+    val blockedVersions: List<String>,
     val blockedDevices: Int,
     /**
      * Accounts with *at least one* device below the floor.
@@ -106,6 +121,6 @@ data class AdminAppVersionCount(
     val version: String,
     val devices: Int,
     val users: Int,
-    /** True when the candidate floor would stop this build. */
+    /** True when the candidate gate would stop this build, by its floor or by its list. */
     val blocked: Boolean,
 )

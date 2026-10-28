@@ -170,6 +170,8 @@ enum class BadRequestCause (val key: String) {
     APP_VERSION_INVALID("app_version_invalid"),
     APP_VERSION_MINIMUM_ABOVE_LATEST("app_version_minimum_above_latest"),
     APP_VERSION_STORE_URL_INVALID("app_version_store_url_invalid"),
+    APP_VERSION_BLOCKED_NOT_BELOW_LATEST("app_version_blocked_not_below_latest"),
+    APP_VERSION_TOO_MANY_BLOCKED("app_version_too_many_blocked"),
 
     // A grant that says neither "forever" nor "until when" - refused rather than read as
     // either one, since both readings hand out something nobody asked for.
