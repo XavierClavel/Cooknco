@@ -78,6 +78,13 @@ class HomeViewModel(
      */
     private var loadJob: Job? = null
 
+    /**
+     * What [RecipeRepository.writes] said when the first page on screen was asked for — see
+     * [reloadIfStale]. Read before the request rather than after it, so a write that lands
+     * while the page is on its way counts as one the page may not show.
+     */
+    private var readAt = recipeRepository.writes.value
+
     init {
         loadMore()
     }
@@ -115,8 +122,9 @@ class HomeViewModel(
      * Throws the pages away and asks for the first one again.
      *
      * The other half of what paging does not do: [loadMore] only ever appends, so a recipe
-     * deleted or renamed since the feed was opened stays as it was until the screen is left.
-     * A pull replaces the list outright, which is the only way a row leaves it.
+     * somebody else deleted or renamed since the feed was opened stays as it was. A pull
+     * replaces the list outright, which is the only way such a row leaves it; the cook's own
+     * writes have [reloadIfStale] as well.
      */
     fun refresh() {
         if (_uiState.value.isRefreshing) return
@@ -124,6 +132,7 @@ class HomeViewModel(
         _uiState.update { it.copy(isRefreshing = true, isLoading = false, error = null) }
         loadJob = viewModelScope.launch {
             val startedAt = TimeSource.Monotonic.markNow()
+            val writes = recipeRepository.writes.value
             val result = recipeRepository.listRecipes(userId, 0)
             // Held open to the floor below before anything is said about the result. On a
             // warm connection the whole round trip is over in a tenth of a second, and a
@@ -132,9 +141,7 @@ class HomeViewModel(
             delay(MIN_VISIBLE_REFRESH - startedAt.elapsedNow())
             result
                 .onSuccess { items ->
-                    allRecipes.clear()
-                    allRecipes.addAll(items)
-                    currentPage = 1
+                    replaceWith(items, writes)
                     _uiState.update { it.copy(
                         isRefreshing = false,
                         // Cleared as well as set: a feed that had reached its end before the
@@ -162,15 +169,55 @@ class HomeViewModel(
     fun reloadIfEmpty() {
         if (!_uiState.value.isEmpty || loadJob?.isActive == true) return
         loadJob = viewModelScope.launch {
+            val writes = recipeRepository.writes.value
             recipeRepository.listRecipes(userId, 0).onSuccess { items ->
                 if (items.isEmpty()) return@onSuccess
-                allRecipes.addAll(items)
-                // Set rather than incremented: an empty refresh leaves it at 1 without
-                // having loaded anything.
-                currentPage = 1
+                // Replaced rather than appended to, which sets the page rather than
+                // incrementing it: an empty refresh leaves it at 1 without having loaded
+                // anything.
+                replaceWith(items, writes)
                 _uiState.update { it.copy(allLoaded = false, dateGroups = groupByDate(allRecipes)) }
             }
         }
+    }
+
+    /**
+     * Reads the first page again, without the pull's spinner, when the cook has written a
+     * recipe since it was read.
+     *
+     * Called each time the feed comes back on screen, like [reloadIfEmpty] — and from the same
+     * place, because that is where the feed is when a recipe is created, edited or given a
+     * picture: behind the editor. Paging never asks for the first page again, so the new
+     * recipe stayed out of the feed, and a new picture stayed the old one, until a pull.
+     *
+     * Replaces the list rather than merging into it, as a pull does: a deleted recipe has to
+     * leave it. Quiet both ways — the stale rows are on screen and stay until the fresh ones
+     * arrive, and a failure keeps them and tries again the next time the feed is shown.
+     */
+    fun reloadIfStale() {
+        val writes = recipeRepository.writes.value
+        if (writes == readAt || _uiState.value.isRefreshing) return
+        // A page still in flight would append to the list this is about to replace.
+        loadJob?.cancel()
+        _uiState.update { it.copy(isLoading = false) }
+        loadJob = viewModelScope.launch {
+            recipeRepository.listRecipes(userId, 0).onSuccess { items ->
+                replaceWith(items, writes)
+                _uiState.update { it.copy(
+                    allLoaded = items.isEmpty(),
+                    dateGroups = groupByDate(allRecipes),
+                    error = null,
+                ) }
+            }
+        }
+    }
+
+    /** The feed becomes [items], as the first page read when [RecipeRepository.writes] said [writes]. */
+    private fun replaceWith(items: List<RecipeOverview>, writes: Long) {
+        allRecipes.clear()
+        allRecipes.addAll(items)
+        currentPage = 1
+        readAt = writes
     }
 
     private fun groupByDate(recipes: List<RecipeOverview>): List<DateGroup> {

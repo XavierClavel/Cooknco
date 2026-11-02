@@ -15,6 +15,7 @@ import com.xavierclavel.cooknco.ui.plan.MealEntryDraft
 import com.xavierclavel.cooknco.ui.components.pdfExportFailure
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeStatus
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,8 +91,45 @@ class RecipeViewModel(
     val isOwner: Boolean
         get() = _uiState.value.recipe?.owner?.id == currentUserId
 
+    /**
+     * What [RecipeRepository.writes] said when the recipe on screen was asked for — see
+     * [reloadIfStale]. Read before the request, so an edit saved while it was on its way
+     * counts as one it may not show.
+     */
+    private var readAt = repo.writes.value
+
+    /** The quiet reload in flight, so coming back twice does not ask twice. */
+    private var reloadJob: Job? = null
+
     init {
         loadAll()
+    }
+
+    /**
+     * Reads the recipe again, without a spinner, when a recipe has been written since it was
+     * read.
+     *
+     * Called each time the screen comes back, which is what saving an edit does: the editor
+     * pops back to the recipe it was opened from (AppNavigation), and this one was read
+     * before the edit. Only the recipe is read again — the like, the notes and the cookbooks
+     * are not things the editor changes. The portions the cook dialled in are kept unless the
+     * recipe's own yield moved, since the write can as well have been another recipe's.
+     */
+    fun reloadIfStale() {
+        val writes = repo.writes.value
+        if (writes == readAt || _uiState.value.recipe == null || reloadJob?.isActive == true) return
+        reloadJob = viewModelScope.launch {
+            repo.getRecipe(recipeId).onSuccess { recipe ->
+                readAt = writes
+                _uiState.update { state ->
+                    state.copy(
+                        recipe = recipe,
+                        selectedYield = if (recipe.yield == state.recipe?.yield) state.selectedYield
+                        else recipe.yield ?: 1,
+                    )
+                }
+            }
+        }
     }
 
     private fun loadAll() {

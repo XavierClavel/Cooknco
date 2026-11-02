@@ -118,6 +118,9 @@ fun RecipesScreen(
     val ingredientsState by viewModel.ingredientsState.collectAsState()
 
     val focusRequester = remember { FocusRequester() }
+    // Every time the list comes back on screen, which is where opening one of its recipes and
+    // editing it lands — and where a recipe created from the bottom bar's button belongs.
+    LaunchedEffect(Unit) { viewModel.reloadIfStale() }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         Row(
