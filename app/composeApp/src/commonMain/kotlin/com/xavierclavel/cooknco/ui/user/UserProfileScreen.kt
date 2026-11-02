@@ -102,8 +102,13 @@ fun UserProfileScreen(
     val uiState by viewModel.uiState.collectAsState()
     val linkSharer = rememberLinkSharer()
     // Every time the profile comes back on screen: the recipe written or liked that its empty
-    // state asked for was made on another one.
-    LaunchedEffect(Unit) { viewModel.reloadIfEmpty() }
+    // state asked for was made on another one, and so was any edit of a recipe it shows.
+    // Stale first, as on the feed: its reload covers an empty grid too, and the empty one
+    // stands down while it is in flight.
+    LaunchedEffect(Unit) {
+        viewModel.reloadIfStale()
+        viewModel.reloadIfEmpty()
+    }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         when {

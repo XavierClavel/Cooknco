@@ -107,8 +107,13 @@ fun HomeScreen(
         if (reachedEnd && !uiState.allLoaded) viewModel.loadMore()
     }
     // Every time the feed comes back on screen, from another tab or a pushed route: that is
-    // where the follow or the recipe the empty state asked for was made.
-    LaunchedEffect(Unit) { viewModel.reloadIfEmpty() }
+    // where the follow or the recipe the empty state asked for was made, and where a recipe
+    // already in the feed was edited. Stale first: its reload covers an empty feed too, and
+    // the empty one stands down while it is in flight.
+    LaunchedEffect(Unit) {
+        viewModel.reloadIfStale()
+        viewModel.reloadIfEmpty()
+    }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
         HomeHeader(user = user, onAvatarClick = onProfileClick)

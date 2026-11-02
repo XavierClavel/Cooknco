@@ -7,8 +7,10 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import main.com.xavierclavel.utils.addCookbookRecipe
 import main.com.xavierclavel.utils.createCookbook
 import main.com.xavierclavel.utils.createRecipe
+import main.com.xavierclavel.utils.getCookbookRecipes
 import main.com.xavierclavel.utils.getRecipe
 import main.com.xavierclavel.utils.callToolOk
 import main.com.xavierclavel.utils.sessionToken
@@ -67,6 +69,23 @@ class ImageControllerTest : ApplicationTest() {
         assertImageExists(RECIPES_IMG_PATH, recipe.id, 2)
         // the replaced version is cleaned up
         assertTrue(!Path("$RECIPES_IMG_PATH/${recipe.id}-v1.webp").exists())
+    }
+
+    /**
+     * A cookbook lists its recipes at the picture version they are on. It used to send none,
+     * and the app drew every row at version 1 — a file the second upload deletes.
+     */
+    @Test
+    fun `a cookbook lists each recipe at its picture's version`() = runTestAsAdmin {
+        val cookbook = client.createCookbook()
+        val recipe = client.createRecipe()
+        client.addCookbookRecipe(cookbook.id, recipe.id)
+        assertEquals(0, client.getCookbookRecipes(cookbook.id).single().version)
+
+        client.uploadRecipeImage(recipe.id)
+        client.uploadRecipeImage(recipe.id)
+
+        assertEquals(2, client.getCookbookRecipes(cookbook.id).single().version)
     }
 
     // ── The part of a picture its uploader kept ─────────────────────────────────

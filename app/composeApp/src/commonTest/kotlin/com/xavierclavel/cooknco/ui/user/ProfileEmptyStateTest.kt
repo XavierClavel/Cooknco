@@ -22,6 +22,7 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -94,6 +95,7 @@ class ProfileEmptyStateTest {
         tokens.saveToken("session-token")
         val viewModel = UserProfileViewModel(
             UserRepository(UserApi(client), tokens, store),
+            recipeWrites = MutableStateFlow(0L),
             profileUserId = 7L,
             currentUserId = 7L,
         )

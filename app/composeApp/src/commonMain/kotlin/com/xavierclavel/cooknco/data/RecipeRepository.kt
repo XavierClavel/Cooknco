@@ -12,13 +12,32 @@ import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.isOffline
 import com.xavierclavel.cooknco.platform.CapturedPage
 import com.xavierclavel.cooknco.platform.PickedImage
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 
 class RecipeRepository(
     private val recipeApi: RecipeApi,
     private val tokenDataStore: TokenDataStore,
     private val offlineStore: OfflineStore,
 ) {
+
+    private val _writes = MutableStateFlow(0L)
+
+    /**
+     * How many recipes this cook has created, edited, deleted or re-photographed since the
+     * app started. The number means nothing; only that it moved does.
+     *
+     * The screens that show a recipe they read earlier compare it, when they come back on
+     * screen, with what it said when they read: the feed, and the recipe screen an edit
+     * returns to. None of those screens is on screen while the write happens, and each one
+     * reads only once otherwise, so without this a new recipe or a new picture stayed out of
+     * them until a pull. Asked rather than told, so a write site has nobody to notify, and a
+     * screen that never comes back costs nothing.
+     */
+    val writes: StateFlow<Long> = _writes.asStateFlow()
 
     /**
      * The rule every read below follows: the network is the truth when it answers, and the
@@ -83,7 +102,7 @@ class RecipeRepository(
 
     suspend fun createRecipe(dto: RecipeSaveDto): Result<RecipeInfo> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
-        recipeApi.createRecipe(token, dto)
+        recipeApi.createRecipe(token, dto).also { _writes.update { it + 1 } }
     }
 
     /**
@@ -106,17 +125,19 @@ class RecipeRepository(
 
     suspend fun updateRecipe(id: Long, dto: RecipeSaveDto): Result<RecipeInfo> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
-        recipeApi.updateRecipe(id, token, dto)
+        recipeApi.updateRecipe(id, token, dto).also { _writes.update { it + 1 } }
     }
 
     suspend fun deleteRecipe(id: Long): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         recipeApi.deleteRecipe(id, token)
+        _writes.update { it + 1 }
     }
 
     suspend fun uploadRecipeImage(recipeId: Long, image: PickedImage): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         recipeApi.uploadRecipeImage(token, recipeId, image)
+        _writes.update { it + 1 }
     }
 
     suspend fun uploadStepImage(stepId: Long, image: PickedImage): Result<Unit> = runCatching {

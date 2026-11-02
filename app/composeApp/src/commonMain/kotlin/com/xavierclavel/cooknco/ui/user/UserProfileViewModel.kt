@@ -58,6 +58,8 @@ data class UserProfileUiState(
 
 class UserProfileViewModel(
     private val userRepo: UserRepository,
+    /** [com.xavierclavel.cooknco.data.RecipeRepository.writes] — see [reloadIfStale]. */
+    private val recipeWrites: StateFlow<Long>,
     val profileUserId: Long,
     val currentUserId: Long,
 ) : ViewModel() {
@@ -85,8 +87,14 @@ class UserProfileViewModel(
     private var isLoadingMore = false
     private var isLoadingMoreLiked = false
 
-    /** The quiet reload in flight — see [reloadIfEmpty]. */
+    /** The quiet reload in flight — see [reloadIfEmpty] and [reloadIfStale]. */
     private var reloadJob: Job? = null
+
+    /**
+     * What [recipeWrites] said when the grids on screen were read. Read before the requests, so
+     * a write that lands while they are on their way counts as one they may not show.
+     */
+    private var readAt = recipeWrites.value
 
     init {
         loadAll()
@@ -192,6 +200,55 @@ class UserProfileViewModel(
         }
     }
 
+    /**
+     * Reads the first page of each grid again, and the counts above them, without a spinner,
+     * when the cook has written a recipe since they were read.
+     *
+     * Called each time the profile comes back on screen, which is where it is when a recipe is
+     * created, edited, given a picture or deleted: behind the editor or the recipe. Paging
+     * never asks for the first page again, so the new recipe and the new picture stayed out
+     * of it until the screen was left for good. Any profile, not only the cook's own: theirs
+     * is where the write shows most, but their likes can hold a recipe of their own too, and
+     * the count is cheap to keep honest everywhere.
+     *
+     * Replaces rather than merges, so a deleted recipe leaves. Quiet both ways: the old rows
+     * stay until the new ones arrive, and a grid that could not be read keeps them and is
+     * asked again on the next return. Stands down while a page is on its way, which would
+     * otherwise land after the replacement and skip the rows between.
+     */
+    fun reloadIfStale() {
+        val writes = recipeWrites.value
+        val state = _uiState.value
+        if (writes == readAt || state.isLoading || reloadJob?.isActive == true) return
+        if (isLoadingMore || isLoadingMoreLiked) return
+        reloadJob = viewModelScope.launch {
+            val ownDeferred = async { userRepo.getUserRecipes(profileUserId, 0) }
+            // Only a grid that has been read is read again; the likes wait for their tab.
+            val likedDeferred = if (state.likedLoaded) async { userRepo.getUserRecipes(profileUserId, 0, liked = true) } else null
+            val userDeferred = async { userRepo.getUser(profileUserId) }
+
+            val own = ownDeferred.await()
+            val likes = likedDeferred?.await()
+            own.onSuccess { page ->
+                recipes.clear()
+                recipes.addAll(page)
+                recipePage = 1
+                _uiState.update {
+                    it.copy(recipes = recipes.toList(), allRecipesLoaded = page.size < pageSize, recipesLoaded = true)
+                }
+            }
+            likes?.onSuccess { page ->
+                liked.clear()
+                liked.addAll(page)
+                likedPage = 1
+                _uiState.update { it.copy(liked = liked.toList(), allLikedLoaded = page.size < pageSize) }
+            }
+            // The recipe count above the grid.
+            userDeferred.await().onSuccess { user -> _uiState.update { it.copy(user = user) } }
+            if (own.isSuccess && likes?.isSuccess != false) readAt = writes
+        }
+    }
+
     /** Pages whichever grid is on screen; the two keep their own offset and their own guard. */
     fun loadMoreShown() {
         if (_uiState.value.tab == ProfileTab.LIKED) loadMoreLiked() else loadMoreRecipes()
@@ -258,7 +315,9 @@ class UserProfileViewModel(
 
     companion object {
         fun factory(profileUserId: Long, currentUserId: Long): ViewModelProvider.Factory = viewModelFactory {
-            initializer { UserProfileViewModel(AppGraph.userRepository, profileUserId, currentUserId) }
+            initializer {
+                UserProfileViewModel(AppGraph.userRepository, AppGraph.recipeRepository.writes, profileUserId, currentUserId)
+            }
         }
     }
 }

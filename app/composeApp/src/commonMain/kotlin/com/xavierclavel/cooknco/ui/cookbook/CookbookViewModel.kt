@@ -13,6 +13,8 @@ import com.xavierclavel.cooknco.ui.components.pdfExportFailure
 import com.xavierclavel.cooknco.network.dto.CookbookInfo
 import com.xavierclavel.cooknco.network.dto.CookbookRecipeInfo
 import com.xavierclavel.cooknco.network.dto.CookbookUserInfo
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,12 +40,20 @@ data class CookbookUiState(
 class CookbookViewModel(
     private val repo: CookbookRepository,
     private val exportRepo: ExportRepository,
+    /** [com.xavierclavel.cooknco.data.RecipeRepository.writes] — see [reloadIfStale]. */
+    private val recipeWrites: StateFlow<Long>,
     private val cookbookId: Long,
     private val currentUserId: Long,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CookbookUiState())
     val uiState: StateFlow<CookbookUiState> = _uiState.asStateFlow()
+
+    /** What [recipeWrites] said when the recipes on screen were asked for. */
+    private var readAt = recipeWrites.value
+
+    /** The quiet reload in flight, so coming back twice does not ask twice. */
+    private var reloadJob: Job? = null
 
     init {
         loadCookbook()
@@ -85,6 +95,28 @@ class CookbookViewModel(
                 .onFailure {
                     // Non-critical
                 }
+        }
+    }
+
+    /**
+     * Reads the recipes again, and the cookbook with its count, without a spinner, when the
+     * cook has written a recipe since they were read.
+     *
+     * Called each time the cookbook comes back on screen, which is where it is when one of its
+     * recipes is opened and edited, given a picture or deleted. It reads them once otherwise,
+     * so the old picture stayed, and a deleted recipe stayed listed, until the cookbook was
+     * left and opened again. A failure keeps what is shown and asks again on the next return.
+     */
+    fun reloadIfStale() {
+        val writes = recipeWrites.value
+        if (writes == readAt || reloadJob?.isActive == true) return
+        reloadJob = viewModelScope.launch {
+            val cookbook = async { repo.getCookbook(cookbookId) }
+            repo.getCookbookRecipes(cookbookId).onSuccess { recipes ->
+                readAt = writes
+                _uiState.update { it.copy(recipes = recipes) }
+            }
+            cookbook.await().onSuccess { info -> _uiState.update { it.copy(cookbook = info) } }
         }
     }
 
@@ -170,7 +202,13 @@ class CookbookViewModel(
     companion object {
         fun factory(cookbookId: Long, userId: Long): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                CookbookViewModel(AppGraph.cookbookRepository, AppGraph.exportRepository, cookbookId, userId)
+                CookbookViewModel(
+                    AppGraph.cookbookRepository,
+                    AppGraph.exportRepository,
+                    AppGraph.recipeRepository.writes,
+                    cookbookId,
+                    userId,
+                )
             }
         }
     }
