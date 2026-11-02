@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -110,6 +111,18 @@ class RecipesViewModel(
     private var loadedQuery = initialQuery
     private var loadedSort = effectiveSort(initialQuery, null)
 
+    /**
+     * What [RecipeRepository.writes] said when the first page on screen was asked for — see
+     * [reloadIfStale].
+     */
+    private var readAt = recipeRepository.writes.value
+
+    /**
+     * The quiet reload in flight. Its own flag rather than [RecipesUiState.isLoading], which
+     * draws the paging spinner at the foot of the list.
+     */
+    private var reloadJob: Job? = null
+
     init {
         viewModelScope.launch {
             // Debounce text; sort changes apply immediately
@@ -152,12 +165,49 @@ class RecipesViewModel(
         page = 0
         loadedQuery = q
         loadedSort = s
+        readAt = recipeRepository.writes.value
         _uiState.update { it.copy(recipes = emptyList(), isLoading = true, allLoaded = false, error = null) }
         loadPage(q, s)
     }
 
+    /**
+     * Reads the first page of the same search again, without a spinner, when the cook has
+     * written a recipe since it was read.
+     *
+     * Called each time the list comes back on screen. With nothing typed it is the most
+     * recent recipes, so a recipe just created belongs at the top of it, and any list can be
+     * showing the one just given a picture. Only the results are read again: the cooks,
+     * cookbooks and ingredients beside them are not things a recipe write changes.
+     *
+     * Stands down while a page is loading — a new query's first page is already fresh, and a
+     * further page would land after the replacement. A failure keeps the list as it is and
+     * asks again on the next return.
+     */
+    fun reloadIfStale() {
+        val writes = recipeRepository.writes.value
+        if (writes == readAt || _uiState.value.isLoading || reloadJob?.isActive == true) return
+        val q = loadedQuery
+        val s = loadedSort
+        reloadJob = viewModelScope.launch {
+            runCatching {
+                val token = tokenDataStore.tokenFlow.first()
+                recipeApi.searchRecipes(token = token, query = q, sort = s, page = 0, size = pageSize)
+            }.onSuccess { results ->
+                // A new search started meanwhile owns the list now.
+                if (q != loadedQuery || s != loadedSort) return@onSuccess
+                buffer.clear()
+                buffer.addAll(results)
+                page = 1
+                readAt = writes
+                _uiState.update {
+                    it.copy(recipes = buffer.toList(), allLoaded = results.size < pageSize, error = null)
+                }
+            }
+        }
+    }
+
     fun loadMore() {
-        if (_uiState.value.isLoading || _uiState.value.allLoaded) return
+        if (_uiState.value.isLoading || _uiState.value.allLoaded || reloadJob?.isActive == true) return
         // Set here rather than inside loadPage, which runs in the coroutine: two calls in
         // one frame would both get past the guard and both append the same page.
         _uiState.update { it.copy(isLoading = true) }

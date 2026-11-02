@@ -173,6 +173,8 @@ fun RecipeScreen(
     val linkSharer = rememberLinkSharer()
 
     LaunchedEffect(uiState.deleted) { if (uiState.deleted) onNavigateBack() }
+    // Every time the screen comes back, which is where saving an edit of this recipe lands.
+    LaunchedEffect(Unit) { viewModel.reloadIfStale() }
 
     val recipe = uiState.recipe
 

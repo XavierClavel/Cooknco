@@ -103,6 +103,9 @@ fun CookbookScreen(
 
     LaunchedEffect(uiState.left) { if (uiState.left) onNavigateBack() }
     LaunchedEffect(uiState.deleted) { if (uiState.deleted) onNavigateBack() }
+    // Every time the cookbook comes back, which is where opening one of its recipes and
+    // editing it lands.
+    LaunchedEffect(Unit) { viewModel.reloadIfStale() }
 
     val cookbook = uiState.cookbook
 
@@ -490,7 +493,7 @@ private fun RecipeRow(
         ) {
             RecipeImage(
                 recipeId = recipe.id,
-                version = 1L,
+                version = recipe.version,
                 contentDescription = recipe.title,
                 modifier = Modifier
                     .size(60.dp)

@@ -37,6 +37,7 @@ class CookbookRecipe (
     fun toInfo() = CookbookRecipeInfo(
         id = recipe.id,
         title = recipe.title,
+        version = recipe.imageVersion,
         addedById = addedBy.id,
         addedByUsername = addedBy.username,
         additionDate = additionDate.toEpochSecond(ZoneOffset.UTC),

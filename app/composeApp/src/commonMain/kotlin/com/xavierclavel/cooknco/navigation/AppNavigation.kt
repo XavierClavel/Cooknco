@@ -215,8 +215,15 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 isPremium = (authState as? AuthState.Authenticated)?.user?.isPremium == true,
                 onNavigateBack = { navController.popBackStack() },
                 onSaved = { savedId ->
-                    navController.navigate("recipe/$savedId") {
-                        popUpTo("recipe/$recipeId/edit") { inclusive = true }
+                    // Back to the recipe the editor was opened from, which reads the recipe
+                    // again as it comes back (RecipeViewModel.reloadIfStale). Pushing a fresh
+                    // copy on top of it instead left the one read before the edit a back-press
+                    // away — the same recipe, without the picture just given to it — between
+                    // the cook and wherever they had opened it from.
+                    if (!navController.popBackStack("recipe/$savedId", inclusive = false)) {
+                        navController.navigate("recipe/$savedId") {
+                            popUpTo("recipe/$recipeId/edit") { inclusive = true }
+                        }
                     }
                 },
                 viewModel = editViewModel,

@@ -313,6 +313,11 @@ data class CookbookSaveDto(
 data class CookbookRecipeInfo(
     val id: Long,
     val title: String,
+    /**
+     * The picture's version, as [RecipeOverview.version]. One from a backend that predates the
+     * field, which is what every row was drawn at before it existed.
+     */
+    val version: Long = 1L,
     val addedById: Long,
     val addedByUsername: String,
     val additionDate: Long,
