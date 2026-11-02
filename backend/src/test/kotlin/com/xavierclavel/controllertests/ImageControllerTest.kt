@@ -9,6 +9,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import main.com.xavierclavel.utils.addCookbookRecipe
 import main.com.xavierclavel.utils.createCookbook
+import main.com.xavierclavel.utils.uploadImage
+import main.com.xavierclavel.utils.getMe
+import main.com.xavierclavel.utils.getCookbookUsers
 import main.com.xavierclavel.utils.createRecipe
 import main.com.xavierclavel.utils.getCookbookRecipes
 import main.com.xavierclavel.utils.getRecipe
@@ -86,6 +89,22 @@ class ImageControllerTest : ApplicationTest() {
         client.uploadRecipeImage(recipe.id)
 
         assertEquals(2, client.getCookbookRecipes(cookbook.id).single().version)
+    }
+
+    /**
+     * A cookbook lists its members at the picture version they are on. It used to send none,
+     * and the app drew every member at version 1 — a file the second upload deletes.
+     */
+    @Test
+    fun `a cookbook lists each member at their picture's version`() = runTestAsAdmin {
+        val cookbook = client.createCookbook()
+        val me = client.getMe()
+        assertEquals(0, client.getCookbookUsers(cookbook.id).single { it.id == me.id }.version)
+
+        client.uploadImage("users", me.id)
+        client.uploadImage("users", me.id)
+
+        assertEquals(2, client.getCookbookUsers(cookbook.id).single { it.id == me.id }.version)
     }
 
     // ── The part of a picture its uploader kept ─────────────────────────────────

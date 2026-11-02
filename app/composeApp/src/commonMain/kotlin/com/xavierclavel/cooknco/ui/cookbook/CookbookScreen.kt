@@ -544,7 +544,7 @@ private fun MemberRow(
         ) {
             UserAvatar(
                 userId = member.id,
-                version = 1L,
+                version = member.version,
                 contentDescription = member.username,
                 modifier = Modifier
                     .size(44.dp)

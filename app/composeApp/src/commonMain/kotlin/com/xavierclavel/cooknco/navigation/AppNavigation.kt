@@ -275,7 +275,12 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             val currentUsername = (authState as? AuthState.Authenticated)?.user?.username ?: ""
             val createViewModel: CookbookEditViewModel = viewModel(
                 key = "cookbook_create",
-                factory = CookbookEditViewModel.factory(null, currentUserId, currentUsername),
+                factory = CookbookEditViewModel.factory(
+                    null,
+                    currentUserId,
+                    currentUsername,
+                    (authState as? AuthState.Authenticated)?.user?.version ?: 0L,
+                ),
             )
             CookbookEditScreen(
                 cookbookId = null,
@@ -322,7 +327,12 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
             val currentUsername = (authState as? AuthState.Authenticated)?.user?.username ?: ""
             val editViewModel: CookbookEditViewModel = viewModel(
                 key = "cookbook_edit_$cookbookId",
-                factory = CookbookEditViewModel.factory(cookbookId, currentUserId, currentUsername),
+                factory = CookbookEditViewModel.factory(
+                    cookbookId,
+                    currentUserId,
+                    currentUsername,
+                    (authState as? AuthState.Authenticated)?.user?.version ?: 0L,
+                ),
             )
             CookbookEditScreen(
                 cookbookId = cookbookId,

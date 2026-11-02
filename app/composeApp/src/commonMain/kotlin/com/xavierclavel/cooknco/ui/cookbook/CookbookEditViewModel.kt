@@ -21,6 +21,8 @@ import kotlinx.coroutines.launch
 
 data class EditMember(
     val userId: Long,
+    /** The account's picture version, for its avatar. Meaningless while [userId] is 0. */
+    val version: Long = 0L,
     val username: String,
     val isAdmin: Boolean,
     val searchResults: List<UserSummary> = emptyList(),
@@ -57,6 +59,7 @@ class CookbookEditViewModel(
     private val cookbookId: Long?,
     private val currentUserId: Long,
     private val currentUsername: String,
+    private val currentUserVersion: Long,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CookbookEditUiState(cookbookId = cookbookId))
@@ -74,6 +77,7 @@ class CookbookEditViewModel(
                     members = listOf(
                         EditMember(
                             userId = currentUserId,
+                            version = currentUserVersion,
                             username = currentUsername,
                             isAdmin = true,
                             searchQuery = currentUsername,
@@ -108,6 +112,7 @@ class CookbookEditViewModel(
                 val editMembers = users.map { u ->
                     EditMember(
                         userId = u.id,
+                        version = u.version,
                         username = u.username,
                         isAdmin = u.isAdmin,
                         searchQuery = u.username,
@@ -189,6 +194,7 @@ class CookbookEditViewModel(
             if (index < list.size) {
                 list[index] = list[index].copy(
                     userId = user.id,
+                    version = user.version,
                     username = user.username,
                     searchQuery = user.username,
                     searchResults = emptyList(),
@@ -272,8 +278,8 @@ class CookbookEditViewModel(
     }
 
     companion object {
-        fun factory(cookbookId: Long?, userId: Long, username: String): ViewModelProvider.Factory = viewModelFactory {
-            initializer { CookbookEditViewModel(AppGraph.cookbookRepository, cookbookId, userId, username) }
+        fun factory(cookbookId: Long?, userId: Long, username: String, userVersion: Long): ViewModelProvider.Factory = viewModelFactory {
+            initializer { CookbookEditViewModel(AppGraph.cookbookRepository, cookbookId, userId, username, userVersion) }
         }
     }
 }

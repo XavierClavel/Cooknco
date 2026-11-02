@@ -405,7 +405,7 @@ private fun MemberEditRow(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 UserAvatar(
                     userId = member.userId,
-                    version = 1L,
+                    version = member.version,
                     contentDescription = member.username,
                     modifier = Modifier.size(40.dp).clip(CircleShape),
                 )

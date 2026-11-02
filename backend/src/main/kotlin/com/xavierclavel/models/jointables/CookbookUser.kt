@@ -35,6 +35,7 @@ class CookbookUser (
 
     fun toInfo() = CookbookUserInfo(
         id = user.id,
+        version = user.imageVersion,
         username = user.username,
         isAdmin = isAdmin,
         joinDate = joinDate.toEpochSecond(ZoneOffset.UTC),
