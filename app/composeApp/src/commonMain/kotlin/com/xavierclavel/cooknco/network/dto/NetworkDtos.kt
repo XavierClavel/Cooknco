@@ -286,6 +286,11 @@ data class IngredientSearchResult(
 @Serializable
 data class CookbookUserInfo(
     val id: Long,
+    /**
+     * The member's picture version, as [UserInfo.version]. One from a backend that predates the
+     * field, which is what every member was drawn at before it existed.
+     */
+    val version: Long = 1L,
     val username: String,
     val isAdmin: Boolean,
     val joinDate: Long,
