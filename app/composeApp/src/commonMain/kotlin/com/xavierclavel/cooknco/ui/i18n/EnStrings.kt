@@ -572,7 +572,7 @@ object EnStrings : Strings {
     override fun weekRange(start: LocalDate, end: LocalDate) =
         if (start.month == end.month) "${start.day} – ${end.day} ${monthName(end.month)}"
         else "${start.day} ${monthName(start.month)} – ${end.day} ${monthName(end.month)}"
-    override val thisWeek = "This week"
+    override val thisWeek = "Now"
     override val previousWeek = "Previous week"
     override val nextWeek = "Next week"
     override fun mealSlot(slot: MealSlot) = when (slot) {

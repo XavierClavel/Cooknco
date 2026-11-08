@@ -32,6 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -45,6 +51,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.xavierclavel.cooknco.data.monthGrid
 import com.xavierclavel.cooknco.data.monthOf
 import com.xavierclavel.cooknco.ui.i18n.strings
+import com.xavierclavel.cooknco.ui.theme.CookncoGold
 import com.xavierclavel.cooknco.ui.theme.CookncoNavy
 import com.xavierclavel.cooknco.ui.theme.CookncoOrange
 import com.xavierclavel.cooknco.ui.theme.CookncoWhite
@@ -172,13 +179,25 @@ fun MonthCalendar(
             }
             grid.chunked(7).forEach { week ->
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    week.forEach { day ->
+                    // A picked day shows as picked whether or not it already has the meal
+                    val bands = week.map { day ->
+                        when {
+                            isSelected(day) -> DayBand.PICKED
+                            hasMeal(day) -> DayBand.PLANNED
+                            else -> null
+                        }
+                    }
+                    week.forEachIndexed { i, day ->
+                        val band = bands[i]
                         CalendarDay(
                             day = day,
                             isInMonth = day.month == month.month,
-                            isSelected = isSelected(day),
+                            isSelected = band == DayBand.PICKED,
+                            band = band,
+                            // Days of one kind side by side read as one stretch, within a week's row
+                            joinsPrevious = band != null && i > 0 && bands[i - 1] == band,
+                            joinsNext = band != null && i < week.lastIndex && bands[i + 1] == band,
                             isToday = day == today,
-                            hasMeal = hasMeal(day),
                             onClick = { onDayClick(day) },
                             modifier = Modifier.weight(1f),
                         )
@@ -240,6 +259,37 @@ private fun MonthArrow(onClick: () -> Unit, icon: @Composable () -> Unit) {
     ) { icon() }
 }
 
+/** What a day of the grid is filled with: picked, or already holding the meal being planned. */
+private enum class DayBand { PICKED, PLANNED }
+
+/**
+ * A day's fill: a circle on its own, and a pill running into the cell beside it when that day
+ * has the same fill. Each cell draws its share; a side that joins runs past the cell's edge and
+ * is clipped there, so the outline has no seam where two cells meet. Picked days are orange and
+ * outlined; days that already have the meal are a plain yellow, behind what is being picked.
+ */
+private fun Modifier.dayBand(band: DayBand, joinsPrevious: Boolean, joinsNext: Boolean): Modifier = drawBehind {
+    val diameter = 34.dp.toPx()
+    val stroke = 2.dp.toPx()
+    val top = (size.height - diameter) / 2
+    val centre = size.width / 2
+    val overrun = diameter
+    val left = if (joinsPrevious) -overrun else centre - diameter / 2
+    val right = if (joinsNext) size.width + overrun else centre + diameter / 2
+    clipRect {
+        val corner = CornerRadius(diameter / 2)
+        val fill = if (band == DayBand.PICKED) CookncoOrange else CookncoGold
+        drawRoundRect(fill, Offset(left, top), Size(right - left, diameter), corner)
+        if (band == DayBand.PICKED) drawRoundRect(
+            CookncoNavy,
+            Offset(left + stroke / 2, top + stroke / 2),
+            Size(right - left - stroke, diameter - stroke),
+            CornerRadius((diameter - stroke) / 2),
+            style = Stroke(stroke),
+        )
+    }
+}
+
 /** One day of the grid: filled when picked, a dashed ring when it is today, grey off the month. */
 @Composable
 private fun CalendarDay(
@@ -247,19 +297,28 @@ private fun CalendarDay(
     isInMonth: Boolean,
     isSelected: Boolean,
     isToday: Boolean,
-    hasMeal: Boolean,
+    band: DayBand?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    joinsPrevious: Boolean = false,
+    joinsNext: Boolean = false,
 ) {
     val s = strings()
-    Box(modifier = modifier.height(38.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier
+            .height(38.dp)
+            .then(if (band != null) Modifier.dayBand(band, joinsPrevious, joinsNext) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
         Box(
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
                 .then(
                     when {
-                        isSelected -> Modifier.background(CookncoOrange).border(2.dp, CookncoNavy, CircleShape)
+                        // Drawn by the band behind, so that neighbours can run into each other;
+                        // today keeps its ring over a day that already has the meal
+                        isSelected -> Modifier
                         isToday -> Modifier.dashedBorder(CircleShape, CookncoNavy, strokeWidth = 2.dp, dashLength = 4.dp, gapLength = 3.dp)
                         else -> Modifier
                     },
@@ -279,20 +338,9 @@ private fun CalendarDay(
                     isInMonth -> FontWeight.SemiBold
                     else -> FontWeight.Medium
                 },
-                color = if (isInMonth || isSelected) CookncoNavy else PlanOutOfMonth,
+                color = if (isInMonth || band != null) CookncoNavy else PlanOutOfMonth,
                 modifier = Modifier.clearAndSetSemantics {},
             )
-            // That meal is already planned on this day
-            if (hasMeal) {
-                Box(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 4.dp)
-                        .size(5.dp)
-                        .clip(CircleShape)
-                        .background(if (isSelected) CookncoNavy else PlanMuted),
-                )
-            }
         }
     }
 }
