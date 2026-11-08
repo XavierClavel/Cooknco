@@ -80,6 +80,7 @@ import com.xavierclavel.cooknco.data.OfflineState
 import com.xavierclavel.cooknco.navigation.WebRoutes
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.RecipeStepInfo
+import com.xavierclavel.cooknco.network.dto.MealPlanRecipe
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeIngredientInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
@@ -280,6 +281,8 @@ fun RecipeScreen(
             saveFailed = planSheet.saveFailed,
             onSave = viewModel::planRecipe,
             onDismissRequest = viewModel::closePlanSheet,
+            recipe = MealPlanRecipe(id = recipe.id, version = recipe.version),
+            servingsNote = recipe.yield?.let { s.recipeMakes(it) },
         )
     }
 
