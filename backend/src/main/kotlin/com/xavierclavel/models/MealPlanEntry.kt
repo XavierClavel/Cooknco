@@ -84,7 +84,7 @@ class MealPlanEntry(
      * [title] is empty, there is no [recipe] and no [servings].
      */
     @DbDefault("true")
-    var cooked: Boolean = true,
+    var hasCooked: Boolean = true,
 
 ) : Model() {
 
@@ -101,6 +101,6 @@ class MealPlanEntry(
         title = readableRecipe?.title ?: title,
         servings = servings,
         recipe = readableRecipe?.let { MealPlanRecipe(id = it.id, version = it.imageVersion) },
-        cooked = cooked,
+        hasCooked = hasCooked,
     )
 }

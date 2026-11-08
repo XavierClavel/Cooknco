@@ -483,7 +483,7 @@ class MealPlanViewModel(
         if (editing.isSaving) return
         val entry = editing.entry
         val originalSlot = MealSlot.of(entry.slot)
-        val named = entry.recipe == null && entry.cooked
+        val named = entry.recipe == null && entry.hasCooked
         val renamed = editing.title.trim().takeIf { named && it.isNotEmpty() && it != entry.title }
         val slotChanged = editing.slot != originalSlot
         if (named && editing.title.isBlank()) return
@@ -506,7 +506,7 @@ class MealPlanViewModel(
                 async {
                     val recipe = entry.recipe
                     when {
-                        !entry.cooked -> mealPlanRepository.planNotCooked(date, editing.slot)
+                        !entry.hasCooked -> mealPlanRepository.planNotCooked(date, editing.slot)
                         recipe != null -> mealPlanRepository.planRecipe(recipe.id, date, editing.slot, editing.servingsOn(date))
                         else -> mealPlanRepository.planDish(title, date, editing.slot, editing.servingsOn(date))
                     }
@@ -562,7 +562,7 @@ class MealPlanViewModel(
 private fun MealPlanEntry.isSameDishAs(other: MealPlanEntry): Boolean {
     if (slot != other.slot) return false
     // Not cooking is one thing whatever day it falls on, and never a dish
-    if (!cooked || !other.cooked) return !cooked && !other.cooked
+    if (!hasCooked || !other.hasCooked) return !hasCooked && !other.hasCooked
     val mine = recipe
     val theirs = other.recipe
     return if (mine != null || theirs != null) mine?.id == theirs?.id

@@ -423,9 +423,9 @@ class MealPlanControllerTest : ApplicationTest() {
         runAsUser1 {
             val stew = client.createRecipe(recipeDTO.copy(title = "Stew"))
             val entry = client.planMeal(
-                MealPlanEntryDTO(date = monday, slot = MealSlot.LUNCH, recipeId = stew.id, title = "Restaurant", servings = 3, cooked = false),
+                MealPlanEntryDTO(date = monday, slot = MealSlot.LUNCH, recipeId = stew.id, title = "Restaurant", servings = 3, hasCooked = false),
             )
-            assertFalse(entry.cooked)
+            assertFalse(entry.hasCooked)
             assertEquals("", entry.title)
             assertNull(entry.recipe)
             assertNull(entry.servings)
@@ -435,7 +435,7 @@ class MealPlanControllerTest : ApplicationTest() {
             assertEquals(MealSlot.DINNER, moved.slot)
             assertEquals("", moved.title)
             assertNull(moved.servings)
-            assertFalse(moved.cooked)
+            assertFalse(moved.hasCooked)
             assertEquals(listOf(moved), client.listMealPlan(monday, sunday))
             assertTrue(client.mealPlanSuggestions().isEmpty(), "not cooking is not a dish to suggest")
         }

@@ -16,7 +16,7 @@ import shared.enums.MealSlot
  *   Ignored when [recipeId] is set: the recipe names itself, and its title is what is kept.
  * @param servings how many it is cooked for. Null on a recipe means as many as the recipe
  *   makes; null on anything else means nobody said.
- * @param cooked false when the meal was not cooked at all — eaten out, ordered in, skipped.
+ * @param hasCooked false when the meal was not cooked at all — eaten out, ordered in, skipped.
  *   It then takes no recipe, title or servings, and any sent are ignored.
  */
 @Serializable
@@ -26,7 +26,7 @@ data class MealPlanEntryDTO(
     val recipeId: Long? = null,
     val title: String? = null,
     val servings: Int? = null,
-    val cooked: Boolean = true,
+    val hasCooked: Boolean = true,
 )
 
 /**

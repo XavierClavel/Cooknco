@@ -14,7 +14,7 @@ import shared.enums.MealSlot
  * @param recipe the recipe to open, or null when there is none to open: a dish that never
  *   was one, or a recipe that has since gone out of the caller's reach. The entry stays
  *   either way, so a plan never loses a meal because somebody else changed their recipe.
- * @param cooked false when the meal was not cooked: it fills the meal, and names no dish —
+ * @param hasCooked false when the meal was not cooked: it fills the meal, and names no dish —
  *   [title] is empty, for a client to word in its own language.
  */
 @Serializable
@@ -26,7 +26,7 @@ data class MealPlanEntryInfo(
     val title: String,
     val servings: Int? = null,
     val recipe: MealPlanRecipe? = null,
-    val cooked: Boolean = true,
+    val hasCooked: Boolean = true,
 )
 
 /** Just enough of a planned recipe to draw its picture and to open it. */

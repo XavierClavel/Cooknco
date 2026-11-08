@@ -172,10 +172,10 @@ internal fun PlanSearchField(
  * reach — a fork and knife on green.
  */
 @Composable
-internal fun DishThumbnail(recipe: MealPlanRecipe?, size: Dp, cornerRadius: Dp, borderWidth: Dp = 2.dp, cooked: Boolean = true) {
+internal fun DishThumbnail(recipe: MealPlanRecipe?, size: Dp, cornerRadius: Dp, borderWidth: Dp = 2.dp, hasCooked: Boolean = true) {
     val shape = RoundedCornerShape(cornerRadius)
     val frame = Modifier.size(size).clip(shape).border(borderWidth, CookncoNavy, shape)
-    if (!cooked) {
+    if (!hasCooked) {
         Box(modifier = frame.background(CookncoGoldLight), contentAlignment = Alignment.Center) {
             Icon(Icons.Outlined.NoMeals, contentDescription = null, tint = CookncoNavy, modifier = Modifier.size(size * 0.42f))
         }
