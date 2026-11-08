@@ -588,7 +588,7 @@ object FrStrings : Strings {
     override fun weekRange(start: LocalDate, end: LocalDate) =
         if (start.month == end.month) "${start.day} – ${end.day} ${monthName(end.month)}"
         else "${start.day} ${monthName(start.month)} – ${end.day} ${monthName(end.month)}"
-    override val thisWeek = "Cette semaine"
+    override val thisWeek = "Maintenant"
     override val previousWeek = "Semaine précédente"
     override val nextWeek = "Semaine suivante"
     override fun mealSlot(slot: MealSlot) = when (slot) {
