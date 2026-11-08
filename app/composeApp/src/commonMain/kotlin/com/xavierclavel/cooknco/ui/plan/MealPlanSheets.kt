@@ -423,7 +423,7 @@ fun DishDaysSheet(
     onDismissRequest: () -> Unit,
 ) {
     val s = strings()
-    val titleEditable = state.entry.recipe == null && !state.entry.notCooked
+    val titleEditable = state.entry.recipe == null && state.entry.cooked
     val initialMonth = remember(state.entry.id) { runCatching { LocalDate.parse(state.entry.date) }.getOrDefault(today) }
     // The month the calendar shows, whose days the portions below are for
     var shownMonth by remember(state.entry.id) { mutableStateOf(monthOf(initialMonth)) }
@@ -439,9 +439,9 @@ fun DishDaysSheet(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DishThumbnail(recipe = state.entry.recipe, size = 56.dp, cornerRadius = 16.dp, borderWidth = 2.5.dp, notCooked = state.entry.notCooked)
+            DishThumbnail(recipe = state.entry.recipe, size = 56.dp, cornerRadius = 16.dp, borderWidth = 2.5.dp, cooked = state.entry.cooked)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(if (state.entry.notCooked) s.notCooked else state.entry.title, fontSize = 21.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(if (state.entry.cooked) state.entry.title else s.notCooked, fontSize = 21.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(s.mealSlot(state.slot), fontSize = 13.5.sp, color = PlanMuted)
             }
             if (onOpenRecipe != null) {
@@ -491,7 +491,7 @@ fun DishDaysSheet(
         // Only the month on screen, so the list stays beside the calendar it belongs to
         val monthDays = state.days.filter { monthOf(it) == shownMonth }
         // Nothing was cooked, so there is nobody to count
-        if (monthDays.isNotEmpty() && !state.entry.notCooked) {
+        if (monthDays.isNotEmpty() && state.entry.cooked) {
             PlanFieldLabel(s.servingsLabel, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 4.dp))
             monthDays.sorted().forEach { date ->
                 Row(

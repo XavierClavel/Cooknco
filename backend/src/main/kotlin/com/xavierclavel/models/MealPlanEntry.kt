@@ -79,12 +79,12 @@ class MealPlanEntry(
     var servings: Int? = null,
 
     /**
-     * The cook did not cook this meal — ate out, ordered in, skipped it. It fills the meal as a
-     * dish would, so a calendar reads it as planned, but it names nothing: [title] is empty,
-     * there is no [recipe] and no [servings].
+     * Whether the meal was cooked. False when it was not — eaten out, ordered in, skipped: it
+     * fills the meal as a dish would, so a calendar reads it as planned, but it names nothing:
+     * [title] is empty, there is no [recipe] and no [servings].
      */
-    @DbDefault("false")
-    var notCooked: Boolean = false,
+    @DbDefault("true")
+    var cooked: Boolean = true,
 
 ) : Model() {
 
@@ -101,6 +101,6 @@ class MealPlanEntry(
         title = readableRecipe?.title ?: title,
         servings = servings,
         recipe = readableRecipe?.let { MealPlanRecipe(id = it.id, version = it.imageVersion) },
-        notCooked = notCooked,
+        cooked = cooked,
     )
 }

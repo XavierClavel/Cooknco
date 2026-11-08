@@ -29,6 +29,7 @@ import shared.dto.UserSettingsDTO
 import shared.enums.MealSlot
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -422,9 +423,9 @@ class MealPlanControllerTest : ApplicationTest() {
         runAsUser1 {
             val stew = client.createRecipe(recipeDTO.copy(title = "Stew"))
             val entry = client.planMeal(
-                MealPlanEntryDTO(date = monday, slot = MealSlot.LUNCH, recipeId = stew.id, title = "Restaurant", servings = 3, notCooked = true),
+                MealPlanEntryDTO(date = monday, slot = MealSlot.LUNCH, recipeId = stew.id, title = "Restaurant", servings = 3, cooked = false),
             )
-            assertTrue(entry.notCooked)
+            assertFalse(entry.cooked)
             assertEquals("", entry.title)
             assertNull(entry.recipe)
             assertNull(entry.servings)
@@ -434,7 +435,7 @@ class MealPlanControllerTest : ApplicationTest() {
             assertEquals(MealSlot.DINNER, moved.slot)
             assertEquals("", moved.title)
             assertNull(moved.servings)
-            assertTrue(moved.notCooked)
+            assertFalse(moved.cooked)
             assertEquals(listOf(moved), client.listMealPlan(monday, sunday))
             assertTrue(client.mealPlanSuggestions().isEmpty(), "not cooking is not a dish to suggest")
         }

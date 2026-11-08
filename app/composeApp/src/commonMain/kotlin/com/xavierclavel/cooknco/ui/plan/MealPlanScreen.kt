@@ -572,10 +572,10 @@ private fun DishRow(dish: MealPlanEntry, onClick: () -> Unit, onMenu: () -> Unit
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        DishThumbnail(recipe = dish.recipe, size = 44.dp, cornerRadius = 12.dp, notCooked = dish.notCooked)
+        DishThumbnail(recipe = dish.recipe, size = 44.dp, cornerRadius = 12.dp, cooked = dish.cooked)
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (dish.notCooked) s.notCooked else dish.title,
+                text = if (dish.cooked) dish.title else s.notCooked,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,

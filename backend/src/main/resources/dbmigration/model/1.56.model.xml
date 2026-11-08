@@ -2,7 +2,7 @@
 <migration xmlns="http://ebean-orm.github.io/xml/ns/dbmigration">
     <changeSet type="apply">
         <addColumn tableName="meal_plan_entries">
-            <column name="not_cooked" type="boolean" defaultValue="false" notnull="true"/>
+            <column name="cooked" type="boolean" defaultValue="true" notnull="true"/>
         </addColumn>
     </changeSet>
 </migration>

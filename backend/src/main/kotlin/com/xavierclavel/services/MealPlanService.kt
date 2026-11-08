@@ -53,7 +53,7 @@ class MealPlanService : KoinComponent {
 
     fun create(owner: User, dto: MealPlanEntryDTO): MealPlanEntryInfo {
         val date = parseDate(dto.date)
-        if (dto.notCooked) {
+        if (!dto.cooked) {
             // Nothing to name and nothing to count: the meal is filled, and that is all
             val entry = MealPlanEntry(
                 owner = owner,
@@ -61,7 +61,7 @@ class MealPlanService : KoinComponent {
                 slot = dto.slot,
                 position = nextPosition(owner.id, date, dto.slot),
                 title = "",
-                notCooked = true,
+                cooked = false,
             ).insertAndGet()
             return describe(owner.id, entry)
         }
@@ -103,8 +103,8 @@ class MealPlanService : KoinComponent {
     fun update(ownerId: Long, id: Long, dto: MealPlanEntryEditDTO): MealPlanEntryInfo {
         val entry = findOwned(ownerId, id)
         val date = parseDate(dto.date)
-        val servings = checkServings(dto.servings).takeUnless { entry.notCooked }
-        if (dto.title != null && !entry.notCooked && !isReadableRecipe(ownerId, entry)) {
+        val servings = checkServings(dto.servings).takeIf { entry.cooked }
+        if (dto.title != null && entry.cooked && !isReadableRecipe(ownerId, entry)) {
             entry.title = checkTitle(dto.title)
             entry.recipe = null
         }
@@ -134,7 +134,7 @@ class MealPlanService : KoinComponent {
             .select(QMealPlanEntry.Alias.title)
             .owner.id.eq(ownerId)
             .recipe.id.isNull()
-            .notCooked.isFalse()
+            .cooked.isTrue()
             .apply { if (!query.isNullOrBlank()) title.icontains(query.trim()) }
             .orderBy().date.desc().id.desc()
             .setMaxRows(SUGGESTION_SCAN)
