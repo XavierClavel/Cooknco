@@ -34,6 +34,7 @@ object MealPlanController : Controller(MEAL_PLAN_URL) {
     override fun Route.routes() {
         listEntries()
         suggestTitles()
+        suggestRecent()
         createEntry()
         updateEntry()
         deleteEntry()
@@ -49,6 +50,15 @@ object MealPlanController : Controller(MEAL_PLAN_URL) {
     private fun Route.suggestTitles() = get("/suggestions") {
         val user = userService.checkPremiumAccess(getSessionUserId())
         call.respond(mealPlanService.suggestions(user.id, getStringQueryParam("query")))
+    }
+
+    /**
+     * The dishes planned before, recipes included. `/suggestions` is the words-only list app
+     * builds before this one still ask for, and stays for them.
+     */
+    private fun Route.suggestRecent() = get("/recent") {
+        val user = userService.checkPremiumAccess(getSessionUserId())
+        call.respond(mealPlanService.recent(user.id, getStringQueryParam("query")))
     }
 
     private fun Route.createEntry() = post {

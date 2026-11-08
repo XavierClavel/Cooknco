@@ -16,6 +16,7 @@ import com.xavierclavel.cooknco.data.planWeek
 import com.xavierclavel.cooknco.data.weekStartOf
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.dto.MealPlanEntry
+import com.xavierclavel.cooknco.network.dto.MealPlanSuggestion
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import kotlin.math.abs
 import kotlin.time.Clock
@@ -61,7 +62,7 @@ data class AddDishState(
     /** The cook's own recipes, liked ones and cookbooks' that match [query]. */
     val recipes: List<RecipeOverview> = emptyList(),
     /** What they planned before as words, matching [query]. */
-    val suggestions: List<String> = emptyList(),
+    val suggestions: List<MealPlanSuggestion> = emptyList(),
     val isSearching: Boolean = false,
     val isSaving: Boolean = false,
     val saveFailed: Boolean = false,
@@ -74,6 +75,8 @@ data class AddDishState(
 private sealed interface NewDish {
     data class Recipe(val recipe: RecipeOverview) : NewDish
     data class Words(val title: String) : NewDish
+    /** A recipe planned before, known by its id alone. */
+    data class PlannedRecipe(val recipeId: Long) : NewDish
     data object NotCooked : NewDish
 }
 
@@ -93,6 +96,11 @@ data class EditDishState(
      */
     val planned: Map<LocalDate, MealPlanEntry> = emptyMap(),
     val loadedMonths: Set<LocalDate> = emptySet(),
+    /**
+     * The meals other dishes already fill, by day, in the same months — what the calendar marks
+     * so the cook sees which days already have something at the meal this dish is moved to.
+     */
+    val taken: Map<LocalDate, Set<MealSlot>> = emptyMap(),
     val isLoadingDays: Boolean = false,
     /** Days ticked that the dish is not planned on yet, and planned days unticked. */
     val added: Set<LocalDate> = emptySet(),
@@ -323,7 +331,7 @@ class MealPlanViewModel(
             if (query.isNotBlank()) delay(SEARCH_DEBOUNCE_MILLIS)
             _uiState.update { state -> state.copy(adding = state.adding?.copy(isSearching = true)) }
             val recipes = async { recipeRepository.searchOwnCollections(userId, query.trim()) }
-            val suggestions = async { mealPlanRepository.suggestions(query.trim()) }
+            val suggestions = async { mealPlanRepository.recent(query.trim()) }
             val foundRecipes = recipes.await().getOrDefault(emptyList())
             val foundSuggestions = suggestions.await().getOrDefault(emptyList())
             _uiState.update { state ->
@@ -348,6 +356,12 @@ class MealPlanViewModel(
 
     fun addSuggestion(title: String) = add(NewDish.Words(title))
 
+    /** A dish planned before, planned again: as its recipe when it has one, else as its words. */
+    fun addPlannedBefore(suggestion: MealPlanSuggestion) {
+        val recipe = suggestion.recipe
+        add(if (recipe != null) NewDish.PlannedRecipe(recipe.id) else NewDish.Words(suggestion.title))
+    }
+
     /** Notes the meal as not cooked on the sheet's days: it fills the meal as a dish would. */
     fun addNotCooked() = add(NewDish.NotCooked)
 
@@ -357,6 +371,7 @@ class MealPlanViewModel(
             when (dish) {
                 is NewDish.Recipe -> mealPlanRepository.planRecipe(dish.recipe.id, date, slot, servings = DEFAULT_MEAL_SERVINGS)
                 is NewDish.Words -> mealPlanRepository.planDish(dish.title, date, slot, servings = DEFAULT_MEAL_SERVINGS)
+                is NewDish.PlannedRecipe -> mealPlanRepository.planRecipe(dish.recipeId, date, slot, servings = DEFAULT_MEAL_SERVINGS)
                 NewDish.NotCooked -> mealPlanRepository.planNotCooked(date, slot)
             }
         }
@@ -438,7 +453,22 @@ class MealPlanViewModel(
                             // Two of the same dish in one meal is one day ticked; the first is the one edited
                             .groupBy({ it.first }, { it.second })
                             .mapValues { (_, list) -> list.minBy { it.position } }
-                        state.copy(editing = current.copy(planned = same + current.planned, isLoadingDays = false))
+                        val sameIds = same.values.mapTo(HashSet()) { it.id } + current.planned.values.map { it.id }
+                        val taken = entries.filterNot { it.id in sameIds || it.isSameDishAs(current.entry) }
+                            .mapNotNull { e ->
+                                val date = runCatching { LocalDate.parse(e.date) }.getOrNull() ?: return@mapNotNull null
+                                val slot = MealSlot.of(e.slot) ?: return@mapNotNull null
+                                date to slot
+                            }
+                            .groupBy({ it.first }, { it.second })
+                            .mapValues { (_, slots) -> slots.toSet() }
+                        state.copy(
+                            editing = current.copy(
+                                planned = same + current.planned,
+                                taken = current.taken + taken,
+                                isLoadingDays = false,
+                            ),
+                        )
                     },
                     // Asked again the next time the cook pages to it
                     onFailure = { state.copy(editing = current.copy(loadedMonths = current.loadedMonths - first, isLoadingDays = false)) },

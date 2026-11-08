@@ -540,6 +540,16 @@ data class MealPlanEntry(
     val hasCooked: Boolean = true,
 )
 
+/**
+ * A dish planned before, offered to plan again — `shared.infodto.MealPlanSuggestionInfo`. A
+ * [recipe] is planned as that recipe; without one, the dish is the words of its [title].
+ */
+@Serializable
+data class MealPlanSuggestion(
+    val title: String,
+    val recipe: MealPlanRecipe? = null,
+)
+
 @Serializable
 data class MealPlanRecipe(
     val id: Long,
