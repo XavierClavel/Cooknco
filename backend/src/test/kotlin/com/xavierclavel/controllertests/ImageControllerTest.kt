@@ -145,6 +145,41 @@ class ImageControllerTest : ApplicationTest() {
         assertFilledWith(GREEN, storedImage(RECIPES_IMG_PATH, recipe.id, 1))
     }
 
+    /**
+     * A picture the cook turned in the cropper is turned before it is cut: the crop is measured
+     * on the picture as they last saw it. Turned a quarter clockwise, the 800x600 quarters stand
+     * 600x800 with green — the top right — at the bottom right.
+     */
+    @Test
+    fun `a turned picture is cut where the cook framed it once turned`() = runTestAsAdmin {
+        val recipe = client.createRecipe()
+
+        // Unturned, the same fractions are the white quarter.
+        client.uploadRecipeImage(recipe.id, quartersImageBytes(800, 600), crop = "0.5,0.5,0.5,0.5", rotate = 90).apply {
+            assertEquals(HttpStatusCode.OK, status)
+        }
+        assertFilledWith(GREEN, storedImage(RECIPES_IMG_PATH, recipe.id, 1))
+
+        // Half a turn puts green at the bottom left.
+        client.uploadRecipeImage(recipe.id, quartersImageBytes(800, 600), crop = "0,0.5,0.5,0.5", rotate = 180).apply {
+            assertEquals(HttpStatusCode.OK, status)
+        }
+        assertFilledWith(GREEN, storedImage(RECIPES_IMG_PATH, recipe.id, 2))
+    }
+
+    @Test
+    fun `a turn the cropper cannot make is refused`() = runTestAsAdmin {
+        val recipe = client.createRecipe()
+
+        listOf(45, -90, 360).forEach { rotate ->
+            client.uploadRecipeImage(recipe.id, rotate = rotate).apply {
+                assertEquals(HttpStatusCode.BadRequest, status, "rotate $rotate")
+                assertContains(bodyAsText(), "invalid_image_crop")
+            }
+        }
+        assertEquals(0, client.getRecipe(recipe.id).version)
+    }
+
     /** What every upload got before there was a crop, and what a build that sends none still gets. */
     @Test
     fun `without a crop the picture is centred in its frame`() = runTestAsAdmin {

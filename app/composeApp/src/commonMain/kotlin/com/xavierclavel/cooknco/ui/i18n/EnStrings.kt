@@ -386,6 +386,7 @@ object EnStrings : Strings {
     override val cropHint = "Drag to move it, pinch or use the slider to zoom."
     override val cropConfirm = "Use this framing"
     override val cropZoomIn = "Zoom in"
+    override val cropRotate = "Rotate"
     override val cropZoomOut = "Zoom out"
     override val cropUnavailable = "This photo can't be shown here, so it will be centred."
     override val readyToPublish = "Ready to publish"

@@ -931,6 +931,10 @@ Three things not to undo:
   reports that same centred frame — an old app build and an untouched picture store the same.
 - **A crop that leaves the picture is refused** (`invalid_image_crop`), not clamped into it: it
   means a client measured against some other picture. Only rounding past an edge is tolerated.
+- **A turn rides beside the crop, as `?rotate=90|180|270`**, and is applied after the EXIF
+  orientation and before the crop: the app's cropper turns the picture a quarter at a time, and
+  frames it once turned, so that is the picture the fractions are of. Anything else is refused
+  with the crop's cause. The site's cropper has no turn and sends none.
 
 The frame's ratio is restated on each client — `CropFrame` in the app (`shared` is JVM-only),
 the `aspect-ratio` each page hands `EditablePicture`, the bucket's own size in the backoffice.

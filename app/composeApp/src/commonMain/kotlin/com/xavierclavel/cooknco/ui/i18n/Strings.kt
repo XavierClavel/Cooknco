@@ -358,6 +358,7 @@ interface Strings {
     val cropHint: String
     val cropConfirm: String
     val cropZoomIn: String
+    val cropRotate: String
     val cropZoomOut: String
     val cropUnavailable: String
     val readyToPublish: String

@@ -120,4 +120,15 @@ class ImageCropTest {
         assertEquals("0.166667,0.000000,0.666667,1.000000", ImageCrop(1.0 / 6, 0.0, 2.0 / 3, 1.0).toQueryValue())
         assertEquals("0.000001,0.250000,0.500000,0.375000", ImageCrop(0.0000005, 0.25, 0.5, 0.375).toQueryValue())
     }
+
+    /** The turn goes up as `?rotate=` in degrees, and a picture left as it was sends none. */
+    @Test
+    fun a_turned_picture_sends_its_rotation_in_degrees() {
+        val crop = ImageCrop(0.0, 0.0, 1.0, 1.0)
+        assertEquals(null, crop.rotationDegrees)
+        assertEquals(90, crop.copy(quarterTurns = 1).rotationDegrees)
+        assertEquals(270, crop.copy(quarterTurns = 3).rotationDegrees)
+        assertEquals(null, crop.copy(quarterTurns = 4).rotationDegrees, "a full turn is no turn")
+        assertEquals("0.000000,0.000000,1.000000,1.000000", crop.copy(quarterTurns = 1).toQueryValue(), "the crop's value is unchanged")
+    }
 }

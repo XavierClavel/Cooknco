@@ -396,6 +396,7 @@ object FrStrings : Strings {
     override val cropHint = "Faites-la glisser pour la déplacer, pincez ou utilisez le curseur pour zoomer."
     override val cropConfirm = "Garder ce cadrage"
     override val cropZoomIn = "Zoomer"
+    override val cropRotate = "Pivoter"
     override val cropZoomOut = "Dézoomer"
     override val cropUnavailable = "Cette photo ne peut pas être affichée ici : elle sera centrée."
     override val readyToPublish = "Prêt à publier"
