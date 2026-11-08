@@ -584,6 +584,7 @@ object FrStrings : Strings {
     override val cookbookTooLargeToExport = "Ce carnet contient trop de recettes pour être imprimé en un seul livre."
     override val exportRendererBusy = "Trop d'exports sont en cours d'impression. Réessayez dans un instant."
 
+    override val breakfastAndSnack = "Petit déjeuner et goûter"
     override val mealPlan = "Planning des repas"
     override fun weekRange(start: LocalDate, end: LocalDate) =
         if (start.month == end.month) "${start.day} – ${end.day} ${monthName(end.month)}"

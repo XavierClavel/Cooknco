@@ -572,6 +572,7 @@ object EnStrings : Strings {
     override val cookbookTooLargeToExport = "This cookbook holds too many recipes to be printed as one book."
     override val exportRendererBusy = "Too many exports are being printed right now. Try again in a moment."
 
+    override val breakfastAndSnack = "Breakfast and afternoon snack"
     override val mealPlan = "Meal plan"
     override fun weekRange(start: LocalDate, end: LocalDate) =
         if (start.month == end.month) "${start.day} – ${end.day} ${monthName(end.month)}"

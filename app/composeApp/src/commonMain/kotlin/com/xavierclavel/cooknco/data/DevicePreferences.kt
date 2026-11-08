@@ -28,6 +28,7 @@ class DevicePreferences(private val dataStore: DataStore<Preferences>) {
     private val languageKey = stringPreferencesKey("app_language")
     private val unitSystemKey = stringPreferencesKey("unit_system")
     private val offlineRecipesKey = booleanPreferencesKey("offline_recipes")
+    private val showsBreakfastAndSnackKey = booleanPreferencesKey("meal_plan_breakfast_and_snack")
 
     val pushEnabled: Flow<Boolean> = dataStore.data.map { it[pushEnabledKey] ?: true }
 
@@ -64,6 +65,16 @@ class DevicePreferences(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setOfflineRecipes(enabled: Boolean) {
         dataStore.edit { it[offlineRecipesKey] = enabled }
+    }
+
+    /**
+     * Whether the meal plan offers breakfast and the afternoon snack besides lunch and dinner.
+     * Off by default — see [PlanMeals]. A property of this handset, like [offlineRecipes].
+     */
+    val showsBreakfastAndSnack: Flow<Boolean> = dataStore.data.map { it[showsBreakfastAndSnackKey] ?: false }
+
+    suspend fun setShowsBreakfastAndSnack(shows: Boolean) {
+        dataStore.edit { it[showsBreakfastAndSnackKey] = shows }
     }
 
     /**

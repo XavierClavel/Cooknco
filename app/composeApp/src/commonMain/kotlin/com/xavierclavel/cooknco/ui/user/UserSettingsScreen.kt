@@ -195,6 +195,19 @@ fun UserSettingsScreen(
                     }
                 }
 
+                // ── Meal plan ────────────────────────────────────────────────────
+                Column {
+                    SettingsSectionLabel(s.mealPlan)
+                    StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                        SettingsToggleRow(
+                            title = s.breakfastAndSnack,
+                            checked = uiState.showsBreakfastAndSnack,
+                            onCheckedChange = { viewModel.toggleBreakfastAndSnack() },
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
+                }
+
                 // ── Offline ──────────────────────────────────────────────────────
                 Column {
                     SettingsSectionLabel(s.offlineSettingsTitle)
