@@ -63,6 +63,8 @@ class MealPlanViewModelTest {
     /** What the server answers a week with; tests change it between requests. */
     private var week: List<MealPlanEntry> = emptyList()
     private var failingWrites = false
+    /** Days whose creation the server refuses, the others going through. */
+    private var failingDates: Set<String> = emptySet()
     private val requests = mutableListOf<HttpRequestData>()
     private val bodies = mutableListOf<String>()
     private var nextId = 100L
@@ -80,6 +82,8 @@ class MealPlanViewModelTest {
             if (text.isNotEmpty()) bodies += text
             val (content, status, headers) = when {
                 request.method != HttpMethod.Get && failingWrites -> Triple("down", HttpStatusCode.InternalServerError, headersOf())
+                request.method == HttpMethod.Post && failingDates.any { text.contains("\"$it\"") } ->
+                    Triple("down", HttpStatusCode.InternalServerError, headersOf())
                 path.endsWith("/meal-plan/suggestions") -> json("[]")
                 path.endsWith("/recipe") -> json("[]")
                 path.endsWith("/meal-plan") && request.method == HttpMethod.Get -> json(ApiClient.json.encodeToString(week))
@@ -290,5 +294,60 @@ class MealPlanViewModelTest {
 
         assertTrue(requests.any { it.method == HttpMethod.Delete && it.url.encodedPath.endsWith("/meal-plan/1") })
         assertTrue(state.days.all { it.meals.isEmpty() })
+    }
+
+    @Test
+    fun a_meal_is_planned_on_every_day_picked_however_many_weeks_apart() = planTest { viewModel ->
+        viewModel.load()
+        viewModel.awaitLoaded()
+
+        viewModel.openAddMeal()
+        val opened = viewModel.uiState.value.adding!!
+        assertTrue(opened.picksDays)
+        assertTrue(opened.dates.isEmpty(), "no day is picked for the cook")
+
+        viewModel.toggleAddDate(LocalDate(2026, 10, 16))
+        viewModel.toggleAddDate(LocalDate(2026, 10, 23))
+        viewModel.toggleAddDate(LocalDate(2026, 11, 6))
+        viewModel.toggleAddDate(today)
+        viewModel.toggleAddDate(today)
+        viewModel.setAddSlot(MealSlot.DINNER)
+        viewModel.addSuggestion("Pizza night")
+        val state = viewModel.uiState.first { it.adding == null }
+
+        val sent = bodies.map { ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(it) }
+        assertEquals(listOf("2026-10-16", "2026-10-23", "2026-11-06"), sent.map { it.date }.sorted())
+        assertTrue(sent.all { it.slot == "DINNER" && it.title == "Pizza night" && it.servings == 1 })
+        assertEquals(listOf("2026-10-16"), state.entries.map { it.date }, "only the week on screen is drawn")
+    }
+
+    @Test
+    fun days_that_failed_stay_picked_and_the_others_stay_planned() = planTest { viewModel ->
+        viewModel.load()
+        viewModel.awaitLoaded()
+        failingDates = setOf("2026-10-23")
+
+        viewModel.openAddMeal()
+        viewModel.toggleAddDate(today)
+        viewModel.toggleAddDate(LocalDate(2026, 10, 23))
+        viewModel.addSuggestion("Soup")
+        val state = viewModel.uiState.first { it.adding?.saveFailed == true }
+
+        assertEquals(setOf(LocalDate(2026, 10, 23)), state.adding!!.dates, "trying again plans only what is missing")
+        assertFalse(state.adding!!.isSaving)
+        assertEquals(listOf("2026-10-14"), state.entries.map { it.date })
+    }
+
+    @Test
+    fun no_day_picked_plans_nothing() = planTest { viewModel ->
+        viewModel.load()
+        viewModel.awaitLoaded()
+
+        viewModel.openAddMeal()
+        viewModel.addSuggestion("Soup")
+        viewModel.awaitIdle()
+
+        assertTrue(bodies.isEmpty())
+        assertTrue(viewModel.uiState.value.adding!!.dates.isEmpty())
     }
 }

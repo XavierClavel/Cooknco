@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MenuBook
@@ -88,12 +89,17 @@ import kotlinx.datetime.LocalDate
  *
  * A tap adds and closes, for one (`DEFAULT_MEAL_SERVINGS`). Any other number is the dish's own
  * sheet's business: asking every time would be a step most dishes do not need.
+ *
+ * Opened to plan a meal on several days ([AddDishState.picksDays]), it also says which: the
+ * picked days as chips, and the calendar to pick more. The tap then plans on all of them.
  */
 @Composable
 fun AddDishSheet(
     state: AddDishState,
+    today: LocalDate,
     onQueryChange: (String) -> Unit,
     onSlotChange: (MealSlot) -> Unit,
+    onToggleDate: (LocalDate) -> Unit,
     onAddTyped: () -> Unit,
     onAddSuggestion: (String) -> Unit,
     onAddRecipe: (RecipeOverview) -> Unit,
@@ -103,13 +109,38 @@ fun AddDishSheet(
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     val typed = state.query.trim()
+    val canAdd = !state.isSaving && state.dates.isNotEmpty()
+    var pickingDays by remember { mutableStateOf(false) }
 
     PlanSheetScaffold(
         footerLabel = s.cancel,
         onFooter = onDismissRequest,
         onDismissRequest = onDismissRequest,
     ) {
-        SheetHeader(title = s.fullDate(state.date), subtitle = s.addADish)
+        if (state.picksDays) {
+            SheetHeader(title = s.planAMeal, subtitle = s.daysCount(state.dates.size))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(end = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FieldLabel(s.daysLabel, modifier = Modifier.weight(1f))
+                PickDaysButton(enabled = !state.isSaving, onClick = { pickingDays = true })
+            }
+            if (state.dates.isEmpty()) {
+                Text(
+                    text = s.noDayPicked,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CookncoGreenDark,
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                )
+            } else {
+                PickedDayChips(days = state.dates.sorted(), enabled = !state.isSaving, onRemove = onToggleDate)
+            }
+            FieldLabel(s.mealLabel)
+        } else {
+            SheetHeader(title = s.fullDate(state.dates.first()), subtitle = s.addADish)
+        }
         StickerSegmentedControl(
             options = MealSlot.entries,
             selected = state.slot,
@@ -136,7 +167,7 @@ fun AddDishSheet(
                 item(key = "typed") {
                     PickRow(
                         label = s.addTypedDish(typed),
-                        enabled = !state.isSaving,
+                        enabled = canAdd,
                         onClick = onAddTyped,
                         emphasised = true,
                     ) { RowIcon(Icons.Outlined.Add, filled = true) }
@@ -145,7 +176,7 @@ fun AddDishSheet(
             if (state.suggestions.isNotEmpty()) {
                 item(key = "suggestions") { SectionLabel(s.plannedBeforeCaps) }
                 items(state.suggestions, key = { "s:$it" }) { suggestion ->
-                    PickRow(label = suggestion, enabled = !state.isSaving, onClick = { onAddSuggestion(suggestion) }) {
+                    PickRow(label = suggestion, enabled = canAdd, onClick = { onAddSuggestion(suggestion) }) {
                         RowIcon(Icons.Outlined.History)
                     }
                 }
@@ -167,7 +198,7 @@ fun AddDishSheet(
                     )
                 }
                 else -> items(state.recipes, key = { "r:${it.id}" }) { recipe ->
-                    PickRow(label = recipe.title, enabled = !state.isSaving, onClick = { onAddRecipe(recipe) }) {
+                    PickRow(label = recipe.title, enabled = canAdd, onClick = { onAddRecipe(recipe) }) {
                         RecipeImage(
                             recipeId = recipe.id,
                             version = recipe.version,
@@ -182,6 +213,15 @@ fun AddDishSheet(
             }
         }
         if (state.saveFailed) SaveFailed()
+    }
+
+    if (pickingDays) {
+        MealDaysPickerDialog(
+            selected = state.dates,
+            today = today,
+            onToggle = onToggleDate,
+            onDismissRequest = { pickingDays = false },
+        )
     }
 }
 
@@ -401,6 +441,52 @@ private fun DateButton(date: LocalDate, isOutsideChips: Boolean, onClick: () -> 
     ) {
         Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
         Text(s.fullDate(date), fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = content, maxLines = 1)
+    }
+}
+
+/** What opens the calendar that picks the days of a meal planned on several. */
+@Composable
+private fun PickDaysButton(enabled: Boolean, onClick: () -> Unit) {
+    val s = strings()
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(CookncoBackground)
+            .border(2.dp, CookncoNavy, shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = CookncoNavy, modifier = Modifier.size(16.dp))
+        Text(s.pickDays, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, maxLines = 1)
+    }
+}
+
+/** The days a meal will be planned on, in order. A tap on one takes it back out. */
+@Composable
+private fun PickedDayChips(days: List<LocalDate>, enabled: Boolean, onRemove: (LocalDate) -> Unit) {
+    val s = strings()
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(days, key = { it.toString() }) { day ->
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(CookncoOrange)
+                    .border(2.dp, CookncoNavy, RoundedCornerShape(12.dp))
+                    .clickable(enabled = enabled, onClickLabel = s.removeDay(day)) { onRemove(day) }
+                    .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(text = s.dayChip(day), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = CookncoWhite)
+                Icon(Icons.Outlined.Close, contentDescription = null, tint = CookncoWhite, modifier = Modifier.size(14.dp))
+            }
+        }
     }
 }
 

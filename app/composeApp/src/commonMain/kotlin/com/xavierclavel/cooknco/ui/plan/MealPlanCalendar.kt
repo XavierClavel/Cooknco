@@ -75,7 +75,65 @@ fun MealDatePickerDialog(
     onDismissRequest: () -> Unit,
 ) {
     val s = strings()
-    var month by remember { mutableStateOf(monthOf(selection.start)) }
+    CalendarDialog(
+        initialMonth = selection.start,
+        today = today,
+        isSelected = { it in selection },
+        onDayClick = onPick,
+        onDismissRequest = onDismissRequest,
+    ) {
+        StickerPill(
+            onClick = onDismissRequest,
+            height = 38.dp,
+            shadowOffset = 3.dp,
+            contentPadding = PaddingValues(horizontal = 16.dp),
+        ) { Text(s.cancel, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+    }
+}
+
+/**
+ * The same calendar, picking several days rather than one: a tap adds a day or takes it back
+ * out, and the calendar stays open until "done", so days weeks or months apart are one visit.
+ *
+ * Opens on the month of the earliest day already picked, or on [today]'s.
+ */
+@Composable
+fun MealDaysPickerDialog(
+    selected: Set<LocalDate>,
+    today: LocalDate,
+    onToggle: (LocalDate) -> Unit,
+    onDismissRequest: () -> Unit,
+) {
+    val s = strings()
+    CalendarDialog(
+        initialMonth = selected.minOrNull() ?: today,
+        today = today,
+        isSelected = { it in selected },
+        onDayClick = onToggle,
+        onDismissRequest = onDismissRequest,
+    ) {
+        StickerPill(
+            onClick = onDismissRequest,
+            height = 38.dp,
+            shadowOffset = 3.dp,
+            fillColor = CookncoOrange,
+            contentColor = CookncoWhite,
+            contentPadding = PaddingValues(horizontal = 16.dp),
+        ) { Text(s.done, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+    }
+}
+
+@Composable
+private fun CalendarDialog(
+    initialMonth: LocalDate,
+    today: LocalDate,
+    isSelected: (LocalDate) -> Boolean,
+    onDayClick: (LocalDate) -> Unit,
+    onDismissRequest: () -> Unit,
+    footer: @Composable () -> Unit,
+) {
+    val s = strings()
+    var month by remember { mutableStateOf(monthOf(initialMonth)) }
 
     Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(
@@ -138,9 +196,9 @@ fun MealDatePickerDialog(
                                     if (day.month == month.month) {
                                         CalendarDay(
                                             day = day,
-                                            isSelected = day in selection,
+                                            isSelected = isSelected(day),
                                             isToday = day == today,
-                                            onClick = { onPick(day) },
+                                            onClick = { onDayClick(day) },
                                         )
                                     }
                                 }
@@ -149,12 +207,7 @@ fun MealDatePickerDialog(
                     }
 
                     Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
-                        StickerPill(
-                            onClick = onDismissRequest,
-                            height = 38.dp,
-                            shadowOffset = 3.dp,
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                        ) { Text(s.cancel, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                        footer()
                     }
                 }
             }
