@@ -1,6 +1,8 @@
 package com.xavierclavel.cooknco.ui.recipe
 
 import androidx.lifecycle.ViewModel
+import com.xavierclavel.cooknco.data.LIKERS_PAGE_SIZE
+import com.xavierclavel.cooknco.network.dto.LikeInfoDto
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -47,10 +49,20 @@ data class RecipeUiState(
     val export: PdfExportState = PdfExportState(),
     /** The "Add to meal plan" sheet, while it is open. Premium, like [export]. */
     val planSheet: PlanRecipeState? = null,
+    /** Who liked the recipe, while that sheet is open. */
+    val likers: LikersState? = null,
 ) {
     /** Whether the recipe is filed anywhere, which is what the bookmark shows. */
     val isBookmarked: Boolean get() = cookbooks.any { it.hasRecipe }
 }
+
+/** The "liked by" sheet: the likers loaded so far, newest first, a page at a time. */
+data class LikersState(
+    val likers: List<LikeInfoDto> = emptyList(),
+    val isLoading: Boolean = true,
+    val allLoaded: Boolean = false,
+    val failed: Boolean = false,
+)
 
 /**
  * The "Add to a cookbook" sheet, while it is open. Null means closed.
@@ -227,6 +239,52 @@ class RecipeViewModel(
                 .onFailure { error ->
                     _uiState.update { it.copy(error = error.message) }
                 }
+        }
+    }
+
+    // ── Who liked it ─────────────────────────────────────────────────────────
+
+    private var likersPage = 0
+
+    /** Opens the "liked by" sheet on its first page. */
+    fun openLikers() {
+        likersPage = 0
+        _uiState.update { it.copy(likers = LikersState()) }
+        loadLikers()
+    }
+
+    /** The next page, as the list nears its end; nothing while one is on its way or all are in. */
+    fun loadMoreLikers() {
+        val likers = _uiState.value.likers ?: return
+        if (likers.isLoading || likers.allLoaded || likers.failed) return
+        _uiState.update { it.copy(likers = likers.copy(isLoading = true)) }
+        loadLikers()
+    }
+
+    fun closeLikers() = _uiState.update { it.copy(likers = null) }
+
+    private fun loadLikers() {
+        val page = likersPage
+        viewModelScope.launch {
+            val result = repo.getLikers(recipeId, page)
+            _uiState.update { state ->
+                val likers = state.likers ?: return@update state
+                result.fold(
+                    onSuccess = { found ->
+                        likersPage = page + 1
+                        // Offset paging can hand a row over twice when someone likes it meanwhile
+                        val known = likers.likers.mapTo(HashSet()) { it.user.id }
+                        state.copy(
+                            likers = likers.copy(
+                                likers = likers.likers + found.filterNot { it.user.id in known },
+                                isLoading = false,
+                                allLoaded = found.size < LIKERS_PAGE_SIZE,
+                            ),
+                        )
+                    },
+                    onFailure = { state.copy(likers = likers.copy(isLoading = false, failed = true)) },
+                )
+            }
         }
     }
 

@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.network
 
 import com.xavierclavel.cooknco.network.dto.IngredientSearchResult
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
+import com.xavierclavel.cooknco.network.dto.LikeInfoDto
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.CooklangImportDto
@@ -290,6 +291,20 @@ class RecipeApi(private val client: HttpClient) {
     suspend fun isLiked(recipeId: Long, token: String): Boolean {
         val response = client.get("$base/like/$recipeId") {
             bearerAuth(token)
+        }
+        if (!response.status.isSuccess()) {
+            throw ApiException(response.status, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    /** Who liked [recipeId], newest first. The backend answers 404 for a recipe the caller cannot open. */
+    suspend fun getLikers(recipeId: Long, page: Int, size: Int, token: String): List<LikeInfoDto> {
+        val response = client.get("$base/like") {
+            bearerAuth(token)
+            parameter("recipe", recipeId)
+            parameter("page", page)
+            parameter("size", size)
         }
         if (!response.status.isSuccess()) {
             throw ApiException(response.status, response.bodyAsText())

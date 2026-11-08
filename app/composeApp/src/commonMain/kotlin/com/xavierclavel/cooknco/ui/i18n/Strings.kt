@@ -198,6 +198,12 @@ interface Strings {
     fun followingSince(days: Long): String
     fun requestedSince(days: Long): String
     fun followedSince(days: Long): String
+    /** Under a liker in the "liked by" sheet: when they liked it. */
+    fun likedSince(days: Long): String
+    val likedBy: String
+    val noLikesYet: String
+    /** What the like count says to a screen reader: that it opens who liked it. */
+    val seeWhoLiked: String
     fun connectedSince(days: Long): String
     fun usedSince(days: Long): String
     val pendingRequests: String

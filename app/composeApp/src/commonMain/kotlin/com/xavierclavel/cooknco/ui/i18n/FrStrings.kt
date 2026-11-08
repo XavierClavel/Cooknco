@@ -195,6 +195,10 @@ object FrStrings : Strings {
     override fun followingSince(days: Long) = "Vous suit depuis ${duration(days)}"
     override fun requestedSince(days: Long) = "Demandé ${ago(days)}"
     override fun followedSince(days: Long) = "Depuis ${duration(days)}"
+    override fun likedSince(days: Long) = "A aimé ${ago(days)}"
+    override val likedBy = "Aimée par"
+    override val noLikesYet = "Personne n'a encore aimé cette recette."
+    override val seeWhoLiked = "Voir qui a aimé"
     override fun connectedSince(days: Long) = "Connecté ${ago(days)}"
     override fun usedSince(days: Long) = "utilisé ${ago(days)}"
 

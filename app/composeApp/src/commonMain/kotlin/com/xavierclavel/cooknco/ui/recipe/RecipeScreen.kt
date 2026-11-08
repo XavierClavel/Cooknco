@@ -204,6 +204,7 @@ fun RecipeScreen(
                 isOwner = viewModel.isOwner,
                 isPremium = isPremium,
                 onToggleLike = viewModel::toggleLike,
+                onShowLikers = viewModel::openLikers,
                 onShare = {
                     linkSharer.share(recipe.title, WebRoutes.urlFor(WebRoutes.Shareable.RECIPE, recipe.id))
                 },
@@ -228,6 +229,19 @@ fun RecipeScreen(
         }
         OfflineBanner()
         }
+    }
+
+    uiState.likers?.let { likers ->
+        LikersSheet(
+            state = likers,
+            likesCount = recipe?.likesCount ?: likers.likers.size,
+            onLoadMore = viewModel::loadMoreLikers,
+            onUserClick = { userId ->
+                viewModel.closeLikers()
+                onNavigateToUser(userId)
+            },
+            onDismissRequest = viewModel::closeLikers,
+        )
     }
 
     // Mounted here rather than inside the list: it is a dialog, and the list it would sit
@@ -300,6 +314,8 @@ private fun RecipeContent(
     /** Premium — see [RecipeScreen]. */
     isPremium: Boolean,
     onToggleLike: () -> Unit,
+    /** Opens who liked the recipe, from its like count. */
+    onShowLikers: () -> Unit,
     onShare: () -> Unit,
     onExport: () -> Unit,
     onExportCooklang: () -> Unit,
@@ -491,6 +507,7 @@ private fun RecipeContent(
                                     .clip(RoundedCornerShape(percent = 50))
                                     .background(CookncoOrange)
                                     .border(2.dp, CookncoNavy, RoundedCornerShape(percent = 50))
+                                    .clickable(onClickLabel = s.seeWhoLiked, onClick = onShowLikers)
                                     .padding(horizontal = 10.dp, vertical = 4.dp),
                             ) {
                                 LikeCount(count = recipe.likesCount, color = CookncoWhite)
@@ -1214,6 +1231,7 @@ fun RecipeScreenPreview() {
                 isOwner = true,
                 isPremium = true,
                 onToggleLike = {},
+                onShowLikers = {},
                 onShare = {},
                 onExport = {},
                 onExportCooklang = {},

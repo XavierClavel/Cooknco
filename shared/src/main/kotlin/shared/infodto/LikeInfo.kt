@@ -18,5 +18,7 @@ data class LikeInfo(
     data class User(
         val id: Long,
         val username: String,
+        /** The avatar's version, so a list of likers can show their pictures. */
+        val version: Long = 0,
     )
 }

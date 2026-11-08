@@ -31,6 +31,11 @@ object LikeController: Controller(LIKE_URL) {
         val userId = getIdPathVariable("user")
         val recipeId = getIdPathVariable("recipe")
         val paging = getPaging()
+        // Who liked a recipe is only for those who can open it: a hidden or private recipe's
+        // likers are no more anybody's business than the recipe is
+        if (recipeId != null && recipeService.findReadable(getSessionUserId(), listOf(recipeId)).isEmpty()) {
+            return@get call.respond(HttpStatusCode.NotFound)
+        }
         call.respond(likeService.find(recipeId, userId, paging))
     }
 

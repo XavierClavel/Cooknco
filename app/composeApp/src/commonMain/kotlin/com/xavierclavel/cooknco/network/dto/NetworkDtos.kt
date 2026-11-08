@@ -394,6 +394,23 @@ data class UserSettingsDTO(
     val unitSystem: String? = null,
 )
 
+/** A recipe's likers come one page at a time, newest first. */
+@Serializable
+data class LikeInfoDto(
+    val user: LikeUserDto,
+    val creationDate: Long,
+)
+
+/** Who liked a recipe. `version` is the avatar's, and an older backend sends none. */
+@Serializable
+data class LikeUserDto(
+    val id: Long,
+    val username: String,
+    val version: Long = 0,
+) {
+    fun toSummary() = UserSummary(id = id, version = version, username = username)
+}
+
 /**
  * One row of a followers/following list (`FollowController.getFollowers`/`getFollows`):
  * [user] is whichever side of the relationship the endpoint is listing (the follower on
