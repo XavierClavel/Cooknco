@@ -105,6 +105,7 @@ fun MealPlanScreen(
         onPickDate = viewModel::showWeekOf,
         onRetry = viewModel::load,
         onAdd = viewModel::openAdd,
+        onPlanMeal = viewModel::openAddMeal,
         onDish = { entry ->
             // A recipe opens: that is what a planned recipe is tapped for, on the evening it is
             // cooked. Everything else about the dish is behind its "···".
@@ -118,8 +119,10 @@ fun MealPlanScreen(
     uiState.adding?.let { adding ->
         AddDishSheet(
             state = adding,
+            today = uiState.today,
             onQueryChange = viewModel::setQuery,
             onSlotChange = viewModel::setAddSlot,
+            onToggleDate = viewModel::toggleAddDate,
             onAddTyped = viewModel::addTypedDish,
             onAddSuggestion = viewModel::addSuggestion,
             onAddRecipe = viewModel::addRecipe,
@@ -158,6 +161,7 @@ private fun MealPlanContent(
     onPickDate: (LocalDate) -> Unit,
     onRetry: () -> Unit,
     onAdd: (PlannedDay) -> Unit,
+    onPlanMeal: () -> Unit,
     onDish: (MealPlanEntry) -> Unit,
     onDishMenu: (MealPlanEntry) -> Unit,
     modifier: Modifier = Modifier,
@@ -179,7 +183,15 @@ private fun MealPlanContent(
     }
 
     Column(modifier = modifier.fillMaxSize().background(CookncoGreen)) {
-        MealPlanHeader(title = s.mealPlan) {
+        MealPlanHeader(
+            title = s.mealPlan,
+            action = {
+                // One dish on several days, weeks apart if need be — the day cards' "+" plan on one
+                StickerIconButton(onClick = onPlanMeal, size = 40.dp, shape = RoundedCornerShape(13.dp), shadowOffset = 3.dp) {
+                    Icon(Icons.Outlined.Add, contentDescription = s.planAMeal, tint = CookncoNavy, modifier = Modifier.size(22.dp))
+                }
+            },
+        ) {
             WeekNavigation(
                 label = s.weekRange(uiState.weekStart, weekEnd),
                 isCurrentWeek = uiState.isCurrentWeek,
@@ -242,14 +254,30 @@ private fun MealPlanContent(
 }
 
 @Composable
-private fun MealPlanHeader(title: String, below: @Composable () -> Unit = {}) {
+private fun MealPlanHeader(
+    title: String,
+    action: @Composable () -> Unit = {},
+    below: @Composable () -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 14.dp),
     ) {
-        Text(title, fontSize = 27.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, lineHeight = 33.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                title,
+                fontSize = 27.sp,
+                fontWeight = FontWeight.Bold,
+                color = CookncoNavy,
+                lineHeight = 33.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            action()
+        }
         below()
     }
 }
@@ -438,7 +466,7 @@ fun MealPlanScreenPreview() {
                 hasLoaded = true,
             ),
             onPreviousWeek = {}, onNextWeek = {}, onThisWeek = {}, onPickDate = {}, onRetry = {},
-            onAdd = {}, onDish = {}, onDishMenu = {},
+            onAdd = {}, onPlanMeal = {}, onDish = {}, onDishMenu = {},
         )
     }
 }

@@ -42,10 +42,17 @@ data class MealEntryDraft(
     val title: String,
 )
 
-/** The "add a dish" sheet, while it is open. */
+/**
+ * The "add a dish" sheet, while it is open.
+ *
+ * Opened from a day's "+", it plans on that day and no other. Opened from the header's "plan a
+ * meal" ([picksDays]), the cook chooses the days in the sheet itself — any number of them, as
+ * many weeks apart as they like — and one tap plans the dish on every one.
+ */
 data class AddDishState(
-    val date: LocalDate,
+    val dates: Set<LocalDate>,
     val slot: MealSlot,
+    val picksDays: Boolean = false,
     val query: String = "",
     /** The cook's own recipes, liked ones and cookbooks' that match [query]. */
     val recipes: List<RecipeOverview> = emptyList(),
@@ -140,8 +147,26 @@ class MealPlanViewModel(
     // ── Adding ────────────────────────────────────────────────────────────────
 
     fun openAdd(day: PlannedDay) {
-        _uiState.update { it.copy(adding = AddDishState(date = day.date, slot = day.nextOpenSlot)) }
+        _uiState.update { it.copy(adding = AddDishState(dates = setOf(day.date), slot = day.nextOpenSlot)) }
         setQuery("")
+    }
+
+    /**
+     * The header's "plan a meal": the same sheet, with the days left to the cook. It starts on
+     * no day at all — any day picked for them would be a guess they have to undo.
+     */
+    fun openAddMeal() {
+        _uiState.update { state ->
+            state.copy(adding = AddDishState(dates = emptySet(), slot = MealSlot.DINNER, picksDays = true))
+        }
+        setQuery("")
+    }
+
+    /** Adds [date] to the days the sheet plans on, or takes it out if it was there. */
+    fun toggleAddDate(date: LocalDate) = _uiState.update { state ->
+        val adding = state.adding?.takeIf { it.picksDays && !it.isSaving } ?: return@update state
+        val dates = if (date in adding.dates) adding.dates - date else adding.dates + date
+        state.copy(adding = adding.copy(dates = dates, saveFailed = false))
     }
 
     fun closeAdd() {
@@ -191,19 +216,39 @@ class MealPlanViewModel(
         mealPlanRepository.planDish(title, date, slot, servings = DEFAULT_MEAL_SERVINGS)
     }
 
+    /**
+     * Plans the dish on every day of the sheet, one request per day, all at once.
+     *
+     * The days that went through stay planned whatever happened to the others: the sheet stays
+     * open on the ones that failed alone, so trying again cannot plan a dish twice on a day.
+     */
     private fun saveNew(plan: suspend (LocalDate, MealSlot) -> Result<MealPlanEntry>) {
         val adding = _uiState.value.adding ?: return
-        if (adding.isSaving) return
+        if (adding.isSaving || adding.dates.isEmpty()) return
         viewModelScope.launch {
             _uiState.update { it.copy(adding = adding.copy(isSaving = true, saveFailed = false)) }
-            plan(adding.date, adding.slot)
-                .onSuccess { entry ->
-                    searchJob?.cancel()
-                    _uiState.update { it.copy(adding = null, entries = it.entries + entry) }
+            val results = adding.dates.sorted()
+                .map { date -> date to async { plan(date, adding.slot) } }
+                .map { (date, result) -> date to result.await() }
+            val planned = results.mapNotNull { (_, result) -> result.getOrNull() }
+            val failed = results.filter { (_, result) -> result.isFailure }.map { (date, _) -> date }.toSet()
+            _uiState.update { state ->
+                // Only what falls in the week on screen: the others are drawn when their week is
+                val weekEnd = state.weekStart.plus(6, DateTimeUnit.DAY)
+                val shown = planned.filter { entry ->
+                    runCatching { LocalDate.parse(entry.date) }.getOrNull()?.let { it in state.weekStart..weekEnd } == true
                 }
-                .onFailure {
-                    _uiState.update { state -> state.copy(adding = state.adding?.copy(isSaving = false, saveFailed = true)) }
+                val entries = state.entries + shown
+                if (failed.isEmpty()) {
+                    state.copy(adding = null, entries = entries)
+                } else {
+                    state.copy(
+                        adding = state.adding?.copy(dates = failed, isSaving = false, saveFailed = true),
+                        entries = entries,
+                    )
                 }
+            }
+            if (failed.isEmpty()) searchJob?.cancel()
         }
     }
 

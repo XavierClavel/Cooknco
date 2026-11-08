@@ -570,6 +570,18 @@ interface Strings {
     fun mealOn(date: LocalDate, slot: MealSlot): String
     val nothingPlanned: String
     val addADish: String
+    /** The header's button that plans one dish on several days at once, and its sheet's heading. */
+    val planAMeal: String
+    /** Under that heading: how many days the dish will be planned on. */
+    fun daysCount(count: Int): String
+    val daysLabel: String
+    /** What opens the calendar that picks several days. */
+    val pickDays: String
+    /** A picked day in that sheet, which may be weeks away: "Mon 12 October". */
+    fun dayChip(date: LocalDate): String
+    /** Read out on a picked day's chip, which takes it back out of the selection. */
+    fun removeDay(date: LocalDate): String
+    val noDayPicked: String
     val searchOrTypeADish: String
     /** The row that plans what was typed as it is, rather than as a recipe. */
     fun addTypedDish(text: String): String
