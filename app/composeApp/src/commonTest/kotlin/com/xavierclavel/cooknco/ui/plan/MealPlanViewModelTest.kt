@@ -570,4 +570,26 @@ class MealPlanViewModelTest {
             ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(bodies.single()),
         )
     }
+
+    @Test
+    fun a_dish_sheet_knows_which_meals_other_dishes_already_fill() = planTest { viewModel ->
+        val soup = MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "Soup")
+        week = listOf(
+            soup,
+            MealPlanEntry(id = 2, date = "2026-10-15", slot = "DINNER", title = "Pizza"),
+            MealPlanEntry(id = 3, date = "2026-10-15", slot = "LUNCH", title = "Salad"),
+            MealPlanEntry(id = 4, date = "2026-10-21", slot = "DINNER", title = "soup"),
+        )
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openEntry(soup)
+        viewModel.awaitIdle()
+
+        val editing = viewModel.uiState.value.editing!!
+        assertEquals(setOf(MealSlot.DINNER, MealSlot.LUNCH), editing.taken[LocalDate(2026, 10, 15)])
+        assertNull(editing.taken[LocalDate(2026, 10, 14)], "the dish's own days are its own, not taken")
+        assertNull(editing.taken[LocalDate(2026, 10, 21)], "nor is the same dish on another day")
+    }
 }

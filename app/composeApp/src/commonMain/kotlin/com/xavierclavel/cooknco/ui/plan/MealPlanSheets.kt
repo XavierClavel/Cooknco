@@ -481,6 +481,8 @@ fun DishDaysSheet(
                 shownMonth = monthOf(month)
                 onMonthChange(month)
             },
+            // Days another dish already fills at the meal chosen below, as in the "+" sheet
+            hasMeal = { state.slot in state.taken[it].orEmpty() },
             modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 10.dp),
         )
 

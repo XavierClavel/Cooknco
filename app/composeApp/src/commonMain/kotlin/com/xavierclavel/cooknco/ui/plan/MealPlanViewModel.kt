@@ -93,6 +93,11 @@ data class EditDishState(
      */
     val planned: Map<LocalDate, MealPlanEntry> = emptyMap(),
     val loadedMonths: Set<LocalDate> = emptySet(),
+    /**
+     * The meals other dishes already fill, by day, in the same months — what the calendar marks
+     * so the cook sees which days already have something at the meal this dish is moved to.
+     */
+    val taken: Map<LocalDate, Set<MealSlot>> = emptyMap(),
     val isLoadingDays: Boolean = false,
     /** Days ticked that the dish is not planned on yet, and planned days unticked. */
     val added: Set<LocalDate> = emptySet(),
@@ -438,7 +443,22 @@ class MealPlanViewModel(
                             // Two of the same dish in one meal is one day ticked; the first is the one edited
                             .groupBy({ it.first }, { it.second })
                             .mapValues { (_, list) -> list.minBy { it.position } }
-                        state.copy(editing = current.copy(planned = same + current.planned, isLoadingDays = false))
+                        val sameIds = same.values.mapTo(HashSet()) { it.id } + current.planned.values.map { it.id }
+                        val taken = entries.filterNot { it.id in sameIds || it.isSameDishAs(current.entry) }
+                            .mapNotNull { e ->
+                                val date = runCatching { LocalDate.parse(e.date) }.getOrNull() ?: return@mapNotNull null
+                                val slot = MealSlot.of(e.slot) ?: return@mapNotNull null
+                                date to slot
+                            }
+                            .groupBy({ it.first }, { it.second })
+                            .mapValues { (_, slots) -> slots.toSet() }
+                        state.copy(
+                            editing = current.copy(
+                                planned = same + current.planned,
+                                taken = current.taken + taken,
+                                isLoadingDays = false,
+                            ),
+                        )
                     },
                     // Asked again the next time the cook pages to it
                     onFailure = { state.copy(editing = current.copy(loadedMonths = current.loadedMonths - first, isLoadingDays = false)) },
