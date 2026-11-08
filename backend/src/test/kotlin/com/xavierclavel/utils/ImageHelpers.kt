@@ -114,9 +114,11 @@ suspend fun HttpClient.uploadImage(
     id: Long,
     bytes: ByteArray = testImageBytes(),
     crop: String? = null,
+    rotate: Int? = null,
 ): HttpResponse =
     this.post("$IMAGE_URL/$path/$id") {
         crop?.let { parameter("crop", it) }
+        rotate?.let { parameter("rotate", it) }
         setBody(MultiPartFormDataContent(formData {
             append("file", bytes, Headers.build {
                 append(HttpHeaders.ContentType, "image/jpeg")
@@ -129,7 +131,8 @@ suspend fun HttpClient.uploadRecipeImage(
     recipeId: Long,
     bytes: ByteArray = testImageBytes(),
     crop: String? = null,
-): HttpResponse = uploadImage("recipes", recipeId, bytes, crop)
+    rotate: Int? = null,
+): HttpResponse = uploadImage("recipes", recipeId, bytes, crop, rotate)
 
 suspend fun HttpClient.uploadCookbookImage(cookbookId: Long, bytes: ByteArray = testImageBytes()): HttpResponse =
     uploadImage("cookbooks", cookbookId, bytes)

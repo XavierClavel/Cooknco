@@ -12,8 +12,22 @@ import kotlin.math.roundToLong
  * for the cropper to draw, and what the backend turns the upload into before it crops. And
  * fractions rather than pixels, because the cropper draws a downsampled copy and the frame it
  * reports has to mean the same thing on the original.
+ *
+ * [quarterTurns] is how far the cook turned the picture in the cropper, clockwise, 0 to 3. It is
+ * sent as `?rotate=` and turned by the backend before it crops, so the fractions are of the
+ * picture once turned — the one the cropper showed.
  */
-data class ImageCrop(val left: Double, val top: Double, val width: Double, val height: Double) {
+data class ImageCrop(
+    val left: Double,
+    val top: Double,
+    val width: Double,
+    val height: Double,
+    val quarterTurns: Int = 0,
+) {
+
+    /** `?rotate=` in degrees, or null for a picture left as it was. */
+    val rotationDegrees: Int? get() = (quarterTurns.mod(4) * 90).takeIf { it != 0 }
+
 
     /**
      * The query value the backend reads. Six decimals: a millionth of a 12-megapixel

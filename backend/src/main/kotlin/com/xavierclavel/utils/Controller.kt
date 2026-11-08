@@ -120,10 +120,12 @@ suspend fun RoutingContext.handleDeletion(deleted: Boolean?) {
  * The crop rides in the query (`?crop=left,top,width,height`, see [ImageCrop]) rather than as a
  * second part of the body, because this refuses any part that is not the file: a client that
  * sends one is then still understood by a backend that predates it, which saves it centred.
- * It is read first, so a refused crop costs no upload.
+ * It is read first, so a refused crop costs no upload. So is `?rotate=`, the quarter turns the
+ * cropper gave the picture before it was framed (see [UploadedImage.quarterTurns]).
  */
 suspend fun RoutingContext.receiveImage(maxBytes: Long? = null): UploadedImage {
     val crop = call.queryParameters["crop"]?.let { ImageCrop.parse(it) }
+    val quarterTurns = UploadedImage.quarterTurnsOf(call.queryParameters["rotate"])
     val multipart = call.receiveMultipart()
     var image: BufferedImage? = null
     var metadata: Metadata? = null
@@ -149,7 +151,7 @@ suspend fun RoutingContext.receiveImage(maxBytes: Long? = null): UploadedImage {
         logger.error {"No metadata found"}
         throw BadRequestException(BadRequestCause.INVALID_IMAGE)
     }
-    return UploadedImage(image, metadata, crop)
+    return UploadedImage(image, metadata, crop, quarterTurns)
 }
 
 /**

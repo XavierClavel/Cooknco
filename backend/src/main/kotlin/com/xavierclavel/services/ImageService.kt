@@ -87,15 +87,16 @@ class ImageService: KoinComponent {
     }
 
     private fun render(upload: UploadedImage, targetSize: Pair<Int, Int>, upscale: Boolean = true): BufferedImage =
-        render(upload.image, orientationOf(upload.metadata), upload.crop, targetSize, upscale)
+        render(upload.image, orientationOf(upload.metadata), upload.crop, targetSize, upscale, upload.quarterTurns)
 
     /**
-     * Turns what was uploaded into what a bucket stores: upright, then cut down to the part its
-     * uploader kept, then centred into the bucket's frame.
+     * Turns what was uploaded into what a bucket stores: upright, then turned as its uploader
+     * turned it, then cut down to the part they kept, then centred into the bucket's frame.
      *
-     * In that order, because the crop is measured on the picture as it is shown — see
-     * [ImageCrop]. Without one, the centring is all there is, which is what every upload got
-     * before there was a crop to send and what a client that sends none still gets.
+     * In that order, because the crop is measured on the picture as the cropper showed it —
+     * upright by its EXIF tag and then turned, see [ImageCrop]. Without one, the centring is all
+     * there is, which is what every upload got before there was a crop to send and what a
+     * client that sends none still gets.
      */
     private fun render(
         image: BufferedImage,
@@ -103,10 +104,17 @@ class ImageService: KoinComponent {
         crop: ImageCrop?,
         targetSize: Pair<Int, Int>,
         upscale: Boolean = true,
+        quarterTurns: Int = 0,
     ): BufferedImage {
-        logger.info { "Processing image with orientation $orientation and crop $crop" }
+        logger.info { "Processing image with orientation $orientation, $quarterTurns quarter turns and crop $crop" }
         val orientedImage = applyOrientation(image, orientation)
-        val keptImage = crop?.applyTo(orientedImage) ?: orientedImage
+        val turnedImage = when (quarterTurns.mod(4)) {
+            1 -> applyOrientation(orientedImage, ExifOrientation.ROTATION_90_CW)
+            2 -> applyOrientation(orientedImage, ExifOrientation.ROTATION_180)
+            3 -> applyOrientation(orientedImage, ExifOrientation.ROTATION_90_CCW)
+            else -> orientedImage
+        }
+        val keptImage = crop?.applyTo(turnedImage) ?: turnedImage
         return cropAndResizeImage(keptImage, targetSize.first, targetSize.second, upscale)
     }
 

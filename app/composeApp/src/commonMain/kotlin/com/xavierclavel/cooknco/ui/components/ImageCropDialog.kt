@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.RotateRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.pointerInput
@@ -133,10 +135,20 @@ fun ImageCropDialog(
         ?.takeIf { it.isSpecified && it.width > 0f && it.height > 0f }
     val failed = painterState is AsyncImagePainter.State.Error
     var view by remember(image) { mutableStateOf(CropView()) }
+    // Quarter turns clockwise the cook gave the picture. The frame is measured on it once turned
+    var turns by remember(image) { mutableStateOf(0) }
+    val shown = natural?.turned(turns)
 
     fun setZoom(zoom: Double) {
-        val size = natural ?: return
+        val size = shown ?: return
         view = view.copy(zoom = zoom).clamped(size.width.toDouble(), size.height.toDouble(), frame.aspectRatio)
+    }
+
+    fun turn() {
+        if (natural == null) return
+        turns = (turns + 1) % 4
+        // A framing measured on the picture the other way up means nothing once it is turned
+        view = CropView()
     }
 
     Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -157,6 +169,7 @@ fun ImageCropDialog(
                 CropStage(
                     painter = painter,
                     natural = natural,
+                    turns = turns,
                     frame = frame,
                     view = view,
                     onViewChange = { view = it },
@@ -170,6 +183,13 @@ fun ImageCropDialog(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 StickerIconButton(
+                    onClick = ::turn,
+                    size = 40.dp,
+                    shape = CircleShape,
+                    fillColor = CookncoWhite,
+                    shadowColor = CookncoGold,
+                ) { Icon(Icons.Outlined.RotateRight, contentDescription = s.cropRotate) }
+                StickerIconButton(
                     onClick = { setZoom(view.zoom / ZOOM_STEP) },
                     size = 40.dp,
                     shape = CircleShape,
@@ -180,7 +200,7 @@ fun ImageCropDialog(
                     value = view.zoom.toFloat(),
                     onValueChange = { setZoom(it.toDouble()) },
                     valueRange = 1f..CropView.MAX_ZOOM.toFloat(),
-                    enabled = natural != null,
+                    enabled = shown != null,
                     colors = SliderDefaults.colors(
                         thumbColor = CookncoGold,
                         activeTrackColor = CookncoGold,
@@ -225,7 +245,11 @@ fun ImageCropDialog(
                     shadowColor = CookncoWhite,
                     shadowOffset = 4.dp,
                     onClick = if (ready) {
-                        { onCropped(natural?.let { view.cropOf(it.width.toDouble(), it.height.toDouble(), frame.aspectRatio) }) }
+                        {
+                            onCropped(
+                                shown?.let { view.cropOf(it.width.toDouble(), it.height.toDouble(), frame.aspectRatio).copy(quarterTurns = turns) },
+                            )
+                        }
                     } else null,
                 ) {
                     Text(
@@ -250,11 +274,14 @@ fun ImageCropDialog(
 private fun CropStage(
     painter: Painter,
     natural: Size?,
+    turns: Int,
     frame: CropFrame,
     view: CropView,
     onViewChange: (CropView) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Framed, zoomed and dragged as it is shown: turned
+    val shown = natural?.turned(turns)
     // Read at gesture time: the detector is started once per picture, not once per frame.
     val currentView by rememberUpdatedState(view)
     val currentOnViewChange by rememberUpdatedState(onViewChange)
@@ -263,8 +290,8 @@ private fun CropStage(
     Canvas(
         modifier = modifier
             .clipToBounds()
-            .pointerInput(natural) {
-                val picture = natural ?: return@pointerInput
+            .pointerInput(shown) {
+                val picture = shown ?: return@pointerInput
                 val width = picture.width.toDouble()
                 val height = picture.height.toDouble()
                 detectTransformGestures { centroid, pan, zoom, _ ->
@@ -282,15 +309,14 @@ private fun CropStage(
             },
     ) {
         val rect = frameRect(size, FRAME_MARGIN.toPx(), ratio)
-        if (natural != null) {
-            val scale = view.scale(natural.width.toDouble(), natural.height.toDouble(), ratio, rect.width.toDouble()).toFloat()
-            val drawn = Size(natural.width * scale, natural.height * scale)
-            translate(
-                left = rect.center.x - view.centerX.toFloat() * drawn.width,
-                top = rect.center.y - view.centerY.toFloat() * drawn.height,
-            ) {
-                with(painter) { draw(drawn) }
-            }
+        if (natural != null && shown != null) {
+            val scale = view.scale(shown.width.toDouble(), shown.height.toDouble(), ratio, rect.width.toDouble()).toFloat()
+            val drawnShown = Size(shown.width * scale, shown.height * scale)
+            val centre = Offset(
+                rect.center.x - view.centerX.toFloat() * drawnShown.width + drawnShown.width / 2,
+                rect.center.y - view.centerY.toFloat() * drawnShown.height + drawnShown.height / 2,
+            )
+            drawTurned(painter, natural, scale, turns, centre)
         }
         drawFrame(rect, frame.round)
     }
@@ -356,15 +382,32 @@ fun FramedImage(image: PickedImage, contentDescription: String?, modifier: Modif
     ) {
         val natural = painter.intrinsicSize
         if (!natural.isSpecified || natural.width <= 0f || natural.height <= 0f) return@Canvas
+        // The crop is of the picture once turned, as the backend will cut it
+        val shown = natural.turned(crop.quarterTurns)
         val scale = max(
-            size.width / (crop.width.toFloat() * natural.width),
-            size.height / (crop.height.toFloat() * natural.height),
+            size.width / (crop.width.toFloat() * shown.width),
+            size.height / (crop.height.toFloat() * shown.height),
         )
-        val drawn = Size(natural.width * scale, natural.height * scale)
-        translate(
-            left = size.width / 2 - (crop.left + crop.width / 2).toFloat() * drawn.width,
-            top = size.height / 2 - (crop.top + crop.height / 2).toFloat() * drawn.height,
-        ) {
+        val drawnShown = Size(shown.width * scale, shown.height * scale)
+        val centre = Offset(
+            size.width / 2 - (crop.left + crop.width / 2).toFloat() * drawnShown.width + drawnShown.width / 2,
+            size.height / 2 - (crop.top + crop.height / 2).toFloat() * drawnShown.height + drawnShown.height / 2,
+        )
+        drawTurned(painter, natural, scale, crop.quarterTurns, centre)
+    }
+}
+
+/** This size after [turns] quarter turns: its sides swap on an odd number. */
+private fun Size.turned(turns: Int): Size = if (turns % 2 == 1) Size(height, width) else this
+
+/**
+ * [painter], whose picture is [natural] before any turn, drawn at [scale], turned [turns]
+ * quarter turns clockwise, with its centre at [centre].
+ */
+private fun DrawScope.drawTurned(painter: Painter, natural: Size, scale: Float, turns: Int, centre: Offset) {
+    val drawn = Size(natural.width * scale, natural.height * scale)
+    rotate(degrees = 90f * turns, pivot = centre) {
+        translate(left = centre.x - drawn.width / 2, top = centre.y - drawn.height / 2) {
             with(painter) { draw(drawn) }
         }
     }

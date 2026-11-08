@@ -17,7 +17,10 @@ import io.ktor.http.HttpHeaders
  * backend that predates it, which saves the picture centred.
  */
 internal fun HttpRequestBuilder.imageUpload(image: PickedImage, filename: String) {
-    image.crop?.let { parameter("crop", it.toQueryValue()) }
+    image.crop?.let { crop ->
+        parameter("crop", crop.toQueryValue())
+        crop.rotationDegrees?.let { parameter("rotate", it) }
+    }
     setBody(MultiPartFormDataContent(formData {
         append("file", image.bytes, Headers.build {
             append(HttpHeaders.ContentType, image.mimeType)

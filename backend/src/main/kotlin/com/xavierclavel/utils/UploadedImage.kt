@@ -8,13 +8,37 @@ import kotlin.math.roundToInt
 
 /**
  * A picture as it was posted: its pixels, what its metadata says about how to hold them up,
- * and the part of it the uploader chose to keep.
+ * how far its uploader turned it, and the part of it they chose to keep.
  *
- * One value rather than three so that whatever saves a picture is handed the crop along with
- * it — a route that unpacked the pair it used to get and dropped the third would store the
+ * One value rather than four so that whatever saves a picture is handed the framing along with
+ * it — a route that unpacked the pair it used to get and dropped the rest would store the
  * centred frame instead, which looks like a picture and is not the one anybody chose.
+ *
+ * @param quarterTurns how many quarter turns clockwise the uploader gave the picture, 0 to 3,
+ *   on top of its EXIF orientation. [crop] is measured on the picture once turned.
  */
-data class UploadedImage(val image: BufferedImage, val metadata: Metadata, val crop: ImageCrop?)
+data class UploadedImage(
+    val image: BufferedImage,
+    val metadata: Metadata,
+    val crop: ImageCrop?,
+    val quarterTurns: Int = 0,
+) {
+    companion object {
+        /**
+         * `?rotate=` as quarter turns: 0, 90, 180 or 270 degrees clockwise, or a refusal.
+         *
+         * Refused with the crop's cause: the turn is part of the framing, and one the cropper
+         * could not have drawn means it measured some other picture.
+         */
+        fun quarterTurnsOf(degrees: String?): Int = when (degrees?.trim()) {
+            null, "", "0" -> 0
+            "90" -> 1
+            "180" -> 2
+            "270" -> 3
+            else -> throw BadRequestException(BadRequestCause.INVALID_IMAGE_CROP)
+        }
+    }
+}
 
 /**
  * The part of a picture to keep, as fractions of the picture **as it is shown** — after its
