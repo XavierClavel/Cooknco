@@ -569,22 +569,24 @@ interface Strings {
     /** Under a dish in its sheet: "Monday 12 October · Dinner". */
     fun mealOn(date: LocalDate, slot: MealSlot): String
     val nothingPlanned: String
+    /** Today's card, for the main meal it has nothing for yet: "Lunch — nothing yet". */
+    fun nothingYet(slot: MealSlot): String
     val addADish: String
     /** The header's button that plans one dish on several days at once, and its sheet's heading. */
     val planAMeal: String
-    /** Under that heading: how many days the dish will be planned on. */
-    fun daysCount(count: Int): String
+    /** Under that heading: what the sheet does. */
+    val planAMealSubtitle: String
     val daysLabel: String
-    /** What opens the calendar that picks several days. */
-    val pickDays: String
-    /** A picked day in that sheet, which may be weeks away: "Mon 12 October". */
-    fun dayChip(date: LocalDate): String
+    /** Takes every picked day back out. */
+    val clearDays: String
     /** Read out on a picked day's chip, which takes it back out of the selection. */
     fun removeDay(date: LocalDate): String
     val noDayPicked: String
     val searchOrTypeADish: String
     /** The row that plans what was typed as it is, rather than as a recipe. */
     fun addTypedDish(text: String): String
+    /** Under the row that plans what was typed. */
+    val asWordsNoRecipe: String
     val plannedBeforeCaps: String
     val yourRecipesCaps: String
     val noRecipeMatches: String
@@ -593,12 +595,24 @@ interface Strings {
     fun servingsCount(count: Int): String
     val servingsNotSet: String
     val dayLabel: String
+    /** What opens the calendar from a dish's sheet, for a day past its chips. */
+    val anotherDay: String
+    /** The dish sheet's way to the recipe it plans. */
+    val openShort: String
+    /** Under the servings, on a recipe's page: what the recipe yields. */
+    fun recipeMakes(count: Int): String
     /** What opens the calendar, from the week on screen and from a dish's day. */
     val pickADate: String
     /** The calendar's heading, for the month [month] falls in: "October 2026". */
     fun monthYear(month: LocalDate): String
     val previousMonth: String
     val nextMonth: String
+    /** A month on its own, as the calendar's month picker lists it. */
+    fun monthAlone(month: Month): String
+    /** Opens the calendar's month and year picker. */
+    val pickMonth: String
+    val previousYear: String
+    val nextYear: String
     val mealLabel: String
     val openRecipe: String
     val removeFromPlan: String
@@ -610,6 +624,7 @@ interface Strings {
     /** What the tab says to an account without premium: what it would do, and what opens it. */
     val mealPlanLockedTitle: String
     val mealPlanLockedMessage: String
+    val mealPlanPremiumBadge: String
 
     // ── The cook timer, as Android's notification settings list it ────────────
     val timerChannelName: String

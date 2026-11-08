@@ -138,14 +138,16 @@ class MealPlanViewModelTest {
 
     private fun weekRequests() = requests.filter { it.method == HttpMethod.Get && it.url.encodedPath.endsWith("/meal-plan") }
 
+    /** The weeks asked for, by their Monday, in the order they were asked. */
+    private fun weeksAsked() = weekRequests().map { it.url.parameters["from"] }
+
     @Test
     fun the_tab_asks_for_this_week_from_monday_to_sunday() = planTest { viewModel ->
         week = listOf(MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "Soup"))
         viewModel.load()
         val state = viewModel.awaitLoaded()
 
-        val asked = weekRequests().single().url.parameters
-        assertEquals("2026-10-12", asked["from"])
+        val asked = weekRequests().single { it.url.parameters["from"] == "2026-10-12" }.url.parameters
         assertEquals("2026-10-18", asked["to"])
         assertEquals(listOf("Soup"), state.days[2].meals.single().dishes.map { it.title })
         assertTrue(state.isCurrentWeek)
@@ -159,14 +161,17 @@ class MealPlanViewModelTest {
         week = emptyList()
 
         viewModel.nextWeek()
-        assertTrue(viewModel.uiState.value.entries.isEmpty(), "nothing of last week while this one loads")
+        assertTrue(viewModel.uiState.value.days.all { it.meals.isEmpty() }, "nothing of last week while this one loads")
         val state = viewModel.awaitLoaded()
 
-        assertEquals("2026-10-19", weekRequests().last().url.parameters["from"])
+        assertTrue("2026-10-19" in weeksAsked())
         assertFalse(state.isCurrentWeek)
+        viewModel.awaitIdle()
+        val before = weeksAsked().size
         viewModel.thisWeek()
         viewModel.awaitLoaded()
-        assertEquals("2026-10-12", weekRequests().last().url.parameters["from"])
+        viewModel.awaitIdle()
+        assertTrue("2026-10-12" in weeksAsked().drop(before), "asked again, not only shown from what was known")
     }
 
     @Test
@@ -224,8 +229,8 @@ class MealPlanViewModelTest {
         val state = viewModel.awaitLoaded()
 
         assertEquals(LocalDate(2026, 12, 21), state.weekStart, "the Monday before Christmas")
-        assertEquals("2026-12-21", weekRequests().last().url.parameters["from"])
-        assertEquals("2026-12-27", weekRequests().last().url.parameters["to"])
+        assertEquals("2026-12-27", weekRequests().last { it.url.parameters["from"] == "2026-12-21" }.url.parameters["to"])
+        viewModel.awaitIdle()
         val asked = weekRequests().size
         viewModel.showWeekOf(LocalDate(2026, 12, 23))
         viewModel.awaitIdle()
@@ -256,43 +261,96 @@ class MealPlanViewModelTest {
         week = listOf(words, recipe)
         viewModel.load()
         viewModel.awaitLoaded()
-
-        fun draftOf(entry: MealPlanEntry, title: String = entry.title) =
-            MealEntryDraft(date = LocalDate(2026, 10, 15), slot = MealSlot.DINNER, servings = entry.servings, title = title)
+        viewModel.awaitIdle()
 
         viewModel.openEntry(words)
-        viewModel.saveEntry(draftOf(words))
+        viewModel.awaitIdle()
+        viewModel.setEntrySlot(MealSlot.LUNCH)
+        viewModel.saveEntry()
         viewModel.awaitIdle()
         viewModel.openEntry(recipe)
-        viewModel.saveEntry(draftOf(recipe, title = "Renamed"))
+        viewModel.awaitIdle()
+        viewModel.setEntryTitle("Renamed")
+        viewModel.setEntryServings(LocalDate(2026, 10, 14), 3)
+        viewModel.saveEntry()
         viewModel.awaitIdle()
         viewModel.openEntry(words)
-        viewModel.saveEntry(draftOf(words, title = " Leek soup "))
+        viewModel.awaitIdle()
+        viewModel.setEntryTitle(" Leek soup ")
+        viewModel.saveEntry()
         viewModel.awaitIdle()
 
         val sent = bodies.map { Json.parseToJsonElement(it).jsonObject }
+        assertEquals(3, sent.size)
         assertNull(sent[0]["title"], "moved, not renamed")
+        assertEquals("\"LUNCH\"", sent[0]["slot"].toString())
         assertNull(sent[1]["title"], "a recipe is not renamed from here")
+        assertEquals("3", sent[1]["servings"].toString())
         assertEquals("\"Leek soup\"", sent[2]["title"].toString())
-        val state = viewModel.uiState.value
-        assertNull(state.editing)
-        val thursday = state.days[3]
-        assertEquals(LocalDate(2026, 10, 15), thursday.date)
-        assertEquals(listOf("Leek soup", "Stew"), thursday.meals.single().dishes.map { it.title })
+        assertNull(viewModel.uiState.value.editing)
     }
 
     @Test
-    fun a_removed_dish_leaves_the_week() = planTest { viewModel ->
+    fun the_sheet_ticks_every_day_the_dish_is_served_at_its_meal() = planTest { viewModel ->
         val soup = MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "Soup")
-        week = listOf(soup)
+        week = listOf(
+            soup,
+            MealPlanEntry(id = 2, date = "2026-10-21", slot = "DINNER", title = "soup "),
+            MealPlanEntry(id = 3, date = "2026-10-15", slot = "LUNCH", title = "Soup"),
+            MealPlanEntry(id = 4, date = "2026-10-16", slot = "DINNER", title = "Pizza"),
+        )
         viewModel.load()
         viewModel.awaitLoaded()
+        viewModel.awaitIdle()
 
         viewModel.openEntry(soup)
-        viewModel.removeEntry()
-        val state = viewModel.uiState.first { it.editing == null }
+        viewModel.awaitIdle()
 
-        assertTrue(requests.any { it.method == HttpMethod.Delete && it.url.encodedPath.endsWith("/meal-plan/1") })
+        assertEquals(setOf(LocalDate(2026, 10, 14), LocalDate(2026, 10, 21)), viewModel.uiState.value.editing!!.days)
+        val asked = weekRequests().last().url.parameters
+        assertEquals("2026-09-28", asked["from"], "the six weeks the calendar draws for October")
+        assertEquals("2026-11-08", asked["to"])
+    }
+
+    @Test
+    fun days_ticked_and_unticked_are_planned_and_taken_off() = planTest { viewModel ->
+        val soup = MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "Soup", servings = 2)
+        week = listOf(soup, MealPlanEntry(id = 2, date = "2026-10-21", slot = "DINNER", title = "Soup", servings = 2))
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openEntry(soup)
+        viewModel.awaitIdle()
+        viewModel.toggleEntryDate(LocalDate(2026, 10, 21))
+        viewModel.toggleEntryDate(LocalDate(2026, 11, 4))
+        viewModel.saveEntry()
+        viewModel.awaitIdle()
+
+        assertTrue(requests.any { it.method == HttpMethod.Delete && it.url.encodedPath.endsWith("/meal-plan/2") })
+        assertTrue(requests.none { it.method == HttpMethod.Put }, "a day left as it was is not sent")
+        val created = ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(bodies.single())
+        assertEquals(MealPlanEntrySaveDto(date = "2026-11-04", slot = "DINNER", title = "Soup", servings = 2), created)
+        assertNull(viewModel.uiState.value.editing)
+    }
+
+    @Test
+    fun a_removed_dish_leaves_every_day_it_was_on() = planTest { viewModel ->
+        val soup = MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "Soup")
+        week = listOf(soup, MealPlanEntry(id = 2, date = "2026-10-16", slot = "DINNER", title = "Soup"))
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openEntry(soup)
+        viewModel.awaitIdle()
+        week = emptyList()
+        viewModel.removeEntry()
+        viewModel.awaitIdle()
+
+        val deleted = requests.filter { it.method == HttpMethod.Delete }.map { it.url.encodedPath.substringAfterLast('/') }.toSet()
+        assertEquals(setOf("1", "2"), deleted)
+        val state = viewModel.uiState.first { it.editing == null && it.hasLoaded && !it.isLoading }
         assertTrue(state.days.all { it.meals.isEmpty() })
     }
 
@@ -349,5 +407,96 @@ class MealPlanViewModelTest {
 
         assertTrue(bodies.isEmpty())
         assertTrue(viewModel.uiState.value.adding!!.dates.isEmpty())
+    }
+
+    @Test
+    fun clearing_takes_every_picked_day_back_out() = planTest { viewModel ->
+        viewModel.load()
+        viewModel.awaitLoaded()
+
+        viewModel.openAddMeal()
+        viewModel.toggleAddDate(LocalDate(2026, 10, 15))
+        viewModel.toggleAddDate(LocalDate(2026, 11, 3))
+        viewModel.clearAddDates()
+
+        assertTrue(viewModel.uiState.value.adding!!.dates.isEmpty())
+    }
+
+    @Test
+    fun the_weeks_either_side_are_known_before_the_cook_swipes_to_them() = planTest { viewModel ->
+        week = listOf(MealPlanEntry(id = 1, date = "2026-10-21", slot = "DINNER", title = "Soup"))
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        assertTrue("2026-10-05" in weeksAsked() && "2026-10-19" in weeksAsked())
+        val next = LocalDate(2026, 10, 19)
+        assertEquals(listOf("Soup"), viewModel.uiState.value.entriesOf(next)?.map { it.title })
+
+        viewModel.nextWeek()
+        val shown = viewModel.uiState.value
+        assertTrue(shown.hasLoaded, "shown from what was asked ahead, with no spinner")
+        assertEquals(listOf("Soup"), shown.days[2].meals.single().dishes.map { it.title })
+        assertTrue(shown.entriesOf(LocalDate(2026, 10, 12)) != null, "the week left behind is still a swipe away")
+    }
+
+    @Test
+    fun a_dish_planned_next_week_shows_there_before_the_swipe() = planTest { viewModel ->
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openAddMeal()
+        viewModel.toggleAddDate(LocalDate(2026, 10, 21))
+        week = listOf(MealPlanEntry(id = 9, date = "2026-10-21", slot = "DINNER", title = "Soup"))
+        viewModel.addSuggestion("Soup")
+        viewModel.uiState.first { it.adding == null }
+        viewModel.awaitIdle()
+
+        assertEquals(listOf("Soup"), viewModel.uiState.value.entriesOf(LocalDate(2026, 10, 19))?.map { it.title })
+    }
+
+    @Test
+    fun each_day_keeps_its_own_servings() = planTest { viewModel ->
+        val soup = MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "Soup", servings = 2)
+        week = listOf(soup, MealPlanEntry(id = 2, date = "2026-10-21", slot = "DINNER", title = "Soup", servings = 4))
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openEntry(soup)
+        viewModel.awaitIdle()
+        val opened = viewModel.uiState.value.editing!!
+        assertEquals(4, opened.servingsOn(LocalDate(2026, 10, 21)), "each day shows what it was planned for")
+
+        viewModel.setEntryServings(LocalDate(2026, 10, 14), 6)
+        viewModel.toggleEntryDate(LocalDate(2026, 10, 28))
+        viewModel.saveEntry()
+        viewModel.awaitIdle()
+
+        val put = requests.filter { it.method == HttpMethod.Put }.map { it.url.encodedPath.substringAfterLast('/') }
+        assertEquals(listOf("1"), put, "the day whose count is unchanged is left alone")
+        val sent = bodies.map { Json.parseToJsonElement(it).jsonObject }
+        assertTrue(sent.any { it["date"].toString() == "\"2026-10-14\"" && it["servings"].toString() == "6" })
+        assertTrue(sent.any { it["date"].toString() == "\"2026-10-28\"" && it["servings"].toString() == "6" }, "a new day starts at the count last set")
+    }
+
+    @Test
+    fun the_calendar_knows_which_meals_are_already_planned() = planTest { viewModel ->
+        week = listOf(
+            MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "Soup"),
+            MealPlanEntry(id = 2, date = "2026-10-15", slot = "LUNCH", title = "Salad"),
+        )
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openAddMeal()
+        viewModel.loadAddMonth(LocalDate(2026, 10, 1))
+        viewModel.awaitIdle()
+
+        val taken = viewModel.uiState.value.adding!!.taken
+        assertEquals(setOf(MealSlot.DINNER), taken[LocalDate(2026, 10, 14)])
+        assertEquals(setOf(MealSlot.LUNCH), taken[LocalDate(2026, 10, 15)])
     }
 }

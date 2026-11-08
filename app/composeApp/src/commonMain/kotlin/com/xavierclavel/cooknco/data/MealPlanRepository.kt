@@ -21,8 +21,11 @@ class MealPlanRepository(
     private suspend fun token(): String = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
 
     /** The week starting on [start], seven days. Reported to [OfflineState] so the banner is right. */
-    suspend fun week(start: LocalDate): Result<List<MealPlanEntry>> = OfflineState.observe(runCatching {
-        api.list(token(), start.toString(), start.plus(6, DateTimeUnit.DAY).toString())
+    suspend fun week(start: LocalDate): Result<List<MealPlanEntry>> = between(start, start.plus(6, DateTimeUnit.DAY))
+
+    /** Every dish from [from] to [to], both included — at most the backend's `MAX_RANGE_DAYS` apart. */
+    suspend fun between(from: LocalDate, to: LocalDate): Result<List<MealPlanEntry>> = OfflineState.observe(runCatching {
+        api.list(token(), from.toString(), to.toString())
     })
 
     suspend fun suggestions(query: String): Result<List<String>> = runCatching {
