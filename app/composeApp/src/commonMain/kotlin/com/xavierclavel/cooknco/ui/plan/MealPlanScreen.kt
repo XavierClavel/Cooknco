@@ -147,6 +147,7 @@ fun MealPlanScreen(
             onAddTyped = viewModel::addTypedDish,
             onAddSuggestion = viewModel::addSuggestion,
             onAddRecipe = viewModel::addRecipe,
+            onAddNotCooked = viewModel::addNotCooked,
             onDismissRequest = viewModel::closeAdd,
         )
     }
@@ -571,10 +572,10 @@ private fun DishRow(dish: MealPlanEntry, onClick: () -> Unit, onMenu: () -> Unit
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        DishThumbnail(recipe = dish.recipe, size = 44.dp, cornerRadius = 12.dp)
+        DishThumbnail(recipe = dish.recipe, size = 44.dp, cornerRadius = 12.dp, hasCooked = dish.hasCooked)
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = dish.title,
+                text = if (dish.hasCooked) dish.title else s.notCooked,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = CookncoNavy,

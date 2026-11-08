@@ -41,6 +41,11 @@ class MealPlanRepository(
         api.create(token(), MealPlanEntrySaveDto(date = date.toString(), slot = slot.name, title = title, servings = servings))
     }
 
+    /** Notes that [slot] on [date] was not cooked: eaten out, ordered in, skipped. */
+    suspend fun planNotCooked(date: LocalDate, slot: MealSlot): Result<MealPlanEntry> = runCatching {
+        api.create(token(), MealPlanEntrySaveDto(date = date.toString(), slot = slot.name, hasCooked = false))
+    }
+
     /** [title] is only applied to a dish that is not a recipe; null leaves it as it is. */
     suspend fun update(id: Long, date: LocalDate, slot: MealSlot, servings: Int?, title: String?): Result<MealPlanEntry> = runCatching {
         api.update(token(), id, MealPlanEntryEditDto(date = date.toString(), slot = slot.name, servings = servings, title = title))

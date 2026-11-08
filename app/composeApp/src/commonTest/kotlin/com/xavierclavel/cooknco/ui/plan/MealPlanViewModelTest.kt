@@ -41,6 +41,8 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import okio.FileSystem
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,6 +54,7 @@ import kotlin.test.assertTrue
  * The meal plan tab, over a mock server: which week it asks for, what it sends when a dish is
  * added, moved or renamed, and what it shows when the server says no.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class MealPlanViewModelTest {
 
     private val tokenFile = FileSystem.SYSTEM_TEMPORARY_DIRECTORY /
@@ -65,8 +68,22 @@ class MealPlanViewModelTest {
     private var failingWrites = false
     /** Days whose creation the server refuses, the others going through. */
     private var failingDates: Set<String> = emptySet()
-    private val requests = mutableListOf<HttpRequestData>()
-    private val bodies = mutableListOf<String>()
+    /**
+     * What the mock server was sent. Ktor calls it from worker threads — the neighbouring weeks
+     * are fetched while a test is still asserting — so it is appended to atomically and read as
+     * a snapshot; a plain list threw ConcurrentModificationException when a request landed mid-read.
+     */
+    private val requestLog = AtomicReference(emptyList<HttpRequestData>())
+    private val bodyLog = AtomicReference(emptyList<String>())
+    private val requests: List<HttpRequestData> get() = requestLog.load()
+    private val bodies: List<String> get() = bodyLog.load()
+
+    private fun <T> AtomicReference<List<T>>.append(item: T) {
+        while (true) {
+            val before = load()
+            if (compareAndSet(before, before + item)) return
+        }
+    }
     private var nextId = 100L
 
     private fun json(content: String) =
@@ -76,10 +93,10 @@ class MealPlanViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val (store, root) = testOfflineStore()
         val client = HttpClient(MockEngine { request ->
-            requests += request
+            requestLog.append(request)
             val path = request.url.encodedPath
             val text = request.body.toByteArray().decodeToString()
-            if (text.isNotEmpty()) bodies += text
+            if (text.isNotEmpty()) bodyLog.append(text)
             val (content, status, headers) = when {
                 request.method != HttpMethod.Get && failingWrites -> Triple("down", HttpStatusCode.InternalServerError, headersOf())
                 request.method == HttpMethod.Post && failingDates.any { text.contains("\"$it\"") } ->
@@ -90,7 +107,8 @@ class MealPlanViewModelTest {
                 path.endsWith("/meal-plan") && request.method == HttpMethod.Post -> {
                     val sent = ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(text)
                     json(ApiClient.json.encodeToString(
-                        MealPlanEntry(id = nextId++, date = sent.date, slot = sent.slot, title = sent.title ?: "Recipe ${sent.recipeId}", servings = sent.servings)
+                        if (!sent.hasCooked) MealPlanEntry(id = nextId++, date = sent.date, slot = sent.slot, title = "", hasCooked = false)
+                        else MealPlanEntry(id = nextId++, date = sent.date, slot = sent.slot, title = sent.title ?: "Recipe ${sent.recipeId}", servings = sent.servings)
                     ))
                 }
                 request.method == HttpMethod.Put -> {
@@ -498,5 +516,58 @@ class MealPlanViewModelTest {
         val taken = viewModel.uiState.value.adding!!.taken
         assertEquals(setOf(MealSlot.DINNER), taken[LocalDate(2026, 10, 14)])
         assertEquals(setOf(MealSlot.LUNCH), taken[LocalDate(2026, 10, 15)])
+    }
+
+    @Test
+    fun a_meal_not_cooked_is_planned_on_every_picked_day_and_fills_it() = planTest { viewModel ->
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openAddMeal()
+        viewModel.setAddSlot(MealSlot.LUNCH)
+        viewModel.toggleAddDate(LocalDate(2026, 10, 14))
+        viewModel.toggleAddDate(LocalDate(2026, 10, 15))
+        viewModel.addNotCooked()
+        viewModel.awaitIdle()
+
+        val sent = bodies.map { ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(it) }
+        assertEquals(
+            setOf(
+                MealPlanEntrySaveDto(date = "2026-10-14", slot = "LUNCH", hasCooked = false),
+                MealPlanEntrySaveDto(date = "2026-10-15", slot = "LUNCH", hasCooked = false),
+            ),
+            sent.toSet(),
+            "no name and no count: nothing was cooked",
+        )
+        val state = viewModel.uiState.value
+        assertNull(state.adding)
+        val wednesday = state.days.single { it.date == LocalDate(2026, 10, 14) }
+        assertTrue(wednesday.meals.single { it.slot == MealSlot.LUNCH }.dishes.single().hasCooked.not(), "the lunch counts as filled")
+    }
+
+    @Test
+    fun a_meal_not_cooked_is_its_own_dish_across_days() = planTest { viewModel ->
+        val out = MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "", hasCooked = false)
+        week = listOf(
+            out,
+            MealPlanEntry(id = 2, date = "2026-10-16", slot = "DINNER", title = "", hasCooked = false),
+            MealPlanEntry(id = 3, date = "2026-10-17", slot = "DINNER", title = "Soup"),
+        )
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openEntry(out)
+        viewModel.awaitIdle()
+        assertEquals(setOf(LocalDate(2026, 10, 14), LocalDate(2026, 10, 16)), viewModel.uiState.value.editing!!.days)
+
+        viewModel.toggleEntryDate(LocalDate(2026, 10, 21))
+        viewModel.saveEntry()
+        viewModel.awaitIdle()
+        assertEquals(
+            MealPlanEntrySaveDto(date = "2026-10-21", slot = "DINNER", hasCooked = false),
+            ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(bodies.single()),
+        )
     }
 }

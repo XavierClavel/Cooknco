@@ -29,6 +29,7 @@ import shared.dto.UserSettingsDTO
 import shared.enums.MealSlot
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -408,6 +409,36 @@ class MealPlanControllerTest : ApplicationTest() {
         }
         assertNull(userService.findEntityByMail(USER1))
         assertEquals(0, QMealPlanEntry().findCount())
+    }
+
+    // ----------------------------------------------------------- not cooked
+
+    /**
+     * A meal nobody cooked fills its meal like a dish, and names nothing: whatever came with it
+     * is dropped, and an edit can move it but not give it a name or a count.
+     */
+    @Test
+    fun `a meal not cooked fills the meal, and names and counts nothing`() = runTest {
+        grantPremiumForever(USER1)
+        runAsUser1 {
+            val stew = client.createRecipe(recipeDTO.copy(title = "Stew"))
+            val entry = client.planMeal(
+                MealPlanEntryDTO(date = monday, slot = MealSlot.LUNCH, recipeId = stew.id, title = "Restaurant", servings = 3, hasCooked = false),
+            )
+            assertFalse(entry.hasCooked)
+            assertEquals("", entry.title)
+            assertNull(entry.recipe)
+            assertNull(entry.servings)
+
+            val moved = client.editMealPlanEntry(entry.id, MealPlanEntryEditDTO(date = tuesday, slot = MealSlot.DINNER, servings = 2, title = "Pizza"))
+            assertEquals(tuesday, moved.date)
+            assertEquals(MealSlot.DINNER, moved.slot)
+            assertEquals("", moved.title)
+            assertNull(moved.servings)
+            assertFalse(moved.hasCooked)
+            assertEquals(listOf(moved), client.listMealPlan(monday, sunday))
+            assertTrue(client.mealPlanSuggestions().isEmpty(), "not cooking is not a dish to suggest")
+        }
     }
 
     // ----------------------------------------------------------- suggestions

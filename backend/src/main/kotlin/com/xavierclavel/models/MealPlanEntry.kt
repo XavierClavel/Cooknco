@@ -2,6 +2,7 @@ package com.xavierclavel.models
 
 import io.ebean.Model
 import io.ebean.annotation.ConstraintMode
+import io.ebean.annotation.DbDefault
 import io.ebean.annotation.DbForeignKey
 import io.ebean.annotation.Index
 import jakarta.persistence.Column
@@ -77,6 +78,14 @@ class MealPlanEntry(
 
     var servings: Int? = null,
 
+    /**
+     * Whether the meal was cooked. False when it was not — eaten out, ordered in, skipped: it
+     * fills the meal as a dish would, so a calendar reads it as planned, but it names nothing:
+     * [title] is empty, there is no [recipe] and no [servings].
+     */
+    @DbDefault("true")
+    var hasCooked: Boolean = true,
+
 ) : Model() {
 
     /**
@@ -92,5 +101,6 @@ class MealPlanEntry(
         title = readableRecipe?.title ?: title,
         servings = servings,
         recipe = readableRecipe?.let { MealPlanRecipe(id = it.id, version = it.imageVersion) },
+        hasCooked = hasCooked,
     )
 }

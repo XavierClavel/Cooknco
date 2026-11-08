@@ -536,6 +536,8 @@ data class MealPlanEntry(
     val title: String,
     val servings: Int? = null,
     val recipe: MealPlanRecipe? = null,
+    /** False when the meal was not cooked: it fills the meal and names nothing ([title] is empty). */
+    val hasCooked: Boolean = true,
 )
 
 @Serializable
@@ -559,6 +561,7 @@ data class MealPlanEntrySaveDto(
     val recipeId: Long? = null,
     val title: String? = null,
     val servings: Int? = null,
+    val hasCooked: Boolean = true,
 )
 
 /** `PUT /meal-plan/{id}` — `shared.dto.MealPlanEntryEditDTO`. [servings] is sent as it is meant: null clears it. */

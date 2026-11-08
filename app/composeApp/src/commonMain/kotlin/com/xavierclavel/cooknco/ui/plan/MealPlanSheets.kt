@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.NoMeals
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -120,6 +121,7 @@ fun AddDishSheet(
     onAddTyped: () -> Unit,
     onAddSuggestion: (String) -> Unit,
     onAddRecipe: (RecipeOverview) -> Unit,
+    onAddNotCooked: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
     val s = strings()
@@ -160,7 +162,14 @@ fun AddDishSheet(
             modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp),
         )
         Column(modifier = Modifier.padding(top = 6.dp).alpha(if (canAdd || state.isSaving) 1f else 0.4f)) {
-            DishResults(state = state, enabled = canAdd, onAddTyped = onAddTyped, onAddSuggestion = onAddSuggestion, onAddRecipe = onAddRecipe)
+            DishResults(
+                state = state,
+                enabled = canAdd,
+                onAddTyped = onAddTyped,
+                onAddSuggestion = onAddSuggestion,
+                onAddRecipe = onAddRecipe,
+                onAddNotCooked = onAddNotCooked,
+            )
         }
         if (state.saveFailed) SaveFailed()
     }
@@ -226,12 +235,18 @@ private fun DishResults(
     onAddTyped: () -> Unit,
     onAddSuggestion: (String) -> Unit,
     onAddRecipe: (RecipeOverview) -> Unit,
+    onAddNotCooked: () -> Unit,
 ) {
     val s = strings()
     val typed = state.query.trim()
     if (typed.isNotEmpty()) {
         ResultRow(label = s.addTypedDish(typed), sub = s.asWordsNoRecipe, enabled = enabled, onClick = onAddTyped) {
             ResultIcon(Icons.Outlined.Add, background = CookncoOrange)
+        }
+    } else {
+        // First, before any dish: a meal nobody cooked is still a meal accounted for
+        ResultRow(label = s.notCooked, sub = s.notCookedHint, enabled = enabled, onClick = onAddNotCooked) {
+            ResultIcon(Icons.Outlined.NoMeals, background = CookncoGoldLight)
         }
     }
     if (state.suggestions.isNotEmpty()) {
@@ -408,7 +423,7 @@ fun DishDaysSheet(
     onDismissRequest: () -> Unit,
 ) {
     val s = strings()
-    val titleEditable = state.entry.recipe == null
+    val titleEditable = state.entry.recipe == null && state.entry.hasCooked
     val initialMonth = remember(state.entry.id) { runCatching { LocalDate.parse(state.entry.date) }.getOrDefault(today) }
     // The month the calendar shows, whose days the portions below are for
     var shownMonth by remember(state.entry.id) { mutableStateOf(monthOf(initialMonth)) }
@@ -424,9 +439,9 @@ fun DishDaysSheet(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DishThumbnail(recipe = state.entry.recipe, size = 56.dp, cornerRadius = 16.dp, borderWidth = 2.5.dp)
+            DishThumbnail(recipe = state.entry.recipe, size = 56.dp, cornerRadius = 16.dp, borderWidth = 2.5.dp, hasCooked = state.entry.hasCooked)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(state.entry.title, fontSize = 21.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(if (state.entry.hasCooked) state.entry.title else s.notCooked, fontSize = 21.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(s.mealSlot(state.slot), fontSize = 13.5.sp, color = PlanMuted)
             }
             if (onOpenRecipe != null) {
@@ -475,7 +490,8 @@ fun DishDaysSheet(
         // Each day its own count: a dinner for two on Monday can be for six on Saturday
         // Only the month on screen, so the list stays beside the calendar it belongs to
         val monthDays = state.days.filter { monthOf(it) == shownMonth }
-        if (monthDays.isNotEmpty()) {
+        // Nothing was cooked, so there is nobody to count
+        if (monthDays.isNotEmpty() && state.entry.hasCooked) {
             PlanFieldLabel(s.servingsLabel, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 4.dp))
             monthDays.sorted().forEach { date ->
                 Row(
