@@ -146,7 +146,7 @@ fun MealPlanScreen(
             onMonthChange = viewModel::loadAddMonth,
             onClearDates = viewModel::clearAddDates,
             onAddTyped = viewModel::addTypedDish,
-            onAddSuggestion = viewModel::addSuggestion,
+            onAddSuggestion = viewModel::addPlannedBefore,
             onAddRecipe = viewModel::addRecipe,
             onAddNotCooked = viewModel::addNotCooked,
             onDismissRequest = viewModel::closeAdd,

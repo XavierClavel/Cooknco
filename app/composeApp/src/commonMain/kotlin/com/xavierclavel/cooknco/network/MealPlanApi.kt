@@ -1,6 +1,7 @@
 package com.xavierclavel.cooknco.network
 
 import com.xavierclavel.cooknco.network.dto.MealPlanEntry
+import com.xavierclavel.cooknco.network.dto.MealPlanSuggestion
 import com.xavierclavel.cooknco.network.dto.MealPlanEntryEditDto
 import com.xavierclavel.cooknco.network.dto.MealPlanEntrySaveDto
 import io.ktor.client.HttpClient
@@ -36,9 +37,9 @@ class MealPlanApi(private val client: HttpClient) {
         return response.body()
     }
 
-    /** What this account planned before that was not a recipe, newest first. */
-    suspend fun suggestions(token: String, query: String): List<String> {
-        val response = client.get("$base/suggestions") {
+    /** What this account planned before, recipes and words alike, newest first and once each. */
+    suspend fun recent(token: String, query: String): List<MealPlanSuggestion> {
+        val response = client.get("$base/recent") {
             bearerAuth(token)
             if (query.isNotBlank()) parameter("query", query)
         }
