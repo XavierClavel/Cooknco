@@ -11,6 +11,7 @@ import com.xavierclavel.cooknco.data.AppUnitSystem
 import com.xavierclavel.cooknco.data.AppUnits
 import com.xavierclavel.cooknco.data.AppLocale
 import com.xavierclavel.cooknco.data.DevicePreferences
+import com.xavierclavel.cooknco.data.PlanMeals
 import com.xavierclavel.cooknco.data.PushRepository
 import com.xavierclavel.cooknco.data.UserRepository
 import com.xavierclavel.cooknco.di.AppGraph
@@ -48,6 +49,8 @@ data class UserSettingsUiState(
     val pushEnabled: Boolean = true,
     /** Whether this handset keeps the cook's recipes readable without a connection. */
     val offlineRecipes: Boolean = true,
+    /** Whether the meal plan offers breakfast and the snack too. This handset's, see [PlanMeals]. */
+    val showsBreakfastAndSnack: Boolean = false,
     /** How many MCP clients this account has approved — the badge on the "MCP access" row. */
     val mcpClientCount: Int = 0,
     val isLoading: Boolean = true,
@@ -80,7 +83,7 @@ class UserSettingsViewModel(
     private val pushRepository: PushRepository,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(UserSettingsUiState())
+    private val _uiState = MutableStateFlow(UserSettingsUiState(showsBreakfastAndSnack = PlanMeals.showsBreakfastAndSnack.value))
     val uiState: StateFlow<UserSettingsUiState> = _uiState.asStateFlow()
 
     init {
@@ -173,6 +176,12 @@ class UserSettingsViewModel(
                 AppGraph.offlineImages.refresh()
             }
         }
+    }
+
+    fun toggleBreakfastAndSnack() {
+        val shows = !_uiState.value.showsBreakfastAndSnack
+        _uiState.update { it.copy(showsBreakfastAndSnack = shows) }
+        PlanMeals.set(shows, devicePreferences)
     }
 
     private suspend fun readOfflineState() {

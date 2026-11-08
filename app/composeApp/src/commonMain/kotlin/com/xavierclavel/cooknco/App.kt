@@ -13,6 +13,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import com.xavierclavel.cooknco.data.AppLanguage
 import com.xavierclavel.cooknco.data.AppUnits
+import com.xavierclavel.cooknco.data.PlanMeals
 import com.xavierclavel.cooknco.data.UpdateRequirement
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.navigation.AppNavigation
@@ -70,6 +71,8 @@ fun App() {
         AppUnits.restore(AppGraph.devicePreferences)
         AppUnits.refresh(AppGraph.unitRepository)
     }
+    // Which meals the plan offers; this handset's choice, read before the tab can be opened
+    LaunchedEffect(Unit) { PlanMeals.restore(AppGraph.devicePreferences) }
     // A timer started in an earlier process is still counting — its deadline outlived it.
     // Read back here, before cook mode is reachable, so the screen opens on the real one
     // rather than on its step's default. See [CookTimer].

@@ -59,6 +59,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xavierclavel.cooknco.data.MealSlot
+import com.xavierclavel.cooknco.data.plannableMealSlots
 import com.xavierclavel.cooknco.data.PlannedDay
 import com.xavierclavel.cooknco.data.daysFrom
 import com.xavierclavel.cooknco.data.planWeek
@@ -531,6 +532,7 @@ private fun DayCard(
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+            val offered = plannableMealSlots()
             MealSlot.entries.forEach { slot ->
                 val meal = day.meals.firstOrNull { it.slot == slot }
                 when {
@@ -547,7 +549,8 @@ private fun DayCard(
                             DishRow(dish = dish, onClick = { onDish(dish) }, onMenu = { onDishMenu(dish) })
                         }
                     }
-                    expanded -> StickerDashedButton(
+                    // A meal not offered is still shown when something is planned at it
+                    expanded && slot in offered -> StickerDashedButton(
                         text = s.mealSlot(slot),
                         onClick = { onAddTo(slot) },
                         shape = RoundedCornerShape(14.dp),

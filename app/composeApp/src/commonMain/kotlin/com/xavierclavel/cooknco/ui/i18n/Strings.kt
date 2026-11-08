@@ -563,6 +563,8 @@ interface Strings {
 
     // ── The meal plan, which a premium account is offered ─────────────────────
     val mealPlan: String
+    /** The settings switch that adds breakfast and the afternoon snack to the meal plan. */
+    val breakfastAndSnack: String
     /** "12 – 18 October", or "28 September – 4 October" across two months. */
     fun weekRange(start: LocalDate, end: LocalDate): String
     val thisWeek: String

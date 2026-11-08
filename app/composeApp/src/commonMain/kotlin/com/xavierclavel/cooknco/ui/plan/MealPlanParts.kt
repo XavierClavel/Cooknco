@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import com.xavierclavel.cooknco.data.MealSlot
+import com.xavierclavel.cooknco.data.plannableMealSlots
 import com.xavierclavel.cooknco.network.dto.MealPlanRecipe
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.i18n.strings
@@ -84,12 +85,16 @@ internal fun PlanFieldLabel(text: String, modifier: Modifier = Modifier) {
 @Composable
 internal fun MealChips(selected: MealSlot, onSelect: (MealSlot) -> Unit, modifier: Modifier = Modifier) {
     val s = strings()
+    // A dish already at breakfast keeps its chip when breakfast is not offered, or it could
+    // not be shown where it is
+    val offered = plannableMealSlots()
+    val slots = MealSlot.entries.filter { it in offered || it == selected }
     FlowRow(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        MealSlot.entries.forEach { slot ->
+        slots.forEach { slot ->
             val isSelected = slot == selected
             val shape = RoundedCornerShape(percent = 50)
             Box(
