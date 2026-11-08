@@ -602,7 +602,7 @@ interface Strings {
     fun addTypedDish(text: String): String
     /** Under the row that plans what was typed. */
     val asWordsNoRecipe: String
-    val plannedBeforeCaps: String
+    val suggestionsCaps: String
     val yourRecipesCaps: String
     val noRecipeMatches: String
     val dishName: String

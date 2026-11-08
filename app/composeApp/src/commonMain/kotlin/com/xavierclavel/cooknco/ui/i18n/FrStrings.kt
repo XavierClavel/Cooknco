@@ -623,7 +623,7 @@ object FrStrings : Strings {
     override val searchOrTypeADish = "Cherchez une recette, ou tapez un plat…"
     override fun addTypedDish(text: String) = "Ajouter « $text »"
     override val asWordsNoRecipe = "En quelques mots, sans recette"
-    override val plannedBeforeCaps = "DÉJÀ PRÉVU"
+    override val suggestionsCaps = "SUGGESTIONS"
     override val yourRecipesCaps = "VOS RECETTES"
     override val noRecipeMatches = "Aucune de vos recettes ne correspond."
     override val dishName = "Plat"

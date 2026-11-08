@@ -17,6 +17,8 @@ import shared.dto.MealPlanEntryDTO
 import shared.dto.MealPlanEntryEditDTO
 import shared.enums.MealSlot
 import shared.infodto.MealPlanEntryInfo
+import shared.infodto.MealPlanRecipe
+import shared.infodto.MealPlanSuggestionInfo
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
@@ -142,6 +144,36 @@ class MealPlanService : KoinComponent {
             .map { it.title }
             .distinctBy { it.lowercase() }
             .take(SUGGESTION_LIMIT)
+
+    /**
+     * What this account has planned before, recipes and words alike, most recent first and
+     * once each — the dishes a week is mostly made of, to plan again in a tap.
+     *
+     * A recipe is offered as a recipe only while the caller can still open it; one gone out of
+     * reach is offered as the title it was planned under, like any dish typed in words, and is
+     * then the same suggestion as those words. [query] is matched against the title the dish
+     * was planned under. A meal not cooked is not a dish, and is never offered.
+     */
+    fun recent(ownerId: Long, query: String?): List<MealPlanSuggestionInfo> {
+        val entries = QMealPlanEntry()
+            .owner.id.eq(ownerId)
+            .hasCooked.isTrue()
+            .apply { if (!query.isNullOrBlank()) title.icontains(query.trim()) }
+            .orderBy().date.desc().id.desc()
+            .setMaxRows(SUGGESTION_SCAN)
+            .findList()
+        val readable = recipeService.findReadable(ownerId, entries.mapNotNull { it.recipe?.id }.toSet())
+        return entries
+            .map { entry ->
+                val recipe = entry.recipe?.id?.let { readable[it] }
+                MealPlanSuggestionInfo(
+                    title = recipe?.title ?: entry.title,
+                    recipe = recipe?.let { MealPlanRecipe(id = it.id, version = it.imageVersion) },
+                )
+            }
+            .distinctBy { it.recipe?.id?.toString() ?: "words:" + it.title.lowercase() }
+            .take(SUGGESTION_LIMIT)
+    }
 
     private fun describe(viewerId: Long, entry: MealPlanEntry): MealPlanEntryInfo =
         describeAll(viewerId, listOf(entry)).single()

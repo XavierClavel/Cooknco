@@ -16,6 +16,7 @@ import main.com.xavierclavel.utils.listMealPlanRaw
 import main.com.xavierclavel.utils.mealPlanSuggestions
 import main.com.xavierclavel.utils.planMeal
 import main.com.xavierclavel.utils.planMealRaw
+import main.com.xavierclavel.utils.recentMealPlanDishes
 import main.com.xavierclavel.utils.recipeDTO
 import main.com.xavierclavel.utils.removeMealPlanEntryRaw
 import main.com.xavierclavel.utils.unhideRecipe
@@ -458,6 +459,36 @@ class MealPlanControllerTest : ApplicationTest() {
             assertEquals(listOf("leftovers", "Pizza night"), client.mealPlanSuggestions())
             assertEquals(listOf("Pizza night"), client.mealPlanSuggestions("PIZ"))
             assertTrue(client.mealPlanSuggestions("stew").isEmpty(), "a recipe is found as a recipe, not suggested as words")
+        }
+    }
+
+    /**
+     * The dishes planned before include recipes, as recipes, so planning the same stew again is
+     * one tap. A recipe gone out of reach comes back as the words it was planned under.
+     */
+    @Test
+    fun `recent dishes are recipes and words alike, once each and newest first`() = runTest {
+        grantPremiumForever(USER1)
+        grantPremiumForever(USER2)
+        val gone = runAsUser2Returning { client.createRecipe(recipeDTO.copy(title = "Borrowed curry")) }
+        val stewId = runAsUser1Returning {
+            val stew = client.createRecipe(recipeDTO.copy(title = "Stew"))
+            client.planMeal(dish("Leftovers", date = monday))
+            client.planMeal(recipe(stew.id, date = monday, slot = MealSlot.LUNCH))
+            client.planMeal(recipe(gone.id, date = monday))
+            client.planMeal(recipe(stew.id, date = tuesday))
+            client.planMeal(dish("leftovers", date = wednesday))
+            client.planMeal(MealPlanEntryDTO(date = wednesday, slot = MealSlot.LUNCH, hasCooked = false))
+            stew.id
+        }
+        runAsUser2 { client.deleteRecipe(gone.id) }
+        runAsUser1 {
+            val recent = client.recentMealPlanDishes()
+            assertEquals(listOf("leftovers", "Stew", "Borrowed curry"), recent.map { it.title })
+            assertEquals(stewId, recent[1].recipe?.id)
+            assertNull(recent[0].recipe)
+            assertNull(recent[2].recipe, "a recipe out of reach is offered as its words")
+            assertEquals(listOf("Stew"), client.recentMealPlanDishes("ST").map { it.title })
         }
     }
 

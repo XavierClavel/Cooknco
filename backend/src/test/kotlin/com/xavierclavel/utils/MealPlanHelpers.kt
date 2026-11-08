@@ -56,6 +56,12 @@ suspend fun HttpClient.editMealPlanEntry(id: Long, dto: MealPlanEntryEditDTO): M
 
 suspend fun HttpClient.removeMealPlanEntryRaw(id: Long) = this.delete("$MEAL_PLAN_URL/$id")
 
+suspend fun HttpClient.recentMealPlanDishes(query: String? = null): List<shared.infodto.MealPlanSuggestionInfo> =
+    this.get("$MEAL_PLAN_URL/recent") { query?.let { parameter("query", it) } }.let {
+        assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
+        Json.decodeFromString(it.bodyAsText())
+    }
+
 suspend fun HttpClient.mealPlanSuggestions(query: String? = null): List<String> =
     this.get("$MEAL_PLAN_URL/suggestions") { query?.let { parameter("query", it) } }.let {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
