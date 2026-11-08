@@ -576,7 +576,7 @@ object EnStrings : Strings {
     override fun weekRange(start: LocalDate, end: LocalDate) =
         if (start.month == end.month) "${start.day} – ${end.day} ${monthName(end.month)}"
         else "${start.day} ${monthName(start.month)} – ${end.day} ${monthName(end.month)}"
-    override val thisWeek = "This week"
+    override val thisWeek = "Now"
     override val previousWeek = "Previous week"
     override val nextWeek = "Next week"
     override fun mealSlot(slot: MealSlot) = when (slot) {
@@ -590,16 +590,17 @@ object EnStrings : Strings {
     override fun mealOn(date: LocalDate, slot: MealSlot) =
         "${weekday(date.dayOfWeek)} ${date.day} ${monthName(date.month)} · ${mealSlot(slot)}"
     override val nothingPlanned = "Nothing planned"
+    override fun nothingYet(slot: MealSlot) = "${mealSlot(slot)} — nothing yet"
     override val addADish = "Add a dish"
     override val planAMeal = "Plan a meal"
-    override fun daysCount(count: Int) = if (count == 1) "On 1 day" else "On $count days"
+    override val planAMealSubtitle = "One dish, on every day you pick"
     override val daysLabel = "Days"
-    override val pickDays = "Pick days"
-    override fun dayChip(date: LocalDate) = "${weekday(date.dayOfWeek).take(3)} ${date.day} ${monthName(date.month)}"
+    override val clearDays = "Clear"
     override fun removeDay(date: LocalDate) = "Remove ${fullDate(date)}"
     override val noDayPicked = "Pick at least one day."
     override val searchOrTypeADish = "Search your recipes, or type a dish…"
     override fun addTypedDish(text: String) = "Add “$text”"
+    override val asWordsNoRecipe = "As words, no recipe"
     override val plannedBeforeCaps = "PLANNED BEFORE"
     override val yourRecipesCaps = "YOUR RECIPES"
     override val noRecipeMatches = "None of your recipes match."
@@ -608,10 +609,17 @@ object EnStrings : Strings {
     override fun servingsCount(count: Int) = "Serves $count"
     override val servingsNotSet = "Not set"
     override val dayLabel = "Day"
+    override val anotherDay = "Another day"
+    override val openShort = "Open"
+    override fun recipeMakes(count: Int) = "The recipe makes $count"
     override val pickADate = "Pick a date"
     override fun monthYear(month: LocalDate) = "${monthName(month.month)} ${month.year}"
     override val previousMonth = "Previous month"
     override val nextMonth = "Next month"
+    override fun monthAlone(month: Month) = monthName(month)
+    override val pickMonth = "Pick a month"
+    override val previousYear = "Previous year"
+    override val nextYear = "Next year"
     override val mealLabel = "Meal"
     override val openRecipe = "Open the recipe"
     override val removeFromPlan = "Remove from the plan"
@@ -622,7 +630,8 @@ object EnStrings : Strings {
     override val mealPlanLockedTitle = "Plan your meals"
     override val mealPlanLockedMessage =
         "Write down what you will cook — or what you cooked — for every meal of the week, " +
-            "from your recipes or in a few words. Meal planning comes with a premium account."
+            "from your recipes or in a few words."
+    override val mealPlanPremiumBadge = "Comes with a premium account"
 
     override val timerChannelName = "Cook timer"
     override val timerChannelDescription = "The countdown of a timer you started in cook mode."
