@@ -20,6 +20,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Restaurant
+import com.xavierclavel.cooknco.ui.theme.CookncoGoldLight
+import androidx.compose.material.icons.outlined.NoMeals
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -170,10 +172,14 @@ internal fun PlanSearchField(
  * reach — a fork and knife on green.
  */
 @Composable
-internal fun DishThumbnail(recipe: MealPlanRecipe?, size: Dp, cornerRadius: Dp, borderWidth: Dp = 2.dp) {
+internal fun DishThumbnail(recipe: MealPlanRecipe?, size: Dp, cornerRadius: Dp, borderWidth: Dp = 2.dp, notCooked: Boolean = false) {
     val shape = RoundedCornerShape(cornerRadius)
     val frame = Modifier.size(size).clip(shape).border(borderWidth, CookncoNavy, shape)
-    if (recipe != null) {
+    if (notCooked) {
+        Box(modifier = frame.background(CookncoGoldLight), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.NoMeals, contentDescription = null, tint = CookncoNavy, modifier = Modifier.size(size * 0.42f))
+        }
+    } else if (recipe != null) {
         RecipeImage(recipeId = recipe.id, version = recipe.version, contentDescription = null, modifier = frame)
     } else {
         Box(modifier = frame.background(CookncoGreenLight), contentAlignment = Alignment.Center) {

@@ -90,7 +90,8 @@ class MealPlanViewModelTest {
                 path.endsWith("/meal-plan") && request.method == HttpMethod.Post -> {
                     val sent = ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(text)
                     json(ApiClient.json.encodeToString(
-                        MealPlanEntry(id = nextId++, date = sent.date, slot = sent.slot, title = sent.title ?: "Recipe ${sent.recipeId}", servings = sent.servings)
+                        if (sent.notCooked) MealPlanEntry(id = nextId++, date = sent.date, slot = sent.slot, title = "", notCooked = true)
+                        else MealPlanEntry(id = nextId++, date = sent.date, slot = sent.slot, title = sent.title ?: "Recipe ${sent.recipeId}", servings = sent.servings)
                     ))
                 }
                 request.method == HttpMethod.Put -> {
@@ -498,5 +499,58 @@ class MealPlanViewModelTest {
         val taken = viewModel.uiState.value.adding!!.taken
         assertEquals(setOf(MealSlot.DINNER), taken[LocalDate(2026, 10, 14)])
         assertEquals(setOf(MealSlot.LUNCH), taken[LocalDate(2026, 10, 15)])
+    }
+
+    @Test
+    fun a_meal_not_cooked_is_planned_on_every_picked_day_and_fills_it() = planTest { viewModel ->
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openAddMeal()
+        viewModel.setAddSlot(MealSlot.LUNCH)
+        viewModel.toggleAddDate(LocalDate(2026, 10, 14))
+        viewModel.toggleAddDate(LocalDate(2026, 10, 15))
+        viewModel.addNotCooked()
+        viewModel.awaitIdle()
+
+        val sent = bodies.map { ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(it) }
+        assertEquals(
+            setOf(
+                MealPlanEntrySaveDto(date = "2026-10-14", slot = "LUNCH", notCooked = true),
+                MealPlanEntrySaveDto(date = "2026-10-15", slot = "LUNCH", notCooked = true),
+            ),
+            sent.toSet(),
+            "no name and no count: nothing was cooked",
+        )
+        val state = viewModel.uiState.value
+        assertNull(state.adding)
+        val wednesday = state.days.single { it.date == LocalDate(2026, 10, 14) }
+        assertTrue(wednesday.meals.single { it.slot == MealSlot.LUNCH }.dishes.single().notCooked, "the lunch counts as filled")
+    }
+
+    @Test
+    fun a_meal_not_cooked_is_its_own_dish_across_days() = planTest { viewModel ->
+        val out = MealPlanEntry(id = 1, date = "2026-10-14", slot = "DINNER", title = "", notCooked = true)
+        week = listOf(
+            out,
+            MealPlanEntry(id = 2, date = "2026-10-16", slot = "DINNER", title = "", notCooked = true),
+            MealPlanEntry(id = 3, date = "2026-10-17", slot = "DINNER", title = "Soup"),
+        )
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openEntry(out)
+        viewModel.awaitIdle()
+        assertEquals(setOf(LocalDate(2026, 10, 14), LocalDate(2026, 10, 16)), viewModel.uiState.value.editing!!.days)
+
+        viewModel.toggleEntryDate(LocalDate(2026, 10, 21))
+        viewModel.saveEntry()
+        viewModel.awaitIdle()
+        assertEquals(
+            MealPlanEntrySaveDto(date = "2026-10-21", slot = "DINNER", notCooked = true),
+            ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(bodies.single()),
+        )
     }
 }

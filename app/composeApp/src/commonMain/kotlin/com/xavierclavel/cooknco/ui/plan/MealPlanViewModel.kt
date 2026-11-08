@@ -74,6 +74,7 @@ data class AddDishState(
 private sealed interface NewDish {
     data class Recipe(val recipe: RecipeOverview) : NewDish
     data class Words(val title: String) : NewDish
+    data object NotCooked : NewDish
 }
 
 /** A planned dish's sheet, while it is open. */
@@ -347,12 +348,16 @@ class MealPlanViewModel(
 
     fun addSuggestion(title: String) = add(NewDish.Words(title))
 
+    /** Notes the meal as not cooked on the sheet's days: it fills the meal as a dish would. */
+    fun addNotCooked() = add(NewDish.NotCooked)
+
     /** Plans [dish] on the sheet's days. With none picked, the sheet shows its dishes as not yet tappable. */
     private fun add(dish: NewDish) {
         saveNew { date, slot ->
             when (dish) {
                 is NewDish.Recipe -> mealPlanRepository.planRecipe(dish.recipe.id, date, slot, servings = DEFAULT_MEAL_SERVINGS)
                 is NewDish.Words -> mealPlanRepository.planDish(dish.title, date, slot, servings = DEFAULT_MEAL_SERVINGS)
+                NewDish.NotCooked -> mealPlanRepository.planNotCooked(date, slot)
             }
         }
     }
@@ -478,9 +483,10 @@ class MealPlanViewModel(
         if (editing.isSaving) return
         val entry = editing.entry
         val originalSlot = MealSlot.of(entry.slot)
-        val renamed = editing.title.trim().takeIf { entry.recipe == null && it.isNotEmpty() && it != entry.title }
+        val named = entry.recipe == null && !entry.notCooked
+        val renamed = editing.title.trim().takeIf { named && it.isNotEmpty() && it != entry.title }
         val slotChanged = editing.slot != originalSlot
-        if (entry.recipe == null && editing.title.isBlank()) return
+        if (named && editing.title.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(editing = editing.copy(isSaving = true, saveFailed = false)) }
             val removals = editing.removed.mapNotNull { editing.planned[it] }.map { e -> async { mealPlanRepository.remove(e.id) } }
@@ -499,8 +505,11 @@ class MealPlanViewModel(
             val additions = editing.added.map { date ->
                 async {
                     val recipe = entry.recipe
-                    if (recipe != null) mealPlanRepository.planRecipe(recipe.id, date, editing.slot, editing.servingsOn(date))
-                    else mealPlanRepository.planDish(title, date, editing.slot, editing.servingsOn(date))
+                    when {
+                        entry.notCooked -> mealPlanRepository.planNotCooked(date, editing.slot)
+                        recipe != null -> mealPlanRepository.planRecipe(recipe.id, date, editing.slot, editing.servingsOn(date))
+                        else -> mealPlanRepository.planDish(title, date, editing.slot, editing.servingsOn(date))
+                    }
                 }
             }
             val removedIds = editing.removed.mapNotNull { editing.planned[it]?.id }
@@ -552,6 +561,8 @@ class MealPlanViewModel(
  */
 private fun MealPlanEntry.isSameDishAs(other: MealPlanEntry): Boolean {
     if (slot != other.slot) return false
+    // Not cooking is one thing whatever day it falls on, and never a dish
+    if (notCooked || other.notCooked) return notCooked && other.notCooked
     val mine = recipe
     val theirs = other.recipe
     return if (mine != null || theirs != null) mine?.id == theirs?.id

@@ -632,6 +632,8 @@ object FrStrings : Strings {
     override fun monthYear(month: LocalDate) = "${monthName(month.month).replaceFirstChar { it.uppercase() }} ${month.year}"
     override val previousMonth = "Mois précédent"
     override val nextMonth = "Mois suivant"
+    override val notCooked = "Pas cuisiné"
+    override val notCookedHint = "Restaurant, livraison, repas sauté"
     override fun monthAlone(month: Month) = monthName(month).replaceFirstChar { it.uppercase() }
     override val pickMonth = "Choisir un mois"
     override val previousYear = "Année précédente"

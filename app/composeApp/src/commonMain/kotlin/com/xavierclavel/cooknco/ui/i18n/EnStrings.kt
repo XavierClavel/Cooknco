@@ -616,6 +616,8 @@ object EnStrings : Strings {
     override fun monthYear(month: LocalDate) = "${monthName(month.month)} ${month.year}"
     override val previousMonth = "Previous month"
     override val nextMonth = "Next month"
+    override val notCooked = "Didn't cook"
+    override val notCookedHint = "Ate out, ordered in, skipped"
     override fun monthAlone(month: Month) = monthName(month)
     override val pickMonth = "Pick a month"
     override val previousYear = "Previous year"

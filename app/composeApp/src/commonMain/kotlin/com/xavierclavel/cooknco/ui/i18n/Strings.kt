@@ -613,6 +613,9 @@ interface Strings {
     fun monthYear(month: LocalDate): String
     val previousMonth: String
     val nextMonth: String
+    /** A meal noted as not cooked — eaten out, ordered in, skipped — wherever a dish name would be. */
+    val notCooked: String
+    val notCookedHint: String
     /** A month on its own, as the calendar's month picker lists it. */
     fun monthAlone(month: Month): String
     /** Opens the calendar's month and year picker. */
