@@ -34,6 +34,7 @@ class Like (
         user = LikeInfo.User(
             this.user.id,
             this.user.username,
+            this.user.imageVersion,
         ),
         recipe = LikeInfo.Recipe(
             this.recipe.id,

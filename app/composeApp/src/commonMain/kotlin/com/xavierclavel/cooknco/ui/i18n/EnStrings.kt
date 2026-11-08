@@ -194,6 +194,10 @@ object EnStrings : Strings {
     override fun followingSince(days: Long) = "Following since ${ago(days)}"
     override fun requestedSince(days: Long) = "Requested ${ago(days)}"
     override fun followedSince(days: Long) = "Since ${ago(days)}"
+    override fun likedSince(days: Long) = "Liked ${ago(days)}"
+    override val likedBy = "Liked by"
+    override val noLikesYet = "Nobody has liked this recipe yet."
+    override val seeWhoLiked = "See who liked it"
     override fun connectedSince(days: Long) = "Connected ${ago(days)}"
     override fun usedSince(days: Long) = "used ${ago(days)}"
 

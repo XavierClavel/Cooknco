@@ -36,11 +36,15 @@ class LikeService: KoinComponent {
             .query()
             .countByParent()
 
+    /** Newest first: who liked a recipe most recently is what a list of likers leads with. */
     fun find(recipeId: Long?, userId: Long?, paging: Paging): List<LikeInfo> =
         QLike()
             .filterByRecipe(recipeId)
             .filterByUser(userId)
+            .user.fetch()
+            .recipe.fetch()
             .setPaging(paging)
+            .orderBy().creationDate.desc().id.desc()
             .findList()
             .map { it.toInfo() }
 

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import com.xavierclavel.cooknco.network.dto.LikeInfoDto
 
 class RecipeRepository(
     private val recipeApi: RecipeApi,
@@ -158,6 +159,12 @@ class RecipeRepository(
         fromStore = { offlineStore.readRecipe(recipeId)?.isLiked },
     )
 
+    /** A page of who liked [recipeId], newest first. Online only: the store keeps no likers. */
+    suspend fun getLikers(recipeId: Long, page: Int, size: Int = LIKERS_PAGE_SIZE): Result<List<LikeInfoDto>> = runCatching {
+        val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
+        recipeApi.getLikers(recipeId, page, size, token)
+    }
+
     suspend fun addLike(recipeId: Long): Result<Unit> = runCatching {
         val token = tokenDataStore.tokenFlow.first() ?: error("Not authenticated")
         recipeApi.addLike(recipeId, token)
@@ -221,3 +228,5 @@ class RecipeRepository(
         recipeApi.searchIngredients(query, token, sort)
     }
 }
+
+const val LIKERS_PAGE_SIZE = 20

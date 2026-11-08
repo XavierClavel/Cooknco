@@ -12,7 +12,15 @@ import main.com.xavierclavel.utils.getLikes
 import main.com.xavierclavel.utils.getMe
 import main.com.xavierclavel.utils.getRecipe
 import main.com.xavierclavel.utils.getUser
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
+import kotlinx.serialization.json.Json
+import main.com.xavierclavel.utils.hideRecipe
 import org.junit.jupiter.api.Test
+import shared.infodto.LikeInfo
+import shared.utils.URL.LIKE_URL
 import kotlin.test.assertEquals
 
 class LikeControllerTest : ApplicationTest() {
@@ -93,4 +101,32 @@ class LikeControllerTest : ApplicationTest() {
         val result4 = client.getUser(user.id)
         assertEquals(0, result4.likesCount)
     }
+
+    @Test
+    fun `a recipe's likers come newest first, with their avatars`() = runTest {
+        var recipeId = 0L
+        runAsUser1 { recipeId = client.createRecipe().id }
+        runAsUser2 { client.createLike(recipeId) }
+        runAsAdmin { client.createLike(recipeId) }
+        runAsUser1 {
+            val likers = client.listLikers(recipeId)
+            assertEquals(HttpStatusCode.OK, likers.status)
+            val users = Json.decodeFromString<List<LikeInfo>>(likers.bodyAsText()).map { it.user }
+            assertEquals(listOf("admin", USER2), users.map { it.username })
+            assertEquals(userService.getUserByUsername("admin")!!.version, users.first().version)
+        }
+    }
+
+    @Test
+    fun `a hidden recipe's likers are not listed to who cannot open it`() = runTest {
+        var recipeId = 0L
+        runAsUser1 { recipeId = client.createRecipe().id }
+        runAsUser2 { client.createLike(recipeId) }
+        runAsAdmin { client.hideRecipe(recipeId) }
+        runAsUser2 { assertEquals(HttpStatusCode.NotFound, client.listLikers(recipeId).status) }
+        // Its author still sees it, so still sees who liked it
+        runAsUser1 { assertEquals(HttpStatusCode.OK, client.listLikers(recipeId).status) }
+    }
+
+    private suspend fun HttpClient.listLikers(recipeId: Long) = get("$LIKE_URL?recipe=$recipeId")
 }
