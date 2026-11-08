@@ -106,13 +106,18 @@ class LikeControllerTest : ApplicationTest() {
     fun `a recipe's likers come newest first, with their avatars`() = runTest {
         var recipeId = 0L
         runAsUser1 { recipeId = client.createRecipe().id }
-        runAsUser2 { client.createLike(recipeId) }
+        var user2 = ""
+        runAsUser2 {
+            // The test accounts are named at random; "user2" is only their login
+            user2 = client.getMe().username
+            client.createLike(recipeId)
+        }
         runAsAdmin { client.createLike(recipeId) }
         runAsUser1 {
             val likers = client.listLikers(recipeId)
             assertEquals(HttpStatusCode.OK, likers.status)
             val users = Json.decodeFromString<List<LikeInfo>>(likers.bodyAsText()).map { it.user }
-            assertEquals(listOf("admin", USER2), users.map { it.username })
+            assertEquals(listOf("admin", user2), users.map { it.username })
             assertEquals(userService.getUserByUsername("admin")!!.version, users.first().version)
         }
     }
