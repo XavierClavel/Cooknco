@@ -36,6 +36,16 @@ class LikeService: KoinComponent {
             .query()
             .countByParent()
 
+    /** Which of [recipeIds] [userId] has liked, in one query however many are asked about. */
+    fun likedAmong(userId: Long, recipeIds: Collection<Long>): Set<Long> =
+        if (recipeIds.isEmpty()) emptySet()
+        else QLike()
+            .user.id.eq(userId)
+            .recipe.id.`in`(recipeIds)
+            .findList()
+            .map { it.recipe.id }
+            .toSet()
+
     /** Newest first: who liked a recipe most recently is what a list of likers leads with. */
     fun find(recipeId: Long?, userId: Long?, paging: Paging): List<LikeInfo> =
         QLike()

@@ -24,6 +24,12 @@ data class RecipeOverview(
      * the response rather than failing on it.
      */
     val editionDate: Long = 0,
+    /**
+     * `Recipe.revision`: moves on any change to what [shared.infodto.RecipeInfo] carries about
+     * the recipe, pictures included. What the offline sync compares, where [editionDate] only
+     * says when the author last pressed save. Opaque — compare it, never order it.
+     */
+    val revision: Long = 0,
     /** Set when a moderator has hidden the recipe; only its owner and admins ever see it. */
     val isHidden: Boolean = false,
 )

@@ -5,6 +5,7 @@ import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.exceptions.NotFoundCause
 import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.models.Ingredient
+import com.xavierclavel.models.Recipe
 import com.xavierclavel.models.jointables.query.QRecipeIngredient
 import com.xavierclavel.models.localization.LocalizedIngredientName
 import com.xavierclavel.models.localization.query.QLocalizedIngredientName
@@ -189,6 +190,15 @@ class IngredientService: KoinComponent {
             .raw(nameMatch, customName)
             .findCount()
 
+        // Read before the update, which is what makes them findable: afterwards the rows no
+        // longer carry the name. A recipe saved with it in between moves its own revision.
+        val affectedRecipes = QRecipeIngredient()
+            .raw(nameMatch, customName)
+            .unit.`in`(allowedUnits)
+            .findList()
+            .mapNotNull { it.recipe?.id }
+            .toSet()
+
         val converted = QRecipeIngredient()
             .raw(nameMatch, customName)
             .unit.`in`(allowedUnits)
@@ -196,6 +206,10 @@ class IngredientService: KoinComponent {
             .set(QRecipeIngredient.Alias.ingredient.id, ingredient.id)
             .setNull(QRecipeIngredient.Alias.customName)
             .update()
+
+        // A line that was free text now names a catalogue entry, which is a different line on
+        // every copy of those recipes — the offline ones included.
+        Recipe.touch(affectedRecipes)
 
         return AbsorbCustomIngredientResult(convertedRows = converted, skippedRows = matched - converted)
     }

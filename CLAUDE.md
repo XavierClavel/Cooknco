@@ -909,6 +909,42 @@ A dish shown as words renames like words — including one whose recipe went out
 which the rename then detaches for good. The app therefore sends a title only when it
 changed, or a save that merely moved such a dish would cut a link that might have come back.
 
+## The offline sync is one request, and compares state
+
+The app keeps a cook's own, liked and cookbook recipes on the phone (`data/OfflineSync.kt`),
+and brings them up to date with `POST /offline/sync` (`OfflineSyncService`): the phone sends
+the id and revision of every copy it holds, and the server answers with what the account
+should hold, the recipes among those that are missing or out of date — a hundred per answer,
+with `hasMore` — and the lists, notes and cookbooks whole. It used to read the three
+collections page by page and then each recipe, its notes and its like one request at a time,
+which at a first sync was over a thousand requests and ran the app into nginx's per-client
+limit on `/api/`: the cook's own taps came back 429 while the sync spent the budget.
+
+Three things not to undo:
+
+- **It compares state; it does not replay a log.** Most of what a phone holds is other
+  people's recipes, and they leave it because of writes to other people's rows — an author
+  deletes or hides one, goes private, a moderator steps in. A cursor over changes would need
+  each of those to write a tombstone for every account holding the recipe; here the server
+  recomputes the set from the same listings and visibility rules every screen reads, and what
+  the phone holds that the answer does not pin is dropped. Pull, not push.
+- **`Recipe.revision` must move on every write to what a copy shows**, after the write: the
+  row (`mergeDTO`), the steps (`saveSteps`), the ingredient lines and step links
+  (`RecipeIngredientService`), both pictures, and the backoffice's ingredient absorb. It is a
+  random stamp compared for equality, not a counter, so racing writes cannot share one. A new
+  path that writes recipe content without moving it leaves phones with a stale copy for good,
+  and `OfflineControllerTest` is where such a path gets its test. Like counts, the author's
+  name and catalogue renames deliberately do not move it.
+- **`RecipeService.findWhole` reads the recipe rows before their children**, and fetches the
+  steps' ingredient links explicitly. The order is what makes a save caught halfway resolve on
+  the next sync instead of pairing a new revision with old content; the fetch is because
+  `FetchType.EAGER` on `RecipeStep.ingredientLinks` does not survive a plain `findList`, and
+  without it each step lazy-loads its links. `OfflineFetchPlanTest` holds the second.
+
+Notes and likes are the account's own and change without the recipe doing so, so every
+answer carries them and the app corrects a current copy in place. The index still only names
+what is on disk: a page that never arrived is not claimed, so the next sync is sent it.
+
 ## A picture is framed on the client, and cut out on the backend
 
 Every upload goes through a cropper first — the site's `EditablePicture`, the backoffice's

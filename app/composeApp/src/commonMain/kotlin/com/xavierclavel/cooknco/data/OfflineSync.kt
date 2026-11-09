@@ -1,11 +1,9 @@
 package com.xavierclavel.cooknco.data
 
-import com.xavierclavel.cooknco.network.CookbookApi
 import com.xavierclavel.cooknco.network.RecipeApi
-import com.xavierclavel.cooknco.network.RecipeScope
-import com.xavierclavel.cooknco.network.dto.CookbookInfo
+import com.xavierclavel.cooknco.network.dto.HeldRecipe
+import com.xavierclavel.cooknco.network.dto.OfflineSyncResponse
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
-import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -14,16 +12,24 @@ import kotlin.time.Clock
 /**
  * Brings this phone's copy of the cook's three collections up to date.
  *
- * Three things about how it is arranged are worth keeping:
+ * Four things about how it is arranged are worth keeping:
  *
+ * - **One request, not one per recipe.** The phone says what it holds and at which revision
+ *   (`POST /offline/sync`), and the server answers with what it should hold and the recipes
+ *   it is missing or has out of date. This used to read the three collections page by page
+ *   and then every new or edited recipe, its notes and its like one request at a time — dozens
+ *   of requests at every launch and well over a thousand at a first one, which ran into the
+ *   API's per-client rate limit and had the cook's own taps refused while it ran. Which
+ *   recipes to hold is now the server's to say, from the same listings and visibility rules
+ *   the screens read, so nothing here decides it.
  * - **It never reports an error.** A sync is best effort by construction: whatever it could
  *   not fetch is simply not pinned, and the index says what it managed. There is no screen
  *   this could fail on that would not be lying — a cook did not ask for this to happen and
  *   cannot do anything about it having not.
  * - **The index is written last.** Everything else can be interrupted — the process dies, the
- *   network goes halfway through — and the worst that leaves is an index that under-claims,
- *   costing a refetch next time. Writing it first would leave one naming recipes whose files
- *   were never written, which is a screen opening on nothing.
+ *   network goes halfway through a first sync's pages — and the worst that leaves is an index
+ *   that under-claims, costing a refetch next time. Writing it first would leave one naming
+ *   recipes whose files were never written, which is a screen opening on nothing.
  * - **One at a time, and the second is dropped rather than queued.** Launch, sign-in and a
  *   pull-to-refresh can all ask within a second of each other, and a sync starting a second
  *   after one that is still running has nothing new to find. Queueing it would only mean
@@ -31,7 +37,6 @@ import kotlin.time.Clock
  */
 class OfflineSync(
     private val recipeApi: RecipeApi,
-    private val cookbookApi: CookbookApi,
     private val tokenDataStore: TokenDataStore,
     private val store: OfflineStore,
     private val images: OfflineImages,
@@ -54,63 +59,82 @@ class OfflineSync(
 
     private suspend fun run(userId: Long) {
         val token = tokenDataStore.tokenFlow.first() ?: return
+        // A mismatch means the copies are somebody else's, which counts as holding nothing.
+        val previous = store.readIndex()?.takeIf { it.userId == userId }
 
-        val own = pagesOf(RecipeScope.OWN, userId, token)
-        val liked = pagesOf(RecipeScope.LIKED, userId, token)
-        val inCookbooks = pagesOf(RecipeScope.COOKBOOKS, userId, token)
+        // What is on this phone, by the revision each copy was read at — which is all the
+        // server needs to work out what to send. It grows as the pages arrive, so each page
+        // asks only for what is still missing.
+        val held = previous?.recipes.orEmpty().associateTo(mutableMapOf()) { it.id to it.revision }
 
-        // A list that came back empty because the request failed is indistinguishable here
-        // from one that is genuinely empty, and acting on the second would throw away a
-        // perfectly good offline copy. So a sync that reached nothing at all does nothing.
-        if (own.isEmpty() && liked.isEmpty() && inCookbooks.isEmpty() &&
-            runCatching { recipeApi.listRecipesIn(RecipeScope.OWN, userId, token, 0, 1) }.isFailure
-        ) return
-
-        val held = store.readIndex()?.takeIf { it.userId == userId }
-        val plan = planSync(own, liked, inCookbooks, held)
-
-        plan.fetch.forEach { id ->
-            val recipe = runCatching { recipeApi.getRecipe(id, token) }.getOrNull() ?: return@forEach
-            // Fetched with the recipe, not on opening it: a copy with the method but without
-            // the cook's own notes is a screen with an empty box where their writing was.
-            val notes = runCatching { recipeApi.getNotes(id, token) }.getOrNull()
-            val isLiked = runCatching { recipeApi.isLiked(id, token) }.getOrDefault(false)
-            store.writeRecipe(OfflineRecipe(recipe = recipe, notes = notes, isLiked = isLiked))
+        var answer: OfflineSyncResponse? = null
+        for (page in 0 until MAX_PAGES) {
+            val next = runCatching {
+                recipeApi.syncOffline(token, held.map { (id, revision) -> HeldRecipe(id, revision) })
+            }.getOrNull() ?: break
+            answer = next
+            val pins = next.pinned.associateBy { it.id }
+            val notes = next.notes.associate { it.recipeId to it.notes }
+            next.recipes.forEach { recipe ->
+                store.writeRecipe(
+                    OfflineRecipe(recipe = recipe, notes = notes[recipe.id], isLiked = pins[recipe.id]?.isLiked ?: false)
+                )
+                // The recipe's own revision, not the pin's: it was read with the content, and
+                // the pin's can be a moment older.
+                held[recipe.id] = recipe.revision
+            }
+            // An answer that promises more and brings nothing would loop for ever.
+            if (!next.hasMore || next.recipes.isEmpty()) break
         }
+        // An unreachable server is not an account with nothing in it: a sync that got no
+        // answer at all leaves a perfectly good copy exactly as it was.
+        val last = answer ?: return
 
-        // The recipe did not change, only its picture did — so the stored copy needs its
-        // version moved on and nothing else. That is the request this case exists to save.
-        plan.refetchImages.forEach { id ->
-            val entry = plan.entries.first { it.id == id }
-            val stored = store.readRecipe(id) ?: return@forEach
-            store.writeRecipe(stored.copy(recipe = stored.recipe.copy(version = entry.imageVersion)))
-        }
+        val pinnedIds = last.pinned.map { it.id }.toSet()
+        // Unliked, taken out of a cookbook, deleted, hidden, out of reach: the server does not
+        // say which, only that the account no longer keeps it.
+        held.keys.filterNot { it in pinnedIds }.forEach { store.deleteRecipe(it) }
 
-        plan.drop.forEach { store.deleteRecipe(it) }
-
-        val cookbooks = syncCookbooks(userId, token)
-
-        // Only what is actually on disk goes into the index, which is why this reads each
-        // recipe back rather than trusting the plan. A fetch that failed leaves no file, and an
-        // entry claiming it would match its own edition date on the next sync — so the recipe
-        // would never be fetched again, and the screen that opened it would find nothing. An
-        // index that under-claims costs one refetch; this is the only shape that self-heals.
+        val notes = last.notes.associate { it.recipeId to it.notes }
+        val entries = mutableListOf<OfflineEntry>()
         val wanted = mutableSetOf<String>()
-        val pinned = mutableListOf<OfflineEntry>()
-        plan.entries.forEach { entry ->
-            val recipe = store.readRecipe(entry.id)?.recipe ?: return@forEach
-            pinned += entry
-            wanted += pictureUrlsOf(recipe, entry)
+        last.pinned.forEach { pin ->
+            // Only what is actually on disk goes into the index, which is why each copy is read
+            // back rather than the answer trusted. A recipe that never arrived — a page that
+            // failed — has no file, and an entry claiming it would leave the screen opening it
+            // with nothing. An index that under-claims costs one refetch; this is the only
+            // shape that heals itself.
+            val stored = store.readRecipe(pin.id) ?: return@forEach
+            val pinNotes = notes[pin.id]
+            // The notes and the like are the cook's own and change without the recipe doing
+            // so, which no revision follows — so a copy that is otherwise current is corrected
+            // where it stands.
+            if (stored.notes != pinNotes || stored.isLiked != pin.isLiked) {
+                store.writeRecipe(stored.copy(notes = pinNotes, isLiked = pin.isLiked))
+            }
+            val entry = OfflineEntry(
+                id = pin.id,
+                revision = held[pin.id],
+                sets = pin.sets.mapNotNull { name -> PinSet.entries.firstOrNull { it.name == name } }.toSet(),
+            )
+            entries += entry
+            wanted += pictureUrlsOf(stored.recipe, entry)
         }
-        cookbooks.forEach { if (it.version > 0) wanted += ImageUrls.cookbook(it.id, it.version) }
+
+        val cookbooks = last.cookbooks.map { OfflineCookbook(cookbook = it.cookbook, recipes = it.recipes) }
+        cookbooks.forEach { store.writeCookbook(it) }
+        val cookbookIds = cookbooks.map { it.cookbook.id }
+        (previous?.cookbookIds.orEmpty() - cookbookIds.toSet()).forEach { store.deleteCookbook(it) }
+        cookbooks.forEach { if (it.cookbook.version > 0) wanted += ImageUrls.cookbook(it.cookbook.id, it.cookbook.version) }
+
         wanted.forEach { images.download(it) }
         images.retainOnly(wanted)
 
         store.writeLists(
             OfflineLists(
-                own = own.take(OFFLINE_LIST_LIMIT),
-                liked = liked.take(OFFLINE_LIST_LIMIT),
-                cookbooks = cookbooks,
+                own = last.own,
+                liked = last.liked,
+                cookbooks = cookbooks.map { it.cookbook },
             )
         )
 
@@ -118,8 +142,8 @@ class OfflineSync(
             OfflineIndex(
                 userId = userId,
                 syncedAt = Clock.System.now().epochSeconds,
-                recipes = pinned,
-                cookbookIds = cookbooks.map { it.id },
+                recipes = entries,
+                cookbookIds = cookbookIds,
             )
         )
         // Only now: everything above may have written or deleted a file, and [resolve] reads
@@ -155,49 +179,12 @@ class OfflineSync(
         }
     }
 
-    /**
-     * The cookbooks themselves, and the rows their screens list.
-     *
-     * One request per cookbook, unlike the recipes: `GET /recipe?cookbookUser=` gets every
-     * recipe in every book in one paged query, but a cookbook screen also prints who added
-     * each recipe and when, which only `GET /cookbook/{id}/recipes` knows. Cookbooks are
-     * counted in tens, so N+1 here costs what the recipes' N+1 would not.
-     */
-    private suspend fun syncCookbooks(userId: Long, token: String): List<CookbookInfo> {
-        val cookbooks = runCatching { cookbookApi.listCookbooks(token, userId) }.getOrNull()
-            ?: return store.readLists()?.cookbooks.orEmpty()
-        val previous = store.readIndex()?.cookbookIds.orEmpty()
-        cookbooks.forEach { cookbook ->
-            val recipes = runCatching { cookbookApi.getCookbookRecipes(cookbook.id, token) }
-                .getOrNull() ?: return@forEach
-            store.writeCookbook(OfflineCookbook(cookbook = cookbook, recipes = recipes))
-        }
-        (previous - cookbooks.map { it.id }.toSet()).forEach { store.deleteCookbook(it) }
-        return cookbooks
-    }
-
-    /**
-     * Pages one collection until the server runs out or the bound is reached.
-     *
-     * Deduplicated by id on the way, for the reason the feed and the profile grids both do it:
-     * offset paging over a list that is changing repeats rows, and a repeated row here would
-     * be a recipe counted twice against the bound.
-     */
-    private suspend fun pagesOf(scope: RecipeScope, userId: Long, token: String): List<RecipeOverview> {
-        val collected = mutableListOf<RecipeOverview>()
-        val seen = mutableSetOf<Long>()
-        var page = 0
-        while (collected.size < OFFLINE_LIST_LIMIT) {
-            val items = runCatching { recipeApi.listRecipesIn(scope, userId, token, page, PAGE_SIZE) }
-                .getOrNull() ?: break
-            items.forEach { if (seen.add(it.id)) collected += it }
-            if (items.size < PAGE_SIZE) break
-            page++
-        }
-        return collected.take(OFFLINE_LIST_LIMIT)
-    }
-
     private companion object {
-        const val PAGE_SIZE = 20
+        /**
+         * Pages a sync reads at most. The server bounds a full phone at six (three collections
+         * of two hundred, a hundred recipes a page), so this only stops a server that keeps
+         * saying there is more.
+         */
+        const val MAX_PAGES = 12
     }
 }

@@ -5,6 +5,7 @@ import com.xavierclavel.exceptions.BadRequestException
 import com.xavierclavel.exceptions.NotFoundCause
 import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.models.Ingredient
+import com.xavierclavel.models.Recipe
 import com.xavierclavel.models.jointables.RecipeIngredient
 import com.xavierclavel.models.jointables.RecipeStepIngredient
 import com.xavierclavel.models.jointables.query.QRecipeIngredient
@@ -78,6 +79,7 @@ class RecipeIngredientService: KoinComponent {
             QRecipeStepIngredient().step.recipe.id.eq(recipeId).delete()
             QRecipeIngredient().recipe.id.eq(recipeId).delete()
             entities.forEach { it.insert() }
+            Recipe.touch(listOf(recipeId))
             transaction.commit()
         }
     }
@@ -176,6 +178,7 @@ class RecipeIngredientService: KoinComponent {
                         ).insert()
                     }
             }
+            Recipe.touch(listOf(recipeId))
             transaction.commit()
         }
     }

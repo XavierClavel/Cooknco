@@ -23,6 +23,15 @@ class RecipeNotesService: KoinComponent {
             .findOne()
             ?: throw NotFoundException(NotFoundCause.NOTES_NOT_FOUND)
 
+    /** [userId]'s notes on each of [recipeIds] that has some, by recipe id, in one query. */
+    fun notesOf(userId: Long, recipeIds: Collection<Long>): Map<Long, String> =
+        if (recipeIds.isEmpty()) emptyMap()
+        else QRecipeNotes()
+            .user.id.eq(userId)
+            .recipe.id.`in`(recipeIds)
+            .findList()
+            .associate { it.recipe.id to it.notes }
+
     fun notesExists(recipeId: Long, userId: Long) =
         QRecipeNotes()
             .recipe.id.eq(recipeId)
