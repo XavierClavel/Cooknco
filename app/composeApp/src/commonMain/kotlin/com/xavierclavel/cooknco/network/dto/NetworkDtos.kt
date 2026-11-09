@@ -82,11 +82,9 @@ data class RecipeOverview(
     /**
      * When the recipe was last edited — `shared.overviewdto.RecipeOverview.editionDate`.
      *
-     * The offline store diffs on this and on nothing else: [version] is the *picture's*
-     * version and moves only when the picture does, so a recipe whose text changed and whose
-     * photo did not is indistinguishable by it. Zero from a backend that predates the field,
-     * which reads as "never edited" and so as "nothing to refetch" — the safe way round for a
-     * copy we already hold.
+     * Nothing here diffs on it any more: it only moved on an editor save, so a new step
+     * picture never reached a pinned copy. The offline sync compares [RecipeInfo.revision]
+     * instead, on the server (see [com.xavierclavel.cooknco.data.OfflineSync]).
      */
     val editionDate: Long = 0,
 )
@@ -106,6 +104,13 @@ data class RecipeIngredientInfo(
 data class RecipeInfo(
     val id: Long,
     val version: Long,
+    /**
+     * `Recipe.revision`: moves on any write to what this carries about the recipe itself,
+     * pictures included. What the offline index records for each copy, so the server can tell
+     * which ones are out of date. Opaque — compared, never ordered. Zero from a backend that
+     * predates it.
+     */
+    val revision: Long = 0,
     val title: String,
     val dishClass: String,
     val owner: RecipeOwner,
@@ -123,8 +128,7 @@ data class RecipeInfo(
      *
      * Nullable, unlike the overview's, because `shared.infodto.RecipeInfo` declares it that
      * way and kotlinx writes an explicit `null` — which a non-null `Long` here would refuse to
-     * parse, taking the whole recipe with it. Nothing reads it; the sync diffs on the
-     * overview's.
+     * parse, taking the whole recipe with it. Nothing reads it.
      */
     val editionDate: Long? = null,
     val likesCount: Int,

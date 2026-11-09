@@ -10,6 +10,7 @@ import com.xavierclavel.models.RecipeStep
 import com.xavierclavel.models.User
 import com.xavierclavel.models.jointables.query.QCookbookRecipe
 import com.xavierclavel.models.jointables.query.QLike
+import com.xavierclavel.models.jointables.query.QRecipeIngredient
 import com.xavierclavel.models.query.QRecipe
 import io.ebean.DB
 import com.xavierclavel.models.jointables.query.QRecipeStepIngredient
@@ -276,6 +277,62 @@ class RecipeService: KoinComponent {
         return recipes.map { it.toInfo(locale, likesCount = likes[it.id] ?: 0, catalogueNames = catalogueNames) }
     }
 
+    /**
+     * Every recipe of [ids] that [viewerId] may open — the ones [getById] would serve them —
+     * whole, at a fixed cost however many are asked for.
+     *
+     * For the offline sync, which hands a phone up to a hundred recipes in one answer.
+     * [describeAll] reads each recipe's steps and ingredient lines off the entity, which costs
+     * a query per recipe per collection; that is right for one recipe and tolerable for a
+     * bounded export, and neither of those is this. So the two collections are read here for
+     * the whole list, grouped by recipe, and handed to the mapper.
+     *
+     * The recipe rows are read **before** their children, and that order is load-bearing: a
+     * save moves [Recipe.revision] after it writes, so a revision read first can only be older
+     * than the content read after it — which the next sync corrects. Read the other way round,
+     * a copy could pair a new revision with old content and never be refreshed.
+     */
+    fun findWhole(viewerId: Long, ids: Collection<Long>, locale: Locale): List<RecipeInfo> {
+        if (ids.isEmpty()) return emptyList()
+        val recipes = QRecipe()
+            .owner.fetch()
+            .id.`in`(ids)
+            .filterOutDeletion(viewerId)
+            .filterByVisibility(viewerId)
+            .findList()
+        if (recipes.isEmpty()) return emptyList()
+
+        val found = recipes.map { it.id }
+        // A step's links are a collection of their own, and `FetchType.EAGER` on them does not
+        // survive a plain `findList`: unfetched, they lazy-load one query per step. The line each
+        // link names is what gives it its position, so it is joined in with it.
+        val steps = QRecipeStep()
+            .recipe.id.`in`(found)
+            .ingredientLinks.fetch()
+            .ingredientLinks.ingredient.fetch()
+            .findList()
+            .groupBy { it.recipe!!.id }
+        val lines = QRecipeIngredient()
+            .recipe.id.`in`(found)
+            .ingredient.fetch()
+            .findList()
+            .groupBy { it.recipe!!.id }
+        val likes = likeService.countLikesByRecipe(found)
+        val catalogueNames = ingredientService.namesOf(
+            lines.values.flatten().mapNotNull { it.ingredient?.id }.toSet(),
+            locale,
+        )
+        return recipes.map { recipe ->
+            recipe.toInfo(
+                locale,
+                likesCount = likes[recipe.id] ?: 0,
+                catalogueNames = catalogueNames,
+                steps = steps[recipe.id].orEmpty(),
+                lines = lines[recipe.id].orEmpty(),
+            )
+        }
+    }
+
     fun getById(userId: Long?, recipeId: Long, locale: Locale) : RecipeInfo {
         if (!existsById(recipeId, userId)) throw NotFoundException(NotFoundCause.RECIPE_NOT_FOUND)
         if (!QRecipe()
@@ -348,6 +405,7 @@ class RecipeService: KoinComponent {
                 QRecipeStepIngredient().step.id.`in`(removed).delete()
                 QRecipeStep().id.`in`(removed).delete()
             }
+            Recipe.touch(listOf(recipeId))
             transaction.commit()
         }
     }

@@ -3,6 +3,7 @@ package com.xavierclavel.models
 import com.xavierclavel.models.jointables.CookbookRecipe
 import com.xavierclavel.models.jointables.Like
 import com.xavierclavel.models.jointables.RecipeIngredient
+import com.xavierclavel.models.query.QRecipe
 import shared.dto.RecipeDTO
 import shared.enums.DishClass
 import shared.enums.Locale
@@ -24,6 +25,7 @@ import io.ebean.annotation.SoftDelete
 import jakarta.persistence.Column
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import kotlin.random.Random
 
 @Entity
 @Table(name = "recipes")
@@ -34,6 +36,21 @@ class Recipe (
 
     @DbDefault("0")
     var imageVersion: Long = 0,
+
+    /**
+     * Moves whenever something a copy of this recipe shows has changed: the row, its steps,
+     * its ingredient lines, the links between the two, or a picture. It is what the offline
+     * sync compares a phone's copy against (`OfflineSyncService`), in place of
+     * [modificationDate], which only an editor save moves — a step picture changed afterwards
+     * never reached a copy at all.
+     *
+     * A stamp rather than a counter. It is only ever compared for equality, never ordered, so
+     * a random value is enough, and unlike `revision + 1` two racing writes cannot both land on
+     * the same number. Every write moves it *after* its own change, so a reader that catches a
+     * save halfway holds a stamp the end of the save replaces. See [touch].
+     */
+    @DbDefault("0")
+    var revision: Long = 0,
 
     var title: String = "",
 
@@ -109,6 +126,7 @@ class Recipe (
         // Not the steps: they are matched to the rows already there rather than replaced,
         // which needs the database. See RecipeService.saveSteps.
         this.modificationDate = LocalDateTime.now()
+        this.revision = newRevision()
 
         this.yield = recipeDTO.yield
         this.preparationTime = recipeDTO.preparationTime
@@ -124,10 +142,12 @@ class Recipe (
 
     fun increaseVersion() = apply {
         this.imageVersion++;
+        this.revision = newRevision()
     }.update()
 
     fun resetVersion() = apply {
         this.imageVersion = 0
+        this.revision = newRevision()
     }.update()
 
     /**
@@ -139,15 +159,29 @@ class Recipe (
      *
      * @param catalogueNames what each catalogue ingredient is called in [locale], by ingredient id,
      *   for the same reason — see [com.xavierclavel.models.jointables.RecipeIngredient.toInfo].
+     * @param steps and [lines] read by the caller when it maps many recipes at once, for the
+     *   same reason again: each collection otherwise lazy-loads per recipe. See
+     *   `RecipeService.findWhole`. Null reads the entity's own.
+     *
+     *   Null rather than defaulting to `this.steps`: a default is evaluated in a static
+     *   synthetic method, which Ebean's enhancement does not reach, so it reads the field
+     *   without loading it — and a recipe whose steps were not loaded yet maps with none.
      */
-    fun toInfo(locale: Locale, likesCount: Int, catalogueNames: Map<Long, String>) = RecipeInfo(
+    fun toInfo(
+        locale: Locale,
+        likesCount: Int,
+        catalogueNames: Map<Long, String>,
+        steps: List<RecipeStep>? = null,
+        lines: List<RecipeIngredient>? = null,
+    ) = RecipeInfo(
         id = this.id,
         version = this.imageVersion,
+        revision = this.revision,
         title = title,
         description = description,
         dishClass = dishClass,
-        steps = steps.sortedBy { it.sortOrder }.map { it.toDto() },
-        ingredients = ingredients.sortedBy { it.sortOrder }
+        steps = (steps ?: this.steps).sortedBy { it.sortOrder }.map { it.toDto() },
+        ingredients = (lines ?: this.ingredients).sortedBy { it.sortOrder }
             .map { line -> line.toInfo(line.ingredient?.id?.let { catalogueNames[it] }) },
 
         owner = this.owner!!.toOverview(),
@@ -173,6 +207,7 @@ class Recipe (
         likesCount = likesCount,
         creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),
         editionDate = this.modificationDate.toEpochSecond(ZoneOffset.UTC),
+        revision = this.revision,
         isHidden = this.isHidden,
     )
 
@@ -211,4 +246,25 @@ class Recipe (
 
     fun hasReferences(): Boolean =
         likes.isNotEmpty() && cookbooks.isNotEmpty()
+
+    companion object {
+        /** A fresh [revision]. Never 0, which is what a row nothing has written to since 1.57 holds. */
+        fun newRevision(): Long = Random.nextLong(1, Long.MAX_VALUE)
+
+        /**
+         * Moves the [revision] of every recipe in [recipeIds], after a write to rows that hang
+         * off them — steps, ingredient lines, the links between the two.
+         *
+         * Called once the write is done rather than before it: a copy read between the two
+         * then holds the old stamp, and the next sync replaces it. Done the other way round, a
+         * copy read in between would hold the new stamp with the old content, for good.
+         */
+        fun touch(recipeIds: Collection<Long>) {
+            if (recipeIds.isEmpty()) return
+            QRecipe().id.`in`(recipeIds)
+                .asUpdate()
+                .set(QRecipe.Alias.revision, newRevision())
+                .update()
+        }
+    }
 }

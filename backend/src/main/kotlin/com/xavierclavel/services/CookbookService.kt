@@ -23,6 +23,7 @@ import shared.enums.Visibility
 import shared.infodto.CookbookInfo
 import shared.infodto.CookbookRecipeInfo
 import shared.infodto.CookbookUserInfo
+import shared.infodto.OfflineCookbookInfo
 import shared.overviewdto.CookbookRecipeOverview
 import shared.overviewdto.UserOverview
 import io.ebean.Paging
@@ -162,6 +163,34 @@ class CookbookService: KoinComponent {
                 .setPaging(paging)
                 .findList()
         )
+
+    /**
+     * Every cookbook [userId] belongs to, each with the rows its screen lists — the offline
+     * copy of the cookbooks tab, at a fixed cost however many books there are.
+     *
+     * The rows are the ones `GET /cookbook/{id}/recipes` answers, read for every book at once
+     * rather than a request per book, and **unpaged**: that route pages at twenty by default,
+     * and a book kept on a phone that stops at its twentieth recipe has had pages torn out.
+     */
+    fun findWithRecipes(userId: Long): List<OfflineCookbookInfo> {
+        val cookbooks = QCookbook()
+            .filterByUser(userId)
+            .filterByVisibility(userId)
+            .orderBy().id.asc()
+            .findList()
+        if (cookbooks.isEmpty()) return emptyList()
+
+        val rows = QCookbookRecipe()
+            .cookbook.id.`in`(cookbooks.map { it.id })
+            .recipe.fetch()
+            .addedBy.fetch()
+            .orderBy().id.asc()
+            .findList()
+            .groupBy { it.cookbook.id }
+        return describeAll(cookbooks).map { info ->
+            OfflineCookbookInfo(cookbook = info, recipes = rows[info.id].orEmpty().map { it.toInfo() })
+        }
+    }
 
     fun getRecipeStatusInUserCookbooks(user: Long, recipe: Long) : List<CookbookRecipeOverview> {
         // The recipes are what the mark below is read off, so they are fetched rather than left to

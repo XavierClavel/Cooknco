@@ -20,6 +20,7 @@ import com.xavierclavel.controllers.McpController
 import com.xavierclavel.controllers.OAuthController
 import com.xavierclavel.controllers.OAuthMetadataController
 import com.xavierclavel.controllers.NotificationController
+import com.xavierclavel.controllers.OfflineController
 import com.xavierclavel.controllers.RecipeNotesController
 import com.xavierclavel.controllers.MealPlanController
 import com.xavierclavel.controllers.ReportController
@@ -146,6 +147,7 @@ fun Application.serveRoutes() = routing {
         serve(DashboardController)
         serve(FollowController)
         serve(RecipeNotesController)
+        serve(OfflineController)
         serve(MealPlanController)
     }
     serve(IngredientController)

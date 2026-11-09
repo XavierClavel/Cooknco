@@ -123,7 +123,7 @@ object AppGraph {
      * it decides for itself whether there is anything to do. See [OfflineSync].
      */
     val offlineSync by lazy {
-        OfflineSync(recipeApi, cookbookApi, tokenDataStore, offlineStore, offlineImages, devicePreferences)
+        OfflineSync(recipeApi, tokenDataStore, offlineStore, offlineImages, devicePreferences)
     }
     val unitRepository by lazy { UnitRepository(recipeApi) }
     val reportRepository by lazy { ReportRepository(reportApi, tokenDataStore) }

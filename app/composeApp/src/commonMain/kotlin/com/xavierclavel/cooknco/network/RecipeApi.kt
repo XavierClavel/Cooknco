@@ -6,6 +6,9 @@ import com.xavierclavel.cooknco.network.dto.LikeInfoDto
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.CooklangImportDto
+import com.xavierclavel.cooknco.network.dto.HeldRecipe
+import com.xavierclavel.cooknco.network.dto.OfflineSyncRequest
+import com.xavierclavel.cooknco.network.dto.OfflineSyncResponse
 import com.xavierclavel.cooknco.platform.CapturedPage
 import com.xavierclavel.cooknco.network.dto.RecipeSaveDto
 import com.xavierclavel.cooknco.network.dto.UnitInfo
@@ -50,12 +53,10 @@ enum class RecipeSort(val value: String) {
 }
 
 /**
- * Which of a cook's three collections a list is asking for.
+ * A cook's three collections.
  *
- * All three are filters on the one `GET /recipe` (`RecipeFilter`), not three endpoints — and
- * they are sent one at a time because the backend ORs its additive filters together, so
- * asking for two at once would answer with their union rather than their intersection. The
- * offline sync walks them in this order, cheapest and most important first.
+ * All three are filters on the one `GET /recipe` (`RecipeFilter`), not three endpoints, and
+ * the backend ORs these additive filters together: sending all three asks for their union.
  */
 enum class RecipeScope(val parameter: String) {
     /** Recipes this cook wrote. */
@@ -71,26 +72,19 @@ class RecipeApi(private val client: HttpClient) {
     private val base = ApiClient.BASE_URL
 
     /**
-     * One page of one of the cook's three collections, most recently created first.
+     * Brings the offline copy up to date: what the phone should hold, and whichever of those
+     * recipes [held] is missing or has at an old revision — a page of them at a time.
      *
-     * Sorted by date rather than by anything cleverer because the offline store keeps the
-     * most recent [com.xavierclavel.cooknco.data.OFFLINE_LIST_LIMIT] of each: a bound is only
-     * meaningful against an order, and "the ones they added last" is the one a cook can
-     * predict.
+     * One request where the sync used to make dozens, page by page and recipe by recipe, which
+     * ran into the API's per-client rate limit and had the cook's own taps refused while it
+     * ran. See [com.xavierclavel.cooknco.data.OfflineSync].
      */
-    suspend fun listRecipesIn(
-        scope: RecipeScope,
-        userId: Long,
-        token: String,
-        page: Int,
-        size: Int = 20,
-    ): List<RecipeOverview> {
-        val response = client.get("$base/recipe") {
+    suspend fun syncOffline(token: String, held: List<HeldRecipe>): OfflineSyncResponse {
+        val response = client.post("$base/offline/sync") {
             bearerAuth(token)
-            parameter(scope.parameter, userId)
-            parameter("sort", "DATE_DESCENDING")
-            parameter("page", page)
-            parameter("size", size)
+            parameter("locale", ApiClient.locale)
+            contentType(ContentType.Application.Json)
+            setBody(OfflineSyncRequest(held))
         }
         if (!response.status.isSuccess()) throw ApiException(response.status, response.bodyAsText())
         return response.body()
@@ -137,7 +131,7 @@ class RecipeApi(private val client: HttpClient) {
     /**
      * The cook's own recipes, the ones they liked and the ones in their cookbooks, matching
      * [query] — all three at once, because the backend ORs its additive filters, which is the
-     * union this wants (see [RecipeScope] for why the offline sync sends them one at a time).
+     * union this wants.
      *
      * What the meal plan offers to plan: the recipes a cook already has to hand. Anything else
      * is planned from its own page.

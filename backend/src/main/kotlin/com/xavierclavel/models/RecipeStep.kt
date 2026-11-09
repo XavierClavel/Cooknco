@@ -105,11 +105,22 @@ class RecipeStep(
             .sortedBy { it.index },
     )
 
-    /** Bumped when a picture is saved, so the URL moves with it. */
-    fun increaseImageVersion() = apply { imageVersion++ }.update()
+    /**
+     * Bumped when a picture is saved, so the URL moves with it — and the recipe's
+     * [Recipe.revision] with it, since a copy of the recipe names this picture by its version.
+     */
+    fun increaseImageVersion() {
+        imageVersion++
+        update()
+        recipe?.let { Recipe.touch(listOf(it.id)) }
+    }
 
     /** Back to what a step with no picture says. See `ImageController.deleteRecipeStepImage`. */
-    fun clearImageVersion() = apply { imageVersion = 0 }.update()
+    fun clearImageVersion() {
+        imageVersion = 0
+        update()
+        recipe?.let { Recipe.touch(listOf(it.id)) }
+    }
 
     /** Takes on what the author wrote, keeping the row - and its id - as it is. */
     fun mergeDto(dto: RecipeDTO.RecipeStepDTO, sortOrder: Int) = apply {

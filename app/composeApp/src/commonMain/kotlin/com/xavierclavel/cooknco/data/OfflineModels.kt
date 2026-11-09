@@ -18,19 +18,20 @@ import kotlinx.serialization.Serializable
 enum class PinSet { OWN, LIKED, COOKBOOK }
 
 /**
- * One pinned recipe, as the index knows it — which is to say, just enough to tell whether the
- * copy on disk is still the right one.
+ * One pinned recipe, as the index knows it — which is to say, just enough for the server to
+ * tell whether the copy on disk is still the right one.
  *
- * [editionDate] is what says the recipe changed and [imageVersion] is what says the picture
- * did. They move independently: an edit that does not touch the photograph leaves the image
- * alone, and a new photograph is not an edit. Diffing on only one of them would either
- * refetch every recipe whose picture changed or miss every edit that left it alone.
+ * [revision] is the recipe's revision when the copy was read, and the sync sends it back as
+ * what the phone holds. It moves on every write to the recipe, its pictures included, which
+ * is why it replaced the edition date and the image version this used to keep: the edition
+ * date only moved when the author pressed save, so a step picture changed afterwards never
+ * reached the copy at all. Null for an entry written before it existed, which the server
+ * matches to nothing, so that recipe comes back whole once.
  */
 @Serializable
 data class OfflineEntry(
     val id: Long,
-    val editionDate: Long = 0,
-    val imageVersion: Long = 0,
+    val revision: Long? = null,
     val sets: Set<PinSet> = emptySet(),
 )
 

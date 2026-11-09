@@ -4,6 +4,15 @@ Branch: `offline-recipe-access`
 
 ## Implementation status
 
+**The sync was rebuilt at `1.47.0` and is now one request**, `POST /offline/sync`. What
+follows describes the first version, which listed the three collections page by page and
+fetched each new or edited recipe, its notes and its like separately, diffing on
+`editionDate`. That was dozens of requests per launch and over a thousand on a first sync,
+enough to trip nginx's per-client rate limit, and the edition date missed every picture
+change. The server now decides what a phone holds and sends only what changed, by
+`Recipe.revision`; the reasoning is in `CLAUDE.md` ("The offline sync is one request") and on
+`OfflineSyncService`. Phases 3 and 4 below are superseded in their mechanics, not their goal.
+
 **Phases 0–6 are implemented** — the whole of offline *reading* — at version `1.35.0`.
 `:composeApp:testAndroidHostTest` is green (166 tests, 36 of them new),
 `:composeApp:compileKotlinIosSimulatorArm64` compiles, and `:backend:test` covers the one

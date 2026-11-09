@@ -32,6 +32,7 @@ import com.xavierclavel.services.RecipeScanService
 import com.xavierclavel.services.AiUsageService
 import com.xavierclavel.services.RecipePhotoReader
 import com.xavierclavel.services.RecipeIngredientService
+import com.xavierclavel.services.OfflineSyncService
 import com.xavierclavel.services.RecipeNotesService
 import com.xavierclavel.services.MealPlanService
 import com.xavierclavel.services.RecipeService
@@ -129,6 +130,7 @@ abstract class ApplicationTest: KoinTest {
                 single { RecipeStepService() }
                 single { FollowService() }
                 single { RecipeNotesService() }
+                single { OfflineSyncService() }
                 single { MealPlanService() }
                 single { ModerationService() }
                 single { AdminService() }

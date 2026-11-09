@@ -10,6 +10,11 @@ import kotlinx.serialization.*
 data class RecipeInfo (
     val id: Long,
     val version: Long,
+    /**
+     * Moves whenever anything this DTO carries about the recipe itself changes, pictures
+     * included — not its like count or its author's name. Opaque: compare it, never order it.
+     */
+    val revision: Long = 0,
     val title: String,
     val dishClass: DishClass,
     val owner: UserOverview,
@@ -68,6 +73,7 @@ data class RecipeInfo (
         // clients that diff on it, and "the server did not say" is not an answer they can
         // act on — it would read as a recipe that changes on every sync.
         editionDate = this.editionDate ?: 0,
+        revision = this.revision,
         isHidden = this.isHidden,
     )
 }
