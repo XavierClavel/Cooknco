@@ -165,8 +165,13 @@ class FcmPushSender(
                 put("priority", "HIGH")
                 putJsonObject("notification") {
                     put("channel_id", androidChannelId)
-                    // Lets the app collapse a burst from one sender into one row
-                    put("tag", message.data["kind"] ?: "announcement")
+                    // The tag is what Android replaces by: a second push with the same tag
+                    // takes the first one's place in the tray. So it names the stored row and
+                    // never the kind — tagged by kind, two followers publishing in a row left
+                    // only the second recipe on a phone that was not in the app. The same id
+                    // the app draws a foreground push under, so the two paths agree. With no
+                    // row there is no tag, and FCM gives every push a row of its own.
+                    message.data["notificationId"]?.let { put("tag", "notification-$it") }
                 }
             }
         }
