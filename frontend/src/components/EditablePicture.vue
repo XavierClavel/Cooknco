@@ -1,7 +1,58 @@
 <template>
   <input ref="fileInput" type="file" accept="image/*" hidden @change="onFilePicked" />
 
+  <!-- The picture with its controls beside it, always visible: the profile picture -->
+  <div v-if="controls === 'side'" class="side-picture">
+    <div
+      class="side-picture__frame sk-placeholder"
+      :class="{'side-picture__frame--round': rounded === 'circle'}"
+      :style="{width: width, aspectRatio: String(aspectRatio)}"
+    >
+      <img
+        v-if="!previewCrop"
+        :src="imageUrl"
+        alt=""
+        @load="handleImageLoad(imageUrl)"
+        @error="handleImageError(imageUrl)"
+      />
+      <div v-else class="crop-preview">
+        <img :src="imageUrl" alt="" :style="previewStyle" />
+      </div>
+    </div>
+    <div class="side-picture__buttons">
+      <button type="button" class="sk-icon-btn sk-icon-btn--white" :aria-label="$t('change_picture')" :title="$t('change_picture')" @click="triggerFileInput">
+        <v-icon>mdi-tray-arrow-up</v-icon>
+      </button>
+      <button v-if="previewCrop" type="button" class="sk-icon-btn sk-icon-btn--white" :aria-label="$t('crop_adjust')" :title="$t('crop_adjust')" @click="reframe">
+        <v-icon>mdi-crop</v-icon>
+      </button>
+      <button v-if="imageUpdated" type="button" class="sk-icon-btn sk-icon-btn--white" :aria-label="$t('undo_picture_change')" :title="$t('undo_picture_change')" @click="undoImageChange">
+        <v-icon>mdi-arrow-u-left-top</v-icon>
+      </button>
+      <button v-if="hasImage && !imageDeleted" type="button" class="sk-icon-btn sk-icon-btn--white" :aria-label="$t('remove_picture')" :title="$t('remove_picture')" @click="deleteImage">
+        <v-icon>mdi-trash-can-outline</v-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Nothing to show yet: a dashed box asking for one, rather than the default picture -->
+  <div v-else-if="showEmpty" class="empty-picture">
+    <button
+      type="button"
+      class="empty-picture__add"
+      :style="{width: width, aspectRatio: String(aspectRatio)}"
+      @click="triggerFileInput"
+    >
+      <v-icon>mdi-plus</v-icon>
+      <span>{{ emptyLabel }}</span>
+    </button>
+    <button v-if="imageUpdated" type="button" class="sk-icon-btn sk-icon-btn--white" :aria-label="$t('undo_picture_change')" :title="$t('undo_picture_change')" @click="undoImageChange">
+      <v-icon>mdi-arrow-u-left-top</v-icon>
+    </button>
+  </div>
+
   <v-img
+    v-else
     :src="imageUrl"
     :width="width"
     :aspect-ratio="aspectRatio"
@@ -136,6 +187,17 @@ const props = defineProps({
     required: false,
     default: "xl"
   },
+  /** Shown in a dashed box, in place of the default picture, while there is no picture. */
+  emptyLabel: {
+    type: [String],
+    required: false,
+  },
+  /** `overlay`: buttons over the picture, on hover. `side`: always-visible buttons beside it. */
+  controls: {
+    type: [String],
+    required: false,
+    default: "overlay"
+  },
 })
 
 import {doDeleteImage, getDefaultImageUrl, getImageUrl, uploadImage} from "@/scripts/common";
@@ -166,6 +228,8 @@ const cropFile = ref<File | null>(null)
 const cropSource = ref<string | null>(null)
 const cropInitial = ref<ImageCrop | null>(null)
 const draftCrop = ref<ImageCrop | null>(null)
+
+const showEmpty = computed(() => !!props.emptyLabel && imageUrl.value === defaultImageUrl.value)
 
 const previewCrop = computed(() => imageUpdated.value && !imageDeleted.value ? imageCrop.value : null)
 
@@ -319,6 +383,64 @@ defineExpose({
 .crop-preview img {
   position: absolute;
   max-width: none;
+}
+
+.side-picture {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.side-picture__frame {
+  position: relative;
+  flex-shrink: 1;
+  max-width: 100%;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.side-picture__frame--round {
+  border-radius: 50%;
+  background: var(--cream);
+}
+.side-picture__frame > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.side-picture__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.empty-picture {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.empty-picture__add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  border: var(--line) dashed var(--ink);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.empty-picture__add:hover {
+  background: rgba(255, 255, 255, .5);
+}
+.empty-picture__add:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
 }
 
 .overlay-button {

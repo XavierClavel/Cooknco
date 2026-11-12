@@ -48,22 +48,15 @@ const selectItem = (index) => {
 </script>
 
 <template>
-  <v-row class="d-flex flex-row ma-1 justify-sm-start">
-    <v-chip
+  <div class="sk-chip-row">
+    <button
       v-for="(item, index) in values"
-      filter
-      class="ma-1 my-sm-0"
-      :color="selectedItems.includes(index) ? 'primary' : 'background'"
-      variant="elevated"
+      :key="index"
+      type="button"
+      class="sk-chip"
+      :class="{'is-active': selectedItems.includes(index)}"
+      :aria-pressed="selectedItems.includes(index)"
       @click="selectItem(index)"
-      :prepend-icon="selectedItems.includes(index) ? 'mdi-check' : undefined"
-    > {{$t(item.label)}}</v-chip>
-  </v-row>
+    >{{ $t(item.label) }}</button>
+  </div>
 </template>
-
-<style scoped>
-
-</style>
-
-
-

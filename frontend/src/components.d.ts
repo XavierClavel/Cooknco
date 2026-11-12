@@ -10,6 +10,7 @@ declare module 'vue' {
     ActionButton: typeof import('./components/ActionButton.vue')['default']
     AdminOnly: typeof import('./components/AdminOnly.vue')['default']
     AppFooter: typeof import('./components/AppFooter.vue')['default']
+    AuthCard: typeof import('./components/AuthCard.vue')['default']
     ChipRow: typeof import('./components/ChipRow.vue')['default']
     Cookbook: typeof import('./components/Cookbook.vue')['default']
     CookbooksGrid: typeof import('./components/CookbooksGrid.vue')['default']

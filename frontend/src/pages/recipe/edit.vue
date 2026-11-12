@@ -1,26 +1,25 @@
 <template>
-  <v-card
-  class="mx-auto pa-5 ma-auto my-5"
-  max-width="1000px"
-  style="border: 4px solid #0d1821 !important;"
-  >
-
-
-    <v-form @submit.prevent="submit" class="mx-auto" ref="form">
+  <div class="recipe-form sticker sk-pad-lg">
+    <v-form @submit.prevent="onSubmit" ref="form" class="recipe-form__form">
+      <h1 class="sk-title">{{ recipeId == null ? $t('new_recipe') : $t('edit_recipe') }}</h1>
 
       <!--
         Only while creating. An import fills blanks and appends, so on an existing recipe it
         would read as "add this file to that recipe" - which is a thing to want, and not what
         anyone would expect a button labelled "import" to do.
       -->
-      <div v-if="recipeId == null" class="d-flex align-center mb-4">
-        <v-btn
-          prepend-icon="mdi-file-upload-outline"
-          variant="tonal"
-          :loading="importing"
+      <div v-if="recipeId == null" class="sk-row">
+        <button
+          type="button"
+          class="sk-btn"
+          :disabled="importing"
           @click="cooklangInput?.click()"
-        >{{ $t('import_cooklang') }}</v-btn>
-        <span class="text-caption ml-3">{{ $t('import_cooklang_hint') }}</span>
+        >
+          <v-progress-circular v-if="importing" indeterminate size="16" width="2"></v-progress-circular>
+          <v-icon v-else>mdi-tray-arrow-up</v-icon>
+          {{ $t('import_cooklang') }}
+        </button>
+        <span class="sk-hint">{{ $t('import_cooklang_hint') }}</span>
         <input
           ref="cooklangInput"
           type="file"
@@ -30,280 +29,280 @@
         />
       </div>
 
-      <v-alert
-        v-if="importMessage"
-        type="info"
-        variant="tonal"
-        class="mb-4"
-        closable
-        @click:close="importMessage = null"
-      >{{ importMessage }}</v-alert>
-
-      <v-text-field
-        v-model="recipe.title"
-        :label="`${$t('title')}`"
-        :rules="[requiredRule, max100]"
-      ></v-text-field>
-
-      <v-textarea
-        v-model="recipe.description"
-        :label="`${$t('description')}`"
-        :rules="[max255]"
-      ></v-textarea>
-
-      <div class="d-flex flex-wrap mx-2">
-        <v-btn-toggle
-          v-model="recipe.dishClass"
-          color="primary"
-          bg-color="background"
-          base-color="background"
-          rounded="lg"
-          group
-          mandatory
-          class="ga-1 my-1 ml-n3 flex-wrap"
-          style="height: auto; align-items: flex-start;"
-        >
-          <v-btn
-            v-for="dishClass in dishOptions"
-            :key="dishClass.value"
-            :value="dishClass.value"
-            class="ma-1 pa-1 px-2"
-            height="45"
-          >
-            {{ $t(dishClass.label) }}
-          </v-btn>
-        </v-btn-toggle>
+      <div v-if="importMessage" class="sticker sticker--cream sticker--sm import-message" role="status">
+        <v-icon>mdi-information-outline</v-icon>
+        <span class="import-message__text">{{ importMessage }}</span>
+        <button
+          type="button"
+          class="sk-icon-btn sk-icon-btn--white"
+          :aria-label="$t('close')"
+          @click="importMessage = null"
+        ><v-icon>mdi-close</v-icon></button>
       </div>
 
-      <editable-picture
-         v-if="ready"
-         path="recipes"
-         :id="recipeId"
-         :version="recipe.version"
-         ref="editablePicture"
-         width="100%"
-         :aspect-ratio="4/3"
-       ></editable-picture>
+      <div class="sk-field">
+        <label class="sk-label" for="recipe-title">{{ $t('title') }}</label>
+        <v-text-field
+          id="recipe-title"
+          v-model="recipe.title"
+          class="my-0"
+          :rules="[requiredRule, max100]"
+        ></v-text-field>
+      </div>
 
+      <div class="sk-field">
+        <label class="sk-label" for="recipe-description">{{ $t('description') }}</label>
+        <v-textarea
+          id="recipe-description"
+          v-model="recipe.description"
+          rows="3"
+          :rules="[max255]"
+        ></v-textarea>
+      </div>
 
-      <v-number-input
-        v-model="recipe.yield"
-        :label="`${$t('yield')}`"
-        type="number"
-        color="primary"
-        :min=1
-        :rules="[requiredRule]"
-      ></v-number-input>
+      <!-- Exactly one dish class: clicking the one already chosen keeps it -->
+      <div class="sk-chip-row" role="group" :aria-label="$t('recipe_dish_class')">
+        <button
+          v-for="dishClass in dishOptions"
+          :key="dishClass.value"
+          type="button"
+          class="sk-chip"
+          :class="{'is-active': recipe.dishClass === dishClass.value}"
+          :aria-pressed="recipe.dishClass === dishClass.value"
+          @click="recipe.dishClass = dishClass.value"
+        >{{ $t(dishClass.label) }}</button>
+      </div>
 
-      <v-number-input
-        v-model="recipe.preparationTime"
-        :label="`${$t('time_preparation')}`"
-        type="number"
-        :step="5"
-        :min=0
-      ></v-number-input>
+      <div class="recipe-form__picture">
+        <editable-picture
+          v-if="ready"
+          path="recipes"
+          :id="recipeId"
+          :version="recipe.version"
+          ref="editablePicture"
+          width="100%"
+          :aspect-ratio="4/3"
+          :empty-label="$t('recipe_add_photo')"
+        ></editable-picture>
+      </div>
 
-      <v-number-input
-        v-model="recipe.cookingTime"
-        :label="`${$t('time_cooking')}`"
-        type="number"
-        :step="5"
-        :min=0
-      ></v-number-input>
-
-      <v-number-input
-        v-model="recipe.cookingTemperature"
-        :label="`${$t('cooking_temperature')}`"
-        type="number"
-        :step="5"
-        :min=0
-      >
-      </v-number-input>
+      <div class="recipe-form__numbers">
+        <div class="sk-field">
+          <label class="sk-label" for="recipe-yield">{{ $t('yield') }}</label>
+          <v-number-input
+            id="recipe-yield"
+            v-model="recipe.yield"
+            type="number"
+            color="primary"
+            :min=1
+            :rules="[requiredRule]"
+          ></v-number-input>
+        </div>
+        <div class="sk-field">
+          <label class="sk-label" for="recipe-preparation">{{ $t('time_preparation') }}</label>
+          <v-number-input
+            id="recipe-preparation"
+            v-model="recipe.preparationTime"
+            type="number"
+            :step="5"
+            :min=0
+          ></v-number-input>
+        </div>
+        <div class="sk-field">
+          <label class="sk-label" for="recipe-cooking">{{ $t('time_cooking') }}</label>
+          <v-number-input
+            id="recipe-cooking"
+            v-model="recipe.cookingTime"
+            type="number"
+            :step="5"
+            :min=0
+          ></v-number-input>
+        </div>
+        <div class="sk-field">
+          <label class="sk-label" for="recipe-temperature">{{ $t('cooking_temperature') }}</label>
+          <v-number-input
+            id="recipe-temperature"
+            v-model="recipe.cookingTemperature"
+            type="number"
+            :step="5"
+            :min=0
+          ></v-number-input>
+        </div>
+      </div>
 
       <!-- Ingredients -->
-      <h2 class="my-3 mt-12" >{{$t("ingredients")}}</h2>
-      <draggable v-model="recipe.ingredients" tag="div" ghost-class="ghost" item-key="index" handle=".drag-handle">
-        <template #item="{ element, index }">
-          <div class="d-flex flex-wrap align-center mb-2">
-            <!-- Handle for dragging -->
-            <v-icon
-              class="mr-2 drag-handle"
-              color="black"
-              small
-            >mdi-drag</v-icon>
+      <section class="sk-stack">
+        <h2 class="sk-h2">{{$t("ingredients")}}</h2>
+        <draggable v-model="recipe.ingredients" tag="div" class="recipe-form__rows" ghost-class="ghost" item-key="index" handle=".drag-handle">
+          <template #item="{ index }">
+            <div class="form-row form-row--ingredient">
+              <!-- Handle for dragging -->
+              <span class="drag-handle" :title="$t('recipe_drag_to_reorder')" aria-hidden="true">
+                <v-icon>mdi-drag-vertical</v-icon>
+              </span>
 
-            <v-autocomplete
-              v-model="recipe.ingredients[index].ingredient"
-              :label="`${$t('ingredient')} ${index + 1}`"
-              v-model:search="queryList[index]"
-              color="primary"
-              :items="getAutocompleteItems(index)"
-              item-color="primary"
-              item-title="name"
-              item-value="id"
-              @update:search="(query) => onIngredientAutocompleteChange(query, index)"
-              @update:model-value="(value) => onIngredientSelected(value, index)"
-              :key="index"
-              return-object
-              @keydown.enter.prevent="selectFirstMatch(index)"
-              class="ma-1"
-              min-width="150px"
-              :no-data-text="`${$t('no_data')}`"
-            >
-              <!-- Only the dropdown says "use this as a custom ingredient"; the option itself
-                   carries the plain name, which is what the field shows once it is picked -->
-              <template v-slot:item="{ props, item }">
-                <v-list-item
-                  v-bind="props"
-                  :title="item.raw.isCustom ? $t('custom_ingredient', {name: item.raw.name}) : item.raw.name"
-                >
-                  <template #prepend v-if="item.raw.isCustom">
-                    <v-icon>mdi-plus</v-icon>
-                  </template>
-                </v-list-item>
-              </template>
-            </v-autocomplete>
-
-            <v-select
-              v-model="recipe.ingredients[index].unit"
-              :label="`${$t('unit')}`"
-              :items="getUnitOptions(recipe.ingredients[index].ingredient?.allowedTypes)"
-              color="primary"
-              :item-title="getLocalizedLabel"
-              item-value="value"
-              return-object
-              min-width="120px"
-              class="ma-1"
-            >
-              <!-- Customize how items appear in the dropdown -->
-              <template v-slot:item="{ props, item }">
-                <v-list-item v-bind="props">
-                  <template #prepend>
-                    <v-icon>{{ item.raw.icon }}</v-icon>
-                  </template>
-                </v-list-item>
-              </template>
-
-              <!-- Customize how selected item appears -->
-              <template v-slot:selection="{ item }">
-                <v-icon start class="mr-2">{{ item.raw.icon }}</v-icon>
-                {{ $t(item.raw.label) }}
-              </template>
-            </v-select>
-
-            <v-number-input
-              v-model.number="recipe.ingredients[index].amount"
-              :label="`${$t('amount')}`"
-              color="primary"
-              control-variant="stacked"
-              min=0
-              item-title="amount"
-              return-object
-              class="ma-1"
-              max-width="150px"
-              v-if="recipe.ingredients[index].unit?.value != 'NONE'"
-            ></v-number-input>
-
-            <v-text-field
-              v-model="recipe.ingredients[index].complement"
-              :label="`${$t('complement')}`"
-              :rules="[max50]"
-              class="ma-1"
-            ></v-text-field>
-
-            <div>
-              <v-btn
-                @click="removeIngredient(index)"
-                icon="mdi-delete"
+              <v-autocomplete
+                v-model="recipe.ingredients[index].ingredient"
+                :placeholder="`${$t('ingredient')} ${index + 1}`"
+                :aria-label="`${$t('ingredient')} ${index + 1}`"
+                v-model:search="queryList[index]"
                 color="primary"
-                class="ml-4"
-              ></v-btn>
+                :items="getAutocompleteItems(index)"
+                item-color="primary"
+                item-title="name"
+                item-value="id"
+                @update:search="(query) => onIngredientAutocompleteChange(query, index)"
+                @update:model-value="(value) => onIngredientSelected(value, index)"
+                :key="index"
+                return-object
+                @keydown.enter.prevent="selectFirstMatch(index)"
+                class="form-row__name"
+                :no-data-text="`${$t('no_data')}`"
+              >
+                <!-- Only the dropdown says "use this as a custom ingredient"; the option itself
+                     carries the plain name, which is what the field shows once it is picked -->
+                <template v-slot:item="{ props, item }">
+                  <v-list-item
+                    v-bind="props"
+                    :title="item.raw.isCustom ? $t('custom_ingredient', {name: item.raw.name}) : item.raw.name"
+                  >
+                    <template #prepend v-if="item.raw.isCustom">
+                      <v-icon>mdi-plus</v-icon>
+                    </template>
+                  </v-list-item>
+                </template>
+              </v-autocomplete>
+
+              <v-select
+                v-model="recipe.ingredients[index].unit"
+                :aria-label="$t('unit')"
+                :items="getUnitOptions(recipe.ingredients[index].ingredient?.allowedTypes)"
+                color="primary"
+                :item-title="getLocalizedLabel"
+                item-value="value"
+                return-object
+                class="form-row__unit"
+              >
+                <!-- Customize how items appear in the dropdown -->
+                <template v-slot:item="{ props, item }">
+                  <v-list-item v-bind="props">
+                    <template #prepend>
+                      <v-icon>{{ item.raw.icon }}</v-icon>
+                    </template>
+                  </v-list-item>
+                </template>
+
+                <!-- Customize how selected item appears -->
+                <template v-slot:selection="{ item }">
+                  <v-icon start class="mr-2">{{ item.raw.icon }}</v-icon>
+                  {{ $t(item.raw.label) }}
+                </template>
+              </v-select>
+
+              <v-number-input
+                v-model.number="recipe.ingredients[index].amount"
+                :placeholder="$t('amount')"
+                :aria-label="$t('amount')"
+                color="primary"
+                control-variant="stacked"
+                min=0
+                class="form-row__amount"
+                v-if="recipe.ingredients[index].unit?.value != 'NONE'"
+              ></v-number-input>
+
+              <v-text-field
+                v-model="recipe.ingredients[index].complement"
+                :placeholder="$t('complement')"
+                :aria-label="$t('complement')"
+                :rules="[max50]"
+                class="form-row__complement my-0"
+              ></v-text-field>
+
+              <button
+                type="button"
+                class="sk-icon-btn sk-icon-btn--white"
+                :aria-label="$t('recipe_remove_ingredient')"
+                :title="$t('recipe_remove_ingredient')"
+                @click="removeIngredient(index)"
+              ><v-icon>mdi-trash-can-outline</v-icon></button>
             </div>
+          </template>
+        </draggable>
 
-
-          </div>
-        </template>
-      </draggable>
-
-      <!-- Button to add ingredient -->
-      <v-btn
-        @click="addIngredient"
-        prepend-icon="mdi-plus-circle-outline"
-        color="primary"
-        flat
-        class="mb-2 mr-2"
-      >{{$t("ingredient")}}</v-btn>
-
+        <!-- Button to add ingredient -->
+        <button type="button" class="sk-btn sk-btn--block sk-btn--flat add-row" @click="addIngredient">
+          <v-icon>mdi-plus</v-icon>{{$t("ingredient")}}
+        </button>
+      </section>
 
       <!-- Steps -->
-      <h2 class="my-3" >{{$t("steps")}}</h2>
-      <draggable v-model="recipe.steps" tag="div" ghost-class="ghost" item-key="index" handle=".drag-handle">
-        <template #item="{ element, index }">
-          <div class="d-flex align-center">
-            <!-- Add a handle for dragging -->
-            <v-icon
-              class="mr-2 drag-handle"
-              color="black"
-              small
-            >mdi-drag</v-icon>
+      <section class="sk-stack">
+        <h2 class="sk-h2">{{$t("steps")}}</h2>
+        <draggable v-model="recipe.steps" tag="div" class="recipe-form__rows" ghost-class="ghost" item-key="index" handle=".drag-handle">
+          <template #item="{ index }">
+            <div class="form-row">
+              <!-- Add a handle for dragging -->
+              <span class="drag-handle" :title="$t('recipe_drag_to_reorder')" aria-hidden="true">
+                <v-icon>mdi-drag-vertical</v-icon>
+              </span>
 
-            <v-text-field
-              v-model="recipe.steps[index].text"
-              :label="`${$t('step')} ${index + 1}`"
-              :id="`step_${index}`"
-              :rules="[max255]"
-              @keyup.enter="addStepAt(index)"
-              @keyup.delete="deleteStepAt(index)"
-            ></v-text-field>
+              <v-text-field
+                v-model="recipe.steps[index].text"
+                :placeholder="`${$t('step')} ${index + 1}`"
+                :aria-label="`${$t('step')} ${index + 1}`"
+                :id="`step_${index}`"
+                :rules="[max255]"
+                class="form-row__step my-0"
+                @keyup.enter="addStepAt(index)"
+                @keyup.delete="deleteStepAt(index)"
+              ></v-text-field>
 
-            <v-btn
-              @click="removeStep(index)"
-              icon="mdi-delete"
-              color="primary"
-              class="ml-4"
-              tabindex="-1"
-            ></v-btn>
-          </div>
-        </template>
-      </draggable>
+              <button
+                type="button"
+                class="sk-icon-btn sk-icon-btn--white"
+                :aria-label="$t('recipe_remove_step')"
+                :title="$t('recipe_remove_step')"
+                tabindex="-1"
+                @click="removeStep(index)"
+              ><v-icon>mdi-trash-can-outline</v-icon></button>
+            </div>
+          </template>
+        </draggable>
 
-      <!-- Button to add a new item -->
-      <v-btn
-        @click="addStep"
-        prepend-icon="mdi-plus-circle-outline"
-        color="primary"
-        flat
-        class="mb-10 mt-2"
-      >{{$t("steps_add_new")}}</v-btn>
+        <!-- Button to add a new item -->
+        <button type="button" class="sk-btn sk-btn--block sk-btn--flat add-row" @click="addStep">
+          <v-icon>mdi-plus</v-icon>{{$t("steps_add_new")}}
+        </button>
+      </section>
 
+      <div class="sk-field">
+        <label class="sk-label" for="recipe-tips">{{ $t('tips') }}</label>
         <v-textarea
+          id="recipe-tips"
           v-model="recipe.tips"
-          :label="`${$t('tips')}`"
+          rows="3"
           :rules="[max511]"
         ></v-textarea>
+      </div>
 
       <error :error="errorMessage"></error>
 
-      <v-container>
-        <v-row
-          class="d-flex align-center justify-center align-content-center mb-2 ga-4"
-          dense
-        >
-            <action-button
-              v-if="recipeId"
-              icon="mdi-close-circle-outline"
-              :text="`${$t('cancel')}`"
-              :action="() => toViewRecipe(recipeId)"
-            ></action-button>
-            <action-button
-              icon="mdi-content-save"
-              :text="`${$t('save')}`"
-              :action="submit"
-            ></action-button>
-        </v-row>
-      </v-container>
+      <div class="recipe-form__actions">
+        <button
+          v-if="recipeId"
+          type="button"
+          class="sk-btn sk-btn--lg"
+          @click="toViewRecipe(recipeId)"
+        >{{ $t('cancel') }}</button>
+        <button
+          type="button"
+          class="sk-btn sk-btn--lg sk-btn--coral"
+          :disabled="saving"
+          @click="onSubmit"
+        >{{ $t('save') }}</button>
+      </div>
     </v-form>
-  </v-card>
+  </div>
 
 </template>
 
@@ -466,6 +465,19 @@ const removeStep = (index) => {
 
 const removeIngredient = (index) => {
   recipe.value.ingredients.splice(index,1);
+}
+
+// One save at a time: a second click while the first is on its way would create the recipe twice
+const saving = ref(false)
+
+async function onSubmit() {
+  if (saving.value) return
+  saving.value = true
+  try {
+    await submit()
+  } finally {
+    saving.value = false
+  }
 }
 
 async function submit() {
@@ -652,13 +664,127 @@ loadUnits().then(function () {
 
 </script>
 
-<style scoped>
 
-.drag-handle {
-  cursor: grab;
-  display:flex;
-  align-items: center;
+<style scoped>
+.recipe-form {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
+.recipe-form__form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
+/* The label sits above each field, so the fields need none of their default spacing */
+.recipe-form :deep(.v-text-field) {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.import-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.import-message__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.recipe-form__picture {
+  width: 100%;
+  max-width: 440px;
+}
+
+.recipe-form__numbers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.recipe-form__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.form-row > .sk-icon-btn {
+  margin-top: 4px;
+}
+
+.form-row__name {
+  flex: 2 1 200px;
+  min-width: 0;
+}
+
+.form-row__unit {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+.form-row__amount {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+.form-row__complement {
+  flex: 1.5 1 160px;
+  min-width: 0;
+}
+
+.form-row__step {
+  flex: 1;
+  min-width: 0;
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  cursor: grab;
+  color: var(--ink);
+}
+
+.add-row {
+  border-style: dashed;
+  background: transparent;
+}
+
+.add-row:hover:not(:disabled) {
+  background: var(--cream);
+}
+
+.recipe-form__actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+@media (max-width: 760px) {
+  .recipe-form__numbers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-row--ingredient {
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .form-row--ingredient .form-row__name {
+    flex-basis: calc(100% - 100px);
+  }
+}
 </style>

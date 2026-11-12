@@ -1,144 +1,140 @@
 <template>
-  <v-card
-  class="mx-auto pa-5 ma-auto my-5"
-  max-width="1000px"
-  >
+  <div class="sk-narrow">
+    <section class="sticker sk-pad-lg">
+      <v-form @submit.prevent="submit" ref="form" class="sk-stack">
+        <h1 class="sk-title cookbook-form__title">{{ cookbookId ? $t("edit_cookbook") : $t("new_cookbook") }}</h1>
 
-    <v-form @submit.prevent="submit" class="mx-auto" ref="form">
+        <div class="sk-field">
+          <label class="sk-label" for="cookbook-title">{{ $t("title") }}</label>
+          <v-text-field
+            id="cookbook-title"
+            class="my-0"
+            v-model="cookbook.title"
+            :rules="[requiredRule, max50]"
+          ></v-text-field>
+        </div>
 
-        <v-text-field
-          v-model="cookbook.title"
-          :label="`${$t('title')}`"
-          :rules="[requiredRule, max50]"
-        ></v-text-field>
+        <div class="sk-field">
+          <label class="sk-label" for="cookbook-description">{{ $t("description") }}</label>
+          <v-textarea
+            id="cookbook-description"
+            v-model="cookbook.description"
+            rows="2"
+            auto-grow
+            :rules="[max255]"
+          ></v-textarea>
+        </div>
 
-        <v-textarea
-          v-model="cookbook.description"
-          :label="`${$t('description')}`"
-          single-line
-          :rules="[max255]"
-        ></v-textarea>
-
-
-      <v-select
-        max-width="200px"
-        v-model="cookbook.visibility"
-        :label="`${$t('visibility')}`"
-        :item-title="(option) => $t(option.label)"
-        item-value="value"
-        :items="visibilityOptions"
-        :hint="visibilityHint && $t(visibilityHint)"
-        persistent-hint
-      >
-        <!-- Customize how items appear in the dropdown -->
-        <template v-slot:item="{ props, item }">
-          <v-list-item v-bind="props">
-            <template #prepend>
-              <v-icon>{{ $t(item.raw.icon) }}</v-icon>
+        <div class="sk-field">
+          <label class="sk-label" for="cookbook-visibility">{{ $t("visibility") }}</label>
+          <v-select
+            id="cookbook-visibility"
+            class="cookbook-form__visibility"
+            v-model="cookbook.visibility"
+            :item-title="(option) => $t(option.label)"
+            item-value="value"
+            :items="visibilityOptions"
+          >
+            <!-- Customize how items appear in the dropdown -->
+            <template v-slot:item="{ props, item }">
+              <v-list-item v-bind="props">
+                <template #prepend>
+                  <v-icon>{{ $t(item.raw.icon) }}</v-icon>
+                </template>
+              </v-list-item>
             </template>
-          </v-list-item>
-        </template>
 
-        <!-- Customize how selected item appears -->
-        <template v-slot:selection="{ item }">
-          <v-icon start class="mr-2">{{ item.raw.icon }}</v-icon>
-          {{ $t(item.raw.label) }}
-        </template>
-      </v-select>
+            <!-- Customize how selected item appears -->
+            <template v-slot:selection="{ item }">
+              <v-icon start class="mr-2">{{ item.raw.icon }}</v-icon>
+              {{ $t(item.raw.label) }}
+            </template>
+          </v-select>
+          <!-- Said under the select: "Followers" alone does not say whose, which is the whole question. -->
+          <p v-if="visibilityHint" class="sk-hint ma-0">{{ $t(visibilityHint) }}</p>
+        </div>
 
-       <editable-picture
-         v-if="ready"
-         path="cookbooks"
-         :id="cookbookId"
-         :version="cookbook.version"
-         ref="editablePicture"
-         width="600px"
-         height="600px"
-         class="my-2"
-         aspect-ratio="1"
-       ></editable-picture>
+        <editable-picture
+          v-if="ready"
+          path="cookbooks"
+          :id="cookbookId"
+          :version="cookbook.version"
+          ref="editablePicture"
+          width="168px"
+          aspect-ratio="1"
+          buttons-size="40px"
+          buttons-icon-size="text-body-1"
+          buttons-spacing="ga-2"
+          buttons-rounded="lg"
+          :empty-label="$t('add_cover')"
+        ></editable-picture>
 
-      <!-- Cookbook users -->
-      <h2 class="my-3" >{{$t("users")}}</h2>
-          <div class="d-flex flex-wrap align-center mb-2" v-for="index in members.length">
+        <!-- Cookbook users -->
+        <h2 class="sk-h2 mt-2">{{ $t("users") }}</h2>
+        <div class="member-row" v-for="index in members.length" :key="index">
+          <span class="sk-avatar member-row__avatar">
+            <img
+              v-if="members[index - 1]?.id > 0"
+              :src="getUserIconUrl(members[index - 1].id, members[index - 1].version)"
+              alt=""
+            />
+          </span>
 
-            <v-avatar size="50" variant="elevated" style="border:3px solid #0d1821 !important;" class="mr-3">
-              <v-img
-                v-if="members[index - 1]"
-                color="surface-variant"
-                :src="getUserIconUrl(members[index-1].id)"
-                cover
-                v-bind="props"
-                class="clickable_image"
-              ></v-img>
-            </v-avatar>
+          <v-autocomplete
+            class="member-row__user"
+            v-model="members[index-1]"
+            :aria-label="`${$t('user')} ${index}`"
+            :placeholder="$t('username')"
+            :items="autocompleteList[index-1]"
+            item-color="primary"
+            item-title="username"
+            item-value="id"
+            @update:search="(query) => onAutocompleteChange(query, index-1)"
+            @update:modelValue="value => updateMember(index - 1, value)"
+            :key="index"
+            return-object
+          ></v-autocomplete>
 
-            <v-autocomplete
-              v-model="members[index-1]"
-              :label="`${$t('user')} ${index}`"
-              :items="autocompleteList[index-1]"
-              item-color="primary"
-              item-title="username"
-              item-value="id"
-              @update:search="(query) => onAutocompleteChange(query, index-1)"
-              @update:modelValue="value => updateMember(index - 1, value)"
-              :key="index"
-              return-object
-              class="mr-2"
-            ></v-autocomplete>
+          <v-select
+            class="member-row__role"
+            v-model="members[index-1].role"
+            :aria-label="$t('role')"
+            :items="['USER','ADMIN']"
+          ></v-select>
 
-            <v-select
-              max-width="200px"
-              v-model="members[index-1].role"
-              :label="`${$t('role')}`"
-              :items="['USER','ADMIN']"
-            ></v-select>
+          <button
+            type="button"
+            class="sk-icon-btn sk-icon-btn--white"
+            :aria-label="$t('remove_member')"
+            @click="removeUser(index-1)"
+          >
+            <v-icon>mdi-trash-can-outline</v-icon>
+          </button>
+        </div>
 
-            <div>
-              <v-btn
-                @click="removeUser(index-1)"
-                icon="mdi-delete"
-                color="primary"
-                class="ml-4"
-              ></v-btn>
-            </div>
+        <!-- Button to add a member -->
+        <button type="button" class="add-member" @click="addUser">
+          <v-icon>mdi-plus</v-icon>
+          {{ $t("user") }}
+        </button>
 
+        <error :error="errorMessage"></error>
 
-          </div>
-
-      <!-- Button to add ingredient -->
-      <v-btn
-        @click="addUser"
-        prepend-icon="mdi-plus-circle-outline"
-        color="primary"
-        flat
-        class="mb-10"
-      >{{$t("user")}}</v-btn>
-
-
-      <error :error="errorMessage"></error>
-
-      <v-container>
-        <v-row
-          class="d-flex align-center justify-center mb-2 ga-4"
-          dense
-        >
-            <action-button
-              v-if="cookbookId"
-              icon="mdi-close-circle-outline"
-              :text="`${$t('cancel')}`"
-              :action="() => toViewCookbook(cookbookId)"
-            ></action-button>
-            <action-button
-              icon="mdi-content-save"
-              :text="`${$t('save')}`"
-              :action="submit"
-            ></action-button>
-        </v-row>
-      </v-container>
-    </v-form>
-  </v-card>
-
+        <div class="cookbook-form__actions">
+          <button
+            v-if="cookbookId"
+            type="button"
+            class="sk-btn sk-btn--lg"
+            @click="toViewCookbook(cookbookId)"
+          >{{ $t("cancel") }}</button>
+          <button type="submit" class="sk-btn sk-btn--lg sk-btn--coral" :disabled="saving">
+            <v-progress-circular v-if="saving" indeterminate size="18" width="2"></v-progress-circular>
+            {{ $t("save") }}
+          </button>
+        </div>
+      </v-form>
+    </section>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -168,8 +164,9 @@ let addRecipeId = route.query.addRecipe
 const editablePicture = ref(null)
 const errorMessage = ref(null)
 const form = ref(null)
-const members = ref<Array<{ id: number, username: string, role: string }>>([]);
+const members = ref<Array<{ id: number, username: string, role: string, version?: number }>>([]);
 const ready = ref(false)
+const saving = ref(false)
 
 
 const autocompleteList = ref([])
@@ -211,7 +208,6 @@ const cookbook = ref<object>({
   visibility: "PUBLIC"
 })
 
-// Said under the select: "Followers" alone does not say whose, which is the whole question.
 const visibilityHint = computed(() =>
   visibilityOptions.value.find(option => option.value === cookbook.value.visibility)?.hint
 )
@@ -222,6 +218,7 @@ if (cookbookId.value == null) {
   members.value.push({
     id: authStore.id,
     username: authStore.username,
+    version: authStore.iconVersion,
     role: "ADMIN",
   })
 }
@@ -237,8 +234,19 @@ const removeUser = (index) => {
 }
 
 
+// One save at a time: a second click while the first is on its way would create the cookbook twice.
 async function submit() {
-  const {valid, errors} = await form.value.validate()
+  if (saving.value) return
+  saving.value = true
+  try {
+    await save()
+  } finally {
+    saving.value = false
+  }
+}
+
+async function save() {
+  const {valid} = await form.value.validate()
   if (!valid) {
     return
   }
@@ -299,7 +307,7 @@ if (cookbookId.value != null) {
 
   getCookbookUsers(cookbookId.value).then(
     function (response) {
-      members.value = response.data.map(item => ({id: item.id, username: item.username, role: item.isAdmin ? "ADMIN" : "USER"}))
+      members.value = response.data.map(item => ({id: item.id, username: item.username, version: item.version, role: item.isAdmin ? "ADMIN" : "USER"}))
     }
   )
 } else {
@@ -311,4 +319,66 @@ if (cookbookId.value != null) {
 </script>
 
 <style scoped>
+.cookbook-form__title {
+  margin-bottom: 4px;
+}
+
+.cookbook-form__visibility {
+  max-width: 340px;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.member-row__avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.member-row__user {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.member-row__role {
+  flex: 0 1 180px;
+  min-width: 120px;
+}
+
+.add-member {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border: var(--line) dashed var(--ink);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.add-member:hover {
+  background: rgba(255, 255, 255, .5);
+}
+
+.add-member:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
+}
+
+.cookbook-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
 </style>

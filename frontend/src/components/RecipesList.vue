@@ -87,15 +87,13 @@ updateGrid()
     side="end"
     margin="200"
   >
-    <v-container fluid>
-      <div class="recipe-grid">
-        <recipe
-          v-for="recipe in recipes"
-          :key="recipe.id"
-          :recipe="recipe"
-        />
-      </div>
-    </v-container>
+    <div class="sk-recipe-grid">
+      <recipe
+        v-for="recipe in recipes"
+        :key="recipe.id"
+        :recipe="recipe"
+      />
+    </div>
 
     <template v-slot:loading>
       <v-progress-circular
@@ -111,19 +109,3 @@ updateGrid()
     <error :error="errorMessage"></error>
   </div>
 </template>
-
-<style scoped>
-.recipe-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  justify-content: center; /* center whole grid */
-
-  padding: 0 clamp(16px, 8vw, 96px);
-  box-sizing: border-box;
-  margin: 0 auto;
-
-  column-gap: 12px;  /* horizontal space */
-  row-gap: 12px;     /* vertical space */
-}
-
-</style>

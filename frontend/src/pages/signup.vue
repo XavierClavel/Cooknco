@@ -1,122 +1,90 @@
 <template>
-  <v-container class="ma-0 pa-0" align="center">
-  <v-card
-  class="pa-5"
-  max-width="1000px"
-  >
-    <v-form @submit.prevent="submit" class="mx-auto" ref="loginForm" >
-      <v-card-title>
-        {{$t("signup")}}
-      </v-card-title>
-      <error :error="errorMessage"></error>
+  <auth-card :title="$t('sign_up')">
+    <error :error="errorMessage"></error>
 
-      <v-btn
-        class="mt-3"
-        icon="mdi-google"
-        base-color="background"
-        width="150px"
-        @click="loginOauthGoogle"
-      >
-        <img src="@/assets/google.webp" alt="icon" style="width: 24px; height: 24px;" />
-      </v-btn>
+    <button
+      type="button"
+      class="sk-btn sk-btn--block sk-btn--rect sk-btn--lg sk-btn--flat auth-google"
+      @click="loginOauthGoogle"
+    >
+      <img src="@/assets/google.webp" alt="" />
+      {{ $t('continue_with_google') }}
+    </button>
 
-      <v-container class="my-4">
-        <v-row wrap no-gutters>
-          <v-col cols="5" class="text-center">
-            <v-divider class="mt-3" color="black" opacity="1"/>
-          </v-col>
-          <v-col cols="2" class="text-center text-h6" >
-            {{ $t("or")}}
-          </v-col>
-          <v-col cols="5" class="text-center">
-            <v-divider class="mt-3" color="black" opacity="1"/>
-          </v-col>
-        </v-row>
-      </v-container>
+    <div class="sk-or">{{ $t('or') }}</div>
 
+    <v-form ref="loginForm" class="auth-form" @submit.prevent="submit">
       <v-text-field
         v-model="user.username"
-        prepend-inner-icon="mdi-account"
-        :label="`${$t('username')}`"
-        color="primary"
+        name="username"
+        autocomplete="username"
+        prepend-inner-icon="mdi-account-outline"
+        density="comfortable"
+        :label="$t('username')"
         :rules="[requiredRule]"
       ></v-text-field>
 
       <v-text-field
         v-model="user.mail"
+        type="email"
+        name="email"
+        autocomplete="email"
         prepend-inner-icon="mdi-email-outline"
-        :label="`${$t('mail')}`"
-        color="primary"
+        density="comfortable"
+        :label="$t('mail')"
         :rules="[requiredRule]"
       ></v-text-field>
 
       <v-text-field
         v-model="user.password"
+        name="new-password"
+        autocomplete="new-password"
         prepend-inner-icon="mdi-lock-outline"
-        :append-inner-icon="show1 ? 'mdi-eye' : 'mdi-eye-off'"
+        :append-inner-icon="show1 ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+        density="comfortable"
         :rules="[requiredRule, min8Rule]"
         :type="show1 ? 'text' : 'password'"
-        :label="`${$t('password')}`"
-        counter
+        :label="$t('password')"
         @click:append-inner="show1 = !show1"
       ></v-text-field>
 
       <v-text-field
         v-model="password2"
+        name="confirm-password"
+        autocomplete="new-password"
         prepend-inner-icon="mdi-lock-check-outline"
-        :append-inner-icon="show2 ? 'mdi-eye' : 'mdi-eye-off'"
+        :append-inner-icon="show2 ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+        density="comfortable"
         :rules="[requiredRule, passwordRule(user.password, password2)]"
         :type="show2 ? 'text' : 'password'"
-        :label="`${$t('password_confirm')}`"
-        counter
+        :label="$t('password_confirm')"
         @click:append-inner="show2 = !show2"
       ></v-text-field>
 
-      <v-container>
-        <v-row
-          class="d-flex align-center justify-center mb-2 gx-16"
-          dense
-        >
-          <v-col cols="12" sm="auto">
-            <action-button
-              icon="mdi-close-circle-outline"
-              :text="`${$t('log_in')}`"
-              :action="toLogin"
-            ></action-button>
-          </v-col>
-          <v-col cols="12" sm="auto">
-            <action-button
-              icon="mdi-send"
-              :text="`${$t('sign_up')}`"
-              :action="submit"
-            ></action-button>
-          </v-col>
-        </v-row>
-      </v-container>
-
+      <button type="submit" class="sk-btn sk-btn--coral sk-btn--block sk-btn--rect sk-btn--lg auth-btn">
+        {{ $t('sign_up') }}
+      </button>
     </v-form>
-  </v-card>
-  </v-container>
 
+    <template #below>
+      {{ $t('already_have_account') }}
+      <router-link to="/login">{{ $t('log_in') }}</router-link>
+    </template>
+  </auth-card>
 </template>
 
 <script lang="ts" setup>
 import { ref } from 'vue';
-import { useRoute } from 'vue-router';
-import {loginOauthGoogle, signup, toLogin} from "@/scripts/common";
-import {useI18n} from "vue-i18n";
+import {loginOauthGoogle, signup} from "@/scripts/common";
 import {min8Rule, passwordRule, requiredRule} from "@/scripts/rules";
 
-// Get the route object
-const route = useRoute();
 const show1 = ref<boolean>(false)
 const show2 = ref<boolean>(false)
 const password2 = ref<string>('')
-const { t } = useI18n();
 const errorMessage = ref(null)
 const loginForm = ref(null)
 
-const user = ref<object>({
+const user = ref({
   username: '',
   mail: '',
   password: '',
@@ -125,7 +93,7 @@ const user = ref<object>({
 
 const submit = async() => {
   errorMessage.value = null
-  const {valid, errors} = await loginForm.value.validate()
+  const {valid} = await loginForm.value.validate()
   if (!valid) {
     return
   }
@@ -134,5 +102,4 @@ const submit = async() => {
     console.log(error);
   })
 }
-
 </script>

@@ -1,149 +1,111 @@
 <template>
-  <v-container class="mx-auto" align="center">
-    <v-card
-    class="lg pa-5 ma-5"
-    max-width="1000px"
-    min-width="300px"
-    >
+  <section class="sticker sk-pad-lg sk-narrow settings">
+    <h1 class="sk-title">{{ $t("settings") }}</h1>
+    <error :error="errorMessage"></error>
 
+    <form class="settings__form" @submit.prevent="submit">
+      <div class="sk-field settings__language">
+        <label class="sk-label" for="settings-language">{{ $t('language') }}</label>
+        <select id="settings-language" v-model="locale" class="sk-input">
+          <option v-for="item in locales" :key="item.value" :value="item.value">{{ item.label }}</option>
+        </select>
+      </div>
 
-      <form @submit.prevent="submit">
-        <v-card-title >
-          {{$t("settings")}}
-        </v-card-title>
-        <error :error="errorMessage"></error>
-        <v-select
-        v-model="locale"
-        :prepend-inner-icon="ICON_LOCALIZATION"
-        :items="locales"
-        item-title="label"
-        item-value="value"
-        ></v-select>
+      <label class="settings__box settings__row" for="settings-public">
+        <span class="settings__box-title">{{ $t('public_account') }}</span>
+        <span class="sk-switch">
+          <input id="settings-public" v-model="settings.isAccountPublic" type="checkbox" />
+          <span></span>
+        </span>
+      </label>
 
-        <v-card color="background" class="mb-2">
-          <v-checkbox
-            v-model="settings.isAccountPublic"
-            :label="`${$t('public_account')}`"
-            color="black"
-            base-color="black"
-            bg-color="background"
-            variant="elevated"
-            class="mx-2 my-0 mb-n6 text-black"
-          ></v-checkbox>
-        </v-card>
-
-        <v-card color="background" class="mb-2">
-          <v-select
+      <div class="settings__box">
+        <div class="sk-field">
+          <label class="sk-label" for="settings-units">{{ $t('unit_system') }}</label>
+          <select
+            id="settings-units"
             v-model="settings.unitSystem"
-            :prepend-inner-icon="ICON_WEIGHT"
-            :label="`${$t('unit_system')}`"
-            :items="unitSystems"
-            item-title="label"
-            item-value="value"
-            class="mx-2 mt-2"
-          ></v-select>
-          <v-card-text class="pt-0 pb-2 text-caption">
-            {{ $t('unit_system_hint') }}
-          </v-card-text>
-        </v-card>
-
-        <v-card color="background" class="mb-2">
-          <v-checkbox
-            v-model="settings.mailNotificationsEnabled"
-            :label="`${$t('mail_notifications')}`"
-            color="black"
-            base-color="black"
-            variant="elevated"
-            class="mx-2 my-0"
-          ></v-checkbox>
-          <v-card-text class="pt-0 pb-2 text-caption">
-            {{ $t('mail_notifications_hint') }}
-          </v-card-text>
-        </v-card>
-
-        <v-container>
-          <v-row
-            class="d-flex align-center justify-center mb-2 ga-4"
-            dense
+            class="sk-input settings__select"
+            aria-describedby="settings-units-hint"
           >
-              <action-button
-                icon="mdi-lock-reset"
-                :text="`${$t('password')}`"
-                :action="toUpdatePassword"
-              ></action-button>
-              <action-button
-                icon="mdi-robot-outline"
-                :text="`${$t('mcp_settings')}`"
-                :action="toMcp"
-              ></action-button>
-              <action-button
-                :icon="ICON_SAVE"
-                :text="`${$t('save')}`"
-                :action="submit"
-              ></action-button>
-          </v-row>
-        </v-container>
+            <option v-for="item in unitSystems" :key="item.value" :value="item.value">{{ item.label }}</option>
+          </select>
+        </div>
+        <p id="settings-units-hint" class="sk-hint">{{ $t('unit_system_hint') }}</p>
+      </div>
 
+      <div class="settings__box">
+        <label class="settings__row" for="settings-mail">
+          <span class="settings__box-title">{{ $t('mail_notifications') }}</span>
+          <span class="sk-switch">
+            <input
+              id="settings-mail"
+              v-model="settings.mailNotificationsEnabled"
+              type="checkbox"
+              aria-describedby="settings-mail-hint"
+            />
+            <span></span>
+          </span>
+        </label>
+        <p id="settings-mail-hint" class="sk-hint">{{ $t('mail_notifications_hint') }}</p>
+      </div>
 
+      <div class="settings__actions">
+        <button type="button" class="sk-btn" @click="toUpdatePassword">{{ $t('password') }}</button>
+        <button type="button" class="sk-btn" @click="toMcp">{{ $t('mcp_settings') }}</button>
+        <button type="submit" class="sk-btn sk-btn--coral">{{ $t('save') }}</button>
+      </div>
+    </form>
 
+    <!--
+      Deleting the account, at the bottom and behind a confirmation, because it is the one
+      thing on this page that cannot be undone. cooknco.eu/account-deletion describes these
+      exact steps, and the Play Console's data deletion entry points at that page: when
+      this moves, that page moves with it.
+    -->
+    <hr class="sk-divider" />
 
-      </form>
+    <div class="settings__box settings__delete">
+      <i18n-t keypath="delete_account_hint" tag="p" class="sk-hint settings__delete-text">
+        <template #link>
+          <router-link class="sk-link" to="/account-deletion">{{ $t('delete_account_hint_link') }}</router-link>
+        </template>
+      </i18n-t>
 
-      <!--
-        Deleting the account, at the bottom and behind a confirmation, because it is the one
-        thing on this page that cannot be undone. cooknco.eu/account-deletion describes these
-        exact steps, and the Play Console's data deletion entry points at that page: when
-        this moves, that page moves with it.
-      -->
-      <v-divider class="my-2"></v-divider>
+      <v-dialog max-width="500">
+        <template #activator="{ props: activatorProps }">
+          <button type="button" class="sk-btn sk-btn--ink" v-bind="activatorProps">
+            {{ $t('delete_account') }}
+          </button>
+        </template>
 
-      <v-card color="background" class="mb-2">
-        <v-card-text class="pb-0 text-caption">
-          {{ $t('delete_account_hint') }}
-        </v-card-text>
-        <v-card-actions class="justify-center">
-          <v-dialog max-width="500">
-            <template v-slot:activator="{ props: activatorProps }">
-              <action-button
-                icon="mdi-account-remove"
-                :text="`${$t('delete_account')}`"
-                v-bind="activatorProps"
-              ></action-button>
-            </template>
-
-            <template v-slot:default="{ isActive }">
-              <v-card>
-                <v-card-text class="font-weight-bold text-h5">{{ $t('delete_account_title') }}</v-card-text>
-                <v-card-text>{{ $t('delete_account_description') }}</v-card-text>
-
-                <v-card-actions>
-                  <v-spacer></v-spacer>
-                  <v-btn
-                    :text="`${$t('cancel')}`"
-                    @click="isActive.value = false"
-                  ></v-btn>
-                  <v-btn
-                    :text="`${$t('delete_account_confirm')}`"
-                    :loading="isDeleting"
-                    @click="deleteAccount(isActive)"
-                  ></v-btn>
-                </v-card-actions>
-              </v-card>
-            </template>
-          </v-dialog>
-        </v-card-actions>
-      </v-card>
-    </v-card>
-  </v-container>
-
+        <template #default="{ isActive }">
+          <div class="sticker sk-pad-lg settings__dialog">
+            <h2 class="sk-h2">{{ $t('delete_account_title') }}</h2>
+            <p>{{ $t('delete_account_description') }}</p>
+            <div class="settings__dialog-actions">
+              <button type="button" class="sk-btn" @click="isActive.value = false">{{ $t('cancel') }}</button>
+              <button
+                type="button"
+                class="sk-btn sk-btn--ink"
+                :disabled="isDeleting"
+                @click="deleteAccount(isActive)"
+              >
+                <v-progress-circular v-if="isDeleting" indeterminate size="16" width="2"></v-progress-circular>
+                {{ $t('delete_account_confirm') }}
+              </button>
+            </div>
+          </div>
+        </template>
+      </v-dialog>
+    </div>
+  </section>
 </template>
 
 <script lang="ts" setup>
 import { computed, ref } from 'vue';
-import { useRoute } from 'vue-router';
-import {login, toLogin, toMcp, toMyProfile, toSignup, toUpdatePassword} from '@/scripts/common'
+import {toLogin, toMcp, toMyProfile, toUpdatePassword} from '@/scripts/common'
 import {useI18n} from "vue-i18n";
-import {ICON_LOCALIZATION, ICON_SAVE, ICON_WEIGHT} from "@/scripts/icons";
 import {forceLocale, fromApiLocale, getLocale, toApiLocale} from "@/scripts/localization";
 import {getSettings, updateSettings} from "@/scripts/settings";
 import {IMPERIAL, METRIC, setUnitSystem} from "@/scripts/unitSystem";
@@ -220,3 +182,89 @@ const deleteAccount = async (isActive) => {
 
 
 </script>
+
+<style scoped>
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings__language {
+  max-width: 300px;
+}
+
+.settings__box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+}
+
+.settings__box p {
+  margin: 0;
+}
+
+.settings__row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.settings__box-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.settings__select {
+  max-width: 300px;
+  background: var(--paper);
+}
+
+.settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.settings__delete {
+  align-items: center;
+}
+
+.settings__delete-text {
+  align-self: stretch;
+}
+
+.settings__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings__dialog p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.settings__dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+</style>

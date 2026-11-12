@@ -97,90 +97,147 @@ const getTitle = () => {
 
 </script>
 <template>
-<v-card class="ml-2" max-width="500px">
-  <v-card-text v-if="!hasAccepted && !hasPending">{{$t("nothing_to_display")}}</v-card-text>
-  <v-list lines="two" style="background-color: transparent !important; border-width: 0 !important">
-    <v-list-subheader class="text-left ml-n14" inset v-if="hasPending">{{$t("pending")}}</v-list-subheader>
+<div class="followers sticker sk-pad">
+  <h2 class="sk-h2">{{ $t(getTitle()) }}</h2>
+  <p v-if="!hasAccepted && !hasPending" class="sk-muted ma-0">{{$t("nothing_to_display")}}</p>
 
-    <v-list-item
-      v-for="user in usersPending"
-      :key="user.user.username"
-      :title="user.user.username"
-    >
-      <template v-slot:prepend>
-        <v-avatar color="black" class="mr-2" style="border:2px solid #0d1821;">
-          <v-img :src="getUserIconUrl(user.user.id, user.user.version)" @click.stop="toViewUser(user.user.id)" class="clickable_image"></v-img>
-        </v-avatar>
-      </template>
+  <template v-if="hasPending">
+    <div class="sk-eyebrow">{{$t("pending")}}</div>
+    <ul class="followers__list">
+      <li v-for="user in usersPending" :key="user.user.username" class="followers__row">
+        <a
+          class="followers__user"
+          :href="`/user/view/?user=${user.user.id}`"
+          @click.prevent="toViewUser(user.user.id)"
+        >
+          <span class="sk-avatar"><img :src="getUserIconUrl(user.user.id, user.user.version)" alt="" /></span>
+          <span class="followers__name">{{ user.user.username }}</span>
+        </a>
 
-      <template v-slot:append v-if="forMyself">
-        <v-btn
-          color="black"
-          style="border-width: 0 !important"
-          :icon="ICON_ACCEPT"
-          variant="text"
-          v-if="isFollowersTab"
-          @click.stop="doAcceptFollowRequest(user.user.id)"
-        ></v-btn>
-        <v-btn
-          color="black"
-          style="border-width: 0 !important"
-          :icon="ICON_DENY"
-          variant="text"
-          v-if="isFollowersTab"
-          @click.stop="doDeclineFollowRequest(user.user.id)"
-        ></v-btn>
-        <v-btn
-          color="black"
-          style="border-width: 0 !important"
-          :icon="ICON_REMOVE"
-          variant="text"
-          v-if="!isFollowersTab"
-          @click.stop="cancelFollowRequest(user.user.id)"
-        ></v-btn>
-      </template>
-    </v-list-item>
+        <span v-if="forMyself" class="followers__actions">
+          <button
+            v-if="isFollowersTab"
+            type="button"
+            class="sk-icon-btn sk-icon-btn--white"
+            :aria-label="$t('accept_follow_request')"
+            :title="$t('accept_follow_request')"
+            @click.stop="doAcceptFollowRequest(user.user.id)"
+          ><v-icon>{{ ICON_ACCEPT }}</v-icon></button>
+          <button
+            v-if="isFollowersTab"
+            type="button"
+            class="sk-icon-btn sk-icon-btn--white"
+            :aria-label="$t('decline_follow_request')"
+            :title="$t('decline_follow_request')"
+            @click.stop="doDeclineFollowRequest(user.user.id)"
+          ><v-icon>{{ ICON_DENY }}</v-icon></button>
+          <button
+            v-if="!isFollowersTab"
+            type="button"
+            class="sk-icon-btn sk-icon-btn--white"
+            :aria-label="$t('cancel_follow_request')"
+            :title="$t('cancel_follow_request')"
+            @click.stop="cancelFollowRequest(user.user.id)"
+          ><v-icon>{{ ICON_REMOVE }}</v-icon></button>
+        </span>
+      </li>
+    </ul>
+  </template>
 
-    <v-divider inset v-if="hasPending && hasAccepted"></v-divider>
+  <hr v-if="hasPending && hasAccepted" class="sk-divider" />
 
-    <v-list-subheader class="text-left ml-n14" inset v-if="hasAccepted">{{$t("accepted")}}</v-list-subheader>
+  <template v-if="hasAccepted">
+    <div class="sk-eyebrow">{{$t("accepted")}}</div>
+    <ul class="followers__list">
+      <li v-for="user in usersAccepted" :key="user.user.username" class="followers__row">
+        <a
+          class="followers__user"
+          :href="`/user/view/?user=${user.user.id}`"
+          @click.prevent="toViewUser(user.user.id)"
+        >
+          <span class="sk-avatar"><img :src="getUserIconUrl(user.user.id, user.user.version)" alt="" /></span>
+          <span class="followers__name">{{ user.user.username }}</span>
+        </a>
 
-    <v-list-item
-      v-for="user in usersAccepted"
-      :key="user.user.username"
-      :title="user.user.username"
-    >
-      <template v-slot:prepend>
-        <v-avatar color="black" class="mr-2" style="border:2px solid #0d1821;">
-          <v-img :src="getUserIconUrl(user.user.id, user.user.version)" @click.stop="toViewUser(user.user.id)" class="clickable_image"></v-img>
-        </v-avatar>
-      </template>
-
-      <template v-slot:append v-if="forMyself">
-        <v-btn
-          color="black"
-          style="border-width: 0 !important"
-          :icon="ICON_REMOVE"
-          variant="text"
-          v-if="isFollowersTab"
-          @click.stop="doRemoveFollower(user.user.id)"
-        ></v-btn>
-        <v-btn
-          color="black"
-          style="border-width: 0 !important"
-          :icon="ICON_REMOVE"
-          variant="text"
-          v-if="!isFollowersTab"
-          @click.stop="doUnfollow(user.user.id)"
-        ></v-btn>
-      </template>
-    </v-list-item>
-  </v-list>
-</v-card>
+        <span v-if="forMyself" class="followers__actions">
+          <button
+            v-if="isFollowersTab"
+            type="button"
+            class="sk-icon-btn sk-icon-btn--white"
+            :aria-label="$t('remove_follower')"
+            :title="$t('remove_follower')"
+            @click.stop="doRemoveFollower(user.user.id)"
+          ><v-icon>{{ ICON_REMOVE }}</v-icon></button>
+          <button
+            v-if="!isFollowersTab"
+            type="button"
+            class="sk-icon-btn sk-icon-btn--white"
+            :aria-label="$t('unfollow')"
+            :title="$t('unfollow')"
+            @click.stop="doUnfollow(user.user.id)"
+          ><v-icon>{{ ICON_REMOVE }}</v-icon></button>
+        </span>
+      </li>
+    </ul>
+  </template>
+</div>
 </template>
 
 <style scoped>
-.clickable_image {
-  cursor: pointer
+.followers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(440px, calc(100vw - 48px));
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.followers__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.followers__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.followers__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.followers__user:hover .followers__name {
+  text-decoration: underline;
+}
+
+.followers__user:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
+}
+
+.followers__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.followers__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 </style>

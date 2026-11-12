@@ -1,98 +1,91 @@
 <template>
-  <v-layout class="rounded rounded-md">
+  <section class="sticker sk-pad-lg users">
+    <h1 class="sk-title">{{ $t("users") }}</h1>
 
-    <v-main class="d-flex align-center justify-center" style="min-height: 300px;" >
-      <v-card width="100%" max-width="1500px" class="ma-5">
-        <v-card-title>
-          {{$t("users")}}
-        </v-card-title>
-        <v-text-field
-          width="300px"
-          class="ml-2 mt-n2"
-          density="compact"
-          :label="`${$t('search_user')}`"
-          clearable
-          v-model="query"
-          @update:modelValue="updateQuery"
-        ></v-text-field>
-          <v-table
-            fixed-header
-          >
-            <thead>
-            <tr>
-              <th class="text-left">
-                {{$t("user")}}
-              </th>
-              <th class="text-center">
-                {{$t("role")}}
-              </th>
-              <th class="text-center">
-                {{$t("actions")}}
-              </th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr
-              v-for="user in users"
-              :key="user.username"
-            >
-              <td>
-                <v-avatar size="40" variant="elevated" class="mr-2" style="border:2px solid #0d1821 !important;">
-                  <v-img
-                    color="surface-variant"
-                    :src="getUserIconUrl(user.id, user.version)"
-                    cover
-                    v-bind="props"
-                    class="clickable_image"
-                    @click.stop="toViewUser(user.id)"
-                  ></v-img>
-                </v-avatar>
-                {{ user.username }}</td>
-              <td>
-                <div class="d-flex justify-center align-center" style="height: 100%;">
-                  <div style="width: 130px">
-                  <v-select
-                    v-model="user.role"
-                    :items="userRoles"
-                    density="compact"
-                    style="width: 130px"
-                    @update:modelValue="() => updateRole(user)"
-                  ></v-select>
-                  </div>
-                </div>
-              </td>
-              <td class="y-5 align-content-center justify-center align-center" >
-                <div class="d-flex justify-center align-center" style="height: 100%;">
-                <v-btn icon="mdi-pencil" color="primary" flat class="mr-1"></v-btn>
-                <v-btn icon="mdi-delete" color="primary" flat @click="performDelete(user.username)"></v-btn>
-                </div>
-              </td>
-            </tr>
-            </tbody>
-          </v-table>
-        <v-row justify="center">
-          <v-col cols="6">
-            <v-container class="max-width">
-              <v-pagination
-                v-model="page"
-                :length="pagesCount"
-                class="my-4"
-                @update:modelValue="updateDisplay"
-              ></v-pagination>
-            </v-container>
-          </v-col>
-        </v-row>
-      </v-card>
+    <div class="sk-input-wrap users__search">
+      <v-icon>mdi-magnify</v-icon>
+      <input
+        v-model="query"
+        type="search"
+        class="sk-input"
+        :placeholder="$t('search_user')"
+        :aria-label="$t('search_user')"
+        @input="updateQuery"
+      />
+    </div>
 
-    </v-main>
-  </v-layout>
+    <div class="sk-table-scroll">
+      <table class="sk-table">
+        <thead>
+          <tr>
+            <th>{{ $t("user") }}</th>
+            <th>{{ $t("role") }}</th>
+            <th>{{ $t("actions") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="user in users" :key="user.username">
+            <td>
+              <a
+                class="users__who"
+                :href="`/user/view/?user=${user.id}`"
+                @click.prevent="toViewUser(user.id)"
+              >
+                <span class="sk-avatar">
+                  <img :src="getUserIconUrl(user.id, user.version)" alt="" loading="lazy" />
+                </span>
+                <span class="users__name">{{ user.username }}</span>
+              </a>
+            </td>
+            <td>
+              <select
+                v-model="user.role"
+                class="sk-input users__role"
+                :aria-label="`${$t('role')} — ${user.username}`"
+                @change="updateRole(user)"
+              >
+                <option v-for="role in userRoles" :key="role" :value="role">{{ role }}</option>
+              </select>
+            </td>
+            <td>
+              <div class="users__actions">
+                <button type="button" class="sk-icon-btn sk-icon-btn--coral users__action" :aria-label="$t('edit')">
+                  <v-icon>mdi-pencil-outline</v-icon>
+                </button>
+                <button
+                  type="button"
+                  class="sk-icon-btn sk-icon-btn--coral users__action"
+                  :aria-label="$t('delete')"
+                  @click="performDelete(user.username)"
+                >
+                  <v-icon>mdi-trash-can-outline</v-icon>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <v-pagination
+      v-if="pagesCount > 1"
+      v-model="page"
+      :length="pagesCount"
+      :total-visible="5"
+      density="comfortable"
+      rounded="lg"
+      variant="outlined"
+      class="users__pages"
+      @update:model-value="updateDisplay"
+    ></v-pagination>
+  </section>
 </template>
 
 <script lang="ts" setup>
-import {listUsers, deleteUser, setRole, getUsersCount} from "@/scripts/users";
-import {getUserIconUrl, toViewIngredient, toViewUser} from "@/scripts/common";
+import {listUsers, deleteUser, setRole} from "@/scripts/users";
+import {getUserIconUrl, toViewUser} from "@/scripts/common";
 import {debounce} from "lodash";
-let users = ref<string[]>([])
+const users = ref<{id: number, username: string, role: string, version?: number}[]>([])
 const page = ref<number>(1)
 const pagesCount = ref<number>(1)
 const pageSize = ref(20)
@@ -142,3 +135,70 @@ const updateQuery = () => {
 updateDisplay()
 
 </script>
+
+
+<style scoped>
+.users {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.users__search {
+  max-width: 340px;
+}
+
+.users__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.users__who:hover .users__name {
+  text-decoration: underline;
+}
+
+.users__who:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.users__role {
+  width: 120px;
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.users__actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.users__action {
+  width: 34px;
+  height: 34px;
+}
+
+.users__action .v-icon {
+  font-size: 18px;
+}
+
+.users__pages :deep(.v-pagination__list) {
+  gap: 6px;
+}
+
+.users__pages :deep(.v-btn) {
+  background: var(--white);
+  box-shadow: none !important;
+}
+
+.users__pages :deep(.v-pagination__item--is-active .v-btn) {
+  background: var(--ink);
+  color: var(--white);
+}
+</style>

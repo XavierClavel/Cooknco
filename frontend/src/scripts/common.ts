@@ -38,6 +38,7 @@ export {
   toListCookbooks,
   toMyCookbooks,
   toViewCookbook,
+  toMealPlan,
 
   toResetPassword,
   toResetPasswordSuccess,
@@ -113,6 +114,7 @@ const toMyCookbooks = () => {
 }
 
 const toHome = () => navigateTo('/home')
+const toMealPlan = () => navigateTo("/meal-plan")
 const toUsers = () => navigateTo('/user/list')
 // The backoffice is a separate application served at /admin, so this is a full
 // page navigation rather than a client-side route change.

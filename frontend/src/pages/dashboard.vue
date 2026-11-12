@@ -1,39 +1,16 @@
 <template>
-  <v-container class="d-flex flex-wrap align-content-center align-center justify-center ga-2">
-  <v-card width="200px">
-    <v-card-title class="text-center">{{report.usersCount}}</v-card-title>
-    <v-card-text class="text-center"
-    >{{$t('users')}}</v-card-text>
-  </v-card>
-  <v-card width="200px">
-    <v-card-title class="text-center">{{report.recipesCount}}</v-card-title>
-    <v-card-text class="text-center"
-    >{{$t('recipes')}}</v-card-text>
-  </v-card>
-  <v-card width="200px">
-    <v-card-title class="text-center">{{report.likesCount}}</v-card-title>
-    <v-card-text class="text-center"
-    >{{$t('likes')}}</v-card-text>
-  </v-card>
-  <v-card width="200px">
-    <v-card-title class="text-center">{{report.cookbooksCount}}</v-card-title>
-    <v-card-text class="text-center"
-    >{{$t('cookbooks')}}</v-card-text>
-  </v-card>
-    <v-card width="200px">
-      <v-card-title class="text-center">{{report.followsCount}}</v-card-title>
-      <v-card-text class="text-center"
-      >{{$t('follows')}}</v-card-text>
-    </v-card>
-  </v-container>
+  <div class="stats">
+    <div v-for="stat in stats" :key="stat.label" class="sticker stats__item">
+      <div class="stats__value">{{ report[stat.key] ?? '—' }}</div>
+      <div class="stats__label">{{ $t(stat.label) }}</div>
+    </div>
+  </div>
 </template>
 
 <script lang="ts" setup>
 import {getReport} from "@/scripts/dashboard";
-import {useI18n} from "vue-i18n";
-const {t} = useI18n()
 
-const report = ref<object>({
+const report = ref<Record<string, number | null>>({
   usersCount: null,
   recipesCount: null,
   likesCount: null,
@@ -41,8 +18,47 @@ const report = ref<object>({
   followsCount: null,
 })
 
+const stats = [
+  {key: 'usersCount', label: 'users'},
+  {key: 'recipesCount', label: 'recipes'},
+  {key: 'likesCount', label: 'likes'},
+  {key: 'cookbooksCount', label: 'cookbooks'},
+  {key: 'followsCount', label: 'follows'},
+]
+
 getReport().then(response => {
   report.value = response.data
   console.log(report.value)
 })
 </script>
+
+
+<style scoped>
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  padding: 0 var(--lift) var(--lift) 0;
+}
+
+.stats__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.stats__value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stats__label {
+  font-size: 13px;
+  font-weight: 700;
+}
+</style>

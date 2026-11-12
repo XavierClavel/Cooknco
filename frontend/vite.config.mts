@@ -27,7 +27,7 @@ const adminEntry = () => ({
       next()
     })
   },
-  // unplugin-fonts injects Roboto + Material Design Icons into every HTML entry.
+  // unplugin-fonts injects Geologica + Material Design Icons into every HTML entry.
   // The backoffice uses the system font stack and inline SVG icons, so those
   // preloads would pull down the public app's font assets for nothing.
   transformIndexHtml: {
@@ -98,8 +98,8 @@ export default defineConfig({
     Fonts({
       google: {
         families: [ {
-          name: 'Roboto',
-          styles: 'wght@100;300;400;500;700;900',
+          name: 'Geologica',
+          styles: 'wght@300;400;500;700;800',
         }],
       },
     }),

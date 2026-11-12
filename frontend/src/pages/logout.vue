@@ -1,69 +1,17 @@
 <template>
-  <v-container class="mx-auto" align="center">
-  <v-card
-  class="rounded-lh pa-5 ma-5"
-  max-width="1000px"
-  >
-
-
-    <form @submit.prevent="submit" class="mx-auto">
-      <v-card-title>
-        {{$t("logout")}}
-      </v-card-title>
-      <v-card-text>
-        {{$t("logout_successful")}}
-      </v-card-text>
-
-      <v-container>
-        <v-row
-          class="d-flex align-center justify-center mb-2 mt-16 gx-16"
-          dense
-        >
-          <v-col cols="12" sm="auto">
-            <action-button
-              icon="mdi-account-plus"
-              :text="`${$t('signup')}`"
-              :action="toSignup"
-            ></action-button>
-          </v-col>
-          <v-col cols="12" sm="auto">
-            <action-button
-              icon="mdi-send"
-              :text="`${$t('login')}`"
-              :action="toLogin"
-            ></action-button>
-          </v-col>
-        </v-row>
-      </v-container>
-
-    </form>
-  </v-card>
-  </v-container>
-
+  <auth-card :title="$t('logout')">
+    <p class="auth-text">{{ $t('logout_successful') }}</p>
+    <div class="auth-actions">
+      <button type="button" class="sk-btn sk-btn--rect sk-btn--lg auth-btn" @click="toSignup">
+        {{ $t('sign_up') }}
+      </button>
+      <button type="button" class="sk-btn sk-btn--coral sk-btn--rect sk-btn--lg auth-btn" @click="toLogin">
+        {{ $t('log_in') }}
+      </button>
+    </div>
+  </auth-card>
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
-import { useRoute } from 'vue-router';
-import {login, toLogin, toSignup} from '@/scripts/common'
-
-// Get the route object
-const route = useRoute();
-
-
-const user = ref<object>({
-  username: '',
-  password: '',
-})
-
-
-
-const submit = () => {
-  console.log(user.password)
-  console.log(user)
-  login(user.value)
-}
-
-
-
+import {toLogin, toSignup} from '@/scripts/common'
 </script>

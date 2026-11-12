@@ -1,72 +1,50 @@
 <template>
-  <v-layout class="rounded rounded-md">
-    <v-card class="pl-sm-2 pt-4 d-flex flex-column" color="transparent" style="border:0 solid" variant="flat">
-      <v-card-title
-        class="text-h4 text-sm-h2 font-weight-bold text-left mx-n4 mx-sm-0"
-      >
-        {{$t("welcome")}}, {{username}}! ✨
-      </v-card-title>
+  <div class="sk-page home">
+    <header>
+      <h1 class="sk-title">{{ $t("welcome") }}, {{ username }}!</h1>
+      <p class="sk-subtitle">{{ $t("welcome_subtext") }}</p>
+    </header>
 
-      <v-card-text class="text-sm-h4 text-md-h3 mb-8 mt-n4 mt-sm-n6 mx-n4 mx-sm-0 font-weight-thin">
-        {{$t("welcome_subtext")}}
-      </v-card-text>
-
-      <v-infinite-scroll
-        @load="loadMore"
-        :disabled="isLoading || allRecipesLoaded"
-        side="end"
-        margin="200"
-        style="overflow:hidden"
-      >
-        <v-timeline
-          class="my-2"
-          align="start"
-          side="end"
-          line-color="black"
-          line-thickness="2px"
-          :density="xs ? 'compact' : 'comfortable'"
-        >
-
-        <v-timeline-item
+    <v-infinite-scroll
+      @load="loadMore"
+      :disabled="isLoading || allRecipesLoaded"
+      side="end"
+      margin="200"
+      class="home__scroll"
+    >
+      <!-- One group per day: an ink line, a coral circle with the count, the day as a pill -->
+      <ol class="timeline">
+        <li
           v-for="(timelineRecipe, date) in timelineRecipes"
           :key="date"
-          size="large"
-          side="end"
-          dot-color="background"
-          fill-dot
+          class="timeline__group"
         >
-        <template v-slot:icon>
-          <v-avatar color="primary text-black" size="46" style="border: 3px solid #0d1821 !important;" >
-            {{timelineRecipe.length}}
-          </v-avatar>
-        </template>
-          <v-card-text class="mt-n2 ml-n6 text-wrap text-h6 text-sm-h6 font-weight-bold">{{ $t(date) }}</v-card-text>
-          <v-row class="mt-1 mb-16">
+          <div class="timeline__head">
+            <span class="timeline__count">{{ timelineRecipe.length }}</span>
+            <h2 class="sk-pill sk-pill--lg timeline__label">{{ $t(date) }}</h2>
+          </div>
+          <div class="sk-recipe-grid timeline__grid">
+            <recipe v-for="recipe in timelineRecipe" :key="recipe.id" :recipe="recipe"></recipe>
+          </div>
+        </li>
+      </ol>
 
-            <recipe class="ma-2" :recipe="recipe" v-for="recipe in timelineRecipe"></recipe>
-          </v-row>
-
-        </v-timeline-item>
-      </v-timeline>
-        <template v-slot:loading>
-          <v-progress-circular
-            v-if="isLoading"
-            indeterminate
-            color="black"
-            class="my-5 d-flex mx-auto"
-          />
-        </template>
-        </v-infinite-scroll>
-    </v-card>
-  </v-layout>
+      <template v-slot:loading>
+        <v-progress-circular
+          v-if="isLoading"
+          indeterminate
+          color="black"
+          class="my-5 d-flex mx-auto"
+        />
+      </template>
+    </v-infinite-scroll>
+  </div>
 </template>
 
 <script lang="ts" setup>
 
 import {listRecipes} from "@/scripts/recipes";
 import {useAuthStore} from "@/stores/auth";
-import {useI18n} from "vue-i18n";
-import { useDisplay } from 'vuetify';
 import {getLocale} from "@/scripts/localization";
 
 const recipes = ref([])
@@ -77,9 +55,6 @@ const username = computed(() => authStore.username)
 const currentPage = ref(0)
 const isLoading = ref(false)
 const allRecipesLoaded = ref(false)
-
-const { t } = useI18n()
-const { xs, sm, md } = useDisplay();
 
 const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
@@ -155,10 +130,79 @@ const updateGrid = async() => {
       acc[groupKey].push(recipe);
       return acc;
     }, {}); // Initialize with a Map
-    console.log(timelineRecipes.value)
   }
 }
 
 updateGrid()
 
 </script>
+
+<style scoped>
+.home__scroll {
+  overflow: visible !important;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.timeline__group {
+  --dot: 36px;
+  --indent: 52px;
+  position: relative;
+  padding: 0 0 32px var(--indent);
+}
+
+/* The line runs from this day's circle down to the next one's */
+.timeline__group:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--dot) / 2 - 1px);
+  top: calc(var(--dot) / 2);
+  bottom: 0;
+  border-left: var(--line) solid var(--ink);
+}
+
+.timeline__head {
+  display: flex;
+  align-items: center;
+  min-height: var(--dot);
+  margin-bottom: 12px;
+}
+
+.timeline__count {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dot);
+  height: var(--dot);
+  border: var(--line) solid var(--ink);
+  border-radius: 50%;
+  background: var(--coral);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.timeline__label {
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .timeline__group {
+    --dot: 30px;
+    --indent: 40px;
+  }
+
+  .timeline__grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px 12px;
+  }
+}
+</style>

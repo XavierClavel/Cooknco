@@ -1,16 +1,15 @@
 <template>
 
-  <v-dialog v-model="recipesDialog" >
-    <v-card color="background" class="mx-10">
-    <recipes-list :query="`user=${user.id}`"></recipes-list>
-    </v-card>
+  <v-dialog v-model="recipesDialog" max-width="1100">
+    <div class="sticker sk-pad profile-dialog">
+      <recipes-list :query="`user=${user.id}`"></recipes-list>
+    </div>
   </v-dialog>
 
-  <v-dialog v-model="likesDialog" width="260px">
-    <v-card color="background">
+  <v-dialog v-model="likesDialog" max-width="1100">
+    <div class="sticker sk-pad profile-dialog">
       <recipes-list :query="`likedBy=${user.id}`"></recipes-list>
-    </v-card>
-
+    </div>
   </v-dialog>
 
   <v-dialog v-model="followersDialog" width="auto">
@@ -21,104 +20,91 @@
     <followers-display :is-followers-tab="false"></followers-display>
   </v-dialog>
 
-  <error :error="errorMessage"></error>
+  <div class="sk-page">
+    <error :error="errorMessage"></error>
 
-  <v-card
-  class="mx-auto pa-5"
-  max-width="1000px"
-  v-if="!errorMessage"
-  >
-    <v-container class="d-flex
-      flex-wrap justify-center
-      flex-sm-nowrap">
-      <v-img
-        color="surface-variant"
-        :src="getUserIconUrl(user.id, user.version)"
-        rounded="circle"
-        height="200px"
-        max-width="200px"
-        min-width="200px"
-        aspect-ratio="1"
-        cover
-        style="border: 3px solid #0d1821;"
-      ></v-img>
-      <v-container class="justify-center align-content-center">
-      <v-card-title
-        class="mx-auto px-3 mt-n4 text-black text-h2 font-weight-bold
-        text-center text-sm-left"
-      >{{ user.username }}</v-card-title>
-      <v-card-text
-        class="mx-auto px-3 mt-n4 text-h6 font-weight-light
-        text-center text-sm-left"
-      > {{user.bio}} </v-card-text>
-      </v-container>
-    </v-container>
+    <section v-if="!errorMessage" class="profile sticker sk-pad-lg sk-narrow">
+      <div class="profile__top">
+        <span class="sk-avatar profile__avatar">
+          <img v-if="user.id" :src="getUserIconUrl(user.id, user.version)" :alt="user.username" />
+        </span>
 
-    <v-container class="d-flex flex-wrap ga-2">
-      <interactible-picto-info :value="user.recipesCount" :icon="`${ICON_USER_RECIPES}`" :action="openRecipesWindow"></interactible-picto-info>
-      <interactible-picto-info :value="user.likesCount" :icon="`${ICON_USER_LIKES}`" :action="openLikesWindow"></interactible-picto-info>
-      <interactible-picto-info :value="user.followsCount" :icon="`${ICON_USER_FOLLOWS}`" :action="openFollowsWindow"></interactible-picto-info>
-      <interactible-picto-info :value="user.followersCount" :icon="`${ICON_USER_FOLLOWERS}`" :action="openFollowersWindow"></interactible-picto-info>
-  </v-container>
+        <div class="profile__text">
+          <h1 class="sk-title">{{ user.username }}</h1>
+          <p v-if="user.bio" class="profile__bio">{{ user.bio }}</p>
 
-    <v-container>
-      <v-row
-        class="d-flex align-center justify-center align-content-center mb-2 gx-4"
-        dense
-      >
-        <action-button
-          :icon="`${followsUser ? 'mdi-account-minus' : 'mdi-account-plus'}`"
-          :text="`${followsUser ? $t('unfollow') : $t('follow')}`"
-          :action="followUnfollow"
+          <div class="profile__stats">
+            <button type="button" class="profile__stat" @click="openRecipesWindow">
+              <span class="sk-eyebrow">{{ $t("recipes") }}</span>
+              <span class="profile__stat-value">{{ user.recipesCount ?? "–" }}</span>
+            </button>
+            <button type="button" class="profile__stat" @click="openLikesWindow">
+              <span class="sk-eyebrow">{{ $t("likes") }}</span>
+              <span class="profile__stat-value">{{ user.likesCount ?? "–" }}</span>
+            </button>
+            <button type="button" class="profile__stat" @click="openFollowsWindow">
+              <span class="sk-eyebrow">{{ $t("follows") }}</span>
+              <span class="profile__stat-value">{{ user.followsCount ?? "–" }}</span>
+            </button>
+            <button type="button" class="profile__stat" @click="openFollowersWindow">
+              <span class="sk-eyebrow">{{ $t("followers") }}</span>
+              <span class="profile__stat-value">{{ user.followersCount ?? "–" }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile__actions">
+        <button
           v-if="userId != currentUserId"
-        ></action-button>
-        <action-button
-          icon="mdi-pencil"
-          :text="`${$t('edit')}`"
-          :action="() => toEditUser(userId)"
-          v-if="userId == currentUserId"
-        ></action-button>
+          type="button"
+          class="sk-btn"
+          :class="{'sk-btn--coral': !followsUser}"
+          :disabled="following"
+          @click="onFollowUnfollow"
+        >
+          <v-progress-circular v-if="following" indeterminate size="18" width="2"></v-progress-circular>
+          <v-icon v-else>{{ followsUser ? 'mdi-account-minus' : 'mdi-account-plus' }}</v-icon>
+          {{ followsUser ? $t('unfollow') : $t('follow') }}
+        </button>
+        <template v-if="userId == currentUserId">
+          <button type="button" class="sk-btn" @click="toEditUser(userId)">
+            <v-icon>mdi-pencil-outline</v-icon>
+            {{ $t("edit") }}
+          </button>
+          <button type="button" class="sk-btn" @click="toSettings()">
+            <v-icon>mdi-cog-outline</v-icon>
+            {{ $t("settings") }}
+          </button>
+        </template>
         <report-dialog
           v-if="userId != currentUserId"
           target-type="USER"
           :target-id="Number(userId)"
         >
           <template #activator="{props}">
-            <v-btn
-              v-bind="props"
-              height="48"
-              :prepend-icon="ICON_REPORT"
-              color="primary"
-              flat
-              rounded="lg"
-              class="text-h6 px-10 mx-sm-3 text-wrap"
-              min-height="70px"
-              min-width="200px"
-              :text="`${$t('report')}`"
-            ></v-btn>
+            <button type="button" class="sk-btn" v-bind="props">
+              <v-icon>{{ ICON_REPORT }}</v-icon>
+              {{ $t("report") }}
+            </button>
           </template>
         </report-dialog>
-      </v-row>
-    </v-container>
+      </div>
+    </section>
 
-    <error :error="errorMessage"></error>
-
-
-  </v-card>
-
-  <recipes-list :query="`?user=${userId}`"></recipes-list>
+    <recipes-list :query="`?user=${userId}`"></recipes-list>
+  </div>
 
 </template>
 
 <script lang="ts" setup>
 import { useRoute } from 'vue-router';
 import {ref} from "vue";
-import {getUserIconUrl, toEditUser, toListRecipe} from "@/scripts/common";
+import {getUserIconUrl, toEditUser, toListRecipe, toSettings} from "@/scripts/common";
 import {getUser} from "@/scripts/users";
-import InteractiblePictoInfo from "@/components/InteractiblePictoInfo.vue";
 import {follow, isFollowingUser, unfollow} from "@/scripts/follows";
 import {useAuthStore} from "@/stores/auth";
-import {ICON_REPORT, ICON_USER_FOLLOWERS, ICON_USER_FOLLOWS, ICON_USER_LIKES, ICON_USER_RECIPES} from "@/scripts/icons";
+import {ICON_REPORT} from "@/scripts/icons";
 import RecipesList from "@/components/RecipesList.vue";
 
 const route = useRoute();
@@ -133,6 +119,7 @@ const followersDialog = ref(false)
 const followsDialog = ref(false)
 const recipesDialog = ref(false)
 const likesDialog = ref(false)
+const following = ref(false)
 
 const openRecipesWindow = () => {
   recipesDialog.value = true
@@ -166,6 +153,16 @@ const redirectRecipesLiked = () => {
   toListRecipe(`?likedBy=${userId}`)
 }
 
+async function onFollowUnfollow() {
+  if (following.value) return
+  following.value = true
+  try {
+    await followUnfollow()
+  } finally {
+    following.value = false
+  }
+}
+
 async function followUnfollow() {
   if (followsUser.value) {
     await unfollow(userId).catch(function (error) {
@@ -194,3 +191,115 @@ const updateUser = () => {
 
 updateUser()
 </script>
+
+<style scoped>
+.profile {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profile__top {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.profile__avatar {
+  width: 168px;
+  height: 168px;
+}
+
+.profile__text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.profile__text .sk-title {
+  overflow-wrap: anywhere;
+}
+
+.profile__bio {
+  margin: 0;
+  color: var(--muted);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.profile__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.profile__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.profile__stat:hover {
+  background: var(--cream);
+}
+
+.profile__stat:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
+}
+
+.profile__stat .sk-eyebrow {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile__stat-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.profile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.profile-dialog {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 700px) {
+  .profile__top {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile__avatar {
+    width: 120px;
+    height: 120px;
+  }
+
+  .profile__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

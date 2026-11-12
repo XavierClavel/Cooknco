@@ -1,79 +1,617 @@
+/*
+  The sticker theme.
 
+  Every surface is a sticker: a flat pale card, a thin ink outline and a hard ink shadow
+  offset down and to the right, with no blur. The tokens below are the whole palette; a page
+  reaching for a colour that is not one of them is drifting from the theme.
+
+  The primitives (.sticker, .sk-btn, .sk-pill, .sk-chip, .sk-input, .sk-eyebrow…) are what
+  pages are built from. Vuetify components still render the controls that carry behaviour
+  (menus, dialogs, selects, infinite scroll); the overrides further down dress those in the
+  same outline and shadow so the two never look like different products.
+*/
+
+:root {
+  --ink: #0d1821;
+  --page: #629677;
+  --paper: #eef3ee;
+  --white: #ffffff;
+  --coral: #ff6f59;
+  --mustard: #f4b634;
+  --plum: #4f4193;
+  --cream: #fff0c2;
+  --mint: #cfe3d4;
+  --mint-deep: #b9d6c1;
+  --sky: #bfe3f7;
+  --blush: #ffd9d2;
+  --label: #3d6b4f;
+  --muted: #55605a;
+  --rule: #c9d3cb;
+
+  --line: 2px;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --lift: 5px;
+  --lift-sm: 3px;
+  --shadow: var(--lift) var(--lift) 0 var(--ink);
+  --shadow-sm: var(--lift-sm) var(--lift-sm) 0 var(--ink);
+
+  --font: 'Geologica', system-ui, sans-serif;
+}
+
+html, body {
+  background: var(--page);
+}
+
+.v-application {
+  background: var(--page) !important;
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+/* ---------- Typography ---------- */
+
+.sk-title {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.sk-subtitle {
+  font-size: clamp(16px, 2vw, 20px);
+  font-weight: 400;
+  color: var(--ink);
+  margin: 4px 0 0;
+}
+
+.sk-h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.sk-h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.sk-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+.sk-muted {
+  color: var(--muted);
+}
+
+.sk-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sk-link {
+  color: var(--ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---------- Surfaces ---------- */
+
+.sticker {
+  background: var(--paper);
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+}
+
+.sticker--white { background: var(--white); }
+.sticker--mustard { background: var(--mustard); }
+.sticker--cream { background: var(--cream); }
+.sticker--flat { box-shadow: none; }
+.sticker--sm { box-shadow: var(--shadow-sm); border-radius: var(--radius-sm); }
+
+.sticker--dashed {
+  background: transparent;
+  border: var(--line) dashed var(--ink);
+  box-shadow: none;
+}
+
+.sk-pad { padding: 20px; }
+.sk-pad-lg { padding: 24px 28px; }
+
+@media (max-width: 600px) {
+  .sk-pad, .sk-pad-lg { padding: 16px; }
+}
+
+a.sticker, button.sticker, .sticker.sk-clickable {
+  cursor: pointer;
+  transition: transform .08s ease, box-shadow .08s ease;
+}
+
+a.sticker:hover, button.sticker:hover, .sticker.sk-clickable:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: calc(var(--lift) + 1px) calc(var(--lift) + 1px) 0 var(--ink);
+}
+
+a.sticker:active, button.sticker:active, .sticker.sk-clickable:active {
+  transform: translate(2px, 2px);
+  box-shadow: calc(var(--lift) - 2px) calc(var(--lift) - 2px) 0 var(--ink);
+}
+
+/* A picture that has not loaded, or does not exist: pale mint with diagonal stripes */
+.sk-placeholder {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--mint) 0 18px,
+    var(--mint-deep) 18px 36px
+  );
+}
+
+/* ---------- Buttons ---------- */
+
+.sk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 20px;
+  border: var(--line) solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform .08s ease, box-shadow .08s ease;
+  user-select: none;
+
+  &:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: calc(var(--lift-sm) + 1px) calc(var(--lift-sm) + 1px) 0 var(--ink);
+  }
+
+  &:active:not(:disabled) {
+    transform: translate(var(--lift-sm), var(--lift-sm));
+    box-shadow: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--mustard);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: .5;
+    cursor: default;
+  }
+
+  .v-icon { font-size: 18px; }
+}
+
+.sk-btn--coral { background: var(--coral); color: var(--white); }
+.sk-btn--mustard { background: var(--mustard); color: var(--ink); }
+.sk-btn--ink { background: var(--ink); color: var(--white); }
+.sk-btn--paper { background: var(--paper); }
+.sk-btn--block { display: flex; width: 100%; }
+.sk-btn--lg { min-height: 48px; font-size: 16px; }
+.sk-btn--rect { border-radius: var(--radius-sm); }
+.sk-btn--flat { box-shadow: none; }
+
+/* Square icon button: the menu, the bell, the photo actions */
+.sk-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform .08s ease, box-shadow .08s ease;
+
+  &:hover:not(:disabled) { transform: translate(-1px, -1px); }
+  &:active:not(:disabled) { transform: translate(var(--lift-sm), var(--lift-sm)); box-shadow: none; }
+  &:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+  &:disabled { opacity: .5; cursor: default; }
+
+  .v-icon { font-size: 20px; }
+}
+
+.sk-icon-btn--coral { background: var(--coral); color: var(--white); }
+.sk-icon-btn--white { background: var(--white); }
+.sk-icon-btn--round { border-radius: 50%; }
+
+/* ---------- Pills, chips and toggles ---------- */
+
+/* A small inline label: "Today", "Shared", "Dessert", the likes count */
+.sk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+
+  .v-icon { font-size: 12px; }
+}
+
+.sk-pill--coral { background: var(--coral); color: var(--white); }
+.sk-pill--mustard { background: var(--mustard); }
+.sk-pill--sky { background: var(--sky); }
+.sk-pill--label { background: var(--label); color: var(--white); text-transform: uppercase; letter-spacing: .04em; }
+.sk-pill--lg { height: 30px; padding: 0 14px; font-size: 13px; }
+
+/* A filter toggle: outlined at rest, ink when on */
+.sk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: var(--line) solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .1s ease;
+
+  &:hover { background: var(--cream); }
+  &:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+
+  &.is-active, &[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--white);
+  }
+
+  &.is-active.sk-chip--coral, &[aria-pressed="true"].sk-chip--coral {
+    background: var(--coral);
+    color: var(--white);
+  }
+
+  .v-icon { font-size: 16px; }
+}
+
+.sk-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* A user's initial, or picture, in a cream circle */
+.sk-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: var(--line) solid var(--ink);
+  border-radius: 50%;
+  background: var(--cream);
+  color: var(--ink);
+  font-weight: 700;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+/* An ingredient's initial or icon, in a rounded mint square */
+.sk-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  background: var(--mint);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* ---------- Form fields ---------- */
+
+.sk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sk-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sk-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  outline: none;
+
+  &::placeholder { color: #7a827d; }
+  &:focus { box-shadow: 0 0 0 3px var(--mustard); }
+}
+
+textarea.sk-input {
+  min-height: 96px;
+  resize: vertical;
+}
+
+select.sk-input {
+  appearance: auto;
+  cursor: pointer;
+}
+
+/* A field with an icon inside it, on the left */
+.sk-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  > .v-icon:first-child {
+    position: absolute;
+    left: 14px;
+    font-size: 20px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  > .sk-input { padding-left: 44px; }
+
+  > .sk-input-trail {
+    position: absolute;
+    right: 8px;
+  }
+}
+
+/* An iOS-style switch, coral when on */
+.sk-switch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 50px;
+  height: 30px;
+
+  input { opacity: 0; width: 0; height: 0; position: absolute; }
+
+  span {
+    position: absolute;
+    inset: 0;
+    border: var(--line) solid var(--ink);
+    border-radius: 999px;
+    background: var(--paper);
+    cursor: pointer;
+    transition: background .15s ease;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 22px;
+      height: 22px;
+      border: var(--line) solid var(--ink);
+      border-radius: 50%;
+      background: var(--white);
+      transition: transform .15s ease;
+    }
+  }
+
+  input:checked + span { background: var(--coral); }
+  input:checked + span::before { transform: translateX(20px); }
+  input:focus-visible + span { outline: 3px solid var(--mustard); outline-offset: 2px; }
+}
+
+/* ---------- Layout helpers ---------- */
+
+.sk-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.sk-narrow {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.sk-stack { display: flex; flex-direction: column; gap: 16px; }
+.sk-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sk-spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* The grid of recipe stickers every listing uses */
+.sk-recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 22px 18px;
+  padding: 0 var(--lift) var(--lift) 0;
+}
+
+/* A table of rows separated by thin rules, under a mint-green header */
+.sk-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--label);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  th:first-child { text-align: left; }
+
+  td {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 14px;
+    text-align: center;
+  }
+
+  td:first-child { text-align: left; }
+  tr:last-child td { border-bottom: 0; }
+}
+
+.sk-table-scroll { overflow-x: auto; }
+
+.sk-divider {
+  height: 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 0;
+}
+
+/* The "or" between Google sign-in and the form */
+.sk-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 14px;
+
+  &::before, &::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid #9aa59d;
+  }
+}
+
+/* ---------- Vuetify, dressed as stickers ---------- */
 
 .v-card {
-  border: 3px solid #0d1821;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.v-card.sk-bare,
+.v-card.bg-transparent {
+  border: 0;
+  box-shadow: none !important;
 }
 
 .v-card-text {
   white-space: pre-line;
 }
 
-
-.v-text-field .v-input__control {
-  border: 3px solid #0d1821 !important;
-  border-radius: 6px;
+.v-text-field .v-input__control,
+.v-textarea .v-input__control,
+.v-select .v-input__control,
+.v-autocomplete .v-input__control,
+.v-combobox .v-input__control {
+  border: 1.5px solid var(--ink) !important;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
 .v-text-field.no-border .v-input__control {
-  border: 0 solid #0d1821 !important;
+  border: 0 !important;
   border-radius: 0;
 }
 
-.v-text-field--solo {
-  background-color: var(--v-theme-background) !important;
-  border: 0 solid;
-}
-
-.v-text-field.v-input--error .v-input__control .v-input__slot input  {
-  //border-color: #ff6f59 !important; // example error color
-  color: red !important;
+.v-field {
+  font-family: var(--font);
 }
 
 .v-text-field.v-input--error .v-field__prepend-inner .v-icon,
 .v-text-field.v-input--error .v-field__append-inner .v-icon {
-  color: #ff6f59 !important;
-}
-
-.v-text-field.v-input--is-invalid .v-input__control .v-input__slot input {
-  color: red !important; /* Invalid text color */
+  color: var(--coral) !important;
 }
 
 .v-chip {
-  border: 2px solid #0d1821 !important;
+  border: 1.5px solid var(--ink) !important;
 }
 
-.v-navigation-drawer {
-  border: 3px solid #0d1821 !important;
-}
-
-.v-footer {
-  border: 3px solid #0d1821 !important;
-}
-
-.v-btn:not(.v-number-input button) {
-  border: 3px solid #0d1821 !important;
+.v-btn:not(.v-number-input button):not(.sk-plain) {
+  border: var(--line) solid var(--ink) !important;
+  box-shadow: var(--shadow-sm) !important;
+  font-family: var(--font);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .custom-select-menu {
-  background-color: black;
-  color: white;
+  background-color: var(--paper);
+  color: var(--ink);
 }
 
-.v-overlay__content .v-list {
-  background-color: #f0f4ef !important;
-  border: 3px solid #0d1821 !important;
+.v-overlay__content > .v-list,
+.v-overlay__content > .v-card > .v-list,
+.v-menu > .v-overlay__content > .v-list {
+  background-color: var(--paper) !important;
+  border: var(--line) solid var(--ink) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 
 .v-list .v-list-item--active {
-  background-color: #ff6f59 !important;
-  color: white !important;
+  background-color: var(--coral) !important;
+  color: var(--white) !important;
 }
 
 .v-snackbar .v-overlay__content {
-  border: 3px solid #0d1821 !important;
+  border: var(--line) solid var(--ink) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 
 .v-pagination .v-btn--active {
-  background-color: #ff6f59  !important;
-  color: white !important;
+  background-color: var(--ink) !important;
+  color: var(--white) !important;
+}
+
+.v-dialog > .v-overlay__content > .v-card {
+  background: var(--paper);
 }

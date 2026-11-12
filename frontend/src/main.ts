@@ -30,4 +30,13 @@ app.use(VueCookies)
 app.config.globalProperties.$cookies.config('1y')
 
 registerPlugins(app)
+
+/*
+  A picture that fails to load is hidden rather than left as the browser's broken-image icon
+  and alt text: every picture in the sticker theme sits on a striped placeholder, which is the
+  better thing to show. Image errors do not bubble, hence the capture phase.
+*/
+window.addEventListener('error', (event) => {
+  if (event.target instanceof HTMLImageElement) event.target.style.visibility = 'hidden'
+}, true)
 app.mount('#app')
