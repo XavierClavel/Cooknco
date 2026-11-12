@@ -67,6 +67,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.geometry.Rect
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -112,6 +119,7 @@ import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.dto.IngredientSummary
 import com.xavierclavel.cooknco.network.dto.UnitInfo
 import com.xavierclavel.cooknco.network.dto.displayName
+import com.xavierclavel.cooknco.platform.KeepKeyboardFromPanning
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.platform.rememberCameraCapture
 import com.xavierclavel.cooknco.platform.COOKLANG_PICKER_MIME_TYPES
@@ -610,6 +618,10 @@ fun RecipeEditScreen(
         // Only the part of the keyboard above the Back/Next row counts: that row stays put,
         // behind the keys.
         var footerHeight by remember { mutableIntStateOf(0) }
+        // And the system must not also slide the window up for a field low on the page - the
+        // last ingredient, say - or the page moves and shrinks at once, and the room made for
+        // the keyboard shows as a green band above it.
+        KeepKeyboardFromPanning()
 
         Box(
             modifier = Modifier
@@ -1299,7 +1311,7 @@ private fun IngredientsStep(
 
         added.forEach { (index, ingredient) ->
             item(key = "ingredient_$index") {
-                Column {
+                Column(Modifier.keepInViewWhileFocused()) {
                     AddedIngredientCard(
                         ingredient = ingredient,
                         units = uiState.units,
@@ -1319,6 +1331,37 @@ private fun IngredientsStep(
         }
         item { Spacer(Modifier.height(8.dp)) }
     }
+}
+
+/**
+ * Keeps the whole of a row in view while a field inside it has the cursor.
+ *
+ * A focused field only brings its own line of text into view, so a field low on the page
+ * ended up with the box drawn around it half under the keys. The row is brought in again
+ * each time the keyboard's height settles, since the room made for it arrives over the
+ * keyboard's animation, after the field took focus.
+ */
+@Composable
+private fun Modifier.keepInViewWhileFocused(margin: Dp = 8.dp): Modifier {
+    val requester = remember { BringIntoViewRequester() }
+    var focused by remember { mutableStateOf(false) }
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    LaunchedEffect(focused) {
+        if (!focused) return@LaunchedEffect
+        snapshotFlow { ime.getBottom(density) }.collectLatest {
+            // Once the page has been laid out at the new height, not against the old one.
+            withFrameNanos { }
+            // With room below it too: the card's shadow, and a gap before the keys, rather
+            // than its border sitting flush on top of them.
+            val below = with(density) { margin.toPx() }
+            requester.bringIntoView(Rect(0f, 0f, size.width.toFloat(), size.height + below))
+        }
+    }
+    return onSizeChanged { size = it }
+        .bringIntoViewRequester(requester)
+        .onFocusChanged { focused = it.hasFocus }
 }
 
 /** A row points at a catalogue ingredient, or has been confirmed as a custom one. */
@@ -1668,7 +1711,7 @@ private fun StepsStep(
                 ReorderableItem(reorderState, key = step.id) { isDragging ->
                     val elevation by animateDpAsState(targetValue = if (isDragging) 6.dp else 0.dp, label = "step_elevation")
                     val haptic = LocalHapticFeedback.current
-                    StepEditCard(
+                    Box(Modifier.keepInViewWhileFocused()) { StepEditCard(
                         index = index,
                         step = step,
                         textError = when {
@@ -1696,7 +1739,7 @@ private fun StepsStep(
                         onRemove = { viewModel.removeStep(step.id) },
                         focusOnAppear = step.id == focusStepId,
                         onFocused = { focusStepId = null },
-                    )
+                    ) }
                 }
             }
         }
