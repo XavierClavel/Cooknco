@@ -126,6 +126,36 @@ class FcmPushSenderTest {
         )
     }
 
+    /**
+     * Android replaces a tray notification by its tag, so a tag shared by two pushes is one
+     * of them erased. Tagged by kind, two new recipes in a row left only the second.
+     */
+    @Test
+    fun `two notifications of one kind do not replace each other`() = runBlocking {
+        val fcm = Fcm(ok())
+        sender(fcm).send(
+            listOf(
+                message().copy(data = mapOf("kind" to "new_recipe", "notificationId" to "41")),
+                message().copy(data = mapOf("kind" to "new_recipe", "notificationId" to "42")),
+            ),
+        )
+
+        val tags = fcm.bodies.map {
+            json.parseToJsonElement(it).jsonObject["message"]!!.jsonObject["android"]!!.jsonObject["notification"]!!
+                .jsonObject["tag"]?.jsonPrimitive?.content
+        }
+        assertEquals(2, tags.toSet().size, "each push has a tray row of its own: $tags")
+    }
+
+    @Test
+    fun `a push announcing no stored row carries no tag`() = runBlocking {
+        val fcm = Fcm(ok())
+        sender(fcm).send(listOf(PushMessage("device-1", "Notice", "Body")))
+
+        val android = json.parseToJsonElement(fcm.bodies.single()).jsonObject["message"]!!.jsonObject["android"]!!
+        assertNull(android.jsonObject["notification"]!!.jsonObject["tag"])
+    }
+
     @Test
     fun `the request is addressed and authorised`() = runBlocking {
         val fcm = Fcm(ok())
