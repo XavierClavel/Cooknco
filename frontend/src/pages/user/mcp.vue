@@ -1,104 +1,64 @@
 <template>
-  <v-container class="mx-auto" align="center">
-    <v-card
-      class="pa-5 ma-5"
-      max-width="1000px"
-      min-width="300px"
-    >
-      <v-card-title>
-        {{ $t("mcp_title") }}
-      </v-card-title>
+  <section class="sticker sk-pad-lg sk-narrow mcp">
+    <h1 class="sk-title">{{ $t("mcp_title") }}</h1>
 
-      <v-card-text class="text-left">
-        {{ $t("mcp_intro") }}
-      </v-card-text>
+    <p>{{ $t("mcp_intro") }}</p>
 
-      <v-card-text class="text-left pb-0">
-        <ol class="steps">
-          <li>{{ $t("mcp_step_add") }}</li>
-          <li>{{ $t("mcp_step_authorize") }}</li>
-          <li>{{ $t("mcp_step_done") }}</li>
-        </ol>
-      </v-card-text>
+    <ol class="mcp__steps">
+      <li>{{ $t("mcp_step_add") }}</li>
+      <li>{{ $t("mcp_step_authorize") }}</li>
+      <li>{{ $t("mcp_step_done") }}</li>
+    </ol>
 
-      <v-card-title class="text-h6 text-sm-h6 text-left">
-        {{ $t("mcp_endpoint") }}
-      </v-card-title>
-      <v-card-text class="text-left pt-0">
-        <copy-block :text="mcpUrl"></copy-block>
-        <div class="text-body-2">{{ $t("mcp_endpoint_hint") }}</div>
-      </v-card-text>
+    <h2 class="sk-h3 mcp__heading">{{ $t("mcp_endpoint") }}</h2>
+    <copy-block :text="mcpUrl"></copy-block>
+    <p class="sk-hint">{{ $t("mcp_endpoint_hint") }}</p>
 
-      <v-card-title class="text-h6 text-sm-h6 text-left">
-        {{ $t("mcp_clients") }}
-      </v-card-title>
-      <!--
-        One button per client rather than all five laid out at once: a person setting this up
-        uses exactly one of them, and five open code blocks make the page read like a reference
-        instead of an instruction. Coral for the chosen one — with the app's ink border, which
-        is what lets it sit on the green surface.
-      -->
-      <v-card-text class="text-left pt-0">
-        <div class="d-flex flex-wrap ga-3 mb-4">
-          <v-btn
-            v-for="client in mcpClients"
-            :key="client.key"
-            :color="client.key === selected ? 'primary' : 'background'"
-            :aria-pressed="client.key === selected"
-            height="48"
-            rounded="lg"
-            flat
-            class="text-none text-body-1"
-            @click="selected = client.key"
-          >
-            <template v-slot:prepend>
-              <v-img
-                v-if="client.logo"
-                :src="client.logo"
-                width="20"
-                height="20"
-              ></v-img>
-              <v-icon v-else :icon="client.icon"></v-icon>
-            </template>
-            {{ $t(`mcp_client_${client.key}`) }}
-          </v-btn>
-        </div>
+    <h2 class="sk-h3 mcp__heading">{{ $t("mcp_clients") }}</h2>
+    <!--
+      One button per client rather than all five laid out at once: a person setting this up
+      uses exactly one of them, and five open code blocks make the page read like a reference
+      instead of an instruction. Coral for the chosen one.
+    -->
+    <div class="sk-chip-row">
+      <button
+        v-for="client in mcpClients"
+        :key="client.key"
+        type="button"
+        class="sk-chip sk-chip--coral"
+        :class="{'is-active': client.key === selected}"
+        :aria-pressed="client.key === selected"
+        @click="selected = client.key"
+      >
+        <img v-if="client.logo" :src="client.logo" alt="" class="mcp__logo" />
+        <v-icon v-else :icon="client.icon"></v-icon>
+        {{ $t(`mcp_client_${client.key}`) }}
+      </button>
+    </div>
 
-        <v-card color="background" class="pa-4">
-          <div class="text-body-2">{{ $t(`mcp_client_${selectedClient.key}_hint`) }}</div>
-          <copy-block :text="selectedClient.snippet"></copy-block>
-        </v-card>
-      </v-card-text>
+    <div class="mcp__client">
+      <p>{{ $t(`mcp_client_${selectedClient.key}_hint`) }}</p>
+      <copy-block :text="selectedClient.snippet"></copy-block>
+    </div>
 
-      <v-card-title class="text-h6 text-sm-h6 text-left">
-        {{ $t("mcp_permissions") }}
-      </v-card-title>
-      <v-card-text class="text-left pt-0">
-        <!--
-          The same three lines the consent screen lists, in the same order: a person reading
-          this page and a person reading `backend/src/main/resources/oauth/consent.html` must
-          not come away with two different ideas of what they approved. Change both together.
-        -->
-        <ul class="grants">
-          <li>{{ $t("mcp_grant_read") }}</li>
-          <li>{{ $t("mcp_grant_write") }}</li>
-          <li>{{ $t("mcp_grant_collect") }}</li>
-        </ul>
-        <div class="text-body-2 mt-3">{{ $t("mcp_permissions_note") }}</div>
-        <div class="text-body-2 mt-2">{{ $t("mcp_expiry_note") }}</div>
-      </v-card-text>
+    <h2 class="sk-h3 mcp__heading">{{ $t("mcp_permissions") }}</h2>
+    <!--
+      The same three lines the consent screen lists, in the same order: a person reading
+      this page and a person reading `backend/src/main/resources/oauth/consent.html` must
+      not come away with two different ideas of what they approved. Change both together.
+    -->
+    <ul class="mcp__grants">
+      <li>{{ $t("mcp_grant_read") }}</li>
+      <li>{{ $t("mcp_grant_write") }}</li>
+      <li>{{ $t("mcp_grant_collect") }}</li>
+    </ul>
+    <p class="mcp__note">{{ $t("mcp_permissions_note") }}</p>
+    <p class="mcp__note">{{ $t("mcp_expiry_note") }}</p>
 
-      <v-container>
-        <v-row class="d-flex align-center justify-center mb-2" dense>
-          <action-button
-            icon="mdi-cog"
-            :text="`${$t('settings')}`"
-            :action="toSettings"
-          ></action-button>
-        </v-row>
-      </v-container>
-    </v-card>
-  </v-container>
+    <div class="mcp__footer">
+      <button type="button" class="sk-btn" @click="toSettings">{{ $t('settings') }}</button>
+    </div>
+  </section>
 </template>
 
 <script lang="ts" setup>
@@ -113,63 +73,56 @@ const selectedClient = computed(() => mcpClients.find((it) => it.key === selecte
 </script>
 
 <style scoped>
-/*
- * Numbered and bulleted lists, marked with the app's palette rather than the browser's glyphs.
- *
- * Each row is a flex line so the marker centres against its text whatever the two measure:
- * the badge is taller than a line box of card text, so anchoring it to the top of the line
- * (which is what an absolutely positioned marker does) leaves it sitting low.
- */
-.steps,
-.grants {
+.mcp {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mcp p {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: step;
 }
 
-.steps li,
-.grants li {
+.mcp__heading {
+  margin-top: 10px;
+}
+
+.mcp__steps,
+.mcp__grants {
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.mcp__steps li,
+.mcp__grants li {
+  margin-bottom: 4px;
+}
+
+.mcp__logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.mcp__client {
   display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--white);
 }
 
-.steps li {
-  counter-increment: step;
+.mcp__note {
+  font-size: 12px;
 }
 
-.steps li::before {
-  content: counter(step);
-  flex: 0 0 auto;
-  width: 1.5rem;
-  height: 1.5rem;
+.mcp__footer {
   display: flex;
-  align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: white;
-  background: #ff6f59;
-  border: 2px solid #0d1821;
-  border-radius: 6px;
-}
-
-/*
- * Solid, and the only marker here without the app's ink outline: outlined, a small square in a
- * list of what an assistant may do reads as an unticked checkbox, and these are statements
- * rather than choices. Ink rather than the coral accent, because without a border there is
- * nothing between it and the green card. The consent screen marks the same three lines the
- * same way.
- */
-.grants li::before {
-  content: '';
-  flex: 0 0 auto;
-  width: 0.6rem;
-  height: 0.6rem;
-  margin: 0 0.45rem;
-  background: #0d1821;
-  border-radius: 2px;
+  padding-top: 8px;
 }
 </style>

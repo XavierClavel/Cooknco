@@ -1,169 +1,262 @@
 <template>
-  <v-layout class="mt-6">
+  <div class="sk-page">
+    <h1 class="sk-title">{{ $t("ingredients") }}</h1>
 
-      <v-card class="d-flex flex-column pa-0 ma-0" width="100%" color="transparent" variant="flat" style="border:0 !important">
-        <v-card-title class="text-h7">
-          {{$t("ingredients")}}
-        </v-card-title>
-
-      <v-card max-width="1500px"  class="ma-0">
-
-        <v-text-field
-          width="300px"
-          class="ml-2"
-          density="compact"
-          :label="`${$t('search_ingredient')}`"
-          clearable
+    <section class="sticker sk-pad ing-card">
+      <div class="sk-input-wrap ing-search">
+        <v-icon>mdi-magnify</v-icon>
+        <input
           v-model="query"
-          @update:modelValue="updateQuery"
-        ></v-text-field>
+          :aria-label="$t('search_ingredient')"
+          class="sk-input"
+          :placeholder="$t('search_ingredient')"
+          type="search"
+          @input="updateQuery"
+        >
+      </div>
 
-        <div class="custom-scroll-table">
-        <v-table
-            min-height="300px"
-            fixed-header
-            class="rounded-0"
-          >
-            <thead>
+      <div class="sk-table-scroll ing-scroll">
+        <table class="sk-table ing-table">
+          <thead>
             <tr>
-              <th class="text-left">
-                {{$t("ingredient")}}
-              </th>
-              <th class="text-center">
-                {{$t("calories")}}
-              </th>
-              <th class="text-center">
-                {{$t("cholesterol")}}
-              </th>
-              <th class="text-center">
-                {{$t("carbohydrates")}}
-              </th>
-              <th class="text-center">
-                {{$t("sugars")}}
-              </th>
-              <th class="text-center">
-                {{$t("fibers")}}
-              </th>
-              <th class="text-center">
-                {{$t("proteins")}}
-              </th>
-              <th class="text-center">
-                {{$t("sodium")}}
-              </th>
-              <th class="text-center">
-                {{$t("saturatedFat")}}
-              </th>
-              <th class="text-center">
-                {{$t("unsaturatedFat")}}
-              </th>
+              <th scope="col">{{ $t("ingredient") }}</th>
+              <th scope="col">{{ $t("calories") }}</th>
+              <th scope="col">{{ $t("cholesterol") }}</th>
+              <th scope="col">{{ $t("carbohydrates") }}</th>
+              <th scope="col">{{ $t("sugars") }}</th>
+              <th scope="col">{{ $t("fibers") }}</th>
+              <th scope="col">{{ $t("proteins") }}</th>
+              <th scope="col">{{ $t("sodium") }}</th>
+              <th scope="col">{{ $t("saturatedFat") }}</th>
+              <th scope="col">{{ $t("unsaturatedFat") }}</th>
             </tr>
-            </thead>
-            <tbody>
+          </thead>
+          <tbody>
             <tr
               v-for="ingredient in ingredients"
               :key="ingredient.id"
-              class="clickable_row"
+              class="ing-row"
               @click="toViewIngredient(ingredient.id)"
             >
-              <td class="d-flex flex-row align-center">
-                <v-avatar size="40" variant="elevated" class="mr-2" style="border:2px solid #0d1821 !important;">
-                  <v-img
-                    color="background"
-                    :src="getIngredientImageUrl(ingredient.type)"
-                    cover
-                  ></v-img>
-                </v-avatar>
-                {{ ingredient.name[getLocale().toUpperCase()]}}</td>
-              <td class="text-center">{{ ingredient.calories }}</td>
-              <td class="text-center">{{ ingredient.cholesterol }}</td>
-              <td class="text-center">{{ ingredient.carbohydrates }}</td>
-              <td class="text-center">{{ ingredient.sugars }}</td>
-              <td class="text-center">{{ ingredient.fibers }}</td>
-              <td class="text-center">{{ ingredient.proteins }}</td>
-              <td class="text-center">{{ ingredient.sodium }}</td>
-              <td class="text-center">{{ ingredient.saturatedFat }}</td>
-              <td class="text-center">{{ ingredient.unsaturatedFat }}</td>
+              <td>
+                <a
+                  class="ing-name"
+                  :href="`/ingredient/view?ingredient=${ingredient.id}`"
+                  @click.prevent.stop="toViewIngredient(ingredient.id)"
+                >
+                  <span class="sk-tile">
+                    <img alt="" class="ing-icon" :src="getIngredientImageUrl(ingredient.type)">
+                  </span>
+                  {{ nameOf(ingredient) }}
+                </a>
+              </td>
+              <td>{{ ingredient.calories }}</td>
+              <td>{{ ingredient.cholesterol }}</td>
+              <td>{{ ingredient.carbohydrates }}</td>
+              <td>{{ ingredient.sugars }}</td>
+              <td>{{ ingredient.fibers }}</td>
+              <td>{{ ingredient.proteins }}</td>
+              <td>{{ ingredient.sodium }}</td>
+              <td>{{ ingredient.saturatedFat }}</td>
+              <td>{{ ingredient.unsaturatedFat }}</td>
             </tr>
-            </tbody>
-          </v-table>
-        </div>
-        <v-container>
-          <v-row justify="center">
-            <v-col cols="6">
-              <v-container class="max-width">
-                <v-pagination
-                  v-model="page"
-                  :length="pagesCount"
-                  class="my-4"
-                  @update:modelValue="updateDisplay"
-                ></v-pagination>
-              </v-container>
-            </v-col>
-          </v-row>
-        </v-container>
-      </v-card>
-      </v-card>
+          </tbody>
+        </table>
+      </div>
 
-  </v-layout>
+      <nav v-if="pagesCount > 1" :aria-label="$t('pagination')" class="ing-pages">
+        <button
+          :aria-label="$t('previous_page')"
+          class="ing-page"
+          :disabled="page <= 1"
+          type="button"
+          @click="goTo(page - 1)"
+        >
+          <v-icon>mdi-chevron-left</v-icon>
+        </button>
+        <template v-for="(item, i) in pageItems" :key="i">
+          <span v-if="item === null" aria-hidden="true" class="ing-gap">…</span>
+          <button
+            v-else
+            :aria-current="item === page ? 'page' : undefined"
+            class="ing-page"
+            :class="{'is-active': item === page}"
+            type="button"
+            @click="goTo(item)"
+          >{{ item }}</button>
+        </template>
+        <button
+          :aria-label="$t('next_page')"
+          class="ing-page"
+          :disabled="page >= pagesCount"
+          type="button"
+          @click="goTo(page + 1)"
+        >
+          <v-icon>mdi-chevron-right</v-icon>
+        </button>
+      </nav>
+    </section>
+  </div>
 </template>
 
 <script lang="ts" setup>
-// Browsing only: creating, editing and deleting ingredients live in the backoffice at /admin.
-import {searchIngredients} from "@/scripts/ingredients";
-import {getIngredientImageUrl, toViewIngredient} from "@/scripts/common";
-import {getLocale} from "@/scripts/localization";
-import {debounce} from "lodash";
+  // Browsing only: creating, editing and deleting ingredients live in the backoffice at /admin.
+  import { searchIngredients } from '@/scripts/ingredients'
+  import { getIngredientImageUrl, toViewIngredient } from '@/scripts/common'
+  import { getLocale } from '@/scripts/localization'
+  import { debounce } from 'lodash'
 
-const ingredients = ref<object[]>([])
-const page = ref<number>(1)
-const pagesCount = ref<number>(1)
-const query = ref("")
+  /** A page number, or null for the gap between two that are not next to each other. */
+  type PageItem = number | null
 
-const updateDisplay = debounce(() => {
-  searchIngredients(`query=${query.value || ""}`,page.value - 1, 20).then (
-    function (response) {
-      ingredients.value = response.data.items
-      pagesCount.value = Math.ceil(response.data.count / 20)
-    }).catch(function (error) {
-    console.log(error);
+  const PAGE_SIZE = 20
+
+  const ingredients = ref<object[]>([])
+  const page = ref<number>(1)
+  const pagesCount = ref<number>(1)
+  const query = ref('')
+
+  const nameOf = ingredient => ingredient.name?.[getLocale().toUpperCase()]
+
+  const updateDisplay = debounce(() => {
+    searchIngredients(`query=${query.value || ''}`, page.value - 1, PAGE_SIZE).then(
+      function (response) {
+        ingredients.value = response.data.items
+        pagesCount.value = Math.ceil(response.data.count / PAGE_SIZE)
+      }).catch(function (error) {
+      console.log(error)
+    })
+  }, 500)
+
+  const updateQuery = () => {
+    page.value = 1
+    updateDisplay()
+  }
+
+  const goTo = (target: number) => {
+    if (target < 1 || target > pagesCount.value || target === page.value) return
+    page.value = target
+    updateDisplay()
+  }
+
+  /** The first and last pages, and the ones around the current one. */
+  const pageItems = computed(() => {
+    const total = pagesCount.value
+    const current = page.value
+    const shown = new Set([1, total, current - 1, current, current + 1].filter(p => p >= 1 && p <= total))
+    const sorted = [...shown].sort((a, b) => a - b)
+    const items: PageItem[] = []
+    sorted.forEach((p, i) => {
+      if (i > 0 && p - sorted[i - 1] > 1) items.push(null)
+      items.push(p)
+    })
+    return items
   })
-}, 500)
 
-const updateQuery = () => {
-  page.value = 1
   updateDisplay()
-}
-
-
-updateDisplay()
-
 </script>
 
 <style scoped>
-.clickable_row {
-  cursor: pointer
+.ing-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
-.custom-scroll-table::-webkit-scrollbar {
-  height: 4px; /* Height of the horizontal scrollbar */
+.ing-search {
+  max-width: 480px;
 }
 
-.custom-scroll-table::-webkit-scrollbar-track {
-  background: #eee; /* Track background */
-}
-
-.custom-scroll-table::-webkit-scrollbar-thumb {
-  background-color: #000000; /* Vuetify primary, for example */
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background-clip: content-box;
-}
-
-
-/* Firefox */
-.custom-scroll-table {
-  scrollbar-color: #000000 #eee;
+.ing-scroll {
+  scrollbar-color: var(--ink) var(--rule);
   scrollbar-width: thin;
 }
 
+.ing-table th {
+  min-width: 84px;
+}
+
+.ing-table th:first-child {
+  min-width: 200px;
+}
+
+.ing-row {
+  cursor: pointer;
+}
+
+.ing-row:hover td {
+  background: var(--cream);
+}
+
+.ing-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ing-name:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.ing-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.ing-pages {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.ing-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ing-page:hover:not(:disabled):not(.is-active) {
+  background: var(--cream);
+}
+
+.ing-page:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
+}
+
+.ing-page:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+.ing-page.is-active {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.ing-gap {
+  color: var(--muted);
+  font-weight: 700;
+}
 </style>

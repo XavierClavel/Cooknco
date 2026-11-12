@@ -1,126 +1,89 @@
 <template>
-  <v-container class="pa-0 ma-0" align="center">
-  <error :error="errors"></error>
-  <v-card
-    v-if="!errors"
-    class="pa-5 mr-sm-n5"
-  >
+  <div class="sk-page">
+    <error :error="errors"></error>
 
-    <v-container class="d-flex
-      flex-wrap justify-center
-      flex-sm-nowrap">
-      <v-img
-        color="surface-variant"
-        :src="getCookbookIconUrl(cookbook.id, cookbook.version)"
-        rounded="lg"
-        height="200px"
-        width="200px"
-        max-width="200px"
-        aspect-ratio="1"
-        cover
-        style="border: 3px solid #0d1821 !important;"
-      ></v-img>
-      <v-container class="d-flex flex-column mt-3 mt-sm-0">
-        <v-card-title
-          class="text-black text-h2 font-weight-bold my-n8
-          text-center text-sm-left"
-        >{{ cookbook.title }}</v-card-title>
-        <v-card-text class="text-center text-sm-left">
-          {{cookbook.description}}
-        </v-card-text>
-        <v-row class="ml-sm-2 d-flex flex-row
-          justify-center justify-sm-start">
-          <v-col class="d-inline-flex" cols="auto">
-            <picto-info :icon="`${ICON_COOKBOOK_RECIPES}`" :value="cookbook.recipesCount" icon-size="text-h4" value-size="text-h5"></picto-info>
-          </v-col>
-          <v-col class="d-inline-flex" cols="auto">
-            <picto-info :icon="`${ICON_COOKBOOK_USERS}`" :value="cookbook.usersCount" icon-size="text-h4" value-size="text-h5"></picto-info>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-container>
+    <section v-if="!errors" class="cookbook-head sticker sk-pad-lg">
+      <div class="cookbook-head__top">
+        <div class="cookbook-head__cover sk-placeholder">
+          <img
+            v-if="cookbook.id"
+            :src="getCookbookIconUrl(cookbook.id, cookbook.version)"
+            :alt="cookbook.title"
+          />
+        </div>
 
+        <div class="cookbook-head__text">
+          <h1 class="sk-title">{{ cookbook.title }}</h1>
+          <p v-if="cookbook.description" class="cookbook-head__description">{{ cookbook.description }}</p>
 
+          <dl class="cookbook-head__stats">
+            <div>
+              <dt class="sk-eyebrow">{{ $t("recipes") }}</dt>
+              <dd>{{ cookbook.recipesCount ?? "–" }}</dd>
+            </div>
+            <div>
+              <dt class="sk-eyebrow">{{ $t("members") }}</dt>
+              <dd>{{ cookbook.usersCount ?? "–" }}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
 
-    <v-container>
-      <v-row
-        class="d-flex justify-left mb-2 gx-16"
-        dense
-      >
-        <v-col cols="12" sm="auto" >
-          <action-button
-            icon="mdi-cog"
-            :text="`${$t('edit')}`"
-            :action="() => toEditCookbook(cookbookId)"
-          ></action-button>
-        </v-col>
-        <v-col cols="12" sm="auto" >
-          <premium-only>
-            <action-button
-              icon="mdi-tray-arrow-down"
-              :text="`${$t('export_pdf')}`"
-              :action="() => onExport()"
-            ></action-button>
-          </premium-only>
-        </v-col>
-        <v-col cols="12" sm="auto" >
-          <v-dialog max-width="500">
-            <template v-slot:activator="{ props: activatorProps }">
-              <action-button
-                v-bind="activatorProps"
-                icon="mdi-door-open"
-                :text="`${$t('leave')}`"
-              ></action-button>
-            </template>
+      <div class="cookbook-head__actions">
+        <button type="button" class="sk-btn" @click="toEditCookbook(cookbookId)">
+          <v-icon>mdi-pencil-outline</v-icon>
+          {{ $t("edit") }}
+        </button>
 
-            <template v-slot:default="{ isActive }">
-              <v-card>
-                <v-card-text class="font-weight-bold text-h4">{{$t("leaveCookbookTitle")}}</v-card-text>
-                <v-card-text>
-                  {{$t("leaveCookbookDescription")}}
-                </v-card-text>
+        <premium-only>
+          <button type="button" class="sk-btn" :disabled="exporting" @click="onExport()">
+            <v-progress-circular v-if="exporting" indeterminate size="18" width="2"></v-progress-circular>
+            <v-icon v-else>mdi-tray-arrow-down</v-icon>
+            {{ $t("export_pdf") }}
+          </button>
+        </premium-only>
 
-                <v-card-actions>
-                  <v-spacer></v-spacer>
+        <v-dialog max-width="500">
+          <template v-slot:activator="{ props: activatorProps }">
+            <button type="button" class="sk-btn" v-bind="activatorProps">
+              <v-icon>mdi-door-open</v-icon>
+              {{ $t("leave") }}
+            </button>
+          </template>
 
-                  <v-btn
-                    :text="`${$t('cancel')}`"
-                    @click="isActive.value = false"
-                  ></v-btn>
-                  <v-btn
-                    :text="`${$t('leave')}`"
-                    @click="() => leave()"
-                  ></v-btn>
-                </v-card-actions>
-              </v-card>
-            </template>
-          </v-dialog>
-        </v-col>
-      </v-row>
-    </v-container>
+          <template v-slot:default="{ isActive }">
+            <div class="sticker sk-pad-lg sk-stack" role="alertdialog">
+              <h2 class="sk-h2">{{ $t("leaveCookbookTitle") }}</h2>
+              <p class="ma-0">{{ $t("leaveCookbookDescription") }}</p>
+              <div class="sk-row justify-end">
+                <button type="button" class="sk-btn" @click="isActive.value = false">{{ $t("cancel") }}</button>
+                <button type="button" class="sk-btn sk-btn--coral" @click="() => leave()">{{ $t("leave") }}</button>
+              </div>
+            </div>
+          </template>
+        </v-dialog>
+      </div>
+    </section>
 
+    <v-snackbar
+      v-model="snackbar"
+      :timeout="4000"
+    >
+      {{ snackbarMessage }}
+      <template v-slot:actions>
+        <button
+          type="button"
+          class="sk-icon-btn sk-icon-btn--white"
+          :aria-label="$t('close')"
+          @click="snackbar = false"
+        >
+          <v-icon>mdi-close</v-icon>
+        </button>
+      </template>
+    </v-snackbar>
 
-  </v-card>
-
-  <v-snackbar
-    v-model="snackbar"
-    :timeout="4000"
-    height="60px"
-  >
-    {{ snackbarMessage }}
-    <template v-slot:actions>
-      <v-btn
-        variant="flat"
-        color="primary"
-        @click="snackbar = false"
-        icon="mdi-close"
-        height="40px"
-        width="40px"
-      ></v-btn>
-    </template>
-  </v-snackbar>
-  </v-container>
-  <recipes-list v-if="!errors"></recipes-list>
+    <recipes-list v-if="!errors"></recipes-list>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -128,15 +91,11 @@ import {useRoute} from "vue-router";
 import {ref} from "vue";
 import {
   getCookbookIconUrl,
-  getUserIconUrl,
   toEditCookbook,
-  toEditUser,
   toListCookbooks,
   toErrorMessage,
-  toSignup
 } from "@/scripts/common";
 import {downloadCookbook, getCookbook, isAdminOfCookbook, leaveCookbook} from "@/scripts/cookbooks";
-import {ICON_COOKBOOK_RECIPES, ICON_COOKBOOK_USERS} from "@/scripts/icons";
 import {useAuthStore} from "@/stores/auth";
 import {useI18n} from "vue-i18n";
 const {t} = useI18n()
@@ -154,6 +113,7 @@ const cookbook = ref<object>({
 const errors = ref(null)
 const snackbar = ref(false)
 const snackbarMessage = ref<string>("")
+const exporting = ref(false)
 
 
 if (cookbookId.value != null) {
@@ -181,11 +141,15 @@ if (cookbookId.value != null) {
  * so, and that is the one failure an operator can do something about.
  */
 async function onExport() {
+  if (exporting.value) return
+  exporting.value = true
   try {
     await downloadCookbook(cookbookId.value)
   } catch (error) {
     snackbarMessage.value = t(toErrorMessage(error))
     snackbar.value = true
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -195,3 +159,83 @@ async function leave() {
   toListCookbooks(authStore.id)
 }
 </script>
+
+<style scoped>
+.cookbook-head {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cookbook-head__top {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.cookbook-head__cover {
+  width: 180px;
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.cookbook-head__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cookbook-head__text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.cookbook-head__text .sk-title {
+  overflow-wrap: anywhere;
+}
+
+.cookbook-head__description {
+  margin: 0;
+  color: var(--muted);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.cookbook-head__stats {
+  display: flex;
+  gap: 28px;
+  margin: 12px 0 0;
+}
+
+.cookbook-head__stats dd {
+  margin: 2px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.cookbook-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .cookbook-head__top {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .cookbook-head__stats {
+    justify-content: center;
+  }
+}
+</style>

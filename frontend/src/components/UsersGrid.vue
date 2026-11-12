@@ -89,11 +89,9 @@ updateGrid()
     side="end"
     margin="200"
   >
-    <v-card class="d-flex pa-0 ma-0" color="transparent" variant="flat" style="border:0 !important">
-      <v-row class="ma-1">
-        <user :user="user" v-for="user in users" :key="user.id"></user>
-      </v-row>
-    </v-card>
+    <div class="sk-recipe-grid">
+      <user :user="user" v-for="user in users" :key="user.id"></user>
+    </div>
 
     <template v-slot:loading>
       <v-progress-circular
@@ -109,19 +107,3 @@ updateGrid()
     <error :error="errorMessage"></error>
   </div>
 </template>
-
-<style scoped>
-.recipe-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  justify-content: center; /* center whole grid */
-
-  padding: 0 clamp(16px, 8vw, 96px);
-  box-sizing: border-box;
-  margin: 0 auto;
-
-  column-gap: 12px;  /* horizontal space */
-  row-gap: 12px;     /* vertical space */
-}
-
-</style>

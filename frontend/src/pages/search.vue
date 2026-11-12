@@ -56,6 +56,13 @@ watch(() => route.query.search, (newQuery) => {
 
 updateSearch()
 
+const filters = ["everything", "recipes", "ingredients", "users", "cookbooks"]
+
+function selectFilter(filter) {
+  selection.value = filter
+  onChipSelected()
+}
+
 function onChipSelected() {
   console.log(selection.value)
   router.push({ name: '/search', query: { search: searchQuery.value, filter: selection.value } })
@@ -64,123 +71,109 @@ function onChipSelected() {
 
 </script>
 <template>
-  <v-card-title
-    v-if="!ingredients?.length && !users?.length && !recipes?.length && !cookbooks?.length"
-    class="text-black text-h2 font-weight-bold my-8"
-  >{{$t("no_result")}}</v-card-title>
-  <div class="d-flex flex-wrap justify-center">
-    <v-chip-group
+  <div class="sk-page">
+    <h1
+      v-if="!ingredients?.length && !users?.length && !recipes?.length && !cookbooks?.length"
+      class="sk-title"
+    >{{$t("no_result")}}</h1>
+
+    <div
       v-if="ingredients?.length || users?.length || recipes?.length || cookbooks?.length"
-      v-model="selection"
-      selected-class="v-chip--selected v-chip--variant-flat v-chip--color-black"
-      variant="outlined"
-      mandatory
-      @update:modelValue="onChipSelected"
+      class="sk-chip-row search__filters"
+      role="group"
+      :aria-label="$t('search_filters')"
     >
-      <v-chip :text="$t('everything')" value="everything"></v-chip>
-      <v-chip :text="$t('recipes')" value="recipes"></v-chip>
-      <v-chip :text="$t('ingredients')" value="ingredients"></v-chip>
-      <v-chip :text="$t('users')" value="users"></v-chip>
-      <v-chip :text="$t('cookbooks')" value="cookbooks"></v-chip>
-    </v-chip-group>
+      <button
+        v-for="filter in filters"
+        :key="filter"
+        type="button"
+        class="sk-chip"
+        :aria-pressed="selection == filter"
+        @click="selectFilter(filter)"
+      >{{ $t(filter) }}</button>
+    </div>
+
+    <template v-if="selection == 'everything'">
+      <section v-if="users?.length" class="search__section">
+        <h2 class="search__label">
+          <button type="button" class="sticker sticker--white sticker--sm" @click="selection = 'users'">{{$t("users")}}</button>
+        </h2>
+        <div class="sk-recipe-grid">
+          <user v-for="user in users" :key="user.id" :user="user"></user>
+        </div>
+      </section>
+
+      <section v-if="recipes?.length" class="search__section">
+        <h2 class="search__label">
+          <button type="button" class="sticker sticker--white sticker--sm" @click="selection = 'recipes'">{{$t("recipes")}}</button>
+        </h2>
+        <div class="sk-recipe-grid">
+          <recipe v-for="recipe in recipes" :key="recipe.id" :recipe="recipe"></recipe>
+        </div>
+      </section>
+
+      <section v-if="ingredients?.length" class="search__section">
+        <h2 class="search__label">
+          <button type="button" class="sticker sticker--white sticker--sm" @click="selection = 'ingredients'">{{$t("ingredients")}}</button>
+        </h2>
+        <div class="sk-recipe-grid">
+          <ingredient v-for="ingredient in ingredients" :key="ingredient.id" :ingredient="ingredient"></ingredient>
+        </div>
+      </section>
+
+      <section v-if="cookbooks?.length" class="search__section">
+        <h2 class="search__label">
+          <button type="button" class="sticker sticker--white sticker--sm" @click="selection = 'cookbooks'">{{$t("cookbooks")}}</button>
+        </h2>
+        <div class="sk-recipe-grid">
+          <cookbook v-for="cookbook in cookbooks" :key="cookbook.id" :cookbook="cookbook" variant="card"></cookbook>
+        </div>
+      </section>
+    </template>
+
+    <div v-if="selection == 'recipes'">
+      <recipes-list :query="`user=${userId}&likedBy=${userId}&cookbookUser=${userId}&followedBy=${userId}&search=${searchQuery}&sort=BEST_MATCH`"></recipes-list>
+    </div>
+
+    <div v-if="selection == 'cookbooks'">
+      <cookbooks-grid :query="`user=${userId}&query=${searchQuery}`" variant="card"></cookbooks-grid>
+    </div>
+
+    <div v-if="selection == 'users'">
+      <users-grid :query="`query=${searchQuery}`"></users-grid>
+    </div>
+
+    <div v-if="selection == 'ingredients'">
+      <ingredients-grid :query="`query=${searchQuery}`"></ingredients-grid>
+    </div>
   </div>
-  <div v-if="selection == 'everything'">
-  <v-card
-    class="my-5"
-    color="transparent"
-    style="border:0"
-    variant="flat"
-    v-if="users?.length"
-  >
-    <v-card-title
-      class="text-black text-h2 font-weight-bold clickable-title"
-      @click="selection = 'users'"
-    >{{$t("users")}}</v-card-title>
-  </v-card>
-
-    <v-row class="mx-5">
-      <user v-for="user in users" :user="user"></user>
-    </v-row>
-  <v-card
-    class="my-5 mt-16"
-    color="transparent"
-    style="border:0"
-    variant="flat"
-    v-if="recipes?.length"
-  >
-    <v-card-title
-      class="text-black text-h2 font-weight-bold clickable-title"
-      @click="selection = 'recipes'"
-    >{{$t("recipes")}}</v-card-title>
-  </v-card>
-    <v-row class="mx-5 ga-4">
-      <recipe v-for="recipe in recipes" :recipe="recipe"></recipe>
-    </v-row>
-  <v-card
-    class="my-5 mt-16"
-    color="transparent"
-    style="border:0"
-    variant="flat"
-    v-if="ingredients?.length"
-  >
-    <v-card-title
-      class="text-black text-h2 font-weight-bold clickable-title"
-      @click="selection = 'ingredients'"
-    >{{$t("ingredients")}}</v-card-title>
-  </v-card>
-
-  <v-row class="mx-5">
-    <ingredient v-for="ingredient in ingredients" :ingredient="ingredient"></ingredient>
-  </v-row>
-
-  <v-card
-    class="my-5 mt-16"
-    color="transparent"
-    style="border:0"
-    variant="flat"
-    v-if="cookbooks?.length"
-  >
-    <v-card-title
-      class="text-black text-h2 font-weight-bold clickable-title"
-      @click="selection = 'cookbooks'"
-    >{{$t("cookbooks")}}
-    </v-card-title>
-  </v-card>
-
-  <v-row class="mx-5 mb-16">
-    <cookbook v-for="cookbook in cookbooks" :cookbook="cookbook"></cookbook>
-  </v-row>
-  </div>
-
-  <div v-if="selection == 'recipes'">
-    <recipes-list :query="`user=${userId}&likedBy=${userId}&cookbookUser=${userId}&followedBy=${userId}&search=${searchQuery}&sort=BEST_MATCH`"></recipes-list>
-  </div>
-
-  <div v-if="selection == 'cookbooks'">
-    <cookbooks-grid :query="`user=${userId}&query=${searchQuery}`"></cookbooks-grid>
-  </div>
-
-  <div v-if="selection == 'users'">
-    <users-grid :query="`query=${searchQuery}`"></users-grid>
-  </div>
-
-  <div v-if="selection == 'ingredients'">
-    <ingredients-grid :query="`query=${searchQuery}`"></ingredients-grid>
-  </div>
-
 </template>
-<style>
-.v-chip.v-chip--selected {
-  background-color: black !important;
-  color: white !important;
+
+<style scoped>
+.search__filters {
+  justify-content: center;
 }
 
-.clickable-title {
-  cursor: pointer;
-  transition: text-decoration 0.2s ease;
+.search__section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.clickable-title:hover {
-  text-decoration: underline;
+.search__label {
+  margin: 0;
+}
+
+.search__label button {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.search__label button:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 2px;
 }
 </style>

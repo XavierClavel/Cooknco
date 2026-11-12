@@ -1,69 +1,109 @@
 <template>
+  <div class="sk-page">
+    <section class="sticker sk-pad-lg ing-head">
+      <div class="ing-head__tile">
+        <img alt="" :src="getIngredientImageUrl(ingredient.type)">
+      </div>
+      <div class="ing-head__text">
+        <h1 class="sk-title ing-head__name">{{ ingredient.name?.[getLocale().toUpperCase()] }}</h1>
+        <div v-if="recipesCount !== null" class="ing-head__count">
+          <span class="sk-eyebrow">{{ $t("recipes") }}</span>
+          <span class="ing-head__number">{{ recipesCount }}</span>
+        </div>
+      </div>
+    </section>
 
-  <v-card
-    class="pa-5 pb-n4"
-  >
-    <v-container class="d-flex
-      flex-wrap justify-center
-      flex-sm-nowrap">
+    <section :aria-label="$t('nutrition_value')" class="sticker sk-pad-lg">
+      <IngredientNutritionalData :ingredient="ingredient" />
+    </section>
 
-      <v-img
-        color="background"
-        rounded="lg"
-        height="200px"
-        width="200px"
-        cover
-        style="min-width: 200px; max-width: 200px; border: 3px solid #0d1821 !important;"
-        :src="getIngredientImageUrl(ingredient.type)"
-      ></v-img>
-      <v-container
-      class="px-3 mx-auto mb-n8 mt-3 mt-sm-0"
-      >
-        <v-card-title class="mx-auto px-3 mt-n8 text-black text-h2 text-center text-sm-left font-weight-bold"
-        >{{ ingredient.name[getLocale().toUpperCase()] }}</v-card-title>
-        <v-row class="d-flex flex-row mx-4" justify="center" justify-sm="start">
-          <v-col class="d-inline-flex" cols="auto">
-            <picto-info :icon="`${ICON_COOKBOOK_RECIPES}`" :value="recipesCount" icon-size="text-h4" value-size="text-h5"></picto-info>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-container>
-  </v-card>
-
-
-  <v-card class="pa-8 my-2 mt-4">
-    <ingredient-nutrional-data :ingredient="ingredient" class="my-n6"></ingredient-nutrional-data>
-  </v-card>
-  <recipes-list :query="`?ingredient=${ingredientId}`"></recipes-list>
+    <recipes-list :query="`?ingredient=${ingredientId}`" />
+  </div>
 </template>
 
 <script lang="ts" setup>
-import {useRoute} from "vue-router";
-import {ref} from "vue";
-import {ICON_COOKBOOK_RECIPES} from "@/scripts/icons";
-import {getIngredient, getIngredientRecipesCount} from "@/scripts/ingredients";
-import {useAuthStore} from "@/stores/auth";
-import {getLocale} from "@/scripts/localization";
-import IngredientNutrionalData from "@/components/IngredientNutritionalData.vue";
-import {getIngredientImageUrl} from "@/scripts/common";
-const route = useRoute();
-let ingredientId = ref(route.query.ingredient)
-const ingredient = ref<object>({
-  name: "",
-})
-const recipesCount = ref(null)
+  import { useRoute } from 'vue-router'
+  import { ref } from 'vue'
+  import { getIngredient, getIngredientRecipesCount } from '@/scripts/ingredients'
+  import { getLocale } from '@/scripts/localization'
+  import IngredientNutritionalData from '@/components/IngredientNutritionalData.vue'
+  import { getIngredientImageUrl } from '@/scripts/common'
 
-const authStore = useAuthStore()
+  const route = useRoute()
+  const ingredientId = ref(route.query.ingredient)
+  const ingredient = ref<object>({
+    name: '',
+  })
+  const recipesCount = ref(null)
 
-console.log(ingredientId.value)
+  getIngredient(ingredientId.value).then(response => {
+    ingredient.value = response.data
+  })
 
-getIngredient(ingredientId.value).then((response) => {
-  ingredient.value = response.data
-  console.log(ingredient.value)
-})
-
-getIngredientRecipesCount(ingredientId.value).then(response => {
-  recipesCount.value = response.data
-})
+  getIngredientRecipesCount(ingredientId.value).then(response => {
+    recipesCount.value = response.data
+  })
 
 </script>
+
+<style scoped>
+.ing-head {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.ing-head__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 160px;
+  height: 160px;
+  border: var(--line) solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--mint);
+}
+
+.ing-head__tile img {
+  width: 62%;
+  height: 62%;
+  object-fit: contain;
+}
+
+.ing-head__text {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ing-head__name {
+  font-size: clamp(32px, 5vw, 48px);
+  overflow-wrap: anywhere;
+}
+
+.ing-head__count {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ing-head__number {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .ing-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .ing-head__tile {
+    width: 112px;
+    height: 112px;
+  }
+}
+</style>

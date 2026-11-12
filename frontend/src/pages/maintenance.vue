@@ -1,14 +1,13 @@
 <template>
-
-  <error error="maintenance"></error>
-
+  <div class="maintenance">
+    <error error="maintenance"></error>
+  </div>
 </template>
 
-<script lang="ts" setup>
-import { useRoute } from 'vue-router';
-
-// Get the route object
-const route = useRoute();
-
-
-</script>
+<style scoped>
+.maintenance {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+</style>

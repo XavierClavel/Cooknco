@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {getCookbookIconUrl, getUserIconUrl, toViewCookbook, toViewUser} from "@/scripts/common";
+import {getUserIconUrl, toViewUser} from "@/scripts/common";
 
 defineProps({
   user: {
@@ -10,25 +10,46 @@ defineProps({
 </script>
 
 <template>
-  <v-card
-    class="ma-4"
-    width="150px"
-    @click="toViewUser(user.id)"
+  <a
+    class="user-card sticker"
+    :href="`/user/view/?user=${user.id}`"
+    @click.prevent="toViewUser(user.id)"
   >
-        <v-img
-          color="surface-variant"
-          height="150px"
-          class="mt-n3"
-          rounded="t-lg"
-          :src="getUserIconUrl(user.id, user.version)"
-          cover
-        ></v-img>
-        <v-card-title class="text-black text-h6 text-sm-h6 text-truncate font-weight-regular">{{ user.username }}</v-card-title>
-
-    </v-card>
-
+    <span class="sk-avatar user-card__avatar">
+      <img :src="getUserIconUrl(user.id, user.version)" alt="" loading="lazy" />
+    </span>
+    <span class="user-card__name">{{ user.username }}</span>
+  </a>
 </template>
 
 <style scoped>
+.user-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 10px 16px;
+  min-width: 0;
+  text-decoration: none;
+}
 
+.user-card:focus-visible {
+  outline: 3px solid var(--mustard);
+  outline-offset: 3px;
+}
+
+.user-card__avatar {
+  width: 80px;
+  height: 80px;
+}
+
+.user-card__name {
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 </style>

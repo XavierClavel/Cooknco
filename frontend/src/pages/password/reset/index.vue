@@ -1,63 +1,37 @@
 <template>
-  <v-container class="mx-auto" align="center">
-  <v-card
-  class="pa-5 ma-5"
-  max-width="1000px"
-  >
-    <v-form @submit.prevent="submit" class="mx-auto" ref="loginForm" >
-      <v-card-title>
-        {{$t("reset_password")}}
-      </v-card-title>
-      <v-card-text>
-        {{$t("reset_password_text")}}
-      </v-card-text>
-      <error :error="errorMessage"></error>
+  <auth-card :title="$t('reset_password')">
+    <p class="auth-text">{{ $t('reset_password_text') }}</p>
+    <error :error="errorMessage"></error>
+
+    <v-form ref="loginForm" class="auth-form" @submit.prevent="submit">
       <v-text-field
         v-model="mail"
+        type="email"
+        name="email"
+        autocomplete="email"
         prepend-inner-icon="mdi-email-outline"
-        :label="`${$t('mail')}`"
-        color="primary"
+        density="comfortable"
+        :label="$t('mail')"
         :rules="[requiredRule]"
       ></v-text-field>
 
-      <v-container>
-        <v-row
-          class="d-flex align-center justify-center mb-2 gx-16"
-          dense
-          justify="center"
-          align="center"
-        >
-          <v-col cols="12" sm="auto" justify-center>
-            <action-button
-              icon="mdi-close-circle-outline"
-              :text="`${$t('cancel')}`"
-              :action="toLogin"
-            ></action-button>
-            <action-button
-              icon="mdi-send"
-              :text="`${$t('send')}`"
-              :action="submit"
-            ></action-button>
-          </v-col>
-        </v-row>
-      </v-container>
-
+      <div class="auth-actions">
+        <button type="button" class="sk-btn sk-btn--rect sk-btn--lg auth-btn" @click="toLogin">
+          {{ $t('cancel') }}
+        </button>
+        <button type="submit" class="sk-btn sk-btn--coral sk-btn--rect sk-btn--lg auth-btn">
+          {{ $t('send') }}
+        </button>
+      </div>
     </v-form>
-  </v-card>
-  </v-container>
-
+  </auth-card>
 </template>
 
 <script lang="ts" setup>
 import { ref } from 'vue';
-import { useRoute } from 'vue-router';
-import {requestPasswordReset, signup, toLogin, toResetPasswordEmailSent} from "@/scripts/common";
-import {useI18n} from "vue-i18n";
-import {min8Rule, passwordRule, requiredRule} from "@/scripts/rules";
+import {requestPasswordReset, toLogin, toResetPasswordEmailSent} from "@/scripts/common";
+import {requiredRule} from "@/scripts/rules";
 
-// Get the route object
-const route = useRoute();
-const { t } = useI18n();
 const errorMessage = ref(null)
 const loginForm = ref(null)
 
@@ -66,12 +40,12 @@ const mail = ref<string>()
 
 const submit = async() => {
   errorMessage.value = null
-  const {valid, errors} = await loginForm.value.validate()
+  const {valid} = await loginForm.value.validate()
   if (!valid) {
     return
   }
   requestPasswordReset(mail.value)
-    .then(function (response) {
+    .then(function () {
       toResetPasswordEmailSent()
     })
     .catch(function (error) {
@@ -79,5 +53,4 @@ const submit = async() => {
       console.log(error);
     })
 }
-
 </script>

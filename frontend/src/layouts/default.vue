@@ -1,12 +1,29 @@
 <template>
-  <v-app>
-    <v-main>
+  <!--
+    The shell (App.vue) draws the sidebar or the public logo; a page only adds itself and the
+    footer beneath it.
+  -->
+  <div class="page-frame">
+    <div class="page-frame__body">
       <router-view />
-    </v-main>
+    </div>
     <AppFooter />
-  </v-app>
+  </div>
 </template>
 
-<script lang="ts" setup>
+<style scoped>
+.page-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  flex: 1;
+}
 
-</script>
+.page-frame__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+</style>

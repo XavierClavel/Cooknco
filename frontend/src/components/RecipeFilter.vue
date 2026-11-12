@@ -91,13 +91,6 @@ const toggleSort = (field) => {
   updateUrl()
 };
 
-const getChipColor = (field) => {
-  if (selectedSort.value === field) {
-    return "primary";
-  }
-  return "background"; // Default color when unselected
-};
-
 
 const onIngredientAutocompleteChange = async (query) => {
   const response = await searchIngredients(query, 0, 20);
@@ -134,69 +127,94 @@ const updateUrl = () => {
 </script>
 
 <template>
-  <v-card
-    class=" py-2 px-4"
-  >
+  <section class="recipe-filter sticker sk-pad">
+    <!-- Left: where the recipes come from, what kind of dish, and what goes in them -->
+    <div class="recipe-filter__main">
+      <chip-row :values="sourceOptions" :action="updateUrl" :selected="selectedSource"></chip-row>
+      <chip-row :values="dishOptions" :action="updateUrl" :selected="selectedDishType"></chip-row>
 
-    <v-row class="d-flex justify-space-between align-start">
-      <!-- Left Section: Filters & Input -->
-      <v-col class="d-flex flex-column">
+      <v-combobox
+        class="recipe-filter__ingredients"
+        ref="comboboxRef"
+        v-model="selectedIngredients"
+        :items="autocompleteList"
+        :item-title="`name.${getLocale().toUpperCase()}`"
+        item-value="id"
+        return-object
+        multiple
+        chips
+        closable-chips
+        clearable
+        :placeholder="$t('ingredients')"
+        :aria-label="$t('ingredients')"
+        @update:search="(query) => onIngredientAutocompleteChange(query)"
+        @keydown.enter.prevent="selectFirstMatch"
+        @update:modelValue="onComboUpdate"
+      >
+        <template v-slot:selection="data">
+          <span class="sk-pill sk-pill--mustard">{{ data.item.title }}</span>
+        </template>
+      </v-combobox>
+    </div>
 
-        <chip-row :values="sourceOptions"  :action="updateUrl" :selected="selectedSource"></chip-row>
-        <chip-row :values="dishOptions" :action="updateUrl" :selected="selectedDishType"></chip-row>
-
-          <v-combobox
-            class="my-2 flex-grow-1 ma-1" max-width="400px"
-            ref="comboboxRef"
-            v-model="selectedIngredients"
-            :items="autocompleteList"
-            :item-title="`name.${getLocale().toUpperCase()}`"
-            item-value="id"
-            return-object
-            multiple
-            chips
-            closable-chips
-            clearable
-            :label="$t('ingredients')"
-            @update:search="(query) => onIngredientAutocompleteChange(query)"
-            @keydown.enter.prevent="selectFirstMatch"
-            @update:modelValue="onComboUpdate"
-          >
-            <template v-slot:selection="data">
-              <v-chip
-                size="small"
-                class="text-primary"
-                color="primary"
-                variant="elevated"
-              >
-                {{ data.item.name}}
-              </v-chip>
-            </template>
-          </v-combobox>
-
-      </v-col>
-
-      <!-- Right Section: Sorting Chips -->
-      <v-col class="d-flex flex-column align-center align-sm-end align-self-center mx-auto" cols="auto">
-        <v-chip
-          v-for="option in sortOptions"
-          :key="option.value"
-          :color="getChipColor(option.value)"
-          :variant="'elevated'"
-          @click="toggleSort(option.value)"
-          :prepend-icon="option.icon"
-          class="ma-1"
-        >
-          {{$t(option.label)}}
-          <v-icon v-if="selectedSort === option.value && option.ordered">
-            {{ sortOrder === 'desc' ? 'mdi-arrow-down' : 'mdi-arrow-up' }}
-          </v-icon>
-        </v-chip>
-      </v-col>
-    </v-row>
-  </v-card>
+    <!-- Right: the order, one at a time; a second click flips it, a third clears it -->
+    <div class="recipe-filter__sort">
+      <button
+        v-for="option in sortOptions"
+        :key="option.value"
+        type="button"
+        class="sk-chip"
+        :class="{'is-active': selectedSort === option.value}"
+        :aria-pressed="selectedSort === option.value"
+        @click="toggleSort(option.value)"
+      >
+        {{ $t(option.label) }}
+        <v-icon v-if="selectedSort === option.value && option.ordered">
+          {{ sortOrder === 'desc' ? 'mdi-arrow-down' : 'mdi-arrow-up' }}
+        </v-icon>
+      </button>
+    </div>
+  </section>
 </template>
 
 <style scoped>
+.recipe-filter {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
 
+.recipe-filter__main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.recipe-filter__ingredients {
+  max-width: 400px;
+  width: 100%;
+}
+
+.recipe-filter__sort {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .recipe-filter {
+    flex-direction: column;
+  }
+
+  .recipe-filter__sort {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
 </style>

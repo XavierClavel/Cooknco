@@ -9,94 +9,66 @@
 
   Two things here are load-bearing rather than decorative:
 
-  - **The recipe links are real `<a href>` elements.** Everywhere else in the app a card
-    navigates with `@click` and `toViewRecipe`, which is fine for a person and invisible to a
-    crawler: there is no href to follow, so the recipe pages stay orphans however well their
-    tags are written. `sitemap.xml` lists them all, but a link from a page that is itself
+  - **The recipe links are real `<a href>` elements** (the recipe sticker, `Recipe.vue`,
+    renders one). A card that only navigates with `@click` and `toViewRecipe` is fine for a
+    person and invisible to a crawler: there is no href to follow, so the recipe pages stay
+    orphans however well their tags are written. `sitemap.xml` lists them all, but a link from a page that is itself
     linked-to is what actually carries weight.
   - **The headings are `<h1>`/`<h2>`, not `v-card-title`.** Vuetify's titles render as divs,
     which say nothing about what this page is about.
 -->
 <template>
-  <v-container class="py-8" style="max-width: 1100px">
+  <div class="landing">
 
-    <section class="text-center mb-12">
-      <v-img
-        :src="logo"
-        alt="Cook&Co"
-        height="96"
-        class="mx-auto mb-4"
-        contain
-      />
-      <h1 class="text-h3 text-sm-h2 font-weight-bold mb-3">Cook&amp;Co</h1>
-      <p class="text-h6 text-sm-h5 font-weight-thin mb-6">{{ $t('landing_tagline') }}</p>
+    <section class="landing__hero">
+      <img :src="logo" alt="Cook&Co" class="landing__logo" />
+      <h1 class="landing__title">Cook&amp;Co</h1>
+      <p class="landing__tagline">{{ $t('landing_tagline') }}</p>
 
-      <div class="d-flex flex-wrap justify-center ga-3">
-        <v-btn color="primary" size="large" href="/signup">{{ $t('sign_up') }}</v-btn>
-        <v-btn variant="outlined" size="large" href="/login">{{ $t('log_in') }}</v-btn>
+      <div class="landing__cta">
+        <a class="sk-btn sk-btn--coral sk-btn--lg" href="/signup">{{ $t('sign_up') }}</a>
+        <a class="sk-btn sk-btn--paper sk-btn--lg" href="/login">{{ $t('log_in') }}</a>
       </div>
     </section>
 
-    <section class="mb-12">
-      <h2 class="text-h5 font-weight-bold mb-4">{{ $t('landing_what_is_it') }}</h2>
-      <p class="text-body-1 mb-6">{{ $t('landing_intro') }}</p>
+    <section class="landing__section">
+      <h2 class="sk-h2">{{ $t('landing_what_is_it') }}</h2>
+      <p class="landing__intro">{{ $t('landing_intro') }}</p>
 
-      <v-row>
-        <v-col v-for="feature in features" :key="feature.title" cols="12" md="4">
-          <v-card variant="tonal" class="h-100 pa-4">
-            <v-icon :icon="feature.icon" size="32" class="mb-2" />
-            <h3 class="text-h6 font-weight-bold mb-2">{{ $t(feature.title) }}</h3>
-            <p class="text-body-2">{{ $t(feature.text) }}</p>
-          </v-card>
-        </v-col>
-      </v-row>
+      <div class="landing__features">
+        <article v-for="feature in features" :key="feature.title" class="sticker sk-pad landing__feature">
+          <span class="landing__feature-icon" :style="{ background: feature.color }">
+            <v-icon :icon="feature.icon" />
+          </span>
+          <h3 class="sk-h3">{{ $t(feature.title) }}</h3>
+          <p>{{ $t(feature.text) }}</p>
+        </article>
+      </div>
     </section>
 
-    <section v-if="recipes.length">
-      <h2 class="text-h5 font-weight-bold mb-4">{{ $t('landing_latest_recipes') }}</h2>
-      <v-row>
-        <v-col
-          v-for="recipe in recipes"
-          :key="recipe.id"
-          cols="6"
-          sm="4"
-          md="3"
-        >
-          <!-- A real href, so this is a link a crawler can follow and a visitor can
-               middle-click, not a click handler. -->
-          <a :href="`/recipe/view?id=${recipe.id}`" class="recipe-link">
-            <v-card class="h-100">
-              <v-img
-                :src="getRecipeThumbnailUrl(recipe.id, recipe.version)"
-                :alt="recipe.title"
-                height="150px"
-                color="surface-variant"
-                cover
-              />
-              <v-card-text class="text-subtitle-2 font-weight-bold text-truncate">
-                {{ recipe.title }}
-              </v-card-text>
-            </v-card>
-          </a>
-        </v-col>
-      </v-row>
+    <section v-if="recipes.length" class="landing__section">
+      <h2 class="sk-h2">{{ $t('landing_latest_recipes') }}</h2>
+      <!-- Each card is a real href (see Recipe.vue), so this is a link a crawler can follow
+           and a visitor can middle-click, not a click handler. -->
+      <div class="landing__recipes">
+        <recipe v-for="recipe in recipes" :key="recipe.id" :recipe="recipe" compact />
+      </div>
     </section>
 
-  </v-container>
+  </div>
 </template>
 
 <script lang="ts" setup>
 import { ref } from 'vue'
 import { listPublicRecipes } from '@/scripts/recipes'
-import { getRecipeThumbnailUrl } from '@/scripts/common'
 import logo from '@/assets/logo.png'
 
 const recipes = ref([])
 
 const features = [
-  { icon: 'mdi-notebook-edit-outline', title: 'landing_feature_write_title', text: 'landing_feature_write_text' },
-  { icon: 'mdi-book-open-page-variant-outline', title: 'landing_feature_cookbooks_title', text: 'landing_feature_cookbooks_text' },
-  { icon: 'mdi-account-group-outline', title: 'landing_feature_share_title', text: 'landing_feature_share_text' },
+  { icon: 'mdi-pencil-outline', color: 'var(--mustard)', title: 'landing_feature_write_title', text: 'landing_feature_write_text' },
+  { icon: 'mdi-book-open-variant-outline', color: 'var(--sky)', title: 'landing_feature_cookbooks_title', text: 'landing_feature_cookbooks_text' },
+  { icon: 'mdi-account-multiple-outline', color: 'var(--blush)', title: 'landing_feature_share_title', text: 'landing_feature_share_text' },
 ]
 
 /**
@@ -117,10 +89,117 @@ loadRecipes()
 </script>
 
 <style scoped>
-.recipe-link {
-  text-decoration: none;
-  color: inherit;
+.landing {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding-bottom: 8px;
+}
+
+.landing__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.landing__logo {
   display: block;
-  height: 100%;
+  width: min(160px, 45vw);
+  height: auto;
+}
+
+.landing__title {
+  margin: 4px 0 0;
+  font-size: clamp(36px, 6vw, 48px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.landing__tagline {
+  max-width: 460px;
+  margin: 0;
+  font-size: clamp(16px, 2.2vw, 19px);
+  line-height: 1.4;
+}
+
+.landing__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.landing__cta .sk-btn {
+  box-shadow: var(--shadow);
+  min-width: 96px;
+}
+
+.landing__section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.landing__intro {
+  max-width: 640px;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.landing__features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 0 var(--lift) var(--lift) 0;
+}
+
+.landing__feature {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.landing__feature p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.landing__feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: var(--line) solid var(--ink);
+  border-radius: 8px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.landing__feature-icon .v-icon {
+  font-size: 18px;
+}
+
+.landing__recipes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px 16px;
+  padding: 0 var(--lift) var(--lift) 0;
+}
+
+@media (max-width: 860px) {
+  .landing__features { grid-template-columns: 1fr; }
+  .landing__recipes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .landing__recipes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

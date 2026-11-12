@@ -9,18 +9,21 @@ defineProps({
 </script>
 
 <template>
-  <v-card
-    class="pa-1 pa-sm-2 ma-5 "
-    v-if="error"
-    variant="outlined"
-    color="primary"
-  >
-    <v-card-text class="text-h5  text-sm-h4 text-black text-pre-wrap font-weight-bold">
-      ⚠️ {{ $t(error) }}
-    </v-card-text>
-  </v-card>
+  <div v-if="error" class="error-note sticker sticker--mustard" role="alert">
+    <v-icon size="32">mdi-alert-outline</v-icon>
+    <span>{{ $t(error) }}</span>
+  </div>
 </template>
 
 <style scoped>
-
+.error-note {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 22px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: pre-line;
+}
 </style>

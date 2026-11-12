@@ -15,8 +15,10 @@ import { VNumberInput } from 'vuetify/labs/VNumberInput'
 const customTheme: ThemeDefinition = {
   dark: false,
   colors: {
-    background: '#f0f4ef',
-    surface: '#629677',
+    // The sticker theme: the page is green and every card on it is pale paper
+    background: '#629677',
+    surface: '#eef3ee',
+    'on-background': '#0d1821',
     primary: '#ff6f59',
     secondary: '#f4b634',
     error: '#000000',
@@ -24,7 +26,12 @@ const customTheme: ThemeDefinition = {
     success: '#4CAF50',
     warning: '#FB8C00',
     'on-surface': "#000000", // Default text color
-    'menu': "#0476a3",
+    'menu': "#eef3ee",
+    'paper': "#eef3ee",
+    'ink': "#0d1821",
+    'mustard': "#f4b634",
+    'plum': "#4f4193",
+    'cream': "#fff0c2",
     'border': "#0d1821",
   },
   variables: {
@@ -46,9 +53,10 @@ export default createVuetify({
     },
     VCard: {
       rounded: 'lg',
+      color: 'surface',
     },
     VBtn: {
-      rounded: 'lg',
+      rounded: 'pill',
     },
     VNavigationDrawer: {
       rounded: 'lg',
@@ -57,7 +65,7 @@ export default createVuetify({
       variant:"solo",
       flat: true,
       hideDetails: 'auto',
-      bgColor: "background",
+      bgColor: "white",
       color: "primary",
       VBtn: {
         rounded: 0,
@@ -67,7 +75,7 @@ export default createVuetify({
       variant:"solo",
       flat: true,
       hideDetails: 'auto',
-      bgColor: "background",
+      bgColor: "white",
       color: "primary",
       class: "my-2"
     },
@@ -75,14 +83,14 @@ export default createVuetify({
       variant:"solo",
       flat: true,
       hideDetails: 'auto',
-      bgColor: "background",
+      bgColor: "white",
       color: "primary",
     },
     VSelect: {
       variant:"solo",
       flat: true,
       hideDetails: true,
-      bgColor: "background",
+      bgColor: "white",
       color: "primary",
       menuProps: {
         contentClass: 'custom-select-menu'
@@ -93,14 +101,14 @@ export default createVuetify({
       variant:"solo",
       flat: true,
       hideDetails: true,
-      bgColor: "background",
+      bgColor: "white",
       color: "primary",
     },
     VAutocomplete: {
       variant:"solo",
       flat: true,
       hideDetails: true,
-      bgColor: "background",
+      bgColor: "white",
       color: "primary",
     },
     VListItem: {
@@ -114,7 +122,7 @@ export default createVuetify({
       color: "primary"
     },
     VSnackbar: {
-      color: "surface",
+      color: "ink",
     }
   },
   components: {

@@ -7,6 +7,11 @@ const props = defineProps({
     type: String,
     required: false,
   },
+  /** How each cookbook is drawn: see `Cookbook.vue`. */
+  variant: {
+    type: String,
+    default: "row",
+  },
 })
 
 const cookbooks = ref<object[]>([])
@@ -89,11 +94,14 @@ updateGrid()
     side="end"
     margin="200"
   >
-    <v-card class="d-flex pa-0 ma-0" color="transparent" variant="flat" style="border:0 !important">
-      <v-row class="ma-1">
-        <cookbook :cookbook="cookbook" v-for="cookbook in cookbooks" :key="cookbook.id"></cookbook>
-      </v-row>
-    </v-card>
+    <div :class="variant === 'card' ? 'sk-recipe-grid' : 'cookbook-grid'">
+      <cookbook
+        v-for="cookbook in cookbooks"
+        :key="cookbook.id"
+        :cookbook="cookbook"
+        :variant="variant"
+      ></cookbook>
+    </div>
 
     <template v-slot:loading>
       <v-progress-circular
@@ -111,17 +119,10 @@ updateGrid()
 </template>
 
 <style scoped>
-.recipe-grid {
+.cookbook-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  justify-content: center; /* center whole grid */
-
-  padding: 0 clamp(16px, 8vw, 96px);
-  box-sizing: border-box;
-  margin: 0 auto;
-
-  column-gap: 12px;  /* horizontal space */
-  row-gap: 12px;     /* vertical space */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 18px;
+  padding: 0 var(--lift) var(--lift) 0;
 }
-
 </style>
