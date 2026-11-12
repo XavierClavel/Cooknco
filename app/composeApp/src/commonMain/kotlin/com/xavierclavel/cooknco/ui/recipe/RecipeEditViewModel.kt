@@ -791,7 +791,12 @@ class RecipeEditViewModel(
     }
 
     // Step operations
-    fun addStep() = _uiState.update { it.copy(steps = it.steps + StepItem(newStepId(), "")) }
+    /** Appends an empty step, and answers its id so the screen can put the cursor in it. */
+    fun addStep(): String {
+        val id = newStepId()
+        _uiState.update { it.copy(steps = it.steps + StepItem(id, "")) }
+        return id
+    }
 
     fun removeStep(id: String) = _uiState.update { s ->
         s.copy(steps = s.steps.filter { it.id != id })

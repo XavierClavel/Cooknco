@@ -22,16 +22,20 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -85,6 +89,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
@@ -599,9 +604,17 @@ fun RecipeEditScreen(
             onBackCompleted = viewModel::back,
         )
 
+        // The app draws edge to edge and nothing resizes the window for the keyboard, so the
+        // page makes room for it itself - or the bottom of a long list sits under the keys
+        // with no way to scroll it up, and "+ Add step" can only be reached by closing them.
+        // Only the part of the keyboard above the Back/Next row counts: that row stays put,
+        // behind the keys.
+        var footerHeight by remember { mutableIntStateOf(0) }
+
         Box(
             modifier = Modifier
                 .weight(1f)
+                .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets(bottom = footerHeight)))
                 // A swipe across the page turns it, as Next and Back do — and forward is
                 // refused the same way, so a swipe cannot skip what Next would have stopped at.
                 // It never publishes: a gesture brushing the last page must not put a recipe
@@ -650,63 +663,65 @@ fun RecipeEditScreen(
             }
         }
 
-        // ── Bottom navigation ─────────────────────────────────────────────────
-        // Step 0 has no "Cancel" box beside the primary button — the close icon in the
-        // top bar already covers that, so only the full-width primary action shows.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            if (currentStep > 0) {
-                StickerCard(
-                    modifier = Modifier.size(width = 100.dp, height = 56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    shadowOffset = 4.dp,
-                    onClick = viewModel::back,
-                ) {
-                    Text(
-                        text = s.back,
-                        color = CookncoNavy,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
-                }
-            }
-            StickerCard(
-                modifier = Modifier.weight(1f).height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                fillColor = CookncoOrange,
-                shadowOffset = 4.dp,
-                onClick = viewModel::next,
+        Column(modifier = Modifier.onSizeChanged { footerHeight = it.height }) {
+            // ── Bottom navigation ─────────────────────────────────────────────────
+            // Step 0 has no "Cancel" box beside the primary button — the close icon in the
+            // top bar already covers that, so only the full-width primary action shows.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (uiState.isSaving && currentStep == steps.lastIndex) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp).align(Alignment.Center),
-                        strokeWidth = 2.dp,
-                        color = CookncoWhite,
-                    )
-                } else {
-                    Text(
-                        text = if (currentStep < steps.lastIndex) s.nextStepLabel(steps[currentStep + 1].label(s).lowercase()) else s.publishCaps,
-                        color = CookncoWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        letterSpacing = if (currentStep == steps.lastIndex) 0.6.sp else 0.sp,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
+                if (currentStep > 0) {
+                    StickerCard(
+                        modifier = Modifier.size(width = 100.dp, height = 56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        shadowOffset = 4.dp,
+                        onClick = viewModel::back,
+                    ) {
+                        Text(
+                            text = s.back,
+                            color = CookncoNavy,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
+                }
+                StickerCard(
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    fillColor = CookncoOrange,
+                    shadowOffset = 4.dp,
+                    onClick = viewModel::next,
+                ) {
+                    if (uiState.isSaving && currentStep == steps.lastIndex) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp).align(Alignment.Center),
+                            strokeWidth = 2.dp,
+                            color = CookncoWhite,
+                        )
+                    } else {
+                        Text(
+                            text = if (currentStep < steps.lastIndex) s.nextStepLabel(steps[currentStep + 1].label(s).lowercase()) else s.publishCaps,
+                            color = CookncoWhite,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            letterSpacing = if (currentStep == steps.lastIndex) 0.6.sp else 0.sp,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
                 }
             }
-        }
 
-        if (uiState.error != null) {
-            Text(
-                text = uiState.error!!,
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
-            )
+            if (uiState.error != null) {
+                Text(
+                    text = uiState.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
+                )
+            }
         }
     }
 }
@@ -1629,6 +1644,9 @@ private fun StepsStep(
         else -> uiState.steps.indexOfFirst { it.id == first.stepId }.takeIf { it >= 0 }?.plus(1)
     }
     ScrollToProblem(lazyListState, uiState.refusals, item = firstProblemItem)
+    // The step "+ Add step" just made, until its field has taken the cursor: the cook is
+    // about to type into it, often with the keyboard still open from the step above.
+    var focusStepId by remember { mutableStateOf<String?>(null) }
     val reorderState = rememberReorderableLazyColumnState(lazyListState) { from, to ->
         val steps = uiState.steps
         val fromIdx = steps.indexOfFirst { it.id == from.key }
@@ -1676,6 +1694,8 @@ private fun StepsStep(
                         onAttach = { viewModel.attachToStep(step.id, it) },
                         onDetach = { viewModel.detachFromStep(step.id, it) },
                         onRemove = { viewModel.removeStep(step.id) },
+                        focusOnAppear = step.id == focusStepId,
+                        onFocused = { focusStepId = null },
                     )
                 }
             }
@@ -1685,7 +1705,7 @@ private fun StepsStep(
             // the mockup only ever shows this one way to add a step.
             StickerDashedButton(
                 text = s.addStep,
-                onClick = viewModel::addStep,
+                onClick = { focusStepId = viewModel.addStep() },
                 shape = RoundedCornerShape(18.dp),
             )
         }
@@ -2242,8 +2262,23 @@ private fun StepEditCard(
     onAttach: (StepAttachment) -> Unit,
     onDetach: (StepAttachment) -> Unit,
     onRemove: () -> Unit,
+    focusOnAppear: Boolean = false,
+    onFocused: () -> Unit = {},
 ) {
     val s = strings()
+    val textFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    // One frame first: the card has only just been added, and a FocusRequester whose field is
+    // not attached yet throws rather than waiting (see the ingredient note). Once focused, the
+    // field brings itself into view.
+    if (focusOnAppear) {
+        LaunchedEffect(Unit) {
+            withFrameNanos { }
+            runCatching { textFocus.requestFocus() }
+            keyboard?.show()
+            onFocused()
+        }
+    }
     StickerCard(
         modifier = Modifier.fillMaxWidth().shadow(elevation, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(18.dp),
@@ -2268,6 +2303,7 @@ private fun StepEditCard(
                     onValueChange = onStepChange,
                     placeholder = s.describeThisStep,
                     modifier = Modifier.padding(top = 5.dp),
+                    fieldModifier = Modifier.focusRequester(textFocus),
                 )
                 if (textError != null) FieldError(textError)
                 StepAttachments(
