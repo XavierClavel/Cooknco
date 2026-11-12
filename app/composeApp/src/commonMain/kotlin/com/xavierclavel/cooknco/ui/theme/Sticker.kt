@@ -194,6 +194,8 @@ fun StickerTextArea(
     textColor: Color = CookncoNavy,
     placeholderColor: Color = CookncoGreenDark,
     cursorColor: Color = CookncoOrange,
+    // Reaches the text field itself rather than the box around it: a focus requester, say.
+    fieldModifier: Modifier = Modifier,
 ) {
     val textStyle = TextStyle(
         fontSize = fontSize,
@@ -210,7 +212,7 @@ fun StickerTextArea(
             onValueChange = onValueChange,
             textStyle = textStyle,
             cursorBrush = SolidColor(cursorColor),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().then(fieldModifier),
         )
     }
 }
