@@ -81,9 +81,17 @@ class ImageService: KoinComponent {
         ImageIO.write(render(upload, targetSize), "webp", file.toFile())
     }
 
+    /**
+     * How the picture asks to be turned, which is upright unless it says otherwise.
+     *
+     * An EXIF block is no promise of the tag: an editor, an export or a screenshot tool writes
+     * the resolution or the software and leaves orientation out, so the tag is read with
+     * `getInteger`, which answers null for a missing tag — `getInt` throws instead, and every
+     * such picture was refused with a 500.
+     */
     private fun orientationOf(metadata: Metadata): ExifOrientation {
         val directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory::class.java)
-        return ExifOrientation.fromInt(directory?.getInt(ExifIFD0Directory.TAG_ORIENTATION) ?: 1)
+        return ExifOrientation.fromInt(directory?.getInteger(ExifIFD0Directory.TAG_ORIENTATION))
     }
 
     private fun render(upload: UploadedImage, targetSize: Pair<Int, Int>, upscale: Boolean = true): BufferedImage =

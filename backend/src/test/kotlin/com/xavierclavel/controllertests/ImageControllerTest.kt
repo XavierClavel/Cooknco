@@ -32,6 +32,7 @@ import main.com.xavierclavel.utils.jpegOf
 import main.com.xavierclavel.utils.quartersImageBytes
 import main.com.xavierclavel.utils.storedImage
 import main.com.xavierclavel.utils.withExifOrientation
+import main.com.xavierclavel.utils.withExifShort
 import org.junit.jupiter.api.Test
 import shared.dto.RecipeDTO
 import shared.utils.URL.IMAGE_URL
@@ -143,6 +144,38 @@ class ImageControllerTest : ApplicationTest() {
         }
 
         assertFilledWith(GREEN, storedImage(RECIPES_IMG_PATH, recipe.id, 1))
+    }
+
+    /**
+     * An EXIF block is no promise of an orientation tag: an editor, an export or a screenshot tool
+     * writes the resolution or the software and leaves orientation out. Such a picture is upright —
+     * and was refused with a 500, because the tag was read as though it had to be there.
+     */
+    @Test
+    fun `a picture whose EXIF names no orientation is stored upright`() = runTestAsAdmin {
+        val recipe = client.createRecipe()
+        // Resolution unit (0x0128) and nothing else
+        val untagged = withExifShort(quartersImageBytes(800, 600), tag = 0x0128, value = 2)
+
+        client.uploadRecipeImage(recipe.id, untagged, crop = "0.5,0,0.5,0.5").apply {
+            assertEquals(HttpStatusCode.OK, status)
+        }
+
+        assertFilledWith(GREEN, storedImage(RECIPES_IMG_PATH, recipe.id, 1))
+    }
+
+    /** 0 is "undefined", which some writers put there; nothing outside the eight EXIF defines turns a picture. */
+    @Test
+    fun `an orientation EXIF does not define is read as upright`() = runTestAsAdmin {
+        val recipe = client.createRecipe()
+
+        listOf(0, 9).forEachIndexed { index, orientation ->
+            val tagged = withExifOrientation(quartersImageBytes(800, 600), orientation)
+            client.uploadRecipeImage(recipe.id, tagged, crop = "0.5,0,0.5,0.5").apply {
+                assertEquals(HttpStatusCode.OK, status, "orientation $orientation")
+            }
+            assertFilledWith(GREEN, storedImage(RECIPES_IMG_PATH, recipe.id, index + 1L))
+        }
     }
 
     /**
