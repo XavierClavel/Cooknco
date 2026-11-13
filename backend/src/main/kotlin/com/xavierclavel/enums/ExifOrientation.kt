@@ -1,7 +1,6 @@
 package com.xavierclavel.enums
 
 import java.awt.geom.AffineTransform
-import kotlin.collections.first
 
 enum class ExifOrientation(val value: Int) {
     NORMAL(1),
@@ -14,7 +13,12 @@ enum class ExifOrientation(val value: Int) {
     ROTATION_90_CCW(8);
 
     companion object {
-        fun fromInt(i: Int) = entries.first { it.value == i }
+        /**
+         * The orientation an EXIF value names, or [NORMAL] for none or one outside the eight
+         * EXIF defines — 0, "undefined", is written in the wild. The tag only decorates the
+         * pixels, so a value nothing can act on turns nothing rather than refusing the picture.
+         */
+        fun fromInt(i: Int?): ExifOrientation = entries.firstOrNull { it.value == i } ?: NORMAL
     }
 
     fun requiresSwap(): Boolean = value > 4

@@ -72,12 +72,20 @@ val WHITE: Color = Color(250, 250, 250)
  * and the tag is the whole of what this needs — a big-endian TIFF header and one IFD holding
  * the one SHORT.
  */
-fun withExifOrientation(jpeg: ByteArray, orientation: Int): ByteArray {
+fun withExifOrientation(jpeg: ByteArray, orientation: Int): ByteArray =
+    withExifShort(jpeg, tag = 0x0112, value = orientation)
+
+/**
+ * The same jpeg carrying an EXIF block whose only entry is the SHORT [tag] — [withExifOrientation]
+ * is this with the orientation tag, and any other [tag] is an EXIF block that says nothing about
+ * orientation, as an editor or a screenshot tool writes one.
+ */
+fun withExifShort(jpeg: ByteArray, tag: Int, value: Int): ByteArray {
     val tiff = byteArrayOf(
         0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08, // "MM", 42, first IFD at offset 8
         0x00, 0x01, // one entry
-        0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, // Orientation, SHORT, one value
-        0x00, orientation.toByte(), 0x00, 0x00,
+        (tag shr 8).toByte(), tag.toByte(), 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, // the tag, SHORT, one value
+        0x00, value.toByte(), 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, // no next IFD
     )
     val payload = "Exif".toByteArray() + byteArrayOf(0, 0) + tiff
