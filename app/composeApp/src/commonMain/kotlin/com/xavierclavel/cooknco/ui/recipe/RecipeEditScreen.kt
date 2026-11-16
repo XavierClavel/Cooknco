@@ -94,6 +94,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -265,6 +266,7 @@ private fun StickerField(
                 singleLine = singleLine,
                 textStyle = textStyle,
                 cursorBrush = SolidColor(CookncoOrange),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
             )
         }
@@ -1349,6 +1351,8 @@ private fun IngredientSearchField(query: String, onQueryChange: (String) -> Unit
                     singleLine = true,
                     textStyle = textStyle,
                     cursorBrush = SolidColor(CookncoOrange),
+                    // What is typed here becomes the ingredient's name when the catalogue has no match.
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -1510,6 +1514,7 @@ private fun AddedIngredientCard(
                             singleLine = true,
                             textStyle = noteStyle,
                             cursorBrush = SolidColor(CookncoOrange),
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .focusRequester(noteFocus)
