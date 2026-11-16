@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
@@ -46,6 +47,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -234,6 +236,7 @@ fun CookbookEditScreen(
                                 onValueChange = viewModel::updateTitle,
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
+                                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                                 isError = uiState.error?.contains("Title") == true,
                                 colors = editFieldColors(),
                                 shape = fieldShape,
@@ -246,6 +249,7 @@ fun CookbookEditScreen(
                                 onValueChange = viewModel::updateDescription,
                                 modifier = Modifier.fillMaxWidth(),
                                 minLines = 3,
+                                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                                 colors = editFieldColors(),
                                 shape = fieldShape,
                             )
