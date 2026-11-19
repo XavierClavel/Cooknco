@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.CookbookRepository
+import com.xavierclavel.cooknco.data.DayMeal
 import com.xavierclavel.cooknco.data.ExportRepository
 import com.xavierclavel.cooknco.data.MealPlanRepository
 import com.xavierclavel.cooknco.data.RecipeRepository
@@ -82,10 +83,12 @@ data class CookbookPickerState(
     val error: String? = null,
 )
 
-/** The "Add to meal plan" sheet. What it is planning for — day, meal, servings — is the sheet's own until it is sent. */
+/** The "Add to meal plan" sheet. What it is planning for — day, meals, servings — is the sheet's own until it is sent. */
 data class PlanRecipeState(
     val isSaving: Boolean = false,
     val saveFailed: Boolean = false,
+    /** Where the recipe was planned already by a save that partly failed, which trying again skips. */
+    val saved: Set<DayMeal> = emptySet(),
 )
 
 class RecipeViewModel(
@@ -327,15 +330,19 @@ class RecipeViewModel(
 
     fun closePlanSheet() = _uiState.update { it.copy(planSheet = null) }
 
-    /** Plans this recipe, and closes the sheet once the server has it. */
+    /** Plans this recipe at every meal the sheet picked, and closes the sheet once the server has them all. */
     fun planRecipe(draft: MealEntryDraft) {
         val sheet = _uiState.value.planSheet ?: return
         if (sheet.isSaving) return
+        val meals = draft.slots.sorted().map { DayMeal(draft.date, it) }.filterNot { it in sheet.saved }
         viewModelScope.launch {
-            _uiState.update { it.copy(planSheet = PlanRecipeState(isSaving = true)) }
-            mealPlanRepo.planRecipe(recipeId, draft.date, draft.slot, draft.servings)
-                .onSuccess { _uiState.update { it.copy(planSheet = null) } }
-                .onFailure { _uiState.update { it.copy(planSheet = PlanRecipeState(saveFailed = true)) } }
+            _uiState.update { it.copy(planSheet = sheet.copy(isSaving = true, saveFailed = false)) }
+            val results = meals
+                .map { meal -> meal to async { mealPlanRepo.planRecipe(recipeId, meal.date, meal.slot, draft.servings) } }
+                .map { (meal, result) -> meal to result.await() }
+            val saved = sheet.saved + results.filter { (_, result) -> result.isSuccess }.map { (meal, _) -> meal }
+            val failed = results.any { (_, result) -> result.isFailure }
+            _uiState.update { it.copy(planSheet = if (failed) PlanRecipeState(saveFailed = true, saved = saved) else null) }
         }
     }
 

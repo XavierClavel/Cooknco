@@ -130,9 +130,9 @@ fun MealPlanScreen(
             // A recipe opens: that is what a planned recipe is tapped for, on the evening it is
             // cooked. Everything else about the dish is behind its "···".
             val recipe = entry.recipe
-            if (recipe != null) onRecipeClick(recipe.id) else viewModel.openEntry(entry)
+            if (recipe != null) onRecipeClick(recipe.id) else viewModel.openMenu(entry)
         },
-        onDishMenu = viewModel::openEntry,
+        onDishMenu = viewModel::openMenu,
         modifier = modifier,
     )
 
@@ -141,7 +141,7 @@ fun MealPlanScreen(
             state = adding,
             today = uiState.today,
             onQueryChange = viewModel::setQuery,
-            onSlotChange = viewModel::setAddSlot,
+            onToggleSlot = viewModel::toggleAddSlot,
             onToggleDate = viewModel::toggleAddDate,
             onMonthChange = viewModel::loadAddMonth,
             onClearDates = viewModel::clearAddDates,
@@ -153,19 +153,25 @@ fun MealPlanScreen(
         )
     }
 
-    uiState.editing?.let { editing ->
+    uiState.menu?.let { menu ->
+        DishMenuSheet(
+            state = menu,
+            onServingsChange = viewModel::setMenuServings,
+            onSaveServings = viewModel::saveMenuServings,
+            onReplace = viewModel::openReplace,
+            onSeeEveryDay = viewModel::openDishDays,
+            onRemove = viewModel::removeFromDay,
+            onDismissRequest = viewModel::closeMenu,
+        )
+    }
+
+    uiState.dishDays?.let { dishDays ->
         DishDaysSheet(
-            state = editing,
+            state = dishDays,
             today = uiState.today,
-            onToggleDate = viewModel::toggleEntryDate,
-            onMonthChange = viewModel::loadEntryMonth,
-            onSlotChange = viewModel::setEntrySlot,
-            onServingsChange = viewModel::setEntryServings,
-            onTitleChange = viewModel::setEntryTitle,
-            onSave = viewModel::saveEntry,
-            onRemove = viewModel::removeEntry,
-            onOpenRecipe = editing.entry.recipe?.let { recipe -> { viewModel.closeEntry(); onRecipeClick(recipe.id) } },
-            onDismissRequest = viewModel::closeEntry,
+            onMonthChange = viewModel::loadDishDaysMonth,
+            onOpenRecipe = dishDays.entry.recipe?.let { recipe -> { viewModel.closeDishDays(); onRecipeClick(recipe.id) } },
+            onDismissRequest = viewModel::closeDishDays,
         )
     }
 }

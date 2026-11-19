@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.xavierclavel.cooknco.data.DEFAULT_MEAL_SERVINGS
+import com.xavierclavel.cooknco.data.DayMeal
 import com.xavierclavel.cooknco.data.MealPlanRepository
 import com.xavierclavel.cooknco.data.MealSlot
 import com.xavierclavel.cooknco.data.PlannedDay
@@ -13,6 +14,7 @@ import com.xavierclavel.cooknco.data.RecipeRepository
 import com.xavierclavel.cooknco.data.monthGrid
 import com.xavierclavel.cooknco.data.monthOf
 import com.xavierclavel.cooknco.data.planWeek
+import com.xavierclavel.cooknco.data.toggle
 import com.xavierclavel.cooknco.data.weekStartOf
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.dto.MealPlanEntry
@@ -36,12 +38,13 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * What a dish's sheet is editing: when, which meal, for how many, and — for a dish that is not
- * a recipe — what it is called. The sheet holds one while it is open and hands it back whole.
+ * What a dish's sheet is editing: when, at which meals, for how many, and — for a dish that is
+ * not a recipe — what it is called. The sheet holds one while it is open and hands it back whole.
  */
 data class MealEntryDraft(
     val date: LocalDate,
-    val slot: MealSlot,
+    /** Never empty. */
+    val slots: Set<MealSlot>,
     val servings: Int?,
     val title: String,
 )
@@ -51,11 +54,12 @@ data class MealEntryDraft(
  *
  * Opened from a day's "+", it plans on that day and no other. Opened from the header's "plan a
  * meal" ([picksDays]), the cook chooses the days in the sheet itself — any number of them, as
- * many weeks apart as they like — and one tap plans the dish on every one.
+ * many weeks apart as they like — and one tap plans the dish on every one, at every meal picked.
  */
 data class AddDishState(
     val dates: Set<LocalDate>,
-    val slot: MealSlot,
+    /** The meals the dish goes to on each of [dates]. Never empty. */
+    val slots: Set<MealSlot>,
     val picksDays: Boolean = false,
     val query: String = "",
     /** The cook's own recipes, liked ones and cookbooks' that match [query]. */
@@ -65,9 +69,13 @@ data class AddDishState(
     val isSearching: Boolean = false,
     val isSaving: Boolean = false,
     val saveFailed: Boolean = false,
+    /** Where this sheet has already planned the dish, which a save after one that partly failed skips. */
+    val saved: Set<DayMeal> = emptySet(),
     /** The meals already planned, by day, in the months the calendar has looked at. */
     val taken: Map<LocalDate, Set<MealSlot>> = emptyMap(),
     val loadedMonths: Set<LocalDate> = emptySet(),
+    /** The dish this sheet puts another in place of, on its day and at its meal. */
+    val replacing: MealPlanEntry? = null,
 )
 
 /** What a tap in the "add a dish" sheet plans: one of the cook's recipes, or a few words. */
@@ -77,39 +85,25 @@ private sealed interface NewDish {
     data object NotCooked : NewDish
 }
 
-/** A planned dish's sheet, while it is open. */
-data class EditDishState(
-    /** The dish the sheet was opened on, which names the dish and the meal it is at. */
+/**
+ * A planned dish's "···", while it is open: what can be done to the dish on that one day — its
+ * servings, another dish in its place, taking it off — and the way to every day it is on.
+ */
+data class DishMenuState(
     val entry: MealPlanEntry,
-    val slot: MealSlot,
-    val title: String,
-    /** Servings the cook set, by day. A day not in it keeps what it was planned for. */
-    val servings: Map<LocalDate, Int?> = emptyMap(),
-    /** What a newly ticked day is for: the count last set, or the dish's own. */
-    val newDayServings: Int? = entry.servings,
-    /**
-     * Every day this dish is planned at its meal, in the months the calendar has looked at —
-     * the plan is read a stretch at a time, so the rest arrive as the cook pages to them.
-     */
-    val planned: Map<LocalDate, MealPlanEntry> = emptyMap(),
-    val loadedMonths: Set<LocalDate> = emptySet(),
-    val isLoadingDays: Boolean = false,
-    /** Days ticked that the dish is not planned on yet, and planned days unticked. */
-    val added: Set<LocalDate> = emptySet(),
-    val removed: Set<LocalDate> = emptySet(),
+    val servings: Int? = entry.servings,
     val isSaving: Boolean = false,
     val saveFailed: Boolean = false,
-) {
-    /** The days the dish will be on once saved. */
-    val days: Set<LocalDate> get() = (planned.keys - removed) + added
+)
 
-    /** How many [date]'s serving is for, once saved: each day its own count. */
-    fun servingsOn(date: LocalDate): Int? = when {
-        date in servings -> servings[date]
-        date in planned -> planned.getValue(date).servings
-        else -> newDayServings
-    }
-}
+/** Every day a dish is served at its meal, shown and not edited: each day is edited from its own "···". */
+data class DishDaysState(
+    val entry: MealPlanEntry,
+    /** The days found so far: the plan is read a month at a time, as the calendar pages to them. */
+    val days: Set<LocalDate> = emptySet(),
+    val loadedMonths: Set<LocalDate> = emptySet(),
+    val isLoadingDays: Boolean = false,
+)
 
 data class MealPlanUiState(
     val today: LocalDate,
@@ -126,7 +120,8 @@ data class MealPlanUiState(
      */
     val neighbours: Map<LocalDate, List<MealPlanEntry>> = emptyMap(),
     val adding: AddDishState? = null,
-    val editing: EditDishState? = null,
+    val menu: DishMenuState? = null,
+    val dishDays: DishDaysState? = null,
 ) {
     val days: List<PlannedDay> get() = planWeek(weekStart, entries)
 
@@ -244,7 +239,7 @@ class MealPlanViewModel(
 
     /** The add sheet for [day], on [slot] — the empty meal the cook tapped, or the likeliest one. */
     fun openAdd(day: PlannedDay, slot: MealSlot = day.nextOpenSlot) {
-        _uiState.update { it.copy(adding = AddDishState(dates = setOf(day.date), slot = slot)) }
+        _uiState.update { it.copy(adding = AddDishState(dates = setOf(day.date), slots = setOf(slot))) }
         setQuery("")
     }
 
@@ -254,7 +249,7 @@ class MealPlanViewModel(
      */
     fun openAddMeal() {
         _uiState.update { state ->
-            state.copy(adding = AddDishState(dates = emptySet(), slot = MealSlot.DINNER, picksDays = true))
+            state.copy(adding = AddDishState(dates = emptySet(), slots = setOf(MealSlot.DINNER), picksDays = true))
         }
         setQuery("")
     }
@@ -310,7 +305,11 @@ class MealPlanViewModel(
         _uiState.update { it.copy(adding = null) }
     }
 
-    fun setAddSlot(slot: MealSlot) = _uiState.update { state -> state.copy(adding = state.adding?.copy(slot = slot)) }
+    /** Adds [slot] to the meals the sheet plans on, or takes it out if it was there and is not the last. */
+    fun toggleAddSlot(slot: MealSlot) = _uiState.update { state ->
+        val adding = state.adding?.takeIf { !it.isSaving && it.replacing == null } ?: return@update state
+        state.copy(adding = adding.copy(slots = adding.slots.toggle(slot), saveFailed = false))
+    }
 
     /**
      * Looks for [query] among the cook's recipes and among what they typed before, once they
@@ -353,10 +352,12 @@ class MealPlanViewModel(
 
     /** Plans [dish] on the sheet's days. With none picked, the sheet shows its dishes as not yet tappable. */
     private fun add(dish: NewDish) {
+        // A dish put in another's place is for as many as the one it replaces
+        val servings = _uiState.value.adding?.replacing?.servings ?: DEFAULT_MEAL_SERVINGS
         saveNew { date, slot ->
             when (dish) {
-                is NewDish.Recipe -> mealPlanRepository.planRecipe(dish.recipe.id, date, slot, servings = DEFAULT_MEAL_SERVINGS)
-                is NewDish.Words -> mealPlanRepository.planDish(dish.title, date, slot, servings = DEFAULT_MEAL_SERVINGS)
+                is NewDish.Recipe -> mealPlanRepository.planRecipe(dish.recipe.id, date, slot, servings = servings)
+                is NewDish.Words -> mealPlanRepository.planDish(dish.title, date, slot, servings = servings)
                 NewDish.NotCooked -> mealPlanRepository.planNotCooked(date, slot)
             }
         }
@@ -364,186 +365,155 @@ class MealPlanViewModel(
 
 
     /**
-     * Plans the dish on every day of the sheet, one request per day, all at once.
+     * Plans the dish at every meal of every day of the sheet, one request each, all at once, and
+     * then takes off the dish it replaces, if it replaces one.
      *
-     * The days that went through stay planned whatever happened to the others: the sheet stays
-     * open on the ones that failed alone, so trying again cannot plan a dish twice on a day.
+     * What went through stays planned whatever happened to the rest: the sheet stays open on the
+     * days that failed alone, and remembers which of their meals did not, so trying again cannot
+     * plan a dish twice at a meal. The replaced dish goes once its replacement is planned, so a
+     * failure leaves the meal with one dish too many rather than none.
      */
     private fun saveNew(plan: suspend (LocalDate, MealSlot) -> Result<MealPlanEntry>) {
         val adding = _uiState.value.adding ?: return
         if (adding.isSaving || adding.dates.isEmpty()) return
+        val meals = adding.dates.sorted()
+            .flatMap { date -> adding.slots.sorted().map { DayMeal(date, it) } }
+            .filterNot { it in adding.saved }
         viewModelScope.launch {
             _uiState.update { it.copy(adding = adding.copy(isSaving = true, saveFailed = false)) }
-            val results = adding.dates.sorted()
-                .map { date -> date to async { plan(date, adding.slot) } }
-                .map { (date, result) -> date to result.await() }
+            val results = meals
+                .map { meal -> meal to async { plan(meal.date, meal.slot) } }
+                .map { (meal, result) -> meal to result.await() }
             val planned = results.mapNotNull { (_, result) -> result.getOrNull() }
-            val failed = results.filter { (_, result) -> result.isFailure }.map { (date, _) -> date }.toSet()
+            val saved = results.filter { (_, result) -> result.isSuccess }.map { (meal, _) -> meal }
+            val failed = results.filter { (_, result) -> result.isFailure }.map { (meal, _) -> meal.date }.toSet()
+            val replaced = adding.replacing?.takeIf { failed.isEmpty() }
+            val removed = replaced != null && mealPlanRepository.remove(replaced.id).isSuccess
+            val done = failed.isEmpty() && (adding.replacing == null || removed)
             _uiState.update { state ->
                 // Only what falls in the week on screen: the others are drawn when their week is
                 val weekEnd = state.weekStart.plus(6, DateTimeUnit.DAY)
                 val shown = planned.filter { entry ->
                     runCatching { LocalDate.parse(entry.date) }.getOrNull()?.let { it in state.weekStart..weekEnd } == true
                 }
-                val entries = state.entries + shown
-                if (failed.isEmpty()) {
+                val entries = state.entries.filterNot { removed && it.id == replaced?.id } + shown
+                if (done) {
                     state.copy(adding = null, entries = entries)
                 } else {
                     state.copy(
-                        adding = state.adding?.copy(dates = failed, isSaving = false, saveFailed = true),
+                        adding = state.adding?.copy(
+                            dates = failed.ifEmpty { adding.dates },
+                            saved = adding.saved + saved,
+                            isSaving = false,
+                            saveFailed = true,
+                        ),
                         entries = entries,
                     )
                 }
             }
-            if (failed.isEmpty()) searchJob?.cancel()
-            if (planned.isNotEmpty()) refreshNeighbours()
+            if (done) searchJob?.cancel()
+            if (planned.isNotEmpty() || removed) refreshNeighbours()
         }
     }
 
-    // ── Editing ───────────────────────────────────────────────────────────────
+    // ── A dish's "···" ────────────────────────────────────────────────────────
 
-    /**
-     * Opens a dish's sheet on every day it is served at its meal: the tapped one straight away,
-     * the rest of its month as soon as the server has said.
-     */
-    fun openEntry(entry: MealPlanEntry) {
+    fun openMenu(entry: MealPlanEntry) = _uiState.update { it.copy(menu = DishMenuState(entry)) }
+
+    fun closeMenu() = _uiState.update { it.copy(menu = null) }
+
+    fun setMenuServings(servings: Int?) = _uiState.update { state ->
+        val menu = state.menu?.takeIf { !it.isSaving } ?: return@update state
+        state.copy(menu = menu.copy(servings = servings, saveFailed = false))
+    }
+
+    /** Sends the servings set for the dish on its day, and on that day alone. */
+    fun saveMenuServings() {
+        val menu = _uiState.value.menu ?: return
+        if (menu.isSaving || menu.servings == menu.entry.servings) return
+        val entry = menu.entry
         val date = runCatching { LocalDate.parse(entry.date) }.getOrNull() ?: return
         val slot = MealSlot.of(entry.slot) ?: return
-        _uiState.update {
-            it.copy(editing = EditDishState(entry = entry, slot = slot, title = entry.title, planned = mapOf(date to entry)))
-        }
-        loadEntryMonth(date)
-    }
-
-    fun closeEntry() = _uiState.update { it.copy(editing = null) }
-
-    /**
-     * Finds the dish's days in the month [month] falls in — the six weeks the calendar draws
-     * for it, which one listing covers. A month already looked at is not asked for again.
-     */
-    fun loadEntryMonth(month: LocalDate) {
-        val editing = _uiState.value.editing ?: return
-        val first = monthOf(month)
-        if (first in editing.loadedMonths) return
-        val grid = monthGrid(first)
-        _uiState.update { it.copy(editing = editing.copy(loadedMonths = editing.loadedMonths + first, isLoadingDays = true)) }
         viewModelScope.launch {
-            val found = mealPlanRepository.between(grid.first(), grid.last())
+            _uiState.update { it.copy(menu = menu.copy(isSaving = true, saveFailed = false)) }
+            // No name: the backend lets go of an out-of-reach recipe on a rename
+            val result = mealPlanRepository.update(entry.id, date, slot, menu.servings, null)
             _uiState.update { state ->
-                val current = state.editing?.takeIf { it.entry.id == editing.entry.id } ?: return@update state
-                found.fold(
-                    onSuccess = { entries ->
-                        val same = entries.filter { it.isSameDishAs(current.entry) }
-                            .mapNotNull { e -> runCatching { LocalDate.parse(e.date) }.getOrNull()?.let { it to e } }
-                            // Two of the same dish in one meal is one day ticked; the first is the one edited
-                            .groupBy({ it.first }, { it.second })
-                            .mapValues { (_, list) -> list.minBy { it.position } }
-                        state.copy(editing = current.copy(planned = same + current.planned, isLoadingDays = false))
-                    },
-                    // Asked again the next time the cook pages to it
-                    onFailure = { state.copy(editing = current.copy(loadedMonths = current.loadedMonths - first, isLoadingDays = false)) },
+                result.fold(
+                    onSuccess = { changed -> state.copy(menu = null, entries = state.entries.map { if (it.id == changed.id) changed else it }) },
+                    onFailure = { state.copy(menu = menu.copy(saveFailed = true)) },
                 )
             }
         }
     }
 
-    /** Ticks [date] for the dish, or unticks it. */
-    fun toggleEntryDate(date: LocalDate) = updateEditing { e ->
-        when {
-            date in e.added -> e.copy(added = e.added - date)
-            date in e.removed -> e.copy(removed = e.removed - date)
-            date in e.planned -> e.copy(removed = e.removed + date)
-            else -> e.copy(added = e.added + date)
+    /** Takes the dish off its day, and that day alone: the other days it is planned on keep it. */
+    fun removeFromDay() {
+        val menu = _uiState.value.menu ?: return
+        if (menu.isSaving) return
+        val id = menu.entry.id
+        viewModelScope.launch {
+            _uiState.update { it.copy(menu = menu.copy(isSaving = true, saveFailed = false)) }
+            val removed = mealPlanRepository.remove(id).isSuccess
+            _uiState.update { state ->
+                if (!removed) return@update state.copy(menu = menu.copy(saveFailed = true))
+                state.copy(
+                    menu = null,
+                    entries = state.entries.filterNot { it.id == id },
+                    neighbours = state.neighbours.mapValues { (_, entries) -> entries.filterNot { it.id == id } },
+                )
+            }
         }
     }
 
-    fun setEntrySlot(slot: MealSlot) = updateEditing { it.copy(slot = slot) }
-    /** Sets how many [date]'s serving is for; the days ticked after it start from the same count. */
-    fun setEntryServings(date: LocalDate, servings: Int?) = updateEditing {
-        it.copy(servings = it.servings + (date to servings), newDayServings = servings)
+    /** The add sheet, on the dish's day and meal, where a tap puts another dish in its place. */
+    fun openReplace() {
+        val entry = _uiState.value.menu?.entry ?: return
+        val date = runCatching { LocalDate.parse(entry.date) }.getOrNull() ?: return
+        val slot = MealSlot.of(entry.slot) ?: return
+        _uiState.update {
+            it.copy(menu = null, adding = AddDishState(dates = setOf(date), slots = setOf(slot), replacing = entry))
+        }
+        setQuery("")
     }
-    fun setEntryTitle(title: String) = updateEditing { it.copy(title = title) }
 
-    private fun updateEditing(change: (EditDishState) -> EditDishState) = _uiState.update { state ->
-        val editing = state.editing?.takeIf { !it.isSaving } ?: return@update state
-        state.copy(editing = change(editing).copy(saveFailed = false))
+    // ── Every day of a dish ───────────────────────────────────────────────────
+
+    /** Every day the dish is served at its meal: the tapped one straight away, the rest of its month once the server has said. */
+    fun openDishDays() {
+        val entry = _uiState.value.menu?.entry ?: return
+        val date = runCatching { LocalDate.parse(entry.date) }.getOrNull() ?: return
+        _uiState.update { it.copy(menu = null, dishDays = DishDaysState(entry = entry, days = setOf(date))) }
+        loadDishDaysMonth(date)
     }
+
+    fun closeDishDays() = _uiState.update { it.copy(dishDays = null) }
 
     /**
-     * Saves the sheet: plans the dish on the days ticked, takes it off the days unticked, and
-     * carries a new meal or name to every day it stays on, and each day's own servings.
-     *
-     * Only what the cook changed is sent: a day whose count, meal and name are as they were is
-     * left alone, and the name is only sent when it changed on a dish shown as words — the
-     * backend lets go of an out-of-reach recipe on a rename, which a save that only moved the
-     * dish must not do by accident.
+     * Finds the dish's days in the month [month] falls in — the six weeks the calendar draws
+     * for it, which one listing covers. A month already looked at is not asked for again.
      */
-    fun saveEntry() {
-        val editing = _uiState.value.editing ?: return
-        if (editing.isSaving) return
-        val entry = editing.entry
-        val originalSlot = MealSlot.of(entry.slot)
-        val named = entry.recipe == null && entry.hasCooked
-        val renamed = editing.title.trim().takeIf { named && it.isNotEmpty() && it != entry.title }
-        val slotChanged = editing.slot != originalSlot
-        if (named && editing.title.isBlank()) return
+    fun loadDishDaysMonth(month: LocalDate) {
+        val dishDays = _uiState.value.dishDays ?: return
+        val first = monthOf(month)
+        if (first in dishDays.loadedMonths) return
+        val grid = monthGrid(first)
+        _uiState.update { it.copy(dishDays = dishDays.copy(loadedMonths = dishDays.loadedMonths + first, isLoadingDays = true)) }
         viewModelScope.launch {
-            _uiState.update { it.copy(editing = editing.copy(isSaving = true, saveFailed = false)) }
-            val removals = editing.removed.mapNotNull { editing.planned[it] }.map { e -> async { mealPlanRepository.remove(e.id) } }
-            val updates = (editing.planned - editing.removed).values
-                .filter { e ->
-                    val date = LocalDate.parse(e.date)
-                    slotChanged || renamed != null || editing.servingsOn(date) != e.servings
-                }
-                .map { e ->
-                    async {
-                        val date = LocalDate.parse(e.date)
-                        mealPlanRepository.update(e.id, date, editing.slot, editing.servingsOn(date), renamed)
-                    }
-                }
-            val title = renamed ?: entry.title
-            val additions = editing.added.map { date ->
-                async {
-                    val recipe = entry.recipe
-                    when {
-                        !entry.hasCooked -> mealPlanRepository.planNotCooked(date, editing.slot)
-                        recipe != null -> mealPlanRepository.planRecipe(recipe.id, date, editing.slot, editing.servingsOn(date))
-                        else -> mealPlanRepository.planDish(title, date, editing.slot, editing.servingsOn(date))
-                    }
-                }
-            }
-            val removedIds = editing.removed.mapNotNull { editing.planned[it]?.id }
-                .zip(removals.map { it.await() })
-                .filter { (_, result) -> result.isSuccess }
-                .map { (id, _) -> id }
-                .toSet()
-            val changed = (updates + additions).mapNotNull { it.await().getOrNull() }
-            val failed = removedIds.size < removals.size || changed.size < updates.size + additions.size
-            // Drawn from the answers straight away, rather than after the week is asked again
+            val found = mealPlanRepository.between(grid.first(), grid.last())
             _uiState.update { state ->
-                val weekEnd = state.weekStart.plus(6, DateTimeUnit.DAY)
-                val inWeek = changed.filter { e -> runCatching { LocalDate.parse(e.date) }.getOrNull()?.let { it in state.weekStart..weekEnd } == true }
-                val changedIds = changed.map { it.id }.toSet()
-                state.copy(entries = state.entries.filterNot { it.id in removedIds || it.id in changedIds } + inWeek)
+                val current = state.dishDays?.takeIf { it.entry.id == dishDays.entry.id } ?: return@update state
+                found.fold(
+                    onSuccess = { entries ->
+                        val same = entries.filter { it.isSameDishAs(current.entry) }
+                            .mapNotNull { e -> runCatching { LocalDate.parse(e.date) }.getOrNull() }
+                        state.copy(dishDays = current.copy(days = current.days + same, isLoadingDays = false))
+                    },
+                    // Asked again the next time the cook pages to it
+                    onFailure = { state.copy(dishDays = current.copy(loadedMonths = current.loadedMonths - first, isLoadingDays = false)) },
+                )
             }
-            if (failed) {
-                // What went through is kept; the sheet starts over from what the plan now says
-                _uiState.update { it.copy(editing = editing.copy(planned = emptyMap(), loadedMonths = emptySet(), added = emptySet(), removed = emptySet(), saveFailed = true)) }
-                editing.loadedMonths.forEach { loadEntryMonth(it) }
-            } else {
-                _uiState.update { it.copy(editing = null) }
-            }
-            load()
-            refreshNeighbours()
         }
-    }
-
-    /** Takes the dish off every day the sheet knows it is on. */
-    fun removeEntry() {
-        val editing = _uiState.value.editing ?: return
-        if (editing.isSaving) return
-        _uiState.update { it.copy(editing = editing.copy(removed = editing.planned.keys, added = emptySet())) }
-        saveEntry()
     }
 
     companion object {

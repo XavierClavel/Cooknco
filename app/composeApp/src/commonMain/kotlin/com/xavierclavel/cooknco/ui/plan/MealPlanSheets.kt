@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.NoMeals
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -73,7 +74,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xavierclavel.cooknco.data.MealSlot
-import com.xavierclavel.cooknco.data.monthOf
+import com.xavierclavel.cooknco.data.toggle
+import com.xavierclavel.cooknco.network.dto.MealPlanEntry
 import com.xavierclavel.cooknco.network.dto.MealPlanRecipe
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.ui.components.RecipeImage
@@ -107,14 +109,16 @@ import kotlinx.datetime.LocalDate
  *
  * Opened from a day's "+", it plans on that day. Opened to plan a meal on several days
  * ([AddDishState.picksDays]), the days are picked on a calendar in the sheet itself, and the
- * dishes stay dimmed until there is at least one.
+ * dishes stay dimmed until there is at least one. Either way, it plans at every meal picked.
+ * Opened to replace a dish ([AddDishState.replacing]), it plans at that dish's day and meal and
+ * takes it off.
  */
 @Composable
 fun AddDishSheet(
     state: AddDishState,
     today: LocalDate,
     onQueryChange: (String) -> Unit,
-    onSlotChange: (MealSlot) -> Unit,
+    onToggleSlot: (MealSlot) -> Unit,
     onToggleDate: (LocalDate) -> Unit,
     onMonthChange: (LocalDate) -> Unit,
     onClearDates: () -> Unit,
@@ -136,9 +140,9 @@ fun AddDishSheet(
     ) {
         if (state.picksDays) {
             SheetTitle(title = s.planAMeal, subtitle = s.planAMealSubtitle)
-            // The meal first: the calendar marks the days that already have that meal
-            PlanFieldLabel(s.mealLabel, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 8.dp))
-            MealChips(selected = state.slot, onSelect = onSlotChange, modifier = Modifier.padding(horizontal = 18.dp))
+            // The meals first: the calendar marks the days that already have one of them
+            PlanFieldLabel(s.mealsLabel, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 8.dp))
+            MealChips(selected = state.slots, onClick = onToggleSlot, multiple = true, modifier = Modifier.padding(horizontal = 18.dp))
             PickedDays(state = state, onToggleDate = onToggleDate, onClearDates = onClearDates)
             MonthCalendar(
                 initialMonth = today,
@@ -147,11 +151,20 @@ fun AddDishSheet(
                 onDayClick = { if (!state.isSaving) onToggleDate(it) },
                 modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 12.dp),
                 onMonthChange = onMonthChange,
-                hasMeal = { state.slot in state.taken[it].orEmpty() },
+                hasMeal = { day -> state.taken[day].orEmpty().any { it in state.slots } },
             )
+        } else if (state.replacing != null) {
+            // The day and the meal are the replaced dish's
+            val slot = state.slots.first()
+            SheetTitle(title = s.replaceDish, subtitle = "${s.fullDate(state.dates.first())} · ${s.mealSlot(slot)}")
         } else {
             SheetTitle(title = s.addADish, subtitle = s.fullDate(state.dates.first()))
-            MealChips(selected = state.slot, onSelect = onSlotChange, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp))
+            MealChips(
+                selected = state.slots,
+                onClick = onToggleSlot,
+                multiple = true,
+                modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp),
+            )
         }
         PlanSearchField(
             value = state.query,
@@ -284,7 +297,7 @@ private fun DishResults(
 }
 
 /**
- * When a dish is, which meal, and for how many — for one already planned (from the tab) or
+ * When a dish is, at which meals, and for how many — for one already planned (from the tab) or
  * about to be (from a recipe's page). The two differ only in where the days start, what the
  * button says, and what else the sheet offers, so they are one sheet.
  *
@@ -358,8 +371,13 @@ fun MealEntrySheet(
         }
         DayChips(days = days, selected = draft.date, onSelect = { draft = draft.copy(date = it) })
 
-        PlanFieldLabel(s.mealLabel, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp))
-        MealChips(selected = draft.slot, onSelect = { draft = draft.copy(slot = it) }, modifier = Modifier.padding(horizontal = 18.dp))
+        PlanFieldLabel(s.mealsLabel, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp))
+        MealChips(
+            selected = draft.slots,
+            onClick = { draft = draft.copy(slots = draft.slots.toggle(it)) },
+            multiple = true,
+            modifier = Modifier.padding(horizontal = 18.dp),
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp),
@@ -374,19 +392,7 @@ fun MealEntrySheet(
         }
 
         if (onRemove != null) {
-            Row(
-                modifier = Modifier
-                    .padding(start = 12.dp, top = 22.dp)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(enabled = !isSaving, onClick = onRemove)
-                    .padding(horizontal = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(Icons.Outlined.Delete, contentDescription = null, tint = CookncoOrangeDark, modifier = Modifier.size(20.dp))
-                Text(s.removeFromPlan, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoOrangeDark)
-            }
+            RemoveRow(label = s.removeFromPlan, enabled = !isSaving, onClick = onRemove, modifier = Modifier.padding(top = 22.dp))
         }
         if (saveFailed) SaveFailed()
     }
@@ -404,64 +410,81 @@ fun MealEntrySheet(
 }
 
 /**
- * A planned dish: every day it is served at its meal, on a calendar where a tap adds a day or
- * takes one off, and the meal, servings and — for one shown as words — the name, which a save
- * carries to all of them. The days arrive a month at a time, as the calendar pages to them.
+ * A planned dish's "···": what it is, on which day and at which meal, and what can be done to
+ * it there — its servings, another dish in its place, taking it off that day. Every other day
+ * it is on is one row away, to look at.
  */
 @Composable
-fun DishDaysSheet(
-    state: EditDishState,
-    today: LocalDate,
-    onToggleDate: (LocalDate) -> Unit,
-    onMonthChange: (LocalDate) -> Unit,
-    onSlotChange: (MealSlot) -> Unit,
-    onServingsChange: (LocalDate, Int?) -> Unit,
-    onTitleChange: (String) -> Unit,
-    onSave: () -> Unit,
+fun DishMenuSheet(
+    state: DishMenuState,
+    onServingsChange: (Int?) -> Unit,
+    onSaveServings: () -> Unit,
+    onReplace: () -> Unit,
+    onSeeEveryDay: () -> Unit,
     onRemove: () -> Unit,
-    onOpenRecipe: (() -> Unit)?,
     onDismissRequest: () -> Unit,
 ) {
     val s = strings()
-    val titleEditable = state.entry.recipe == null && state.entry.hasCooked
-    val initialMonth = remember(state.entry.id) { runCatching { LocalDate.parse(state.entry.date) }.getOrDefault(today) }
-    // The month the calendar shows, whose days the portions below are for
-    var shownMonth by remember(state.entry.id) { mutableStateOf(monthOf(initialMonth)) }
+    val entry = state.entry
+    val date = remember(entry.id) { runCatching { LocalDate.parse(entry.date) }.getOrNull() }
+    val slot = MealSlot.of(entry.slot)
+    val servingsChanged = state.servings != entry.servings
 
     PlanBottomSheet(
         onDismissRequest = onDismissRequest,
         footer = {
-            SheetFooterButton(label = s.save, highlighted = true, busy = state.isSaving, onClick = onSave)
+            if (servingsChanged) SheetFooterButton(label = s.save, highlighted = true, busy = state.isSaving, onClick = onSaveServings)
+            else SheetFooterButton(label = s.close, onClick = onDismissRequest)
         },
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            DishThumbnail(recipe = state.entry.recipe, size = 56.dp, cornerRadius = 16.dp, borderWidth = 2.5.dp, hasCooked = state.entry.hasCooked)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(if (state.entry.hasCooked) state.entry.title else s.notCooked, fontSize = 21.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(s.mealSlot(state.slot), fontSize = 13.5.sp, color = PlanMuted)
-            }
-            if (onOpenRecipe != null) {
-                StickerPill(
-                    onClick = onOpenRecipe,
-                    height = 36.dp,
-                    borderWidth = 2.5.dp,
-                    shadowOffset = 3.dp,
-                    contentPadding = PaddingValues(start = 12.dp, end = 8.dp),
-                ) {
-                    Text(s.openShort, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Outlined.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
+        DishHeader(
+            entry = entry,
+            subtitle = listOfNotNull(date?.let { s.fullDate(it) }, slot?.let { s.mealSlot(it) }).joinToString(" · "),
+        )
+        // Nothing was cooked, so there is nobody to count
+        if (entry.hasCooked) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PlanFieldLabel(s.servingsLabel, modifier = Modifier.weight(1f))
+                ServingsStepper(servings = state.servings, onChange = onServingsChange, buttonSize = 36.dp, fontSize = 18.sp)
             }
         }
-        if (titleEditable) {
-            PlanFieldLabel(s.dishName, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 8.dp))
-            DishNameField(value = state.title, onValueChange = onTitleChange, modifier = Modifier.padding(horizontal = 18.dp))
+        ResultRow(label = s.replaceDish, enabled = !state.isSaving, onClick = onReplace) {
+            ResultIcon(Icons.Outlined.SwapHoriz, background = CookncoGoldLight)
         }
+        ResultRow(label = s.seeEveryDay, enabled = !state.isSaving, onClick = onSeeEveryDay) {
+            ResultIcon(Icons.Outlined.CalendarMonth, background = CookncoGoldLight)
+        }
+        if (date != null) {
+            RemoveRow(label = s.removeFromDay(date), enabled = !state.isSaving, onClick = onRemove, modifier = Modifier.padding(top = 8.dp))
+        }
+        if (state.saveFailed) SaveFailed()
+    }
+}
 
+/**
+ * Every day a dish is served at its meal, on a calendar that shows them and changes nothing:
+ * a day's dish is changed from that day's "···". The days arrive a month at a time, as the
+ * calendar pages to them.
+ */
+@Composable
+fun DishDaysSheet(
+    state: DishDaysState,
+    today: LocalDate,
+    onMonthChange: (LocalDate) -> Unit,
+    onOpenRecipe: (() -> Unit)?,
+    onDismissRequest: () -> Unit,
+) {
+    val s = strings()
+    val day = remember(state.entry.id) { runCatching { LocalDate.parse(state.entry.date) }.getOrDefault(today) }
+
+    PlanBottomSheet(
+        onDismissRequest = onDismissRequest,
+        footer = { SheetFooterButton(label = s.close, onClick = onDismissRequest) },
+    ) {
+        DishHeader(entry = state.entry, subtitle = MealSlot.of(state.entry.slot)?.let { s.mealSlot(it) }, onOpenRecipe = onOpenRecipe)
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -473,65 +496,42 @@ fun DishDaysSheet(
             }
         }
         MonthCalendar(
-            initialMonth = initialMonth,
+            initialMonth = day,
             today = today,
             isSelected = { it in state.days },
-            onDayClick = { if (!state.isSaving) onToggleDate(it) },
-            onMonthChange = { month ->
-                shownMonth = monthOf(month)
-                onMonthChange(month)
-            },
+            onDayClick = null,
+            onMonthChange = onMonthChange,
             modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 10.dp),
         )
+    }
+}
 
-        PlanFieldLabel(s.mealLabel, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp))
-        MealChips(selected = state.slot, onSelect = onSlotChange, modifier = Modifier.padding(horizontal = 18.dp))
-
-        // Each day its own count: a dinner for two on Monday can be for six on Saturday
-        // Only the month on screen, so the list stays beside the calendar it belongs to
-        val monthDays = state.days.filter { monthOf(it) == shownMonth }
-        // Nothing was cooked, so there is nobody to count
-        if (monthDays.isNotEmpty() && state.entry.hasCooked) {
-            PlanFieldLabel(s.servingsLabel, modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 4.dp))
-            monthDays.sorted().forEach { date ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        s.fullDate(date),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = CookncoNavy,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    ServingsStepper(
-                        servings = state.servingsOn(date),
-                        onChange = { onServingsChange(date, it) },
-                        buttonSize = 36.dp,
-                        fontSize = 18.sp,
-                    )
-                }
+/** A planned dish's picture, name and [subtitle], and the way to its recipe when it is one. */
+@Composable
+private fun DishHeader(entry: MealPlanEntry, subtitle: String?, onOpenRecipe: (() -> Unit)? = null) {
+    val s = strings()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        DishThumbnail(recipe = entry.recipe, size = 56.dp, cornerRadius = 16.dp, borderWidth = 2.5.dp, hasCooked = entry.hasCooked)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(if (entry.hasCooked) entry.title else s.notCooked, fontSize = 21.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, color = CookncoNavy, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!subtitle.isNullOrEmpty()) Text(subtitle, fontSize = 13.5.sp, color = PlanMuted)
+        }
+        if (onOpenRecipe != null) {
+            StickerPill(
+                onClick = onOpenRecipe,
+                height = 36.dp,
+                borderWidth = 2.5.dp,
+                shadowOffset = 3.dp,
+                contentPadding = PaddingValues(start = 12.dp, end = 8.dp),
+            ) {
+                Text(s.openShort, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Outlined.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
         }
-
-        Row(
-            modifier = Modifier
-                .padding(start = 12.dp, top = 22.dp)
-                .height(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(enabled = !state.isSaving, onClick = onRemove)
-                .padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Icon(Icons.Outlined.Delete, contentDescription = null, tint = CookncoOrangeDark, modifier = Modifier.size(20.dp))
-            Text(s.removeFromPlan, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoOrangeDark)
-        }
-        if (state.saveFailed) SaveFailed()
     }
 }
 
@@ -779,6 +779,24 @@ private fun ServingsStepper(
         ) {
             Icon(Icons.Outlined.Add, contentDescription = s.increase, tint = CookncoNavy)
         }
+    }
+}
+
+/** A bin and what it takes off the plan, in the colour that says so. */
+@Composable
+private fun RemoveRow(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .padding(start = 12.dp)
+            .height(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Outlined.Delete, contentDescription = null, tint = CookncoOrangeDark, modifier = Modifier.size(20.dp))
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoOrangeDark)
     }
 }
 
