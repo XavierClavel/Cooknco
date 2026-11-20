@@ -418,7 +418,7 @@ watch(
   padding: 32px 10px 16px;
   overflow-y: auto;
   background: var(--plum);
-  border-radius: 20px;
+  border-radius: var(--radius);
 }
 
 .sidebar__logo {
@@ -452,7 +452,7 @@ watch(
   min-height: 48px;
   padding: 0 16px;
   white-space: nowrap;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   color: var(--white);
   font-size: 16px;
   font-weight: 400;
