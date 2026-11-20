@@ -23,7 +23,7 @@ defineProps({
     <div class="recipe-card__photo sk-placeholder">
       <img
         :src="getRecipeThumbnailUrl(recipe.id, recipe.version)"
-        :alt="recipe.title"
+        alt=""
         loading="lazy"
        
       />

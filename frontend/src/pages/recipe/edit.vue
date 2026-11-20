@@ -776,7 +776,11 @@ loadUnits().then(function () {
   .recipe-form__numbers {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
+/* Four fields and a button on one line need ~1100px of viewport, sidebar included:
+   any narrower and the unit's label runs under its own arrow */
+@media (max-width: 1100px) {
   .form-row--ingredient {
     flex-wrap: wrap;
     padding-bottom: 12px;
@@ -785,6 +789,13 @@ loadUnits().then(function () {
 
   .form-row--ingredient .form-row__name {
     flex-basis: calc(100% - 100px);
+  }
+}
+
+/* Two to a row leaves a 320px phone ~120px per field, and the steppers take most of it */
+@media (max-width: 400px) {
+  .recipe-form__numbers {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

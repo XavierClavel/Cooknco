@@ -490,6 +490,9 @@ watch(
 
 .topbar__search {
   flex: 1;
+  /* A flex item will not shrink below its content, and an input's content is its
+     default width: without this the bar outgrows a phone and the page scrolls sideways */
+  min-width: 0;
   max-width: 560px;
   margin: 0 auto;
   display: flex;
