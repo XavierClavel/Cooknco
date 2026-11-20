@@ -37,7 +37,6 @@
   width: 100%;
   padding: 10px 16px;
   font-size: 12px;
-  box-shadow: none;
 }
 
 .footer__links {

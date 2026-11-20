@@ -384,6 +384,8 @@ watch(
 
 .shell__main {
   flex: 1;
+  /* As tall as the window, so a short page still puts the footer at the bottom of it */
+  align-self: stretch;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -391,6 +393,7 @@ watch(
 }
 
 .shell__content {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -549,6 +552,7 @@ watch(
   width: 44px;
   height: 44px;
   padding: 0;
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
 }
 
