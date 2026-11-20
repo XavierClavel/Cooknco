@@ -9,7 +9,7 @@
           <img src="@/assets/logo.png" alt="Cook'n'Co" />
         </router-link>
 
-        <button class="sk-btn sk-btn--mustard sk-btn--lg sk-btn--rect sk-btn--block" @click="navigate(toCreateRecipe)">
+        <button class="sk-btn sk-btn--mustard sk-btn--lg sk-btn--rect sidebar__new" @click="navigate(toCreateRecipe)">
           <v-icon>mdi-plus</v-icon>
           {{ $t("new_recipe") }}
         </button>
@@ -23,12 +23,12 @@
             :class="{'is-active': item.active}"
             @click.prevent="navigate(item.go)"
           >
-            <v-icon :icon="item.icon" size="20" />
+            <v-icon :icon="item.icon" size="24" />
             {{ $t(item.key) }}
           </a>
           <admin-only>
             <a href="/admin" class="sidebar__item">
-              <v-icon icon="mdi-shield-outline" size="20" />
+              <v-icon icon="mdi-shield-outline" size="24" />
               {{ $t('admin') }}
             </a>
           </admin-only>
@@ -404,15 +404,19 @@ watch(
   background: rgba(13, 24, 33, .35);
 }
 
+/* The size the drawer had before the theme: 250px wide, the window's full height,
+   48px rows of regular-weight 16px text */
 .sidebar {
   position: sticky;
   top: 16px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  width: 196px;
-  padding: 18px 12px 16px;
+  gap: 24px;
+  width: 250px;
+  height: calc(100vh - 32px);
+  padding: 32px 10px 16px;
+  overflow-y: auto;
   background: var(--plum);
   border-radius: 20px;
 }
@@ -420,7 +424,7 @@ watch(
 .sidebar__logo {
   display: block;
   margin: 0 auto;
-  width: 112px;
+  width: 154px;
 }
 
 .sidebar__logo img {
@@ -428,22 +432,31 @@ watch(
   width: 100%;
 }
 
+.sidebar__new {
+  align-self: center;
+  min-width: 200px;
+  min-height: 50px;
+  font-weight: 400;
+}
+
 .sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .sidebar__item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 40px;
-  padding: 0 14px;
+  gap: 14px;
+  min-height: 48px;
+  padding: 0 16px;
+  white-space: nowrap;
   border-radius: 999px;
   color: var(--white);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.25;
   text-decoration: none;
   transition: background .1s ease;
 }
@@ -462,9 +475,10 @@ watch(
 }
 
 .sidebar__version {
+  margin-top: auto;
   text-align: center;
   color: var(--white);
-  font-size: 12px;
+  font-size: 14px;
   opacity: .9;
 }
 
@@ -477,8 +491,7 @@ watch(
     top: 12px;
     left: 12px;
     z-index: 1006;
-    max-height: calc(100vh - 24px);
-    overflow-y: auto;
+    height: calc(100vh - 24px);
   }
 }
 
