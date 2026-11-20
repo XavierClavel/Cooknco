@@ -466,7 +466,8 @@ watch(
 }
 
 .sidebar__item.is-active {
-  background: var(--coral);
+  background: var(--white);
+  color: var(--ink);
 }
 
 .sidebar__item:focus-visible {
