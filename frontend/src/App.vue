@@ -534,10 +534,6 @@ watch(
   color: #6b736e;
 }
 
-.topbar__search:focus-within {
-  box-shadow: 0 0 0 3px var(--mustard), var(--shadow-sm);
-}
-
 .topbar__end {
   display: flex;
   align-items: center;
