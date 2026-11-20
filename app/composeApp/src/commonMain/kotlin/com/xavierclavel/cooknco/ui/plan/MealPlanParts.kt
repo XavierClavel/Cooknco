@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -80,22 +81,31 @@ internal fun PlanFieldLabel(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** The four meals of a day as chips, the chosen one filled and lifted. */
+/**
+ * The four meals of a day as chips, the chosen ones filled and lifted. With [multiple], a tap
+ * adds a meal or takes it back out, as for a dish eaten at lunch and at dinner; without, it
+ * picks that meal alone.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun MealChips(selected: MealSlot, onSelect: (MealSlot) -> Unit, modifier: Modifier = Modifier) {
+internal fun MealChips(
+    selected: Set<MealSlot>,
+    onClick: (MealSlot) -> Unit,
+    modifier: Modifier = Modifier,
+    multiple: Boolean = false,
+) {
     val s = strings()
     // A dish already at breakfast keeps its chip when breakfast is not offered, or it could
     // not be shown where it is
     val offered = plannableMealSlots()
-    val slots = MealSlot.entries.filter { it in offered || it == selected }
+    val slots = MealSlot.entries.filter { it in offered || it in selected }
     FlowRow(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         slots.forEach { slot ->
-            val isSelected = slot == selected
+            val isSelected = slot in selected
             val shape = RoundedCornerShape(percent = 50)
             Box(
                 modifier = Modifier
@@ -104,8 +114,10 @@ internal fun MealChips(selected: MealSlot, onSelect: (MealSlot) -> Unit, modifie
                     .clip(shape)
                     .background(if (isSelected) CookncoOrange else CookncoBackground)
                     .border(2.5.dp, CookncoNavy, shape)
-                    .semantics { this.selected = isSelected }
-                    .clickable(role = Role.Tab) { onSelect(slot) }
+                    .then(
+                        if (multiple) Modifier.toggleable(value = isSelected, role = Role.Checkbox) { onClick(slot) }
+                        else Modifier.semantics { this.selected = isSelected }.clickable(role = Role.Tab) { onClick(slot) },
+                    )
                     .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {

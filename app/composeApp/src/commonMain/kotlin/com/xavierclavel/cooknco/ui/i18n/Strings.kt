@@ -625,9 +625,16 @@ interface Strings {
     val pickMonth: String
     val previousYear: String
     val nextYear: String
-    val mealLabel: String
+    /** Above the meals a dish is being added to, several of which can be picked. */
+    val mealsLabel: String
     val openRecipe: String
     val removeFromPlan: String
+    /** A dish's "···": takes it off the day it was opened on, and that day alone. "Remove from Wednesday 14". */
+    fun removeFromDay(date: LocalDate): String
+    /** A dish's "···": puts another dish at its day and meal, and the heading of the sheet that picks it. */
+    val replaceDish: String
+    /** A dish's "···": every day it is planned on, to look at. */
+    val seeEveryDay: String
     /** The recipe sheet's row, and the heading of what it opens. */
     val addToMealPlan: String
     val planIt: String

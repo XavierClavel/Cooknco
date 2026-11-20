@@ -23,6 +23,20 @@ enum class MealSlot {
     }
 }
 
+/**
+ * [slot] added to these meals, or taken back out — unless it is the last one, since a dish
+ * being planned is planned for at least one meal. Several is what puts one pot on the table at
+ * lunch and again at dinner.
+ */
+fun Set<MealSlot>.toggle(slot: MealSlot): Set<MealSlot> = when {
+    slot !in this -> this + slot
+    size > 1 -> this - slot
+    else -> this
+}
+
+/** One meal of one day: where a dish is planned. */
+data class DayMeal(val date: LocalDate, val slot: MealSlot)
+
 /** The Monday of the week [date] falls in. A plan is read a week at a time, Monday first. */
 fun weekStartOf(date: LocalDate): LocalDate = date.minus(date.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
 

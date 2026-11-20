@@ -267,7 +267,7 @@ fun RecipeScreen(
             subtitle = s.addToMealPlan,
             initial = MealEntryDraft(
                 date = today,
-                slot = MealSlot.DINNER,
+                slots = setOf(MealSlot.DINNER),
                 // As many as the cook has dialled in on this page, if they moved the dial;
                 // one otherwise, as in the tab. The dial opens on the recipe's yield, which
                 // says how many it makes rather than how many sit down to it.

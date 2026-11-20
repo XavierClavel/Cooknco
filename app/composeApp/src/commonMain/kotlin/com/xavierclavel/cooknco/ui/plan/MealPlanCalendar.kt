@@ -85,7 +85,8 @@ fun MonthCalendar(
     initialMonth: LocalDate,
     today: LocalDate,
     isSelected: (LocalDate) -> Boolean,
-    onDayClick: (LocalDate) -> Unit,
+    /** Null for a calendar that only shows its days. */
+    onDayClick: ((LocalDate) -> Unit)?,
     modifier: Modifier = Modifier,
     onMonthChange: (LocalDate) -> Unit = {},
     hasMeal: (LocalDate) -> Boolean = { false },
@@ -198,7 +199,7 @@ fun MonthCalendar(
                             joinsPrevious = band != null && i > 0 && bands[i - 1] == band,
                             joinsNext = band != null && i < week.lastIndex && bands[i + 1] == band,
                             isToday = day == today,
-                            onClick = { onDayClick(day) },
+                            onClick = onDayClick?.let { click -> { click(day) } },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -298,7 +299,7 @@ private fun CalendarDay(
     isSelected: Boolean,
     isToday: Boolean,
     band: DayBand?,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     joinsPrevious: Boolean = false,
     joinsNext: Boolean = false,
@@ -327,7 +328,7 @@ private fun CalendarDay(
                     contentDescription = s.fullDate(day)
                     selected = isSelected
                 }
-                .clickable(onClick = onClick),
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
             Text(
