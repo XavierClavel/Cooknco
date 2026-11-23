@@ -102,6 +102,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onNavigateToSignup = { navController.navigate(Routes.SIGNUP) },
                 onForgotPassword = { /* TODO: password reset screen */ },
                 onLoginWithGoogle = { viewModel.loginWithGoogle(urlOpener) },
+                onLoginWithApple = { viewModel.loginWithApple(urlOpener) },
             )
         }
 
@@ -130,6 +131,7 @@ fun AppNavigation(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 onSignup = viewModel::signup,
                 onNavigateToLogin = { navController.popBackStack() },
                 onSignupWithGoogle = { viewModel.loginWithGoogle(urlOpener) },
+                onSignupWithApple = { viewModel.loginWithApple(urlOpener) },
             )
         }
 

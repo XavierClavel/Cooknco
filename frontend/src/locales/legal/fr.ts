@@ -44,6 +44,10 @@ const documents: LegalDocuments = {
             text: "si vous vous êtes inscrit avec Google, le service reçoit de Google un identifiant de compte et votre adresse e-mail, rien d'autre. Votre mot de passe Google ne lui parvient jamais.",
           },
           {
+            term: "La connexion avec Apple",
+            text: "si vous vous êtes inscrit avec Apple, le service reçoit un identifiant de compte, l'adresse e-mail qu'Apple partage — la vôtre ou une adresse relais qu'Apple vous fait suivre, selon votre choix — et, la première fois seulement, le nom que vous laissez Apple transmettre, qui sert à proposer votre nom d'utilisateur. Votre mot de passe Apple ne lui parvient jamais.",
+          },
+          {
             term: "Votre profil",
             text: "pseudonyme, biographie et photo, date d'inscription et date de dernière activité.",
           },
@@ -100,6 +104,10 @@ const documents: LegalDocuments = {
             text: "achemine les notifications et les e-mails, et vous identifie si vous avez choisi la connexion Google.",
           },
           {
+            term: "Apple",
+            text: "vous identifie si vous avez choisi la connexion avec Apple, et relaie les e-mails si vous lui avez demandé de masquer votre adresse.",
+          },
+          {
             term: "L'hébergeur",
             text: "les serveurs et la base de données tournent sur des machines louées chez un hébergeur situé dans l'Union européenne.",
           },
@@ -117,7 +125,7 @@ const documents: LegalDocuments = {
           },
         ],
         after: [
-          "Le service ne transfère par lui-même aucune donnée hors de l'Union européenne. Google opère dans le monde entier et ses propres conditions régissent ce qu'il fait de ce qu'il achemine.",
+          "Le service ne transfère par lui-même aucune donnée hors de l'Union européenne. Google et Apple opèrent dans le monde entier et leurs propres conditions régissent ce qu'ils font de ce qu'ils acheminent.",
         ],
       },
       {

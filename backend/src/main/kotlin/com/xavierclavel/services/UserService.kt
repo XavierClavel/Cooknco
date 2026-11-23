@@ -121,6 +121,9 @@ class UserService: KoinComponent {
     fun findEntityByGoogleId(googleId: String): User? =
         QUser().googleId.eq(googleId).findOne()
 
+    fun findEntityByAppleId(appleId: String): User? =
+        QUser().appleId.eq(appleId).findOne()
+
     fun findByMail(mail: String) : User {
         return findEntityByMail(mail) ?: throw NotFoundException(NotFoundCause.MAIL_NOT_FOUND)
     }
@@ -164,7 +167,12 @@ class UserService: KoinComponent {
      *   any device of theirs has had a chance to register, so this is the only thing that
      *   can put the very first mail an account receives in the right language.
      */
-    fun createUser(userDTO: UserDTO, verified: Boolean, locale: Locale? = null): User =
+    /**
+     * @param appleId set only by the Sign in with Apple callback, and deliberately not a field
+     *   of [UserDTO]: that DTO is also what `/auth/signup` reads off the wire, and an id a client
+     *   could name there would be an Apple account it could claim.
+     */
+    fun createUser(userDTO: UserDTO, verified: Boolean, locale: Locale? = null, appleId: String? = null): User =
         User.from(
             userDTO = userDTO,
             passwordHash = encryptionService.encryptPassword(userDTO.password),
@@ -174,6 +182,7 @@ class UserService: KoinComponent {
         )
         .apply {
             this.locale = locale
+            this.appleId = appleId
             if (verified) {
                 this.verify()
             }

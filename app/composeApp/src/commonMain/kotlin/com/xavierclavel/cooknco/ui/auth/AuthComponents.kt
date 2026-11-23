@@ -26,7 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -91,6 +93,59 @@ fun GoogleButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
             modifier = Modifier.padding(start = 10.dp),
         )
     }
+}
+
+/**
+ * Black with the white mark, which is one of the styles Apple's guidelines allow for this button
+ * and the one that reads on the green auth background. The mark is drawn here rather than shipped
+ * as a resource: it is one path.
+ */
+@Composable
+fun AppleButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Black,
+            contentColor = Color.White,
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+    ) {
+        Icon(
+            imageVector = AppleMark,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = text,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(start = 10.dp),
+        )
+    }
+}
+
+private val AppleMark: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "AppleMark",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).addPath(
+        pathData = addPathNodes(
+            "M18.71,19.5C17.88,20.74 17,21.95 15.66,21.97C14.32,22 13.89,21.18 12.37,21.18C10.84,21.18 " +
+                "10.37,21.95 9.1,22C7.79,22.05 6.8,20.68 5.96,19.47C4.25,17 2.94,12.45 4.7,9.39C5.57,7.87 " +
+                "7.13,6.91 8.82,6.88C10.1,6.86 11.32,7.75 12.11,7.75C12.89,7.75 14.37,6.68 15.92,6.84C16.57,6.87 " +
+                "18.39,7.1 19.56,8.82C19.47,8.88 17.39,10.1 17.41,12.63C17.44,15.65 20.06,16.66 20.09,16.67C20.06,16.74 " +
+                "19.67,18.11 18.71,19.5M13,3.5C13.73,2.67 14.94,2.04 15.94,2C16.07,3.17 15.6,4.35 14.9,5.19C14.21,6.04 " +
+                "13.07,6.7 11.95,6.61C11.8,5.47 12.36,4.28 13,3.5Z"
+        ),
+        fill = SolidColor(Color.Black),
+    ).build()
 }
 
 @Composable

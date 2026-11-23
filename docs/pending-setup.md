@@ -350,3 +350,64 @@ kubectl logs deployment/cooknco-backend | grep "Recipe scan by user"
 
 A `503` whose body is `recipe_reader_failed` means the provider refused: the line just before
 it in the log carries the provider's own status and message (bad key, unknown model, quota).
+
+---
+
+## 6. Sign in with Apple — a Services ID, a key, and the return URL
+
+**Inert until then:** the "Continue with Apple" buttons show on the site and in the app, and
+`/auth/login-oauth-apple` answers `503 apple_sign_in_not_configured`. Nothing else changes.
+
+The backend runs Apple's **web** flow for every client — the site, and both apps through the
+browser, exactly as Google's works — so what Apple needs is a Services ID, not just the app's
+bundle id. All of it is in the developer portal, *Certificates, Identifiers & Profiles*:
+
+1. **App ID** (`eu.cooknco…`, the one the iOS app ships as): tick *Sign in with Apple* and
+   make it the primary App ID. It is what groups the Services ID below with the app, so an
+   account made on one is the same `sub` on the other.
+2. **Services ID** (*Identifiers → +, Services IDs*), e.g. `eu.cooknco.signin`. Enable *Sign in
+   with Apple*, *Configure*, choose the App ID above, and register:
+   - Domains: `cooknco.eu`
+   - Return URL: `https://cooknco.eu/api/v1/auth/callback-oauth-apple` — exactly what the
+     backend sends as `redirect_uri` (`backend.url` + `/auth/callback-oauth-apple`). Apple
+     compares the two byte for byte and answers `invalid_request` to anything else.
+3. **Key** (*Keys → +*), with *Sign in with Apple* ticked and configured against the same
+   primary App ID. Download the `.p8` — **once**: Apple will not serve it again. Note its Key ID.
+4. The **Team ID**, top right of the portal — the same one section 2 asks for.
+
+### Setting it
+
+Into the backend's `application.yaml` in the `cooknco-config` secret, beside the Google pair:
+
+```yaml
+oauth:
+  google: { … }
+  apple:
+    client_id: eu.cooknco.signin     # the Services ID, not the bundle id
+    team_id: ABCDE12345
+    key_id: ABC123DEFG
+    private_key: |
+      -----BEGIN PRIVATE KEY-----
+      <the .p8 file's contents>
+      -----END PRIVATE KEY-----
+```
+
+Restart the backend. A key that does not parse is logged (`The Sign in with Apple key could
+not be read`) and leaves the routes at 503 rather than stopping the backend.
+
+Apple also wants to be told where it relays to: if users choose *Hide My Email*, mail to their
+`@privaterelay.appleid.com` address is delivered only from senders registered under
+*Services → Sign in with Apple for Email Communication*. Register the address `mail-service`
+sends from (the `smtp.email` of its config) and its domain's SPF, or verification and reset
+mails to those accounts vanish.
+
+### Checking it worked
+
+```bash
+# Should be a 302 to appleid.apple.com carrying client_id and redirect_uri, plus a Set-Cookie apple_signin
+curl -sS -o /dev/null -D - "https://cooknco.eu/api/v1/auth/login-oauth-apple" | grep -i "location\|set-cookie"
+```
+
+Then sign in once from a browser. `invalid_client` on Apple's side, or `Apple refused the
+authorization code` in the backend log, is the key, the key id or the team id; a mismatched
+return URL fails on Apple's page before ever reaching the backend.

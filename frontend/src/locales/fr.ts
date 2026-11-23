@@ -221,7 +221,7 @@ export default {
   invalid_amount: "Saisissez une quantité supérieure à zéro, ou ne choisissez pas d'unité",
   invalid_conversion_factor: "Les facteurs de conversion doivent être supérieurs à zéro",
 
-  oauth_only: "Utilisez l'OAuth Google pour accéder à votre compte",
+  oauth_only: "Ce compte n'a pas de mot de passe : connectez-vous avec Google ou Apple",
   oauth_not_setup: "Adresse mail déjà liée à un compte",
 
   //Ingredients

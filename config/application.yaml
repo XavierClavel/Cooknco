@@ -19,6 +19,16 @@ oauth:
   google:
     client_id: unused
     client_secret: unused
+  # Sign in with Apple stays off without this section: its routes answer 503. Apple refuses an
+  # http return URL, so it cannot be exercised on this stack anyway. See docs/pending-setup.md.
+  #apple:
+  #  client_id: eu.cooknco.signin
+  #  team_id: ABCDE12345
+  #  key_id: ABC123DEFG
+  #  private_key: |
+  #    -----BEGIN PRIVATE KEY-----
+  #    ...
+  #    -----END PRIVATE KEY-----
 
 # Push notifications are off unless a section says otherwise, so the stack boots
 # without Firebase credentials: notifications are stored and listed, and only the

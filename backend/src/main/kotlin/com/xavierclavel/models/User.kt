@@ -53,6 +53,14 @@ class User (
 
     var googleId: String? = null,
 
+    /**
+     * Apple's `sub` for this account, set by a Sign in with Apple signup and what every later
+     * one finds the account by. Unique, unlike [googleId], so that two rows can never both
+     * answer to one Apple account — nullable, so every other account leaves it empty.
+     */
+    @Column(unique = true)
+    var appleId: String? = null,
+
     var bio: String = "",
 
     //Validation
