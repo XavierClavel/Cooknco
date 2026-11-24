@@ -197,7 +197,7 @@ fun UserSettingsScreen(
 
                 // ── Meal plan ────────────────────────────────────────────────────
                 Column {
-                    SettingsSectionLabel(s.mealPlan)
+                    SettingsSectionLabel(s.mealPlanCaps)
                     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
                         SettingsToggleRow(
                             title = s.breakfastAndSnack,
@@ -210,7 +210,7 @@ fun UserSettingsScreen(
 
                 // ── Offline ──────────────────────────────────────────────────────
                 Column {
-                    SettingsSectionLabel(s.offlineSettingsTitle)
+                    SettingsSectionLabel(s.offlineCaps)
                     // No "update now": the copy is refreshed on every launch (AppNavigation)
                     // and the moment this is switched on.
                     StickerCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {

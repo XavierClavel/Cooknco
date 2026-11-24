@@ -87,7 +87,7 @@ object FrStrings : Strings {
     override fun stepsCount(count: Int) = if (count == 1) "1 étape" else "$count étapes"
     override fun aboutMinutesInTotal(minutes: Int) = "environ $minutes min au total"
     override fun ovenAt(temperature: Int) = "four à $temperature °C"
-    override val portionsUnit = "parts"
+    override fun portionsUnit(count: Int) = if (count == 1) "part" else "parts"
     override val minutesUnit = "min"
     override val degreesUnit = "°C"
     override fun portions(count: Int) = if (count == 1) "1 part" else "$count parts"
@@ -145,6 +145,8 @@ object FrStrings : Strings {
     override val invalidEmailOrPassword = "E-mail ou mot de passe incorrect"
     override val emailAlreadyRegistered = "Cet e-mail est déjà utilisé"
     override val usernameAlreadyTaken = "Ce nom d'utilisateur est déjà pris"
+    override val usernameRequired = "Choisissez un nom d'utilisateur"
+    override val pictureUploadFailed = "La photo n'a pas pu être envoyée"
     override val verifyEmailFirst = "Vérifiez votre e-mail avant de vous connecter"
     override val accountUsesGoogle = "Ce compte utilise la connexion Google. Utilisez le bouton Google."
     override val passwordsDoNotMatch = "Les mots de passe ne correspondent pas"
@@ -337,6 +339,7 @@ object FrStrings : Strings {
     override val follow = "Suivre"
     override fun followersLink(count: Int) = "$count abonnés ›"
     override fun followingLink(count: Int) = "$count abonnements ›"
+    override val recipesStat = "recettes"
     override val followers = "abonnés"
     override val following = "abonnements"
     override val followingState = "Abonné"
@@ -555,6 +558,7 @@ object FrStrings : Strings {
     override val offlineCannotDoThat = "Une connexion est nécessaire pour cela."
 
     override val offlineSettingsTitle = "Garder mes recettes sur ce téléphone"
+    override val offlineCaps = "HORS LIGNE"
 
     override val premiumLocked = "Fonctionnalité premium"
     override val premiumFeatureTitle = "Une fonctionnalité premium"
@@ -587,6 +591,7 @@ object FrStrings : Strings {
 
     override val breakfastAndSnack = "Petit déjeuner et goûter"
     override val mealPlan = "Planning des repas"
+    override val mealPlanCaps = "PLANNING DES REPAS"
     override fun weekRange(start: LocalDate, end: LocalDate) =
         if (start.month == end.month) "${start.day} – ${end.day} ${monthName(end.month)}"
         else "${start.day} ${monthName(start.month)} – ${end.day} ${monthName(end.month)}"

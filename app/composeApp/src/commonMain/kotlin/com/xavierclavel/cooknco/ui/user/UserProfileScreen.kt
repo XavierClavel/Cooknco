@@ -256,12 +256,12 @@ private fun ProfileContent(
                             if (isOwnProfile) {
                                 Row(modifier = Modifier.padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
                                     Text(user.recipesCount.toString(), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = CookncoNavy)
-                                    Text("recipes", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+                                    Text(s.recipesStat, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
                                 }
                             } else {
                                 Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    InlineStat(user.recipesCount, "recipes")
-                                    InlineStat(user.followersCount, "followers")
+                                    InlineStat(user.recipesCount, s.recipesStat)
+                                    InlineStat(user.followersCount, s.followers)
                                 }
                             }
                         }

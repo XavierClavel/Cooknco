@@ -444,6 +444,8 @@ private fun MemberEditRow(
                         label = { it.username },
                         onSelect = onSelect,
                         modifier = Modifier.weight(1f),
+                        // Results arrive while the name is still being typed.
+                        focusable = false,
                     ) {
                         // The white 44dp field the "Cookbook — edit" artboard draws an
                         // unfilled member row as.

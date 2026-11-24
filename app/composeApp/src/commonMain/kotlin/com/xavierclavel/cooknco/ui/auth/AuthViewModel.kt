@@ -176,13 +176,15 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         val s = copy()
         val body = (throwable as? ApiException)?.body ?: throwable.message ?: s.anErrorOccurred
         // The backend answers with a cause rather than a sentence, which is what makes this
-        // translatable at all — anything unrecognised is passed through as it came.
+        // translatable at all — anything unrecognised is passed through as it came. A cause
+        // arrives as the enum's lowercase `key` (`UnauthorizedCause.USER_NOT_VERIFIED.key`),
+        // never as its name, so that is what is matched.
         return when {
-            "INVALID_MAIL_OR_PASSWORD" in body -> s.invalidEmailOrPassword
-            "USER_NOT_VERIFIED" in body -> s.verifyEmailFirst
-            "USERNAME_ALREADY_USED" in body -> s.usernameAlreadyTaken
-            "MAIL_ALREADY_USED" in body -> s.emailAlreadyRegistered
-            "OAUTH_ONLY" in body -> s.accountUsesGoogle
+            "invalid_mail_or_password" in body -> s.invalidEmailOrPassword
+            "user_not_verified" in body -> s.verifyEmailFirst
+            "username_already_used" in body -> s.usernameAlreadyTaken
+            "mail_already_used" in body -> s.emailAlreadyRegistered
+            "oauth_only" in body -> s.accountUsesGoogle
             else -> body
         }
     }

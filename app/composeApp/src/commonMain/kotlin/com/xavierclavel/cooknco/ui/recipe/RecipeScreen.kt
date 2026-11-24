@@ -58,6 +58,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
@@ -1023,6 +1025,10 @@ private fun NotesCard(
 
         // The signed-in user's private note — editing, saved and empty states.
         if (isEditing) {
+            // The tap that opens the note is the one that says what to type into, so the
+            // field takes the focus — and the keyboard comes up — without a second tap.
+            val noteFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) { noteFocus.requestFocus() }
             // The note is edited in the very card it will be read in — the mockup draws no
             // editing state of its own, and a filled Material field inside the cream card
             // was the one place on this screen that did not look like the rest of it.
@@ -1038,6 +1044,7 @@ private fun NotesCard(
                     lineHeight = 22.sp,
                     placeholderColor = CookncoNavy.copy(alpha = 0.4f),
                     modifier = Modifier.padding(16.dp),
+                    fieldModifier = Modifier.focusRequester(noteFocus),
                 )
             }
             Row(
