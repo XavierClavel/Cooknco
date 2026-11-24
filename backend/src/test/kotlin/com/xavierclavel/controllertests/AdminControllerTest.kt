@@ -53,6 +53,7 @@ import shared.enums.IngredientType
 import shared.enums.Locale
 import shared.enums.PremiumStatus
 import com.xavierclavel.services.AdminService
+import com.xavierclavel.exceptions.UnauthorizedCause
 import shared.enums.LogLevel
 import shared.enums.ReportTargetType
 import shared.enums.Sort
@@ -192,6 +193,7 @@ class AdminControllerTest : ApplicationTest() {
         runAsAdmin { client.suspendUserRaw(userId, days = 5) }
         client.login(USER1, password).apply {
             assertEquals(HttpStatusCode.Unauthorized, status)
+            assertEquals(UnauthorizedCause.ACCOUNT_SUSPENDED.key, bodyAsText())
         }
     }
 
@@ -204,6 +206,20 @@ class AdminControllerTest : ApplicationTest() {
         }
         client.login(USER1, password).apply {
             assertEquals(HttpStatusCode.Unauthorized, status)
+            assertEquals(UnauthorizedCause.ACCOUNT_BANNED.key, bodyAsText())
+        }
+    }
+
+    @Test
+    fun `a wrong password on a banned account is only a wrong password`() = runTest {
+        var userId: Long = 0
+        runAsUser1 { userId = client.getMe().id }
+        runAsAdmin {
+            client.banUserRaw(userId, "abuse").apply { assertEquals(HttpStatusCode.OK, status) }
+        }
+        client.login(USER1, UUID.randomUUID().toString()).apply {
+            assertEquals(HttpStatusCode.Unauthorized, status)
+            assertEquals(UnauthorizedCause.INVALID_MAIL_OR_PASSWORD.key, bodyAsText())
         }
     }
 

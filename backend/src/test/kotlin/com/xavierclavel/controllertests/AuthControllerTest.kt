@@ -36,6 +36,16 @@ class AuthControllerTest : ApplicationTest() {
     }
 
     @Test
+    fun `a wrong password on an unverified account is only a wrong password`() = runTest {
+        val mail = "user@mail.com"
+        client.signup(mail = mail)
+        client.login(mail, UUID.randomUUID().toString()).apply {
+            assertEquals(HttpStatusCode.Unauthorized, status)
+            assertEquals(UnauthorizedCause.INVALID_MAIL_OR_PASSWORD.key, bodyAsText())
+        }
+    }
+
+    @Test
     fun `access is granted after email verification`() = runTest {
         val password = UUID.randomUUID().toString()
         val user = client.signup(password = password)
