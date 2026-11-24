@@ -108,6 +108,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -851,24 +855,27 @@ private fun BasicsStep(
 /**
  * The four numbers on the basics step, in the order the mockup's TIMES & YIELD card lists
  * them. Each knows how far one tap of −/+ moves it and what the picker offers as presets,
- * because "5 minutes" is a sensible nudge for a time and a useless one for an oven.
+ * because "5 minutes" is a sensible nudge for a time and a useless one for an oven — and
+ * where the first + lands, because the oven's first step is no oven at all: 10 °C.
  */
 private enum class RecipeNumber(
     val step: Int,
     val max: Int,
     val presets: List<Int>,
+    val first: Int = step,
 ) {
     YIELD(1, 999, listOf(1, 2, 4, 6, 8, 12)),
     PREP(5, 1440, listOf(5, 10, 15, 30, 60)),
     COOK(5, 1440, listOf(10, 20, 35, 60, 90)),
-    TEMP(10, 300, listOf(150, 180, 200, 220, 240));
+    TEMP(10, 300, listOf(150, 180, 200, 220, 240), first = 180);
 
     /**
-     * Minutes and degrees are symbols; portions are a word, and words differ per language —
-     * which is why this comes from the catalogue rather than from a constructor argument.
+     * Minutes and degrees are symbols; portions are a word, which differs per language and
+     * between one portion and several — which is why this comes from the catalogue rather
+     * than from a constructor argument.
      */
-    fun unit(s: Strings) = when (this) {
-        YIELD -> s.portionsUnit
+    fun unit(s: Strings, value: Int) = when (this) {
+        YIELD -> s.portionsUnit(value)
         PREP, COOK -> s.minutesUnit
         TEMP -> s.degreesUnit
     }
@@ -901,7 +908,7 @@ private enum class RecipeNumber(
 
     /** "1 h 30" reads better than "90 min" on a preset chip; the row itself stays in minutes. */
     fun labelFor(value: Int, s: Strings): String = when {
-        this != PREP && this != COOK -> "$value ${unit(s)}"
+        this != PREP && this != COOK -> "$value ${unit(s, value)}"
         value >= 60 && value % 60 == 0 -> "${value / 60} h"
         value >= 60 -> "${value / 60} h ${value % 60}"
         else -> "$value min"
@@ -943,11 +950,12 @@ private fun NumberStepperRow(
         ) {
             StepperButton(
                 symbol = "−",
+                label = "${number.title(s)}, ${s.decrease}",
                 enabled = value > 0,
                 onClick = { onValueChange((value - number.step).coerceAtLeast(0)) },
             )
             Text(
-                text = if (value > 0) "$value ${number.unit(s)}" else "—",
+                text = if (value > 0) "$value ${number.unit(s, value)}" else "—",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (value > 0) CookncoNavy else CookncoNavy.copy(alpha = 0.4f),
@@ -959,16 +967,22 @@ private fun NumberStepperRow(
             )
             StepperButton(
                 symbol = "+",
+                label = "${number.title(s)}, ${s.increase}",
                 filled = true,
-                onClick = { onValueChange((value + number.step).coerceAtMost(number.max)) },
+                onClick = { onValueChange(if (value == 0) number.first else (value + number.step).coerceAtMost(number.max)) },
             )
         }
     }
 }
 
+/**
+ * A − or + of a stepper row. [label] is what a screen reader says for it — the row and the
+ * action — since four rows of bare "−" and "+" do not say which number they move.
+ */
 @Composable
 private fun StepperButton(
     symbol: String,
+    label: String,
     onClick: () -> Unit,
     filled: Boolean = false,
     enabled: Boolean = true,
@@ -978,11 +992,13 @@ private fun StepperButton(
             .size(44.dp)
             .clip(CircleShape)
             .background(if (filled) CookncoOrange else Color.Transparent)
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = symbol,
+            modifier = Modifier.clearAndSetSemantics {},
             fontSize = 21.sp,
             fontWeight = FontWeight.Medium,
             color = when {
@@ -1092,7 +1108,7 @@ private fun NumberPickerSheet(
                                         color = CookncoNavy,
                                     )
                                 }
-                                Text(number.unit(s), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
+                                Text(number.unit(s, draft), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = CookncoGreenDark)
                             }
                             StickerCard(
                                 modifier = Modifier.size(56.dp),

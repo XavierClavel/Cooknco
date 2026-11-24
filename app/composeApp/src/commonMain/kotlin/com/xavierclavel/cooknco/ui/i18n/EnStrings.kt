@@ -86,7 +86,7 @@ object EnStrings : Strings {
     override fun stepsCount(count: Int) = if (count == 1) "1 step" else "$count steps"
     override fun aboutMinutesInTotal(minutes: Int) = "about $minutes min in total"
     override fun ovenAt(temperature: Int) = "$temperature °C oven"
-    override val portionsUnit = "pcs"
+    override fun portionsUnit(count: Int) = if (count == 1) "pc" else "pcs"
     override val minutesUnit = "min"
     override val degreesUnit = "°C"
     override fun portions(count: Int) = if (count == 1) "1 pc" else "$count pcs"
@@ -144,6 +144,8 @@ object EnStrings : Strings {
     override val invalidEmailOrPassword = "Invalid email or password"
     override val emailAlreadyRegistered = "Email already registered"
     override val usernameAlreadyTaken = "Username already taken"
+    override val usernameRequired = "Choose a username"
+    override val pictureUploadFailed = "The picture could not be uploaded"
     override val verifyEmailFirst = "Please verify your email before logging in"
     override val accountUsesGoogle = "This account uses Google Sign-In. Use the Google button to log in."
     override val passwordsDoNotMatch = "Passwords do not match"
@@ -327,6 +329,7 @@ object EnStrings : Strings {
     override val follow = "Follow"
     override fun followersLink(count: Int) = "$count followers ›"
     override fun followingLink(count: Int) = "$count following ›"
+    override val recipesStat = "recipes"
     override val followers = "followers"
     override val following = "following"
     override val followingState = "Following"
@@ -543,6 +546,7 @@ object EnStrings : Strings {
     override val offlineCannotDoThat = "You need a connection to do that."
 
     override val offlineSettingsTitle = "Keep my recipes on this phone"
+    override val offlineCaps = "OFFLINE"
 
     override val premiumLocked = "Premium feature"
     override val premiumFeatureTitle = "A premium feature"
@@ -575,6 +579,7 @@ object EnStrings : Strings {
 
     override val breakfastAndSnack = "Breakfast and afternoon snack"
     override val mealPlan = "Meal plan"
+    override val mealPlanCaps = "MEAL PLAN"
     override fun weekRange(start: LocalDate, end: LocalDate) =
         if (start.month == end.month) "${start.day} – ${end.day} ${monthName(end.month)}"
         else "${start.day} ${monthName(start.month)} – ${end.day} ${monthName(end.month)}"

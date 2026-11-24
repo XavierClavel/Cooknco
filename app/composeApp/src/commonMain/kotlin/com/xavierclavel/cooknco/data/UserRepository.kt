@@ -8,13 +8,26 @@ import com.xavierclavel.cooknco.network.dto.McpClientInfo
 import com.xavierclavel.cooknco.network.dto.UserSettingsDTO
 import com.xavierclavel.cooknco.network.isOffline
 import com.xavierclavel.cooknco.platform.PickedImage
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 
 class UserRepository(
     private val userApi: UserApi,
     private val tokenDataStore: TokenDataStore,
     private val offlineStore: OfflineStore,
 ) {
+    private val _writes = MutableStateFlow(0L)
+
+    /**
+     * How many times this cook has saved their profile or its picture since the app started —
+     * [RecipeRepository.writes] for the profile. The profile screen is behind the editor while
+     * the save happens and reads once otherwise, so it compares this when it comes back.
+     */
+    val writes: StateFlow<Long> = _writes.asStateFlow()
+
     private suspend fun token(): String? = tokenDataStore.tokenFlow.first()
     private suspend fun requireToken(): String = token() ?: throw IllegalStateException("Not authenticated")
 
@@ -31,11 +44,12 @@ class UserRepository(
     }
 
     suspend fun updateUser(username: String, bio: String): Result<UserInfo> = runCatching {
-        userApi.updateUser(requireToken(), username, bio)
+        userApi.updateUser(requireToken(), username, bio).also { _writes.update { it + 1 } }
     }
 
     suspend fun uploadProfileImage(userId: Long, image: PickedImage): Result<Unit> = runCatching {
         userApi.uploadProfileImage(requireToken(), userId, image)
+        _writes.update { it + 1 }
     }
 
     suspend fun isFollowing(userId: Long, currentUserId: Long): Result<Boolean> = runCatching {

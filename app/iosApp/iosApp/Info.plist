@@ -30,6 +30,11 @@
 		<key>UIImageRespectsSafeAreaInsets</key>
 		<true/>
 	</dict>
+	<!-- Compose refuses to start without it on a 120 Hz screen (every Pro iPhone since the
+	     13 Pro): ComposeUIViewController throws from its plist check at launch. It is also
+	     what lets the app draw at more than 60 frames a second there. -->
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

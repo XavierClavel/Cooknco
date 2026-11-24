@@ -91,10 +91,16 @@ class UserProfileViewModel(
     private var reloadJob: Job? = null
 
     /**
-     * What [recipeWrites] said when the grids on screen were read. Read before the requests, so
+     * Every write the profile shows: a recipe of the cook's, and the profile itself. Both counts
+     * only grow, so their sum moves whenever either does.
+     */
+    private fun writes() = recipeWrites.value + userRepo.writes.value
+
+    /**
+     * What [writes] said when the grids on screen were read. Read before the requests, so
      * a write that lands while they are on their way counts as one they may not show.
      */
-    private var readAt = recipeWrites.value
+    private var readAt = writes()
 
     init {
         loadAll()
@@ -201,8 +207,8 @@ class UserProfileViewModel(
     }
 
     /**
-     * Reads the first page of each grid again, and the counts above them, without a spinner,
-     * when the cook has written a recipe since they were read.
+     * Reads the first page of each grid again, and the card above them, without a spinner,
+     * when the cook has written a recipe or saved their profile since they were read.
      *
      * Called each time the profile comes back on screen, which is where it is when a recipe is
      * created, edited, given a picture or deleted: behind the editor or the recipe. Paging
@@ -217,9 +223,9 @@ class UserProfileViewModel(
      * otherwise land after the replacement and skip the rows between.
      */
     fun reloadIfStale() {
-        val writes = recipeWrites.value
+        val seen = writes()
         val state = _uiState.value
-        if (writes == readAt || state.isLoading || reloadJob?.isActive == true) return
+        if (seen == readAt || state.isLoading || reloadJob?.isActive == true) return
         if (isLoadingMore || isLoadingMoreLiked) return
         reloadJob = viewModelScope.launch {
             val ownDeferred = async { userRepo.getUserRecipes(profileUserId, 0) }
@@ -245,7 +251,7 @@ class UserProfileViewModel(
             }
             // The recipe count above the grid.
             userDeferred.await().onSuccess { user -> _uiState.update { it.copy(user = user) } }
-            if (own.isSuccess && likes?.isSuccess != false) readAt = writes
+            if (own.isSuccess && likes?.isSuccess != false) readAt = seen
         }
     }
 

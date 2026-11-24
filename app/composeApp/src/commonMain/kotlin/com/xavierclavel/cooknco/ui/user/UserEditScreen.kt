@@ -184,7 +184,7 @@ private fun UserEditContent(
                 } else {
                     AsyncImage(
                         model = user?.let { "${ApiClient.IMAGE_URL}/users/${it.id}-v${it.version}.webp" },
-                        contentDescription = "Profile photo",
+                        contentDescription = s.profilePhoto,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -231,7 +231,7 @@ private fun UserEditContent(
                         onValueChange = onUsernameChange,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        isError = uiState.error?.contains("username", ignoreCase = true) == true,
+                        isError = uiState.usernameError,
                         colors = editColors(),
                         shape = fieldShape,
                         textStyle = MaterialTheme.typography.bodyLarge,

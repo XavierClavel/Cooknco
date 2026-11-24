@@ -19,6 +19,7 @@ import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.dto.RecipeInfo
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.network.dto.RecipeOwner
+import com.xavierclavel.cooknco.network.dto.UserInfo
 import com.xavierclavel.cooknco.platform.PickedImage
 import com.xavierclavel.cooknco.data.UserRepository
 import com.xavierclavel.cooknco.network.UserApi
@@ -86,6 +87,20 @@ class ReloadAfterWriteTest {
 
     private var uploadFails = false
 
+    /** The owner's profile as the server has it; a save renames them. */
+    private var profile = UserInfo(
+        id = owner.id,
+        version = 1L,
+        username = owner.username,
+        joinDate = 0L,
+        bio = "",
+        recipesCount = 1,
+        likesCount = 0,
+        cookbooksCount = 0,
+        followersCount = 0,
+        followsCount = 0,
+    )
+
     /** Every feed page and every recipe read, in order. */
     private val reads = mutableListOf<String>()
 
@@ -99,10 +114,12 @@ class ReloadAfterWriteTest {
             creationDate = 0L,
         )
 
-    private data class Subject<T : ViewModel>(val viewModel: T, val repo: RecipeRepository)
+    private data class Subject<T : ViewModel>(val viewModel: T, val repo: RecipeRepository, val users: UserRepository)
 
     /** What a view model is built over: one of each, as [com.xavierclavel.cooknco.di.AppGraph] holds one. */
-    private class Graph(val repo: RecipeRepository, val client: HttpClient, val tokens: TokenDataStore, val store: OfflineStore)
+    private class Graph(val repo: RecipeRepository, val client: HttpClient, val tokens: TokenDataStore, val store: OfflineStore) {
+        val users = UserRepository(UserApi(client), tokens, store)
+    }
 
     /**
      * One repository shared by the view model and the test, as the app shares one: the write
@@ -141,6 +158,12 @@ class ReloadAfterWriteTest {
                         ),
                     )))
                 }
+                request.method == HttpMethod.Put && path.endsWith("/user") -> {
+                    profile = profile.copy(username = "aya_b")
+                    json(ApiClient.json.encodeToString(profile))
+                }
+                request.method == HttpMethod.Get && path.endsWith("/user/${owner.id}") ->
+                    json(ApiClient.json.encodeToString(profile))
                 request.method == HttpMethod.Get && path.endsWith("/recipe/${recipe.id}") -> {
                     reads += "recipe"
                     json(ApiClient.json.encodeToString(recipe))
@@ -154,9 +177,10 @@ class ReloadAfterWriteTest {
         val tokens = TokenDataStore(createPreferencesDataStore(tokenFile.toString()))
         tokens.saveToken("session-token")
         val repo = RecipeRepository(RecipeApi(client), tokens, store)
-        val viewModel = build(Graph(repo, client, tokens, store))
+        val graph = Graph(repo, client, tokens, store)
+        val viewModel = build(graph)
         try {
-            body(Subject(viewModel, repo))
+            body(Subject(viewModel, repo, graph.users))
         } finally {
             viewModel.viewModelScope.coroutineContext.job.cancelAndJoin()
             Dispatchers.resetMain()
@@ -189,7 +213,7 @@ class ReloadAfterWriteTest {
     private fun profileTest(body: suspend TestScope.(Subject<UserProfileViewModel>) -> Unit) =
         reloadTest({ graph ->
             UserProfileViewModel(
-                UserRepository(UserApi(graph.client), graph.tokens, graph.store),
+                graph.users,
                 recipeWrites = graph.repo.writes,
                 profileUserId = owner.id,
                 currentUserId = owner.id,
@@ -358,6 +382,20 @@ class ReloadAfterWriteTest {
 
         assertEquals(listOf(12L to 2L), profile.uiState.value.recipes.map { it.id to it.version })
         assertFalse(profile.uiState.value.isLoading, "no spinner over a grid already on screen")
+    }
+
+    /** The profile is behind its editor while it is saved, exactly as it is behind a recipe's. */
+    @Test
+    fun the_profile_shows_its_new_name_when_it_comes_back() = profileTest { (profile, _, users) ->
+        profile.uiState.first { !it.isLoading }
+        profile.awaitIdle()
+        assertEquals("aya", profile.uiState.value.user?.username)
+
+        users.updateUser("aya_b", "").getOrThrow()
+        profile.reloadIfStale()
+        profile.awaitIdle()
+
+        assertEquals("aya_b", profile.uiState.value.user?.username)
     }
 
     @Test

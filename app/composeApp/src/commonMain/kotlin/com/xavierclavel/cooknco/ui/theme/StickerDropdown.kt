@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,9 +32,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 
 /**
@@ -44,9 +50,10 @@ import androidx.compose.ui.window.PopupProperties
  * Material's [androidx.compose.material3.DropdownMenu], whose white elevated surface and
  * 48dp list items are the one piece of Material chrome a sticker screen cannot absorb.
  *
- * [anchor] is drawn in place and the menu is positioned under it by its measured height, so
- * a caller only says what opens the menu, never where the menu goes. [alignEnd] hangs it
- * from the anchor's trailing edge, which is what a narrow chip at the right of a row needs.
+ * [anchor] is drawn in place and the menu hangs under it — over it when the keyboard would
+ * cover it there, see [DropdownPosition] — so a caller only says what opens the menu, never
+ * where the menu goes. [alignEnd] hangs it from the anchor's trailing edge, which is what a
+ * narrow chip at the right of a row needs.
  *
  * [width] defaults to the anchor's own measured width, which is what a menu hung under a
  * field should be. It has to be *some* width: the rows fill their parent and a [Popup] is
@@ -78,29 +85,32 @@ fun <T> StickerDropdownMenu(
     width: Dp? = null,
     maxHeight: Dp = 340.dp,
     gap: Dp = 8.dp,
+    /**
+     * Whether the open menu takes focus — right for a menu a tap opens, wrong for one hung
+     * under a field still being typed in: a focusable popup takes focus from the field as soon
+     * as the first results arrive, which closes the keyboard and drops every key after the first.
+     */
+    focusable: Boolean = true,
     anchor: @Composable () -> Unit,
 ) {
-    var anchorHeight by remember { mutableStateOf(0) }
     var anchorWidth by remember { mutableStateOf(0) }
     val density = LocalDensity.current
-    val gapPx = with(density) { gap.roundToPx() }
     val menuWidth = width ?: with(density) { anchorWidth.toDp() }.takeIf { it > 0.dp }
+    val position = DropdownPosition(
+        gap = with(density) { gap.roundToPx() },
+        alignEnd = alignEnd,
+        keyboardHeight = WindowInsets.ime.getBottom(density),
+    )
 
     Box(modifier = modifier) {
-        Box(
-            modifier = Modifier.onSizeChanged {
-                anchorHeight = it.height
-                anchorWidth = it.width
-            },
-        ) {
+        Box(modifier = Modifier.onSizeChanged { anchorWidth = it.width }) {
             anchor()
         }
         if (expanded && items.isNotEmpty()) {
             Popup(
-                alignment = if (alignEnd) Alignment.TopEnd else Alignment.TopStart,
-                offset = IntOffset(0, anchorHeight + gapPx),
+                popupPositionProvider = position,
                 onDismissRequest = onDismissRequest,
-                properties = PopupProperties(focusable = true),
+                properties = PopupProperties(focusable = focusable),
             ) {
                 StickerCard(
                     modifier = if (menuWidth != null) Modifier.width(menuWidth) else Modifier,
@@ -129,6 +139,36 @@ fun <T> StickerDropdownMenu(
                 }
             }
         }
+    }
+}
+
+/**
+ * Hangs the menu under its anchor, or over it when the keyboard would cover it there.
+ *
+ * The app draws edge to edge and nothing resizes the window for the keyboard, so the window
+ * runs on under the keys: whether a menu fits below its anchor is measured against the
+ * keyboard's top, not the window's bottom. A menu under a field being typed in — the member
+ * search — sits right above the keyboard, and opened below it would be drawn behind the keys.
+ */
+internal data class DropdownPosition(
+    val gap: Int,
+    val alignEnd: Boolean,
+    val keyboardHeight: Int,
+) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x = if (alignEnd) anchorBounds.right - popupContentSize.width else anchorBounds.left
+        val below = anchorBounds.bottom + gap
+        val fitsBelow = below + popupContentSize.height <= windowSize.height - keyboardHeight
+        val y = if (fitsBelow) below else anchorBounds.top - gap - popupContentSize.height
+        return IntOffset(
+            x.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
+            y.coerceAtLeast(0),
+        )
     }
 }
 

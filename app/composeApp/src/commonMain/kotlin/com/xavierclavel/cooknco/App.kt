@@ -5,6 +5,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
@@ -20,6 +22,7 @@ import com.xavierclavel.cooknco.navigation.AppNavigation
 import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.platform.rememberUrlOpener
 import com.xavierclavel.cooknco.ui.auth.AuthViewModel
+import com.xavierclavel.cooknco.ui.components.closeKeyboardOnTapOutside
 import com.xavierclavel.cooknco.ui.i18n.LocalStrings
 import com.xavierclavel.cooknco.ui.i18n.stringsFor
 import com.xavierclavel.cooknco.ui.theme.CookncoTheme
@@ -115,7 +118,10 @@ fun App() {
             DeepLinks.oauthTokens.collect(authViewModel::handleOAuthToken)
         }
 
-        AppNavigation(viewModel = authViewModel)
+        AppNavigation(
+            viewModel = authViewModel,
+            modifier = Modifier.closeKeyboardOnTapOutside(LocalFocusManager.current),
+        )
 
         if (update.requirement == UpdateRequirement.SUGGESTED) {
             UpdateAvailableDialog(

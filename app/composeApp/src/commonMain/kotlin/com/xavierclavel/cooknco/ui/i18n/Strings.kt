@@ -112,7 +112,7 @@ interface Strings {
     fun stepsCount(count: Int): String
     fun aboutMinutesInTotal(minutes: Int): String
     fun ovenAt(temperature: Int): String
-    val portionsUnit: String
+    fun portionsUnit(count: Int): String
     val minutesUnit: String
     val degreesUnit: String
     fun portions(count: Int): String
@@ -144,6 +144,8 @@ interface Strings {
     val invalidEmailOrPassword: String
     val emailAlreadyRegistered: String
     val usernameAlreadyTaken: String
+    val usernameRequired: String
+    val pictureUploadFailed: String
     val verifyEmailFirst: String
     val accountUsesGoogle: String
     val passwordsDoNotMatch: String
@@ -298,6 +300,7 @@ interface Strings {
     val follow: String
     fun followersLink(count: Int): String
     fun followingLink(count: Int): String
+    val recipesStat: String
     val followers: String
     val following: String
     val followingState: String
@@ -502,6 +505,8 @@ interface Strings {
 
     // ── Keeping recipes on the phone, from the settings screen ────────────────
     val offlineSettingsTitle: String
+    /** The caps label over that switch, which the switch itself already spells out. */
+    val offlineCaps: String
 
     // ── Premium, and what a locked feature says when it is tapped ─────────────
     /** The padlock on a locked action sheet row, for a screen reader. */
@@ -563,6 +568,7 @@ interface Strings {
 
     // ── The meal plan, which a premium account is offered ─────────────────────
     val mealPlan: String
+    val mealPlanCaps: String
     /** The settings switch that adds breakfast and the afternoon snack to the meal plan. */
     val breakfastAndSnack: String
     /** "12 – 18 October", or "28 September – 4 October" across two months. */
