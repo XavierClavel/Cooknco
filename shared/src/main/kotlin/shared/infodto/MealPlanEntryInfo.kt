@@ -29,6 +29,19 @@ data class MealPlanEntryInfo(
     val hasCooked: Boolean = true,
 )
 
+/**
+ * A dish planned before, offered to plan again: a recipe the caller can still open, or words.
+ *
+ * @param title the recipe's current title, or the words as they were last typed.
+ * @param recipe the recipe to plan again, or null for a dish named only in words — including a
+ *   recipe since gone out of the caller's reach, which comes back as the title it was planned under.
+ */
+@Serializable
+data class MealPlanSuggestionInfo(
+    val title: String,
+    val recipe: MealPlanRecipe? = null,
+)
+
 /** Just enough of a planned recipe to draw its picture and to open it. */
 @Serializable
 data class MealPlanRecipe(

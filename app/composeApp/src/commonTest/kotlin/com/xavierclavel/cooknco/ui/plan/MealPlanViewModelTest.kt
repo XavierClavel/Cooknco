@@ -12,6 +12,7 @@ import com.xavierclavel.cooknco.network.ApiClient
 import com.xavierclavel.cooknco.network.MealPlanApi
 import com.xavierclavel.cooknco.network.RecipeApi
 import com.xavierclavel.cooknco.network.dto.MealPlanEntry
+import com.xavierclavel.cooknco.network.dto.MealPlanSuggestion
 import com.xavierclavel.cooknco.network.dto.MealPlanEntrySaveDto
 import com.xavierclavel.cooknco.network.dto.MealPlanRecipe
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
@@ -88,6 +89,8 @@ class MealPlanViewModelTest {
         }
     }
     private var nextId = 100L
+    /** What the server offers as planned before. */
+    private var recent: List<MealPlanSuggestion> = emptyList()
 
     private fun json(content: String) =
         Triple(content, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
@@ -107,7 +110,7 @@ class MealPlanViewModelTest {
                     Triple("down", HttpStatusCode.InternalServerError, headersOf())
                 request.method == HttpMethod.Post && failingMeals.any { (date, slot) -> text.contains("\"$date\"") && text.contains("\"$slot\"") } ->
                     Triple("down", HttpStatusCode.InternalServerError, headersOf())
-                path.endsWith("/meal-plan/suggestions") -> json("[]")
+                path.endsWith("/meal-plan/recent") -> json(ApiClient.json.encodeToString(recent))
                 path.endsWith("/recipe") -> json("[]")
                 path.endsWith("/meal-plan") && request.method == HttpMethod.Get -> json(ApiClient.json.encodeToString(week))
                 path.endsWith("/meal-plan") && request.method == HttpMethod.Post -> {
@@ -630,5 +633,28 @@ class MealPlanViewModelTest {
 
         assertEquals(posted, bodies.size, "the replacement was planned the first time")
         assertEquals(listOf("Pizza night"), state.entries.map { it.title })
+    }
+
+    @Test
+    fun a_recipe_planned_before_is_planned_again_as_that_recipe() = planTest { viewModel ->
+        recent = listOf(
+            MealPlanSuggestion(title = "Stew", recipe = MealPlanRecipe(id = 9, version = 2)),
+            MealPlanSuggestion(title = "Leftovers"),
+        )
+        viewModel.load()
+        viewModel.awaitLoaded()
+        viewModel.awaitIdle()
+
+        viewModel.openAddMeal()
+        viewModel.awaitIdle()
+        assertEquals(recent, viewModel.uiState.value.adding!!.suggestions)
+
+        viewModel.toggleAddDate(LocalDate(2026, 10, 14))
+        viewModel.addPlannedBefore(recent.first())
+        viewModel.awaitIdle()
+
+        val sent = ApiClient.json.decodeFromString<MealPlanEntrySaveDto>(bodies.single())
+        assertEquals(9L, sent.recipeId)
+        assertNull(sent.title, "a recipe is planned as the recipe, not as its name")
     }
 }

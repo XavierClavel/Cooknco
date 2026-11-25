@@ -77,6 +77,7 @@ import com.xavierclavel.cooknco.data.MealSlot
 import com.xavierclavel.cooknco.data.toggle
 import com.xavierclavel.cooknco.network.dto.MealPlanEntry
 import com.xavierclavel.cooknco.network.dto.MealPlanRecipe
+import com.xavierclavel.cooknco.network.dto.MealPlanSuggestion
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import com.xavierclavel.cooknco.ui.components.RecipeImage
 import com.xavierclavel.cooknco.ui.i18n.strings
@@ -123,7 +124,7 @@ fun AddDishSheet(
     onMonthChange: (LocalDate) -> Unit,
     onClearDates: () -> Unit,
     onAddTyped: () -> Unit,
-    onAddSuggestion: (String) -> Unit,
+    onAddSuggestion: (MealPlanSuggestion) -> Unit,
     onAddRecipe: (RecipeOverview) -> Unit,
     onAddNotCooked: () -> Unit,
     onDismissRequest: () -> Unit,
@@ -246,7 +247,7 @@ private fun DishResults(
     state: AddDishState,
     enabled: Boolean,
     onAddTyped: () -> Unit,
-    onAddSuggestion: (String) -> Unit,
+    onAddSuggestion: (MealPlanSuggestion) -> Unit,
     onAddRecipe: (RecipeOverview) -> Unit,
     onAddNotCooked: () -> Unit,
 ) {
@@ -263,10 +264,21 @@ private fun DishResults(
         }
     }
     if (state.suggestions.isNotEmpty()) {
-        SectionLabel(s.plannedBeforeCaps)
+        SectionLabel(s.suggestionsCaps)
         state.suggestions.forEach { suggestion ->
-            ResultRow(label = suggestion, enabled = enabled, onClick = { onAddSuggestion(suggestion) }) {
-                ResultIcon(Icons.Outlined.History, background = CookncoGoldLight)
+            ResultRow(label = suggestion.title, enabled = enabled, onClick = { onAddSuggestion(suggestion) }) {
+                val recipe = suggestion.recipe
+                if (recipe != null) {
+                    val shape = RoundedCornerShape(12.dp)
+                    RecipeImage(
+                        recipeId = recipe.id,
+                        version = recipe.version,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp).clip(shape).border(2.dp, CookncoNavy, shape),
+                    )
+                } else {
+                    ResultIcon(Icons.Outlined.History, background = CookncoGoldLight)
+                }
             }
         }
     }

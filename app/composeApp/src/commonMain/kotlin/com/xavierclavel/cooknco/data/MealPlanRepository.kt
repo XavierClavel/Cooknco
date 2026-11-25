@@ -2,6 +2,7 @@ package com.xavierclavel.cooknco.data
 
 import com.xavierclavel.cooknco.network.MealPlanApi
 import com.xavierclavel.cooknco.network.dto.MealPlanEntry
+import com.xavierclavel.cooknco.network.dto.MealPlanSuggestion
 import com.xavierclavel.cooknco.network.dto.MealPlanEntryEditDto
 import com.xavierclavel.cooknco.network.dto.MealPlanEntrySaveDto
 import kotlinx.coroutines.flow.first
@@ -28,8 +29,8 @@ class MealPlanRepository(
         api.list(token(), from.toString(), to.toString())
     })
 
-    suspend fun suggestions(query: String): Result<List<String>> = runCatching {
-        api.suggestions(token(), query)
+    suspend fun recent(query: String): Result<List<MealPlanSuggestion>> = runCatching {
+        api.recent(token(), query)
     }
 
     /** Null [servings] plans it for as many as the recipe makes. */

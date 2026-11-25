@@ -18,6 +18,7 @@ import com.xavierclavel.cooknco.data.toggle
 import com.xavierclavel.cooknco.data.weekStartOf
 import com.xavierclavel.cooknco.di.AppGraph
 import com.xavierclavel.cooknco.network.dto.MealPlanEntry
+import com.xavierclavel.cooknco.network.dto.MealPlanSuggestion
 import com.xavierclavel.cooknco.network.dto.RecipeOverview
 import kotlin.math.abs
 import kotlin.time.Clock
@@ -64,8 +65,8 @@ data class AddDishState(
     val query: String = "",
     /** The cook's own recipes, liked ones and cookbooks' that match [query]. */
     val recipes: List<RecipeOverview> = emptyList(),
-    /** What they planned before as words, matching [query]. */
-    val suggestions: List<String> = emptyList(),
+    /** What they planned before, recipes and words alike, matching [query]. */
+    val suggestions: List<MealPlanSuggestion> = emptyList(),
     val isSearching: Boolean = false,
     val isSaving: Boolean = false,
     val saveFailed: Boolean = false,
@@ -82,6 +83,8 @@ data class AddDishState(
 private sealed interface NewDish {
     data class Recipe(val recipe: RecipeOverview) : NewDish
     data class Words(val title: String) : NewDish
+    /** A recipe planned before, known by its id alone. */
+    data class PlannedRecipe(val recipeId: Long) : NewDish
     data object NotCooked : NewDish
 }
 
@@ -322,7 +325,7 @@ class MealPlanViewModel(
             if (query.isNotBlank()) delay(SEARCH_DEBOUNCE_MILLIS)
             _uiState.update { state -> state.copy(adding = state.adding?.copy(isSearching = true)) }
             val recipes = async { recipeRepository.searchOwnCollections(userId, query.trim()) }
-            val suggestions = async { mealPlanRepository.suggestions(query.trim()) }
+            val suggestions = async { mealPlanRepository.recent(query.trim()) }
             val foundRecipes = recipes.await().getOrDefault(emptyList())
             val foundSuggestions = suggestions.await().getOrDefault(emptyList())
             _uiState.update { state ->
@@ -347,6 +350,12 @@ class MealPlanViewModel(
 
     fun addSuggestion(title: String) = add(NewDish.Words(title))
 
+    /** A dish planned before, planned again: as its recipe when it has one, else as its words. */
+    fun addPlannedBefore(suggestion: MealPlanSuggestion) {
+        val recipe = suggestion.recipe
+        add(if (recipe != null) NewDish.PlannedRecipe(recipe.id) else NewDish.Words(suggestion.title))
+    }
+
     /** Notes the meal as not cooked on the sheet's days: it fills the meal as a dish would. */
     fun addNotCooked() = add(NewDish.NotCooked)
 
@@ -358,6 +367,7 @@ class MealPlanViewModel(
             when (dish) {
                 is NewDish.Recipe -> mealPlanRepository.planRecipe(dish.recipe.id, date, slot, servings = servings)
                 is NewDish.Words -> mealPlanRepository.planDish(dish.title, date, slot, servings = servings)
+                is NewDish.PlannedRecipe -> mealPlanRepository.planRecipe(dish.recipeId, date, slot, servings = servings)
                 NewDish.NotCooked -> mealPlanRepository.planNotCooked(date, slot)
             }
         }

@@ -608,7 +608,7 @@ object EnStrings : Strings {
     override val searchOrTypeADish = "Search your recipes, or type a dish…"
     override fun addTypedDish(text: String) = "Add “$text”"
     override val asWordsNoRecipe = "As words, no recipe"
-    override val plannedBeforeCaps = "PLANNED BEFORE"
+    override val suggestionsCaps = "SUGGESTIONS"
     override val yourRecipesCaps = "YOUR RECIPES"
     override val noRecipeMatches = "None of your recipes match."
     override val dishName = "Dish"
