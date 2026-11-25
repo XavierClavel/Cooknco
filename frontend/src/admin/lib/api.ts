@@ -99,6 +99,10 @@ export const absorbCustomIngredient = (id: number, name: string) =>
 export const searchCiqual = (query: string, limit: number) =>
   api.get(`/admin/ciqual?${qs({query, limit})}`)
 
+/** The Open Prices categories whose name holds every word of `query`, with what each costs. */
+export const searchOpenPrices = (query: string, limit: number) =>
+  api.get(`/admin/open-prices?${qs({query, limit})}`)
+
 // --------------------------------------------------------------- moderation
 export const listReports = (f: Record<string, unknown>, page: number, size: number) =>
   api.get(`/admin/reports?${qs(f, page, size)}`)

@@ -100,6 +100,11 @@ object FrStrings : Strings {
     override fun minutes(value: Int) = "$value min"
     override fun degrees(value: Int) = "$value °C"
     override val serves = "Pour"
+    override val costCaps = "COÛT"
+    override val perPortionCaps = "PAR PART"
+    override fun approxEuros(value: Float) = "≈ ${cents(value).replace('.', ',')} €"
+    override val costSource = "Estimation d'après les prix médians relevés en France par Open Prices (Open Food Facts, ODbL)."
+    override fun costPartial(priced: Int, measured: Int) = "$priced ingrédients chiffrés sur $measured."
 
     override fun fullDate(date: LocalDate) = "${weekday(date.dayOfWeek)} ${date.day} ${monthName(date.month)}"
     override val whatsCooking = "Qu'est-ce que tu mijotes ?"

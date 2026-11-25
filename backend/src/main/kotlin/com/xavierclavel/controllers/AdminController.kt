@@ -29,6 +29,7 @@ object AdminController: Controller(ADMIN_URL) {
             AdminRecipeController.serve(this)
             AdminIngredientController.serve(this)
             AdminCiqualController.serve(this)
+            AdminOpenPricesController.serve(this)
             AdminReportController.serve(this)
             AdminStorageController.serve(this)
             AdminBackupController.serve(this)

@@ -987,6 +987,71 @@ value exactly as published; reading them is `CiqualService.parseValue`'s job, wh
 `CiqualServiceTest` reads every row. A new edition is: download the XML, run the task with the
 new year, delete the old file, bump `CiqualService.EDITION`.
 
+## A recipe's cost is Open Prices', estimated when it is read
+
+A recipe reads with `RecipeInfo.cost`: what it costs to make, and one portion of it, at the
+median prices [Open Prices](https://prices.openfoodfacts.org) recorded in France over a year.
+Open Prices is Open Food Facts' crowdsourced price database — receipts and shelf labels people
+photograph — and no French retailer publishes an API, so it is the only open source there is.
+`OpenPricesService` holds it as a file bundled with the backend
+(`resources/open-prices/prices-fr.tsv`), one median per Open Food Facts category, and the
+backoffice ingredient form links an ingredient to one category (`GET /admin/open-prices`), the
+way it links one to a Ciqual food.
+
+Four things not to undo:
+
+- **The price is looked up, not copied.** An ingredient stores the category
+  (`open_prices_category`) and nothing else; `OpenPricesService.estimate` reads the table when
+  the recipe is read. Unlike Ciqual's figures, prices move every month, and a copy would leave
+  every ingredient at whatever its last save found. Refreshing the file reprices every recipe at
+  the next deploy, and a category the new file drops leaves its ingredients unpriced.
+- **Every price shown is the table's.** There is no price typed in by hand: an ingredient with no
+  fitting category stays unpriced. An estimate is only as honest as its least sourced line.
+- **An estimate says what it left out.** Free-text lines, unlinked ingredients and lines the
+  ingredient cannot convert are not in the total, and `pricedIngredients` of
+  `measuredIngredients` says how many that is — both clients print it, or a partial sum reads as
+  the price of the dish. A line with no amount ("salt, to taste") is not counted at all. A
+  recipe with nothing priced has no `cost` rather than a cost of zero.
+- **The licence is the ODbL.** A screen that shows an estimate says it comes from Open Prices,
+  under the ODbL; both clients print it under the figure. Share-alike applies to the table
+  derived from it, which this public repository already satisfies.
+
+### A refresh can break a link, and the backoffice says so
+
+A category is priced per kilo, per litre or per piece (`OpenPriceInfo.per`), and a line is
+converted to that through the ingredient's own `gramsPerUnit` and `gramsPerMilliliter`
+(`Ingredient.convert`). Every amount reaches grams — an ingredient offering a unit has the
+conversion it needs — so a price per kilo always applies; per litre needs a density, per piece a
+weight per piece. A refresh moves this under existing links, since a category can drop out of
+the table or change what it is priced per, and `OpenPricesService.statusOf` is the one place
+that says where a link stands (`PriceLinkStatus`):
+
+- **One rule, four readers.** The catalogue's price icon, its "no working price" filter, the
+  save check and the estimate all agree on it. The filter is SQL (`AdminService.unpriced`) and
+  the icon is Kotlin, so the two spell the same rule twice — `AdminControllerTest` lists the
+  catalogue both ways and holds them to the same rows.
+- **A link is checked against the table when it is made, and kept after.** A category the table
+  no longer lists stays on the row (`NOT_IN_TABLE`), comes back in `IngredientInfo` and is
+  sent back by the form, so editing anything else does not erase a link a later refresh could
+  revive. Only a *new* link to an unknown category is refused (`unknown_open_prices_category`).
+- **A link that cannot convert is refused on every save** (`open_price_not_measurable`), not
+  just the one that made it: it would price no line and say nothing about why.
+
+The catalogue table carries one icon per source — Ciqual and Open Prices — and filters on each
+being missing, and can order by how many recipe lines name an ingredient. That order is an
+aggregate over `Ingredient.recipeLines`, the pattern `RecipeService.findList` uses for likes:
+Ebean splits an `orderBy` string on spaces and commas, so a correlated subquery cannot go there.
+
+### Rebuilding the table
+
+The file is written by `:backend:extractOpenPrices` from the daily dumps at
+prices.openfoodfacts.org/data and the category taxonomy; `ExtractOpenPrices.kt` says how a
+price reaches a category. One rule there is load-bearing: a category sold loose takes its loose
+prices only, because the packaged products Open Food Facts files under "onions" are fried
+onions and soups, at eight times the price of an onion. A refresh is: download the four files,
+run the task, commit the file. The live API is not an alternative — its filtered queries time
+out.
+
 ## Build and test
 
 Use `sh ./gradlew` (the wrapper lacks the exec bit in worktrees) with JDK 23 — Gradle 8.10.2

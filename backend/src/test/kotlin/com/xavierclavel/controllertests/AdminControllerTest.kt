@@ -48,6 +48,9 @@ import org.junit.jupiter.api.Test
 import shared.dto.IngredientDTO
 import shared.dto.RecipeDTO
 import shared.enums.AmountUnit
+import shared.enums.PriceLinkStatus
+import com.xavierclavel.services.OpenPricesService
+import io.ebean.DB
 import shared.enums.AccountStatus
 import shared.enums.IngredientType
 import shared.enums.Locale
@@ -532,6 +535,68 @@ class AdminControllerTest : ApplicationTest() {
 
         val row = client.listAdminIngredients().items.single { it.id == ingredient.id }
         assertEquals(2, row.recipesCount)
+    }
+
+    @Test
+    fun `the catalogue says which ingredients lack a Ciqual food or a price, and filters on it`() = runTestAsAdmin {
+        val openPrices = OpenPricesService()
+        val perKilo = openPrices.search("carottes", OpenPricesService.MAX_RESULTS).first { it.per == AmountUnit.KILOGRAM }
+        val perLitre = openPrices.search("lait", OpenPricesService.MAX_RESULTS).first { it.per == AmountUnit.LITER }
+        val linked = client.createIngredient(IngredientDTO(ciqualCode = 22000, openPricesCategory = perKilo.category))
+        val unlinked = client.createIngredient(IngredientDTO())
+        val dropped = client.createIngredient(IngredientDTO(openPricesCategory = perKilo.category))
+        val unconvertible = client.createIngredient(IngredientDTO(openPricesCategory = perLitre.category, gramsPerMilliliter = 1f))
+        // Priced per litre and per piece, with the conversion each needs: not missing anything
+        val pouredPriced = client.createIngredient(IngredientDTO(openPricesCategory = perLitre.category, gramsPerMilliliter = 1f))
+        val perPiece = openPrices.categoriesPer(AmountUnit.UNIT).first()
+        val countedPriced = client.createIngredient(IngredientDTO(openPricesCategory = perPiece, gramsPerUnit = 60f))
+        // What a refresh of the table leaves behind: a category it no longer lists, and one now
+        // priced in a way the ingredient cannot reach
+        DB.sqlUpdate("update ingredients set open_prices_category = 'en:dropped-by-a-refresh' where id = :id")
+            .setParameter("id", dropped.id).execute()
+        DB.sqlUpdate("update ingredients set grams_per_milliliter = null where id = :id")
+            .setParameter("id", unconvertible.id).execute()
+
+        val rows = client.listAdminIngredients().items.associateBy { it.id }
+        assertEquals(PriceLinkStatus.PRICED, rows.getValue(linked.id).priceStatus)
+        assertEquals(PriceLinkStatus.NONE, rows.getValue(unlinked.id).priceStatus)
+        assertEquals(PriceLinkStatus.NOT_IN_TABLE, rows.getValue(dropped.id).priceStatus)
+        assertEquals("en:dropped-by-a-refresh", rows.getValue(dropped.id).openPricesCategory)
+        assertNull(rows.getValue(dropped.id).price)
+        assertEquals(PriceLinkStatus.NOT_CONVERTIBLE, rows.getValue(unconvertible.id).priceStatus)
+        assertEquals(PriceLinkStatus.PRICED, rows.getValue(pouredPriced.id).priceStatus)
+        assertEquals(PriceLinkStatus.PRICED, rows.getValue(countedPriced.id).priceStatus)
+
+        // The filters are SQL and the flags are worked out in Kotlin: they have to agree on every row
+        client.listAdminIngredients(missingCiqual = true).apply {
+            assertEquals(rows.values.filter { it.ciqualCode == null }.map { it.id }.toSet(), items.map { it.id }.toSet())
+            assertEquals(items.size, count)
+        }
+        client.listAdminIngredients(missingPrice = true).apply {
+            assertEquals(rows.values.filter { it.priceStatus != PriceLinkStatus.PRICED }.map { it.id }.toSet(), items.map { it.id }.toSet())
+            assertEquals(items.size, count)
+        }
+    }
+
+    @Test
+    fun `the catalogue can put the most used ingredients first, across pages`() = runTestAsAdmin {
+        val unused = client.createIngredient()
+        val usedOnce = client.createIngredient()
+        val usedTwice = client.createIngredient()
+        listOf(listOf(usedTwice, usedOnce), listOf(usedTwice)).forEachIndexed { i, lines ->
+            client.createRecipe(RecipeDTO(
+                title = "recipe $i",
+                ingredients = lines.map {
+                    RecipeDTO.RecipeIngredientDTO(id = it.id, unit = AmountUnit.GRAM, amount = 10f)
+                }.toMutableList(),
+            ))
+        }
+
+        val first = client.listAdminIngredients(mostUsed = true, size = 2, page = 0)
+        val second = client.listAdminIngredients(mostUsed = true, size = 2, page = 1)
+        assertEquals(3, first.count)
+        assertEquals(listOf(usedTwice.id, usedOnce.id, unused.id), (first.items + second.items).map { it.id })
+        assertEquals(listOf(2, 1, 0), (first.items + second.items).map { it.recipesCount })
     }
 
     @Test

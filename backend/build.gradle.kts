@@ -115,6 +115,18 @@ tasks.register<JavaExec>("extractCiqual") {
     workingDir = rootProject.projectDir
 }
 
+/**
+ * Rewrites the bundled price table from the Open Prices dumps:
+ * `./gradlew :backend:extractOpenPrices --args="<directory with the dumps>"`. See `ExtractOpenPrices.kt`.
+ */
+tasks.register<JavaExec>("extractOpenPrices") {
+    group = "open prices"
+    description = "Write backend/src/main/resources/open-prices/prices-fr.tsv from the Open Prices dumps"
+    mainClass.set("main.ExtractOpenPricesKt")
+    classpath = sourceSets["test"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 val generatedVersionDir = "${buildDir}/generated-version"
 
 sourceSets {

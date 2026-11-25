@@ -7,6 +7,7 @@ import shared.enums.IngredientType
 import shared.enums.Locale
 import shared.enums.MeasurementType
 import shared.enums.PremiumStatus
+import shared.enums.PriceLinkStatus
 import shared.enums.UserRole
 import shared.overviewdto.UserOverview
 
@@ -103,6 +104,12 @@ data class AdminIngredientInfo(
     val recipesCount: Int,
     /** Set when the nutrition comes from Ciqual, so the catalogue shows what is left to link. */
     val ciqualCode: Int? = null,
+    /** The Open Prices category the ingredient is linked to, kept even when the bundled table no longer lists it. */
+    val openPricesCategory: String? = null,
+    /** What [openPricesCategory] costs; null when unlinked, or when the bundled table no longer lists it. */
+    val price: OpenPriceInfo? = null,
+    /** Whether the link prices the recipes using it, so the catalogue shows what is left to price or to fix. */
+    val priceStatus: PriceLinkStatus = PriceLinkStatus.NONE,
     /** Carried in the row so the catalogue shows which ingredients still lack a conversion. */
     val allowedTypes: Set<MeasurementType> = setOf(MeasurementType.NONE),
     val defaultUnit: AmountUnit? = null,

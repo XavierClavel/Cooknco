@@ -3,7 +3,7 @@ package com.xavierclavel.services
 import shared.enums.Locale
 import shared.infodto.CiqualFoodInfo
 import shared.infodto.CiqualSource
-import java.text.Normalizer
+import com.xavierclavel.utils.searchWordsOf
 import kotlin.math.roundToInt
 
 /**
@@ -41,14 +41,6 @@ class CiqualService {
             raw.startsWith("<") -> 0f
             else -> raw.replace(',', '.').toFloatOrNull() ?: error("unreadable Ciqual value '$raw'")
         }
-
-        /** Lowercase, accents and ligatures off, so "œuf" finds Ciqual's "Oeuf". */
-        fun normalize(text: String): String =
-            Normalizer.normalize(text.lowercase().replace("œ", "oe").replace("æ", "ae"), Normalizer.Form.NFD)
-                .replace(Regex("\\p{M}+"), "")
-
-        private fun wordsOf(text: String): List<String> =
-            normalize(text).split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
     }
 
     private class Entry(val food: CiqualFoodInfo, val words: List<List<String>>, val isAverage: Boolean)
@@ -72,7 +64,7 @@ class CiqualService {
      * than a near miss linked by accident.
      */
     fun search(query: String, limit: Int): List<CiqualFoodInfo> {
-        val terms = wordsOf(query)
+        val terms = searchWordsOf(query)
         if (terms.isEmpty()) return emptyList()
         return entries
             .mapNotNull { entry ->
@@ -126,7 +118,7 @@ class CiqualService {
             )
             Entry(
                 food = food,
-                words = name.values.map { wordsOf(it) },
+                words = name.values.map { searchWordsOf(it) },
                 isAverage = row.getValue("name_fr").contains("(aliment moyen)"),
             )
         }

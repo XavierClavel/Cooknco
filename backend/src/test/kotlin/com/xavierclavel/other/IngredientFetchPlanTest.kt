@@ -4,11 +4,11 @@ import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.IngredientService
 import io.ebean.Paging
 import main.com.xavierclavel.utils.FetchPlanTest
-import main.com.xavierclavel.utils.createIngredient
+import main.com.xavierclavel.utils.createIngredient import main.com.xavierclavel.utils.createRecipe
 import main.com.xavierclavel.utils.ingredientDTO
 import org.junit.jupiter.api.Test
 import org.koin.test.inject
-import shared.enums.Locale
+import shared.dto.RecipeDTO import shared.enums.AmountUnit import shared.enums.Locale
 
 /**
  * Guards the ingredient catalogue against N+1.
@@ -45,10 +45,32 @@ class IngredientFetchPlanTest : FetchPlanTest() {
             client.createIngredient(ingredientDTO.copy(name = mapOf(Locale.EN to "tomato")))
             assertQueryCountDoesNotGrow(
                 what = "AdminService.searchIngredients",
-                read = { adminService.searchIngredients(null, null, paging).second },
+                read = { adminService.searchIngredients(null, null, false, false, mostUsed = false, paging).second },
                 grow = {
                     listOf("potato", "carrot").forEach {
                         client.createIngredient(ingredientDTO.copy(name = mapOf(Locale.EN to it)))
+                    }
+                },
+            )
+        }
+    }
+
+    @Test
+    fun `ordering the catalogue by use costs the same whether it holds one entry or several`() = runTest {
+        runAsAdmin {
+            client.createIngredient(ingredientDTO.copy(name = mapOf(Locale.EN to "tomato")))
+            assertQueryCountDoesNotGrow(
+                what = "AdminService.searchIngredients, most used first",
+                read = { adminService.searchIngredients(null, null, false, false, mostUsed = true, paging).second },
+                grow = {
+                    listOf("potato", "carrot").forEach {
+                        val ingredient = client.createIngredient(ingredientDTO.copy(name = mapOf(Locale.EN to it)))
+                        client.createRecipe(RecipeDTO(
+                            title = it,
+                            ingredients = mutableListOf(
+                                RecipeDTO.RecipeIngredientDTO(id = ingredient.id, unit = AmountUnit.GRAM, amount = 10f),
+                            ),
+                        ))
                     }
                 },
             )

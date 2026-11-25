@@ -5,6 +5,7 @@ import com.xavierclavel.services.AdminService
 import com.xavierclavel.services.AppShellSource
 import com.xavierclavel.services.AppVersionService
 import com.xavierclavel.services.CiqualService
+import com.xavierclavel.services.OpenPricesService
 import com.xavierclavel.services.HttpAppShellSource
 import com.xavierclavel.services.LinkPreviewService
 import com.xavierclavel.services.SitemapService
@@ -60,6 +61,7 @@ val appModules = module {
     single { UserService() }
     single { IngredientService() }
     single { CiqualService() }
+    single { OpenPricesService() }
     single { ImageService() }
     single { ImageUploadTicketService() }
     single { DefaultImageService() }

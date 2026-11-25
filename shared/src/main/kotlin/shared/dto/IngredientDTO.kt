@@ -30,6 +30,12 @@ data class IngredientDTO(
      */
     val ciqualCode: Int? = null,
 
+    /**
+     * The Open Food Facts category the ingredient is priced as, from the Open Prices table the
+     * server bundles; null leaves it unpriced.
+     */
+    val openPricesCategory: String? = null,
+
     /** Grams per piece; null means the ingredient is not countable. */
     val gramsPerUnit: Float? = null,
     /** Density in g/mL; null means volume units don't apply. */

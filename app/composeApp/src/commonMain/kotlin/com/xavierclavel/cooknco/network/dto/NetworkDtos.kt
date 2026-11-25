@@ -128,6 +128,20 @@ data class RecipeInfo(
      */
     val editionDate: Long? = null,
     val likesCount: Int,
+    /** What the recipe costs to make, from Open Prices; null when none of its lines is priced. */
+    val cost: RecipeCost? = null,
+)
+
+/**
+ * The backend's estimate of a recipe's cost, in euros. It covers [pricedIngredients] of the
+ * [measuredIngredients] lines that state an amount; the rest add nothing to [total].
+ */
+@Serializable
+data class RecipeCost(
+    val total: Float,
+    val perPortion: Float? = null,
+    val pricedIngredients: Int,
+    val measuredIngredients: Int,
 )
 
 /**

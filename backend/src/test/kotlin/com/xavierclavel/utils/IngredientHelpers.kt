@@ -10,6 +10,7 @@ import shared.enums.Sort
 import shared.infodto.CiqualFoodInfo
 import shared.infodto.CustomIngredientUsage
 import shared.infodto.IngredientInfo
+import shared.infodto.OpenPriceInfo
 import shared.utils.URL.INGREDIENT_URL
 import shared.utils.URL.ADMIN_URL
 import io.ktor.client.HttpClient
@@ -156,5 +157,20 @@ suspend fun HttpClient.searchCiqual(query: String, limit: Int? = null): List<Ciq
     this.searchCiqualRaw(query, limit).apply {
         assertEquals(HttpStatusCode.OK, status)
         return Json.decodeFromString(ListSerializer(CiqualFoodInfo.serializer()), bodyAsText())
+    }
+}
+
+suspend fun HttpClient.searchOpenPricesRaw(query: String, limit: Int? = null) =
+    this.get("$ADMIN_URL/open-prices") {
+        url {
+            parameters.append("query", query)
+            if (limit != null) parameters.append("limit", limit.toString())
+        }
+    }
+
+suspend fun HttpClient.searchOpenPrices(query: String, limit: Int? = null): List<OpenPriceInfo> {
+    this.searchOpenPricesRaw(query, limit).apply {
+        assertEquals(HttpStatusCode.OK, status)
+        return Json.decodeFromString(ListSerializer(OpenPriceInfo.serializer()), bodyAsText())
     }
 }

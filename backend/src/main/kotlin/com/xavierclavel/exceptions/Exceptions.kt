@@ -129,6 +129,10 @@ enum class BadRequestCause (val key: String) {
     INVALID_CONVERSION_FACTOR("invalid_conversion_factor"),
     // An ingredient linked to a Ciqual code the bundled table does not list.
     UNKNOWN_CIQUAL_FOOD("unknown_ciqual_food"),
+    // An ingredient newly linked to a category the bundled Open Prices table does not list.
+    UNKNOWN_OPEN_PRICES_CATEGORY("unknown_open_prices_category"),
+    // An ingredient priced per litre or per piece that states no density or weight per piece.
+    OPEN_PRICE_NOT_MEASURABLE("open_price_not_measurable"),
 
     INVALID_MAIL_ADDRESS("invalid_mail_address"),
     MAIL_TEMPLATE_KEY_INVALID("mail_template_key_invalid"),

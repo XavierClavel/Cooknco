@@ -1,7 +1,7 @@
 package com.xavierclavel.services
 
 import com.xavierclavel.logging.LogBuffer
-import com.xavierclavel.models.query.QIngredient
+import com.xavierclavel.models.query.QIngredient import io.ebean.FetchConfig import shared.enums.AmountUnit
 import com.xavierclavel.models.query.QRecipe
 import com.xavierclavel.models.query.QUser
 import io.ebean.DB
@@ -34,6 +34,7 @@ class AdminService: KoinComponent {
     val userService: UserService by inject()
     val recipeService: RecipeService by inject()
     val ingredientService: IngredientService by inject()
+    val openPricesService: OpenPricesService by inject()
     val cookbookService: CookbookService by inject()
     val likeService: LikeService by inject()
     val followService: FollowService by inject()
@@ -279,10 +280,17 @@ class AdminService: KoinComponent {
     /**
      * Ingredient catalogue with usage counts, resolved in one grouped query so the table
      * does not cost a count per row.
+     *
+     * @param missingCiqual only the ingredients whose nutrition is not linked to Ciqual
+     * @param missingPrice only the ingredients whose Open Prices link prices nothing — see [unpriced]
+     * @param mostUsed by how many recipe lines name the ingredient, most first, rather than by id
      */
     fun searchIngredients(
         query: String?,
         type: IngredientType?,
+        missingCiqual: Boolean,
+        missingPrice: Boolean,
+        mostUsed: Boolean,
         paging: Paging,
     ): Pair<Int, List<AdminIngredientInfo>> {
         val ebeanQuery = QIngredient()
@@ -303,12 +311,25 @@ class AdminService: KoinComponent {
                 )
             }
             .apply { if (type != null) this.type.eq(type) }
+            .apply { if (missingCiqual) ciqualCode.isNull() }
+            .apply { if (missingPrice) unpriced() }
 
+        // Counted before the usage aggregate joins in, which would make it a count of groups
         val count = ebeanQuery.findCount()
-        val ingredients = ebeanQuery
-            .orderBy().id.asc()
-            .setPaging(paging)
-            .findList()
+        val ingredients = if (mostUsed) {
+            ebeanQuery
+                .fetch(QIngredient.Alias.recipeLines.toString(), "count(*)", FetchConfig.ofLazy())
+                // Keeps the ingredients no recipe uses, which the left join leaves at zero
+                .having().raw("count(${QIngredient.Alias.recipeLines.id}) >= 0")
+                .setPaging(paging)
+                .orderBy("count(${QIngredient.Alias.recipeLines.id}) desc, ${QIngredient.Alias.id}")
+                .findList()
+        } else {
+            ebeanQuery
+                .setPaging(paging)
+                .orderBy().id.asc()
+                .findList()
+        }
 
         val usage = ingredientService.countRecipesByIngredient(ingredients.map { it.id })
         // An entry's names are a collection, so they are resolved for the page rather than read per
@@ -324,12 +345,36 @@ class AdminService: KoinComponent {
                     calories = it.calories,
                     recipesCount = usage[it.id] ?: 0,
                     ciqualCode = it.ciqualCode,
+                    openPricesCategory = it.openPricesCategory,
+                    price = it.openPricesCategory?.let { category -> openPricesService.find(category) },
+                    priceStatus = openPricesService.statusOf(it.openPricesCategory, it.gramsPerUnit, it.gramsPerMilliliter),
                     allowedTypes = it.allowedTypes(),
                     defaultUnit = it.defaultUnit,
                 )
             },
         )
     }
+
+    /**
+     * The ingredients [OpenPricesService.statusOf] would not call priced: unlinked, linked to a
+     * category the table no longer lists, or to one priced per litre or per piece with no way to
+     * get there. Any amount converts to a price per kilo, so a link to one of those always prices.
+     */
+    private fun QIngredient.unpriced(): QIngredient =
+        or()
+            .openPricesCategory.isNull()
+            .and()
+                .openPricesCategory.notIn(openPricesService.categoriesPer(AmountUnit.KILOGRAM))
+                .or()
+                    .openPricesCategory.notIn(openPricesService.categoriesPer(AmountUnit.LITER))
+                    .gramsPerMilliliter.isNull()
+                .endOr()
+                .or()
+                    .openPricesCategory.notIn(openPricesService.categoriesPer(AmountUnit.UNIT))
+                    .gramsPerUnit.isNull()
+                .endOr()
+            .endAnd()
+        .endOr()
 
     private fun readVersion(): String =
         try {

@@ -14,6 +14,7 @@ import com.xavierclavel.cooknco.network.RecipeSort
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
+import kotlin.math.roundToInt
 
 /**
  * Every word the app says, in one place, once per language.
@@ -125,6 +126,12 @@ interface Strings {
     fun minutes(value: Int): String
     fun degrees(value: Int): String
     val serves: String
+    val costCaps: String
+    val perPortionCaps: String
+    fun approxEuros(value: Float): String
+    /** Open Prices is under the ODbL, which asks a screen showing a figure derived from it to say so. */
+    val costSource: String
+    fun costPartial(priced: Int, measured: Int): String
 
     // ── Feed, continued ───────────────────────────────────────────────────────
     fun fullDate(date: LocalDate): String
@@ -679,4 +686,10 @@ fun strings(): Strings = LocalStrings.current
 fun stringsFor(locale: AppLocale): Strings = when (locale) {
     AppLocale.FR -> FrStrings
     AppLocale.EN -> EnStrings
+}
+
+/** [value] euros to the cent, with a point: each language puts its own separator and symbol around it. */
+internal fun cents(value: Float): String {
+    val cents = (value * 100).roundToInt()
+    return "${cents / 100}.${(cents % 100).toString().padStart(2, '0')}"
 }

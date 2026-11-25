@@ -518,7 +518,9 @@ private fun RecipeContent(
                                 LikeCount(count = recipe.likesCount, color = CookncoWhite)
                             }
                         }
-                        val hasMeta = recipe.preparationTime != null || recipe.cookingTime != null || recipe.cookingTemperature != null
+                        val cost = recipe.cost
+                        val hasMeta = recipe.preparationTime != null || recipe.cookingTime != null ||
+                            recipe.cookingTemperature != null || cost != null
                         if (hasMeta) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Box(
@@ -534,6 +536,27 @@ private fun RecipeContent(
                                     recipe.preparationTime?.let { MetaStat(label = s.prepCaps, value = s.minutes(it), modifier = Modifier.weight(1f)) }
                                     recipe.cookingTime?.let { MetaStat(label = s.cookCaps, value = s.minutes(it), modifier = Modifier.weight(1f)) }
                                     recipe.cookingTemperature?.let { MetaStat(label = s.ovenCaps, value = s.degrees(it), modifier = Modifier.weight(1f)) }
+                                    cost?.let {
+                                        val perPortion = it.perPortion
+                                        MetaStat(
+                                            label = if (perPortion != null) s.perPortionCaps else s.costCaps,
+                                            value = s.approxEuros(perPortion ?: it.total),
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                }
+                                // An estimate that left ingredients out says how many, or it reads as
+                                // the price of the whole dish
+                                cost?.let {
+                                    val partial = if (it.pricedIngredients < it.measuredIngredients) {
+                                        " " + s.costPartial(it.pricedIngredients, it.measuredIngredients)
+                                    } else ""
+                                    Text(
+                                        s.costSource + partial,
+                                        fontSize = 11.sp,
+                                        color = CookncoNavy.copy(alpha = 0.6f),
+                                        modifier = Modifier.padding(top = 8.dp),
+                                    )
                                 }
                             }
                         }

@@ -1,5 +1,6 @@
 package com.xavierclavel.models
 
+import com.xavierclavel.models.jointables.RecipeIngredient
 import com.xavierclavel.models.localization.LocalizedIngredientName
 import shared.dto.IngredientDTO
 import shared.enums.AmountUnit
@@ -9,6 +10,7 @@ import shared.enums.MeasurementType
 import shared.infodto.CiqualFoodInfo
 import shared.infodto.CiqualSource
 import shared.infodto.IngredientInfo
+import shared.infodto.OpenPriceInfo
 import shared.utils.UnitCapabilities
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -31,6 +33,13 @@ class Ingredient (
 
     @OneToMany(mappedBy = "ingredient", cascade = [CascadeType.ALL])
     var translations: MutableList<LocalizedIngredientName> = mutableListOf(),
+
+    /**
+     * The recipe lines naming this ingredient. Mapped for the backoffice to order the catalogue
+     * by how often each entry is used, the way recipes order by likes; never read row by row.
+     */
+    @OneToMany(mappedBy = "ingredient")
+    var recipeLines: MutableList<RecipeIngredient> = mutableListOf(),
 
     var type: IngredientType = IngredientType.MISCELLANEOUS,
 
@@ -58,6 +67,14 @@ class Ingredient (
 
     /** The edition of the table [ciqualCode] was read in, which the citation names. Set with it. */
     var ciqualEdition: Int? = null,
+
+    /**
+     * The Open Food Facts category this is priced as, such as `en:carrots`; null when it is not
+     * priced. The price itself is not stored: it is read from
+     * [com.xavierclavel.services.OpenPricesService] whenever a recipe is, so it is always the
+     * bundled table's.
+     */
+    var openPricesCategory: String? = null,
 
     /**
      * Weight of one piece, in grams. Non-null means the ingredient is countable, so [AmountUnit] values
@@ -98,6 +115,7 @@ class Ingredient (
         this.salt = ingredientDTO.salt
         this.ciqualCode = null
         this.ciqualEdition = null
+        this.openPricesCategory = ingredientDTO.openPricesCategory
 
         this.gramsPerUnit = ingredientDTO.gramsPerUnit
         this.gramsPerMilliliter = ingredientDTO.gramsPerMilliliter
@@ -105,6 +123,27 @@ class Ingredient (
         this.defaultUnit = ingredientDTO.defaultUnit
 
         return this
+    }
+
+    /**
+     * [amount] of [unit], in the base unit of [type] — grams, millilitres or pieces — going
+     * through grams when the two differ; null when this ingredient states no conversion for it.
+     */
+    fun convert(amount: Float, unit: AmountUnit, type: MeasurementType): Float? {
+        val base = unit.toBase(amount)
+        if (unit.type == type) return base
+        val grams = when (unit.type) {
+            MeasurementType.WEIGHT -> base
+            MeasurementType.VOLUME -> gramsPerMilliliter?.times(base)
+            MeasurementType.AMOUNT -> gramsPerUnit?.times(base)
+            MeasurementType.NONE -> null
+        } ?: return null
+        return when (type) {
+            MeasurementType.WEIGHT -> grams
+            MeasurementType.VOLUME -> gramsPerMilliliter?.let { grams / it }
+            MeasurementType.AMOUNT -> gramsPerUnit?.let { grams / it }
+            MeasurementType.NONE -> null
+        }
     }
 
     /**
@@ -135,8 +174,9 @@ class Ingredient (
      *   plan as soon as `maxRows` is set. `IngredientFetchPlanTest` is what keeps this in use.
      * @param ciqual what [ciqualCode] cites, named from the bundled table by
      *   [com.xavierclavel.services.CiqualService.sourceOf]; null when the nutrition was typed in.
+     * @param price what [openPricesCategory] costs; null when unpriced.
      */
-    fun toInfo(names: Map<Locale, String>, ciqual: CiqualSource?) = IngredientInfo(
+    fun toInfo(names: Map<Locale, String>, ciqual: CiqualSource?, price: OpenPriceInfo?) = IngredientInfo(
         id = this.id,
         type = this.type,
 
@@ -150,6 +190,8 @@ class Ingredient (
         proteins = this.proteins,
         salt = this.salt,
         ciqual = ciqual,
+        openPricesCategory = this.openPricesCategory,
+        price = price,
 
         gramsPerUnit = this.gramsPerUnit,
         gramsPerMilliliter = this.gramsPerMilliliter,
