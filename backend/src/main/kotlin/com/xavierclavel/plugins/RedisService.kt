@@ -1,5 +1,6 @@
 package com.xavierclavel.plugins
 
+import shared.enums.Locale
 import shared.enums.UserRole
 import com.xavierclavel.services.UserService
 import shared.infodto.UserInfo
@@ -116,6 +117,25 @@ data class AnsweredDecisionData(
     val approved: Boolean,
 )
 
+/**
+ * A Sign in with Apple that has left for Apple's page and not come back yet, keyed by its
+ * OAuth state.
+ *
+ * In Redis rather than in a map on the controller (which is where Google's lives) so that it
+ * expires on its own, survives the pod it started on, and is spent exactly once.
+ *
+ * @property browser the value of the cookie set on the browser the flow started in — what
+ *   binds the callback to that browser. See `AuthController.callbackAppleOauth`.
+ * @property redirect where to go once signed in: `app`, or a same-origin path.
+ * @property locale the client's language, for an account that has none yet.
+ */
+@Serializable
+data class AppleSignInData(
+    val browser: String,
+    val redirect: String? = null,
+    val locale: Locale? = null,
+)
+
 class RedisService(redisUrl: String): KoinComponent {
     // Lazily, and only reached from touchSession: UserService does not know about this class,
     // so there is no cycle, and nothing is resolved while Koin is still starting up.
@@ -166,6 +186,9 @@ class RedisService(redisUrl: String): KoinComponent {
          * is worthless by the time anyone reads it.
          */
         const val IMAGE_UPLOAD_TICKET_TTL = 10L * 60
+
+        /** How long someone may sit on Apple's page before the sign-in has to start over. */
+        const val APPLE_SIGN_IN_TTL = 10L * 60
     }
 
     /**
@@ -351,6 +374,19 @@ class RedisService(redisUrl: String): KoinComponent {
     @OptIn(ExperimentalLettuceCoroutinesApi::class)
     suspend fun createImageUploadTicket(ticket: String, data: ImageUploadTicketData) {
         redis.setex("image-ticket:$ticket", IMAGE_UPLOAD_TICKET_TTL, redisJson.encodeToString(data))
+    }
+
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun createAppleSignIn(state: String, data: AppleSignInData) {
+        redis.setex("apple-signin:$state", APPLE_SIGN_IN_TTL, redisJson.encodeToString(data))
+    }
+
+    /** Reads a pending Apple sign-in and destroys it: one state, one callback. */
+    @OptIn(ExperimentalLettuceCoroutinesApi::class)
+    suspend fun takeAppleSignIn(state: String): AppleSignInData? {
+        val key = "apple-signin:$state"
+        val json = redis.getdel(key) ?: return null
+        return redisJson.decodeFromString<AppleSignInData>(json)
     }
 
     /** Reads a ticket and destroys it, so a URL that has been posted to is spent. */

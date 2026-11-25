@@ -42,6 +42,10 @@ const documents: LegalDocuments = {
             text: "if you signed up with Google, the service receives an account identifier and your email address from Google, and nothing else. Your Google password never reaches it.",
           },
           {
+            term: "Sign in with Apple",
+            text: "if you signed up with Apple, the service receives an account identifier, the email address Apple shares — your own or a relay address Apple forwards to it, as you chose — and, the first time only, the name you let Apple pass on, used to suggest your username. Your Apple ID password never reaches it.",
+          },
+          {
             term: "Your profile",
             text: "username, bio and profile picture, the date you joined, and the date you were last active.",
           },
@@ -98,6 +102,10 @@ const documents: LegalDocuments = {
             text: "delivers the push notifications, carries the emails, and identifies you if you chose to sign in with Google.",
           },
           {
+            term: "Apple",
+            text: "identifies you if you chose to sign in with Apple, and relays the emails if you asked it to hide your address.",
+          },
+          {
             term: "The hosting provider",
             text: "the servers and the database run on machines rented from a provider inside the European Union.",
           },
@@ -115,7 +123,7 @@ const documents: LegalDocuments = {
           },
         ],
         after: [
-          "The service itself transfers nothing outside the European Union. Google operates worldwide, and its own terms govern what it does with what it carries.",
+          "The service itself transfers nothing outside the European Union. Google and Apple operate worldwide, and their own terms govern what they do with what they carry.",
         ],
       },
       {

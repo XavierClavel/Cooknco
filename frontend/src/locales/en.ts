@@ -221,7 +221,7 @@ export default {
   invalid_amount: "Enter an amount greater than zero, or choose no unit",
   invalid_conversion_factor: "Conversion factors must be greater than zero",
 
-  oauth_only: "Please use Google OAuth to login instead",
+  oauth_only: "This account has no password: sign in with Google or Apple instead",
   oauth_not_setup: "Email already linked to an account",
 
   //Ingredients

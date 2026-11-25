@@ -149,6 +149,14 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         urlOpener.open("${ApiClient.BASE_URL}/auth/login-oauth-google?redirect=app")
     }
 
+    /**
+     * The same browser round trip as Google's, ending at the same `cooknco://login/callback`:
+     * the backend runs Apple's web flow for every client, so nothing here is platform-specific.
+     */
+    fun loginWithApple(urlOpener: UrlOpener) {
+        urlOpener.open("${ApiClient.BASE_URL}/auth/login-oauth-apple?redirect=app")
+    }
+
     fun updateLoginEmail(value: String) = _loginState.update { it.copy(email = value, error = null) }
     fun updateLoginPassword(value: String) = _loginState.update { it.copy(password = value, error = null) }
     fun toggleLoginPasswordVisibility() = _loginState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }

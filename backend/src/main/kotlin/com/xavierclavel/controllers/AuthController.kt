@@ -7,7 +7,10 @@ import com.xavierclavel.exceptions.NotFoundException
 import com.xavierclavel.exceptions.UnauthorizedCause
 import com.xavierclavel.exceptions.UnauthorizedException
 import com.xavierclavel.models.User
+import com.xavierclavel.plugins.AppleSignInData
 import com.xavierclavel.plugins.RedisService
+import com.xavierclavel.services.AppleIdentity
+import com.xavierclavel.services.AppleSignIn
 import com.xavierclavel.plugins.SessionData
 import com.xavierclavel.services.EncryptionService
 import com.xavierclavel.services.UserService
@@ -33,7 +36,9 @@ import io.ktor.server.auth.OAuthAccessTokenResponse
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
+import io.ktor.http.Cookie
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
@@ -92,7 +97,21 @@ object AuthController: Controller(AUTH_URL) {
     val userService: UserService by inject(UserService::class.java)
     val redisService: RedisService by inject(RedisService::class.java)
     val configuration: Configuration by inject(Configuration::class.java)
+    val appleSignIn: AppleSignIn by inject(AppleSignIn::class.java)
     val redirects = mutableMapOf<String, String>()
+
+    /**
+     * The cookie that ties an Apple callback to the browser its sign-in started in.
+     *
+     * Without it a state is a bearer token: anyone who started a sign-in of their own could
+     * have somebody else's browser post its code and state, and sign that person into the
+     * attacker's account (login CSRF). `SameSite=None` because Apple's callback is a
+     * cross-site POST, which a `Lax` cookie is never sent with; scoped to the callback's path
+     * and to the length of one sign-in, so it is worth nothing anywhere else.
+     */
+    private const val APPLE_BROWSER_COOKIE = "apple_signin"
+
+    private val appleCallbackUrl get() = "${configuration.backend.url}/auth/callback-oauth-apple"
 
     /**
      * The language each in-flight Google sign-in was started from, keyed by OAuth state.
@@ -116,6 +135,8 @@ object AuthController: Controller(AUTH_URL) {
             loginGoogleOauth()
             callbackGoogleOauth()
         }
+        loginAppleOauth()
+        callbackAppleOauth()
         authenticate("auth-session", "bearer-auth") {
             whoami()
         }
@@ -240,6 +261,128 @@ object AuthController: Controller(AUTH_URL) {
         val userCreated = userService.createUser(userDTO, true, reported)
         logger.info {"Account created through Google Oauth by ${userCreated.username}"}
         return userCreated
+    }
+
+    /**
+     * Sends the browser to Apple, with the same `?redirect=` and `?locale=` the Google flow takes.
+     *
+     * Hand-written rather than one more Ktor `oauth` provider like Google's: Apple answers by
+     * `form_post` whenever the name or the mail is asked for, and its client secret is a JWT
+     * minted per call — neither of which Ktor's provider does.
+     */
+    private fun Route.loginAppleOauth() = get("/login-oauth-apple") {
+        val state = UUID.randomUUID().toString()
+        val browser = UUID.randomUUID().toString()
+        // First, so an unconfigured install answers 503 before anything is stored
+        val authorizeUrl = appleSignIn.authorizeUrl(state, appleCallbackUrl)
+        redisService.createAppleSignIn(
+            state,
+            AppleSignInData(
+                browser = browser,
+                redirect = call.request.queryParameters["redirect"]?.let(::safeRedirect),
+                locale = reportedLocale(),
+            ),
+        )
+        call.response.cookies.append(appleBrowserCookie(browser, RedisService.APPLE_SIGN_IN_TTL))
+        call.respondRedirect(authorizeUrl)
+    }
+
+    /**
+     * Where Apple posts the code back: finds the account by Apple's `sub`, or creates one.
+     *
+     * The same rules as Google's callback, on purpose — a banned or suspended account is
+     * refused, a returning one adopts the reported language if it has none, and a mail that
+     * already belongs to another account is refused with `oauth_not_setup` rather than merged.
+     * Merging would hand an existing account to whoever controls an Apple ID with that address.
+     */
+    private fun Route.callbackAppleOauth() = post("/callback-oauth-apple") {
+        val form = call.receiveParameters()
+        val pending = form["state"]?.let { redisService.takeAppleSignIn(it) }
+        val browser = call.request.cookies[APPLE_BROWSER_COOKIE]
+        call.response.cookies.append(appleBrowserCookie("", 0))
+        if (pending == null || browser == null || browser != pending.browser) {
+            throw UnauthorizedException(UnauthorizedCause.OAUTH_FAILED)
+        }
+
+        // The user closed Apple's sheet: back where they came from, signed out, no error page
+        if (form["error"] != null) {
+            call.respondRedirect(
+                if (pending.redirect == "app") "cooknco://login/callback"
+                else "${configuration.frontend.url}/login"
+            )
+            return@post
+        }
+
+        val code = form["code"] ?: throw UnauthorizedException(UnauthorizedCause.OAUTH_FAILED)
+        val identity = appleSignIn.identify(code, appleCallbackUrl)
+        val sessionId = appleOauthLogin(identity, AppleSignIn.nameFromUserField(form["user"]), pending.locale)
+
+        when (val redirect = pending.redirect) {
+            "app" -> call.respondRedirect("cooknco://login/callback?token=$sessionId")
+            null -> call.respondRedirect("${configuration.frontend.url}/home")
+            else -> call.respondRedirect(redirect)
+        }
+    }
+
+    private suspend fun RoutingContext.appleOauthLogin(identity: AppleIdentity, name: String?, reported: Locale?): String {
+        var user = userService.findEntityByAppleId(identity.sub)
+        if (user != null) {
+            if (user.isBanned) throw UnauthorizedException(UnauthorizedCause.ACCOUNT_BANNED)
+            if (user.isSuspended()) throw UnauthorizedException(UnauthorizedCause.ACCOUNT_SUSPENDED)
+            reported?.let { userService.adoptLocale(user, it) }
+        } else {
+            // Apple shares the mail on every sign-in the user agreed to share it on; one that
+            // arrives without it cannot be made into an account
+            val mail = identity.email ?: throw UnauthorizedException(UnauthorizedCause.OAUTH_FAILED)
+            if (userService.findEntityByMail(mail) != null) throw UnauthorizedException(UnauthorizedCause.OAUTH_NOT_SETUP)
+            user = userService.createUser(
+                UserDTO(username = availableUsername(name), mail = mail),
+                verified = true,
+                locale = reported,
+                appleId = identity.sub,
+            )
+            logger.info { "Account created through Sign in with Apple by ${user.username}" }
+        }
+        val sessionId = createSession(userService.describe(user))
+        call.sessions.set(UserSession(sessionId))
+        return sessionId
+    }
+
+    /** [base], or [base] with the first free `-n` after it; a random one when there is no name. */
+    private fun availableUsername(base: String?): String {
+        val baseName = base?.trim()?.takeIf { it.isNotEmpty() } ?: UUID.randomUUID().toString()
+        var name = baseName
+        var index = 1
+        while (userService.existsByUsername(name)) {
+            name = "$baseName-$index"
+            index++
+        }
+        return name
+    }
+
+    /**
+     * `app`, or a same-origin path — the rule `postLoginRedirect` applies on the login page.
+     * Anything else is dropped rather than followed, or this route is an open redirect.
+     */
+    private fun safeRedirect(value: String): String? = when {
+        value == "app" -> value
+        value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") -> value
+        else -> null
+    }
+
+    private fun appleBrowserCookie(value: String, maxAge: Long): Cookie {
+        val secure = configuration.backend.url.startsWith("https")
+        return Cookie(
+            name = APPLE_BROWSER_COOKIE,
+            value = value,
+            maxAge = maxAge.toInt(),
+            path = java.net.URI(appleCallbackUrl).path,
+            httpOnly = true,
+            secure = secure,
+            // A browser drops `SameSite=None` without `Secure`; local http dev gets `Lax`,
+            // which Apple's cross-site POST will not carry — Apple refuses http return URLs anyway
+            extensions = mapOf("SameSite" to if (secure) "None" else "Lax"),
+        )
     }
 
     private fun Route.logout() = post("/logout") {

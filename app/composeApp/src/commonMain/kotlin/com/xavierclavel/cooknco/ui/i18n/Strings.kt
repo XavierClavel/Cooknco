@@ -55,6 +55,7 @@ interface Strings {
     val logInCaps: String
     val logOut: String
     val continueWithGoogle: String
+    val continueWithApple: String
     val or: String
     val emailAddress: String
     val password: String

@@ -23,6 +23,16 @@
           <img src="@/assets/google.webp" alt="icon" style="width: 24px; height: 24px;" />
         </v-btn>
 
+        <v-btn
+          aria-label="Sign in with Apple"
+          base-color="black"
+          class="mt-3 ml-2"
+          width="150px"
+          @click="loginOauthApple"
+        >
+          <v-icon color="white" size="24">mdi-apple</v-icon>
+        </v-btn>
+
         <v-container class="my-4">
           <v-row wrap no-gutters>
             <v-col cols="5" class="text-center">
@@ -98,7 +108,7 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
 import { useRoute } from 'vue-router';
-import {login, loginOauthGoogle, toResetPassword, toSignup} from '@/scripts/common'
+import {login, loginOauthGoogle, loginOauthApple, toResetPassword, toSignup} from '@/scripts/common'
 import {useI18n} from "vue-i18n";
 import {requiredRule} from "@/scripts/rules";
 

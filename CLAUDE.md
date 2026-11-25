@@ -779,6 +779,34 @@ Signing in is delegated to the app's login page (`?redirect=` in `frontend/src/s
 same-origin paths only), so the flow keeps Google sign-in and there is still one page in the
 product that asks for a password.
 
+## Sign in with Apple is one web flow, for every client
+
+`GET /auth/login-oauth-apple` sends the browser to Apple and Apple posts back to
+`POST /auth/callback-oauth-apple` (`AuthController`, `services/AppleSignIn.kt`). The site and
+both apps take that same flow through the browser, with the `?redirect=app` / `?locale=` that
+Google's takes, so there is one callback and one account lookup. A native iOS sign-in would
+hand the backend a token *a client* produced, which needs its signature checked against
+Apple's keys — `AppleSignIn.claimsOf` deliberately does not, because it only reads tokens off
+our own call to Apple's token endpoint. Do not reuse it for one.
+
+- **Hand-written, not a Ktor `oauth` provider.** Apple answers by `form_post` whenever the name
+  or mail is asked for, and its client secret is an ES256 JWT this backend signs
+  (`SHA256withECDSAinP1363Format` — DER is what Apple refuses as `invalid_client`).
+- **The state is bound to the browser.** It lives in Redis (spent once, ten minutes) next to a
+  random value also set as the `apple_signin` cookie, `SameSite=None` because the callback is
+  a cross-site POST. Without the cookie a state is a bearer token, and a stranger's code and
+  state posted from your browser signs you into their account. `AppleSignInTest` holds both.
+- **The account is found by `users.apple_id`** (Apple's `sub`, unique), never by mail — Apple
+  may stop relaying it, and sends the name only on the first authorization. A mail that already
+  belongs to an account is refused with `oauth_not_setup`, as Google's is, rather than merged.
+- **`appleId` is not a field of `UserDTO`**: that DTO is what `/auth/signup` reads off the
+  wire, so a field there would let a client claim an Apple account. It is a `createUser`
+  parameter instead.
+
+Off until `oauth.apple` is configured — the routes answer 503 meanwhile, and the Services ID,
+key and return URL are in [`docs/pending-setup.md`](docs/pending-setup.md) section 6. Tests run
+against `FakeAppleSignIn`.
+
 ## Scanning a recipe prefills the editor, and never overwrites it
 
 The app can read a printed recipe off a page and fill the new-recipe form in with it

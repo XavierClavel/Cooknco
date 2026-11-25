@@ -14,6 +14,7 @@ import {convertToPreferred, unitSystem} from "@/scripts/unitSystem";
 export {
   login,
   loginOauthGoogle,
+  loginOauthApple,
   logout,
   signup,
   verifyEmail,
@@ -265,19 +266,29 @@ async function login(user) {
   return result
 }
 
-async function loginOauthGoogle() {
-  console.log("login oauth")
-  // Carried through to the backend, which sends the browser back here after Google answers
-  // (AuthController keeps it against the OAuth state). Without it a Google sign-in would land
-  // on the home page and lose the consent request that sent the user to log in.
+/**
+ * Leaves for a provider's sign-in page, through the backend, which sends the browser back here.
+ *
+ * Google and Apple take the same two parameters, for the same reasons. `redirect` is carried
+ * through so a sign-in lands back on the consent request that sent the user to log in rather
+ * than on the home page. `locale` is the same report as a password sign-in, and has to go out
+ * now rather than on the way back: the provider builds the callback itself and carries nothing
+ * of ours, so the backend keeps both against the OAuth state.
+ */
+function loginOauth (provider: 'google' | 'apple') {
   const redirect = postLoginRedirect()
-  const url = `${import.meta.env.VITE_API_URL}/auth/login-oauth-google`
-  // Same report as a password sign-in. It has to go out now rather than on the way back:
-  // Google builds the callback itself and carries nothing of ours, so the backend keeps
-  // this against the OAuth state alongside the redirect
-  const params = new URLSearchParams({locale: getLocale()})
-  if (redirect) params.set("redirect", redirect)
+  const url = `${import.meta.env.VITE_API_URL}/auth/login-oauth-${provider}`
+  const params = new URLSearchParams({ locale: getLocale() })
+  if (redirect) params.set('redirect', redirect)
   window.location.href = `${url}?${params.toString()}`
+}
+
+async function loginOauthGoogle () {
+  loginOauth('google')
+}
+
+async function loginOauthApple () {
+  loginOauth('apple')
 }
 
 async function signup(user) {

@@ -218,12 +218,46 @@ data class Configuration(
     )
 
     data class OAuth(
-        val google: OAuthProvider
+        val google: OAuthProvider,
+
+        /**
+         * Defaulted whole, and off by default, for the reason [Configuration.pdf] is: the
+         * production `application.yaml` lives on the cluster, so a required section would crash
+         * the first rollout that shipped it. Unset, the Apple routes answer 503 and nothing else
+         * changes. See [Apple].
+         */
+        val apple: Apple = Apple(),
     ) {
         data class OAuthProvider(
             val clientId: String,
             val clientSecret: String,
         )
+
+        /**
+         * Sign in with Apple, as the web flow every client goes through
+         * ([com.xavierclavel.services.AppleSignInClient]).
+         *
+         * Apple has no static client secret: the secret is a JWT this backend signs with the
+         * private key Apple issued, naming the team, the key and the client. So the four values
+         * below are what Apple's developer console hands out, and none of them is a password
+         * on its own — the `.p8` key is the one secret. `docs/pending-setup.md` says where each
+         * is found.
+         *
+         * @property clientId the **Services ID** (e.g. `eu.cooknco.signin`), not the app's bundle
+         *   id: a web flow is a Services ID's, and its return URL must be registered on it.
+         * @property teamId the ten-character Apple team id.
+         * @property keyId the id of the Sign in with Apple key.
+         * @property privateKey the `.p8` file's contents, PEM armour included.
+         */
+        data class Apple(
+            val clientId: String = "",
+            val teamId: String = "",
+            val keyId: String = "",
+            val privateKey: String = "",
+        ) {
+            val isConfigured: Boolean
+                get() = clientId.isNotBlank() && teamId.isNotBlank() && keyId.isNotBlank() && privateKey.isNotBlank()
+        }
     }
 
     data class Frontend(

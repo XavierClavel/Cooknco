@@ -31,6 +31,9 @@ import com.xavierclavel.services.OpenAiCompatiblePhotoReader
 import com.xavierclavel.services.RecipeScanService
 import com.xavierclavel.services.AiUsageService
 import com.xavierclavel.services.RecipePhotoReader
+import com.xavierclavel.services.AppleSignIn
+import com.xavierclavel.services.AppleSignInClient
+import com.xavierclavel.services.UnconfiguredAppleSignIn
 import com.xavierclavel.services.UnconfiguredPhotoReader
 import com.xavierclavel.services.OAuthService
 import com.xavierclavel.services.PdfRenderer
@@ -140,6 +143,21 @@ val appModules = module {
                 jsonMode = ai.jsonMode,
                 timeoutSeconds = ai.timeoutSeconds,
             )
+        }
+    }
+    /**
+     * Sign in with Apple, when this install has a key for it. Like the photo reader, an
+     * install without one keeps the routes and answers 503 — and so does one whose key will
+     * not parse, which must not take the whole backend down. See `Configuration.OAuth.Apple`.
+     */
+    single<AppleSignIn> {
+        val apple = config.oauth.apple
+        if (!apple.isConfigured) {
+            appLogger.info { "Sign in with Apple is not configured: its routes will answer 503" }
+            UnconfiguredAppleSignIn()
+        } else runCatching { AppleSignInClient(apple) }.getOrElse {
+            appLogger.error(it) { "The Sign in with Apple key could not be read; its routes will answer 503" }
+            UnconfiguredAppleSignIn()
         }
     }
     single { RedisService(getProperty("redis.url", "redis://:${System.getenv("REDIS_PASSWORD")}@cooknco-redis:6379")) }

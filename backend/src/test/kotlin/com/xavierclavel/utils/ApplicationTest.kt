@@ -30,6 +30,7 @@ import com.xavierclavel.services.PushSender
 import com.xavierclavel.services.PdfTemplateService
 import com.xavierclavel.services.RecipeScanService
 import com.xavierclavel.services.AiUsageService
+import com.xavierclavel.services.AppleSignIn
 import com.xavierclavel.services.RecipePhotoReader
 import com.xavierclavel.services.RecipeIngredientService
 import com.xavierclavel.services.RecipeNotesService
@@ -55,6 +56,7 @@ import kotlinx.serialization.json.Json
 import main.com.xavierclavel.containers.GotenbergTestContainer
 import main.com.xavierclavel.containers.RedisTestContainer
 import main.com.xavierclavel.utils.FakeAppShellSource
+import main.com.xavierclavel.utils.FakeAppleSignIn
 import main.com.xavierclavel.utils.FakePushSender
 import main.com.xavierclavel.utils.FakeRecipePhotoReader
 import main.com.xavierclavel.utils.login
@@ -88,6 +90,8 @@ abstract class ApplicationTest: KoinTest {
     val fakePushSender by lazy { pushSender as FakePushSender }
     val recipePhotoReader: RecipePhotoReader by inject()
     val fakePhotoReader by lazy { recipePhotoReader as FakeRecipePhotoReader }
+    val appleSignIn: AppleSignIn by inject()
+    val fakeAppleSignIn by lazy { appleSignIn as FakeAppleSignIn }
 
     companion object {
         const val USER1 = "user1"
@@ -142,6 +146,8 @@ abstract class ApplicationTest: KoinTest {
                 single { AppVersionService() }
                 single { NotificationService() }
                 single { OAuthService() }
+                // Apple is not reachable from a test: see FakeAppleSignIn.
+                single<AppleSignIn> { FakeAppleSignIn() }
                 single<AppShellSource> { FakeAppShellSource() }
                 // Firebase is not reachable from a test, and would not be worth reaching:
                 // what matters is the payload, which this records. See FakePushSender.
@@ -280,6 +286,7 @@ abstract class ApplicationTest: KoinTest {
             fakeAppShellSource.reset()
             fakePushSender.reset()
             fakePhotoReader.reset()
+            fakeAppleSignIn.reset()
             val wrapper = TestBuilderWrapper(this)
             wrapper.block() // Use the wrapper in the block
         }

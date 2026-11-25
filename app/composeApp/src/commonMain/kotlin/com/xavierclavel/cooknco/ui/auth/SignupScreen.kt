@@ -47,6 +47,7 @@ fun SignupScreen(
     onSignup: () -> Unit,
     onNavigateToLogin: () -> Unit,
     onSignupWithGoogle: () -> Unit,
+    onSignupWithApple: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = strings()
@@ -74,6 +75,9 @@ fun SignupScreen(
                 )
 
                 GoogleButton(text = s.continueWithGoogle, onClick = onSignupWithGoogle)
+
+
+                AppleButton(text = s.continueWithApple, onClick = onSignupWithApple)
 
                 OrDivider()
 
@@ -162,6 +166,7 @@ fun SignupScreenPreview() {
             onSignup = {},
             onNavigateToLogin = {},
             onSignupWithGoogle = {},
+            onSignupWithApple = {},
         )
     }
 }
@@ -187,6 +192,7 @@ fun SignupScreenErrorPreview() {
             onSignup = {},
             onNavigateToLogin = {},
             onSignupWithGoogle = {},
+            onSignupWithApple = {},
         )
     }
 }
@@ -212,6 +218,7 @@ fun SignupScreenLoadingPreview() {
             onSignup = {},
             onNavigateToLogin = {},
             onSignupWithGoogle = {},
+            onSignupWithApple = {},
         )
     }
 }

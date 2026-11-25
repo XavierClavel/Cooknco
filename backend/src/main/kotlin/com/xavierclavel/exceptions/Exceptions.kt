@@ -92,6 +92,9 @@ enum class ServiceUnavailableCause(val key: String) {
     // The month's spend has reached the budget set in the backoffice. A 503 rather than a
     // 429: the user did nothing wrong. It covers every AI feature, the budget being shared.
     AI_BUDGET_EXHAUSTED("ai_budget_exhausted"),
+
+    // Sign in with Apple on an install with no key configured: see `Configuration.OAuth.Apple`.
+    APPLE_SIGN_IN_NOT_CONFIGURED("apple_sign_in_not_configured"),
 }
 
 enum class BadRequestCause (val key: String) {
