@@ -12,5 +12,5 @@ data class NutritionalInfo(
     val sugars: Float = 0f,
     val fibers: Float = 0f,
     val proteins: Float = 0f,
-    val sodium: Float = 0f,
+    val salt: Float = 0f,
 )

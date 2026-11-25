@@ -102,6 +102,19 @@ tasks.register<JavaExec>("generateDbMigration") {
     workingDir = rootProject.projectDir
 }
 
+/**
+ * Rewrites the bundled Ciqual table from the XML Anses publishes, for a new edition:
+ * `./gradlew :backend:extractCiqual --args="<directory with the XML files> <edition>"`.
+ * See `ExtractCiqual.kt`.
+ */
+tasks.register<JavaExec>("extractCiqual") {
+    group = "ciqual"
+    description = "Write backend/src/main/resources/ciqual/ciqual-<edition>.tsv from the published Ciqual XML"
+    mainClass.set("main.ExtractCiqualKt")
+    classpath = sourceSets["test"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 val generatedVersionDir = "${buildDir}/generated-version"
 
 sourceSets {

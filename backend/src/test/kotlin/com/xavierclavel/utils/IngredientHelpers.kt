@@ -7,9 +7,11 @@ import shared.dto.SearchResult
 import shared.enums.IngredientType
 import shared.enums.Locale
 import shared.enums.Sort
+import shared.infodto.CiqualFoodInfo
 import shared.infodto.CustomIngredientUsage
 import shared.infodto.IngredientInfo
 import shared.utils.URL.INGREDIENT_URL
+import shared.utils.URL.ADMIN_URL
 import io.ktor.client.HttpClient
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -22,6 +24,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -132,5 +135,26 @@ suspend fun HttpClient.assertIngredientExists(id: Long) {
 suspend fun HttpClient.assertIngredientDoesNotExist(id: Long) {
     this.get("$INGREDIENT_URL/$id").apply {
         assertEquals(HttpStatusCode.NotFound, status)
+    }
+}
+suspend fun HttpClient.updateIngredientRaw(id: Long, ingredient: IngredientDTO) =
+    this.put("$INGREDIENT_URL/$id") {
+        contentType(ContentType.Application.Json)
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(ingredient)
+    }
+
+suspend fun HttpClient.searchCiqualRaw(query: String, limit: Int? = null) =
+    this.get("$ADMIN_URL/ciqual") {
+        url {
+            parameters.append("query", query)
+            if (limit != null) parameters.append("limit", limit.toString())
+        }
+    }
+
+suspend fun HttpClient.searchCiqual(query: String, limit: Int? = null): List<CiqualFoodInfo> {
+    this.searchCiqualRaw(query, limit).apply {
+        assertEquals(HttpStatusCode.OK, status)
+        return Json.decodeFromString(ListSerializer(CiqualFoodInfo.serializer()), bodyAsText())
     }
 }
