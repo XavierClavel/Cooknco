@@ -22,12 +22,14 @@ import com.xavierclavel.utils.DbTransaction.updateAndGet
 import com.xavierclavel.utils.sqlStringLiteral
 import shared.enums.AmountUnit
 import shared.enums.Locale
+import shared.enums.PriceLinkStatus
 import java.text.Normalizer
 import shared.enums.Sort
 import shared.infodto.IngredientInfo
 
 class IngredientService: KoinComponent {
     val ciqualService: CiqualService by inject()
+    val openPricesService: OpenPricesService by inject()
 
     fun countAll() =
         QIngredient().findCount()
@@ -83,7 +85,8 @@ class IngredientService: KoinComponent {
             val ciqual = ingredient.ciqualCode?.let {
                 ciqualService.sourceOf(it, ingredient.ciqualEdition ?: CiqualService.EDITION)
             }
-            ingredient.toInfo(names[ingredient.id].orEmpty(), ciqual)
+            val price = ingredient.openPricesCategory?.let { openPricesService.find(it) }
+            ingredient.toInfo(names[ingredient.id].orEmpty(), ciqual, price)
         }
     }
 
@@ -94,7 +97,7 @@ class IngredientService: KoinComponent {
         QIngredient().id.eq(ingredientId).findOne()?.let { describe(it) }
 
     fun createIngredient(ingredientDTO: IngredientDTO): IngredientInfo {
-        validate(ingredientDTO)
+        validate(ingredientDTO, currentCategory = null)
         val ciqualFood = ciqualFoodOf(ingredientDTO)
         val ingredient = Ingredient()
             .mergeDTO(ingredientDTO)
@@ -109,9 +112,9 @@ class IngredientService: KoinComponent {
 
 
     fun updateIngredient(id:Long, ingredientDTO: IngredientDTO): IngredientInfo {
-        validate(ingredientDTO)
-        val ciqualFood = ciqualFoodOf(ingredientDTO)
         val ingredient = findEntityById(id) ?: throw NotFoundException(NotFoundCause.INGREDIENT_NOT_FOUND)
+        validate(ingredientDTO, currentCategory = ingredient.openPricesCategory)
+        val ciqualFood = ciqualFoodOf(ingredientDTO)
 
         ingredientDTO.name.forEach {
             val localizedIngredientName = QLocalizedIngredientName()
@@ -141,8 +144,11 @@ class IngredientService: KoinComponent {
     /**
      * A conversion factor doubles as the "this ingredient can be measured this way" flag, so a
      * non-positive one would claim a capability while making the conversion nonsensical.
+     *
+     * @param currentCategory the Open Prices category the ingredient is linked to before this
+     *   save; null for a new one.
      */
-    private fun validate(ingredientDTO: IngredientDTO) {
+    private fun validate(ingredientDTO: IngredientDTO, currentCategory: String?) {
         val factors = listOf(ingredientDTO.gramsPerUnit, ingredientDTO.gramsPerMilliliter)
         if (factors.any { it != null && it <= 0f }) {
             throw BadRequestException(BadRequestCause.INVALID_CONVERSION_FACTOR)
@@ -151,6 +157,20 @@ class IngredientService: KoinComponent {
         val defaultUnit = ingredientDTO.defaultUnit
         if (defaultUnit != null && defaultUnit.type !in ingredientDTO.allowedTypes()) {
             throw BadRequestException(BadRequestCause.UNIT_NOT_ALLOWED_FOR_INGREDIENT)
+        }
+
+        val priceStatus = openPricesService.statusOf(
+            ingredientDTO.openPricesCategory, ingredientDTO.gramsPerUnit, ingredientDTO.gramsPerMilliliter,
+        )
+        // A link is checked against the table when it is made. One a refresh has since dropped
+        // is saved as it stands, so that editing the ingredient does not cost it the link a
+        // later refresh could bring back
+        if (priceStatus == PriceLinkStatus.NOT_IN_TABLE && ingredientDTO.openPricesCategory != currentCategory) {
+            throw BadRequestException(BadRequestCause.UNKNOWN_OPEN_PRICES_CATEGORY)
+        }
+        // Linked without the conversion, it would price no recipe line and say nothing about why
+        if (priceStatus == PriceLinkStatus.NOT_CONVERTIBLE) {
+            throw BadRequestException(BadRequestCause.OPEN_PRICE_NOT_MEASURABLE)
         }
     }
 

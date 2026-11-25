@@ -7,6 +7,7 @@ import shared.dto.RecipeDTO
 import shared.enums.DishClass
 import shared.enums.Locale
 import shared.infodto.AdminRecipeInfo
+import shared.infodto.RecipeCostInfo
 import shared.infodto.RecipeInfo
 import shared.overviewdto.RecipeOverview
 import jakarta.persistence.CascadeType
@@ -139,8 +140,9 @@ class Recipe (
      *
      * @param catalogueNames what each catalogue ingredient is called in [locale], by ingredient id,
      *   for the same reason — see [com.xavierclavel.models.jointables.RecipeIngredient.toInfo].
+     * @param cost estimated by [com.xavierclavel.services.OpenPricesService.estimate].
      */
-    fun toInfo(locale: Locale, likesCount: Int, catalogueNames: Map<Long, String>) = RecipeInfo(
+    fun toInfo(locale: Locale, likesCount: Int, catalogueNames: Map<Long, String>, cost: RecipeCostInfo?) = RecipeInfo(
         id = this.id,
         version = this.imageVersion,
         title = title,
@@ -154,6 +156,7 @@ class Recipe (
         creationDate = this.creationDate.toEpochSecond(ZoneOffset.UTC),
         editionDate = this.modificationDate.toEpochSecond(ZoneOffset.UTC),
         likesCount = likesCount,
+        cost = cost,
         tips = this.tips,
 
         yield = this.yield,

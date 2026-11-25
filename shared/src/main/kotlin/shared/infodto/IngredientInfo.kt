@@ -27,6 +27,11 @@ data class IngredientInfo(
     /** Where the nutrition above was copied from; null when it was typed in by hand. */
     val ciqual: CiqualSource? = null,
 
+    /** The Open Prices category the ingredient is linked to, kept even when the bundled table no longer lists it. */
+    val openPricesCategory: String? = null,
+    /** What [openPricesCategory] costs; null when unlinked, or when the bundled table no longer lists it. */
+    val price: OpenPriceInfo? = null,
+
     val gramsPerUnit: Float? = null,
     val gramsPerMilliliter: Float? = null,
     val measurableByWeight: Boolean = true,

@@ -11,6 +11,18 @@
           <option :value="null">{{ $t('admin_all_types') }}</option>
           <option v-for="ty in INGREDIENT_TYPES" :key="ty" :value="ty">{{ ty }}</option>
         </select>
+        <label class="check">
+          <input v-model="filters.mostUsed" type="checkbox" @change="reset" />
+          {{ $t('admin_most_used_first') }}
+        </label>
+        <label class="check">
+          <input v-model="filters.missingCiqual" type="checkbox" @change="reset" />
+          {{ $t('admin_missing_ciqual') }}
+        </label>
+        <label class="check">
+          <input v-model="filters.missingPrice" type="checkbox" @change="reset" />
+          {{ $t('admin_missing_price') }}
+        </label>
         <span class="spacer"></span>
         <button class="btn primary" @click="openCreate">
           <ui-icon name="plus" :size="15" />{{ $t('admin_new_ingredient') }}
@@ -28,7 +40,8 @@
               <th>{{ $t('admin_name_fr') }}</th>
               <th>{{ $t('type') }}</th>
               <th class="right">{{ $t('calories') }}</th>
-              <th>{{ $t('admin_nutrition_source') }}</th>
+              <th>{{ $t('admin_sources') }}</th>
+              <th class="right">{{ $t('admin_price') }}</th>
               <th>{{ $t('admin_measurable_as') }}</th>
               <th>{{ $t('defaultUnit') }}</th>
               <th class="right">{{ $t('admin_used_in_recipes') }}</th>
@@ -42,9 +55,19 @@
               <td><span class="badge">{{ i.type }}</span></td>
               <td class="right tnum">{{ i.calories ?? '—' }}</td>
               <td>
-                <span v-if="i.ciqualCode !== null && i.ciqualCode !== undefined" class="badge info"
-                      :title="`#${i.ciqualCode}`">{{ $t('admin_ciqual') }}</span>
-                <span v-else class="subtle small">{{ $t('admin_nutrition_typed') }}</span>
+                <span class="row-wrap" style="gap:4px">
+                  <span :class="['badge', i.ciqualCode != null ? 'ok' : 'warn']" :title="ciqualTitle(i)"
+                        :aria-label="ciqualTitle(i)">
+                    <ui-icon name="leaf" :size="12" />
+                  </span>
+                  <span :class="['badge', PRICE_BADGE[i.priceStatus]]" :title="priceTitle(i)" :aria-label="priceTitle(i)">
+                    <ui-icon name="euro" :size="12" />
+                  </span>
+                </span>
+              </td>
+              <!-- A price the ingredient cannot convert to is the category's, not this ingredient's -->
+              <td class="right tnum small" :class="{unusable: i.priceStatus !== 'PRICED'}" :title="i.price?.category">
+                {{ i.price ? formatPrice(i.price) : '—' }}
               </td>
               <td>
                 <!-- NONE is always allowed and says nothing, so only the real families show -->
@@ -226,6 +249,41 @@
         </div>
 
         <div class="col" style="gap:8px">
+          <span class="panel-title">{{ $t('admin_price_title') }}</span>
+          <p class="small muted">{{ $t('admin_price_hint') }}</p>
+          <div v-if="form.openPricesCategory" :class="['alert', form.price ? 'info' : 'warn']">
+            <span v-if="form.price">
+              {{ form.price.name?.FR || form.price.name?.EN }} — {{ formatPrice(form.price) }}
+              <span class="subtle small">{{ $t('admin_price_count', {count: form.price.prices}) }}</span>
+              <span class="mono small">{{ form.price.category }}</span>
+            </span>
+            <!-- Kept on save: a later refresh of the table may list it again -->
+            <span v-else>{{ $t('admin_price_dropped', {category: form.openPricesCategory}) }}</span>
+            <span class="spacer"></span>
+            <button class="btn sm" @click="unprice">
+              <ui-icon name="undo" :size="14" />{{ $t('admin_ciqual_unlink') }}
+            </button>
+          </div>
+          <template v-else>
+            <div class="search">
+              <ui-icon name="search" :size="15" />
+              <input v-model="priceQuery" class="input" :placeholder="$t('admin_price_search')"
+                     @input="debouncedPrices" />
+            </div>
+            <ul v-if="priceResults.length" class="candidates">
+              <li v-for="p in priceResults" :key="p.category">
+                <button class="btn sm" @click="pickPrice(p)">
+                  <ui-icon name="arrowRight" :size="14" />{{ $t('admin_ciqual_use') }}
+                </button>
+                <span>{{ p.name?.FR || p.name?.EN }}</span>
+                <span class="subtle small">{{ formatPrice(p) }} · {{ $t('admin_price_count', {count: p.prices}) }}</span>
+              </li>
+            </ul>
+            <p v-else-if="priceSearched" class="small muted">{{ $t('admin_price_no_result') }}</p>
+          </template>
+        </div>
+
+        <div class="col" style="gap:8px">
           <span class="panel-title">{{ $t('admin_nutrition_per_100g') }}</span>
           <div class="grid3">
             <label v-for="f in NUTRITION_FIELDS" :key="f.key" class="field">
@@ -264,10 +322,10 @@ import {computed, onMounted, reactive, ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {
   absorbCustomIngredient, createIngredient, deleteIngredient, errorKey, getCustomIngredientUsage,
-  getIngredient, listIngredients, listUnits, searchCiqual, updateIngredient,
+  getIngredient, listIngredients, listUnits, searchCiqual, searchOpenPrices, updateIngredient,
 } from '../lib/api'
 import {
-  allowedTypesOf, emptyForm, FALLBACK_UNITS, formOf, INGREDIENT_TYPES, linkCiqual, NUTRITION_FIELDS,
+  allowedTypesOf, emptyForm, FALLBACK_UNITS, formatPrice, formOf, INGREDIENT_TYPES, linkCiqual, NUTRITION_FIELDS,
   payloadOf, typeDefaults, unitLabel, unlinkCiqual, type IngredientForm,
 } from '../lib/ingredients'
 import {notifyError, notifyInfo, notifyOk} from '../lib/toast'
@@ -283,7 +341,7 @@ const loading = ref(false)
 const page = ref(1)
 const size = ref(25)
 const total = ref(0)
-const filters = reactive<any>({query: '', type: null})
+const filters = reactive<any>({query: '', type: null, mostUsed: false, missingCiqual: false, missingPrice: false})
 
 const usage = ref<any[]>([])
 const usageLoading = ref(false)
@@ -305,6 +363,9 @@ const ciqualQuery = ref('')
 const ciqualResults = ref<any[]>([])
 /** Set once an answer for the query typed has arrived, so that an empty list can say so. */
 const ciqualSearched = ref(false)
+const priceQuery = ref('')
+const priceResults = ref<any[]>([])
+const priceSearched = ref(false)
 
 const selected = ref<any>(null)
 const dialog = ref(false)
@@ -315,6 +376,16 @@ const allowedUnits = computed(() => {
   // NONE is dropped: the empty option above the list already means "no default unit"
   return units.value.filter(u => u.type !== 'NONE' && allowed.includes(u.type))
 })
+
+const ciqualTitle = (row: any) =>
+  row.ciqualCode != null ? t('admin_ciqual_linked', {code: row.ciqualCode}) : t('admin_ciqual_missing')
+
+/** A link that prices nothing because of a refresh or a conversion is a fault, not a gap. */
+const PRICE_BADGE: Record<string, string> = {PRICED: 'ok', NONE: 'warn', NOT_IN_TABLE: 'danger', NOT_CONVERTIBLE: 'danger'}
+
+const priceTitle = (row: any) => row.priceStatus === 'PRICED'
+  ? `${row.price.name?.FR || row.price.name?.EN} — ${formatPrice(row.price)}`
+  : t(`admin_price_status_${row.priceStatus}`, {category: row.openPricesCategory})
 
 /** The families that say something, i.e. everything but the always-allowed NONE. */
 const measurable = (row: any) => (row.allowedTypes ?? []).filter((ty: string) => ty !== 'NONE')
@@ -359,6 +430,10 @@ function openForm(title: string, next: IngredientForm) {
   ciqualResults.value = []
   ciqualQuery.value = next.ciqualCode === null ? (next.name.FR || next.name.EN) : ''
   loadCiqual()
+  // Likewise an unpriced one is offered the categories its name finds
+  priceResults.value = []
+  priceQuery.value = next.openPricesCategory === null ? (next.name.FR || next.name.EN) : ''
+  loadPrices()
 }
 
 const openCreate = () => openForm(t('admin_new_ingredient'), emptyForm())
@@ -417,6 +492,34 @@ const debouncedCiqual = () => { clearTimeout(ciqualTimer); ciqualTimer = setTime
 function pickCiqual(food: any) {
   linkCiqual(form.value, food)
   ciqualResults.value = []
+}
+
+async function loadPrices() {
+  const query = priceQuery.value.trim()
+  priceSearched.value = false
+  if (!query) { priceResults.value = []; return }
+  try {
+    const {data} = await searchOpenPrices(query, 8)
+    if (query !== priceQuery.value.trim()) return
+    priceResults.value = data
+    priceSearched.value = true
+  } catch (e) { fail(e) }
+}
+
+let priceTimer: any
+const debouncedPrices = () => { clearTimeout(priceTimer); priceTimer = setTimeout(loadPrices, 350) }
+
+function pickPrice(price: any) {
+  form.value.openPricesCategory = price.category
+  form.value.price = price
+  priceResults.value = []
+}
+
+function unprice() {
+  form.value.openPricesCategory = null
+  form.value.price = null
+  priceQuery.value = form.value.name.FR || form.value.name.EN
+  loadPrices()
 }
 
 /** The figures stay as the link left them, to be edited; the foods the name finds come back. */
@@ -492,6 +595,7 @@ onMounted(async () => {
 .filters { gap: 8px; flex-wrap: wrap; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
+.unusable { text-decoration: line-through; opacity: .55; }
 .candidates { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .candidates li { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 640px) {

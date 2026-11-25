@@ -29,6 +29,9 @@ data class RecipeInfo (
 
     val likesCount: Int,
 
+    /** What the recipe costs to make, from Open Prices; null when none of its lines is priced. */
+    val cost: RecipeCostInfo? = null,
+
     /** Set when a moderator has hidden the recipe; only its owner and admins ever see it. */
     val isHidden: Boolean = false,
 

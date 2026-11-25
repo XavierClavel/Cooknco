@@ -2,6 +2,7 @@ package com.xavierclavel.controllers
 
 import com.xavierclavel.services.AdminService
 import com.xavierclavel.utils.Controller
+import com.xavierclavel.utils.getBooleanQueryParam
 import com.xavierclavel.utils.getEnumQueryParam
 import com.xavierclavel.utils.getPaging
 import com.xavierclavel.utils.getStringQueryParam
@@ -31,6 +32,9 @@ object AdminIngredientController: Controller("ingredients") {
         val (count, ingredients) = adminService.searchIngredients(
             query = getStringQueryParam("query"),
             type = getEnumQueryParam<IngredientType>("type"),
+            missingCiqual = getBooleanQueryParam("missingCiqual") == true,
+            missingPrice = getBooleanQueryParam("missingPrice") == true,
+            mostUsed = getBooleanQueryParam("mostUsed") == true,
             paging = paging,
         )
         val result = SearchResult(count, paging.pageIndex(), paging.pageSize(), ingredients)

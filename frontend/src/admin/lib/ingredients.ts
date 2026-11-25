@@ -43,6 +43,9 @@ const UNITS = [
 
 export const unitLabel = (unit: string) => UNITS.find(u => u.name === unit)?.label ?? unit
 
+/** An Open Prices median as the backoffice reads it: "2.22 €/kg". */
+export const formatPrice = (price: {price: number; per: string}) => `${price.price.toFixed(2)} €/${unitLabel(price.per)}`
+
 /**
  * Reads an ingredient row's quantity, scaling g to kg and mL to L for display only.
  *
@@ -76,6 +79,10 @@ export type IngredientForm = Record<string, any> & {
   ciqualName: Record<string, string> | null
   /** Known for a saved link only: a food picked in the form is read in whichever edition the server carries. */
   ciqualEdition: number | null
+  /** The Open Prices category the ingredient is linked to, kept even when the server's table no longer lists it. */
+  openPricesCategory: string | null
+  /** What that category costs; null when unlinked, or when the table no longer lists it. */
+  price: Record<string, any> | null
 }
 
 /** A cleared input means "unknown", which is what a null conversion says on the wire. */
@@ -103,6 +110,8 @@ export function emptyForm(): IngredientForm {
     ciqualCode: null,
     ciqualName: null,
     ciqualEdition: null,
+    openPricesCategory: null,
+    price: null,
   }
   // Unknown until somebody says otherwise: a 0 would be printed as "contains none"
   NUTRITION_FIELDS.forEach(f => { form[f.key] = null })
@@ -122,6 +131,8 @@ export function formOf(ingredient: Record<string, any>): IngredientForm {
   form.ciqualCode = ingredient.ciqual?.code ?? null
   form.ciqualName = ingredient.ciqual?.name ?? null
   form.ciqualEdition = ingredient.ciqual?.edition ?? null
+  form.openPricesCategory = ingredient.openPricesCategory ?? null
+  form.price = ingredient.price ?? null
   NUTRITION_FIELDS.forEach(f => { form[f.key] = ingredient[f.key] ?? null })
   return form
 }
@@ -153,6 +164,7 @@ export function payloadOf(form: IngredientForm): Record<string, unknown> {
     measurableByWeight: form.measurableByWeight,
     defaultUnit: form.defaultUnit || null,
     ciqualCode: form.ciqualCode,
+    openPricesCategory: form.openPricesCategory,
   }
   NUTRITION_FIELDS.forEach(f => { body[f.key] = numberOrNull(form[f.key]) })
   return body

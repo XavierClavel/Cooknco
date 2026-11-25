@@ -99,6 +99,11 @@ object EnStrings : Strings {
     override fun minutes(value: Int) = "$value min"
     override fun degrees(value: Int) = "$value °C"
     override val serves = "Serves"
+    override val costCaps = "COST"
+    override val perPortionCaps = "PER PORTION"
+    override fun approxEuros(value: Float) = "≈ €${cents(value)}"
+    override val costSource = "Estimated from the median prices recorded in France by Open Prices (Open Food Facts, ODbL)."
+    override fun costPartial(priced: Int, measured: Int) = "$priced of $measured ingredients priced."
 
     override fun fullDate(date: LocalDate) = "${weekday(date.dayOfWeek)}, ${date.day} ${monthName(date.month)}"
     override val whatsCooking = "What's cooking?"

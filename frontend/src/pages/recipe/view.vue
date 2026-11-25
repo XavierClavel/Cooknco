@@ -149,7 +149,10 @@
         <picto-info :value="`${recipe.preparationTime} min`" icon="mdi-chef-hat" v-if="recipe.preparationTime"></picto-info>
         <picto-info :value="`${recipe.cookingTime} min`" icon="mdi-stove" v-if="recipe.cookingTime"></picto-info>
         <picto-info :value="`${recipe.cookingTemperature} °C`" icon="mdi-thermometer" v-if="recipe.cookingTemperature"></picto-info>
+        <picto-info :value="costLabel" icon="mdi-currency-eur" v-if="recipe.cost"></picto-info>
       </span>
+    <!-- Open Prices is under the ODbL, which asks a page showing a figure derived from it to say so -->
+    <p v-if="recipe.cost" class="text-caption text-medium-emphasis text-center px-3">{{ costNote }}</p>
 
     <v-number-input
       v-model="selectedYield"
@@ -379,10 +382,26 @@ const snackbarMessage = ref<string>("")
 
 const userCookbooks = ref([])
 const authStore = useAuthStore()
-const {t} = useI18n()
+const {t, locale} = useI18n()
 const selectedYield = ref(null)
 
 const coefficient = computed(() =>  selectedYield.value / recipe.value.yield)
+
+const euros = (value: number) => new Intl.NumberFormat(locale.value, {style: 'currency', currency: 'EUR'}).format(value)
+const costLabel = computed(() => {
+  const cost = recipe.value.cost
+  return cost.perPortion != null
+    ? t('cost_per_portion', {price: euros(cost.perPortion)})
+    : t('cost_total', {price: euros(cost.total)})
+})
+// An estimate that left ingredients out says how many, or it reads as the price of the whole dish
+const costNote = computed(() => {
+  const cost = recipe.value.cost
+  const partial = cost.pricedIngredients < cost.measuredIngredients
+    ? ` · ${t('cost_partial', {priced: cost.pricedIngredients, measured: cost.measuredIngredients})}`
+    : ''
+  return t('cost_source') + partial
+})
 
 const recipe = ref<object>({
   steps: [],

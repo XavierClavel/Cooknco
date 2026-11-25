@@ -231,9 +231,23 @@ suspend fun HttpClient.deleteRecipeAsAdminRaw(id: Long) = this.delete("$ADMIN_UR
 
 // ----------------------------------------------------------------- ingredients
 
-suspend fun HttpClient.listAdminIngredients(query: String? = null): SearchResult<AdminIngredientInfo> =
+suspend fun HttpClient.listAdminIngredients(
+    query: String? = null,
+    missingCiqual: Boolean = false,
+    missingPrice: Boolean = false,
+    mostUsed: Boolean = false,
+    size: Int? = null,
+    page: Int? = null,
+): SearchResult<AdminIngredientInfo> =
     this.get("$ADMIN_URL/ingredients") {
-        url { query?.let { parameters.append("query", it) } }
+        url {
+            query?.let { parameters.append("query", it) }
+            if (missingCiqual) parameters.append("missingCiqual", "true")
+            if (missingPrice) parameters.append("missingPrice", "true")
+            if (mostUsed) parameters.append("mostUsed", "true")
+            size?.let { parameters.append("size", it.toString()) }
+            page?.let { parameters.append("page", it.toString()) }
+        }
     }.let {
         assertEquals(HttpStatusCode.OK, it.status)
         json.decodeFromString<SearchResult<AdminIngredientInfo>>(it.bodyAsText())

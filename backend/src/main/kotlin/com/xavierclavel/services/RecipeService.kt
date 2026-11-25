@@ -38,6 +38,7 @@ class RecipeService: KoinComponent {
     val userService: UserService by inject()
     val likeService: LikeService by inject()
     val ingredientService: IngredientService by inject()
+    val openPricesService: OpenPricesService by inject()
 
     fun countAll() =
         QRecipe().findCount()
@@ -273,7 +274,14 @@ class RecipeService: KoinComponent {
             recipes.flatMap { recipe -> recipe.ingredients.mapNotNull { it.ingredient?.id } }.toSet(),
             locale,
         )
-        return recipes.map { it.toInfo(locale, likesCount = likes[it.id] ?: 0, catalogueNames = catalogueNames) }
+        return recipes.map {
+            it.toInfo(
+                locale,
+                likesCount = likes[it.id] ?: 0,
+                catalogueNames = catalogueNames,
+                cost = openPricesService.estimate(it.ingredients, it.yield),
+            )
+        }
     }
 
     fun getById(userId: Long?, recipeId: Long, locale: Locale) : RecipeInfo {
